@@ -18,8 +18,8 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 ## Screenshots
 
 <div align="center">
-<a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Default four-player board with seats facing opposite ends of the table" /></a>
-<a href="screenshots/eight-players.png"><img src="screenshots/eight-players.png" width="180" alt="Default eight-player board with four seats facing each end of the table" /></a>
+<a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Four-player portrait board with two seats facing each long side" /></a>
+<a href="screenshots/eight-players.png"><img src="screenshots/eight-players.png" width="180" alt="Eight-player portrait board with four seats facing each long side" /></a>
 <a href="screenshots/setup.png"><img src="screenshots/setup.png" width="180" alt="Setup for player count, starting life, screen awake, and seat rotation" /></a>
 <br />
 <sub>Four players · Eight players · Setup</sub>
@@ -35,7 +35,7 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 ## At the table
 
-Set the phone in the middle of the table. Players in the same row read their totals from the same direction, with **−** and **+** on either side. A seat that fills a side of the board in landscape faces that side. The board fills the screen, and one seat spans two slots when there are 3, 5, or 7 players.
+Set the phone in the middle of the table. With four or eight players, seats face the phone’s two long sides, with **−** and **+** on either side of each total. With three, five, or seven players, one seat spans two slots so the board still fills the screen.
 
 Tap the sliders in the center to choose 2–8 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
 

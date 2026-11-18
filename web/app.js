@@ -20,11 +20,11 @@ const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
 const seatEdges = {
   2: [['top', 'bottom'], ['left', 'right']],
   3: [['top', 'top', 'bottom'], ['top', 'bottom', 'right']],
-  4: [['top', 'top', 'bottom', 'bottom'], ['top', 'top', 'bottom', 'bottom']],
+  4: [['left', 'left', 'right', 'right'], ['top', 'top', 'bottom', 'bottom']],
   5: [['top', 'top', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'bottom', 'bottom', 'right']],
   6: [['top', 'top', 'bottom', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'top', 'bottom', 'bottom', 'bottom']],
   7: [['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'right']],
-  8: [['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'bottom']],
+  8: [['left', 'left', 'left', 'left', 'right', 'right', 'right', 'right'], ['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'bottom']],
 };
 
 let game = loadGame();

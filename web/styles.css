@@ -39,6 +39,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .board:where([data-count="5"], [data-count="6"]) { --rows: 3; }
 .board:where([data-count="7"], [data-count="8"]) { --rows: 4; }
 .board:where([data-count="3"], [data-count="5"], [data-count="7"]) .player:last-child { grid-column: 1 / -1; }
+.board[data-landscape="false"]:where([data-count="4"], [data-count="8"]) { grid-auto-flow: column; }
 
 .board[data-landscape="true"] { --rows: 2; }
 .board[data-landscape="true"][data-count="2"] { --columns: 2; --rows: 1; }
