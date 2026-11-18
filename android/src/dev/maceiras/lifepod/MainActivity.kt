@@ -1,4 +1,4 @@
-package com.tabletop.lifepod
+package dev.maceiras.lifepod
 
 import android.app.Activity
 import android.graphics.Color
@@ -80,9 +80,7 @@ class MainActivity : Activity() {
         private val preferences = getSharedPreferences("lifepod", MODE_PRIVATE)
 
         @JavascriptInterface
-        fun readGame(): String? =
-            preferences.getString(GAME_KEY, null)
-                ?: getSharedPreferences("life-pad", MODE_PRIVATE).getString(GAME_KEY, null)
+        fun readGame(): String? = preferences.getString(GAME_KEY, null)
 
         @JavascriptInterface
         fun writeGame(game: String) {

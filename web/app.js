@@ -1,7 +1,6 @@
 'use strict';
 
 const storageKey = 'lifepod-game';
-const legacyStorageKey = 'life-pad-game';
 const android = window.LifePodAndroid;
 const ios = window.webkit?.messageHandlers;
 const board = document.querySelector('#board');
@@ -39,8 +38,7 @@ let rotatingSeats = false;
 function loadGame() {
   const defaults = { startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true };
   try {
-    const snapshot = android ? android.readGame() : ios ? window.initialGame :
-      localStorage.getItem(storageKey) ?? localStorage.getItem(legacyStorageKey);
+    const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
     const saved = JSON.parse(snapshot);
     if (!saved || !Array.isArray(saved.scores) || saved.scores.length < 2 || saved.scores.length > 8 ||
         !saved.scores.every(Number.isSafeInteger) || !Number.isSafeInteger(saved.startingLife) || saved.startingLife < 1) {

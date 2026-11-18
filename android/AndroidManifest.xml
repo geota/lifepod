@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.tabletop.lifepad" android:versionCode="1" android:versionName="1.0">
+    package="dev.maceiras.lifepod" android:versionCode="1" android:versionName="1.0">
     <application android:label="LifePod" android:icon="@mipmap/ic_launcher"
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:enableOnBackInvokedCallback="false">
-        <activity android:name="com.tabletop.lifepod.MainActivity" android:exported="true"
+        <activity android:name=".MainActivity" android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -12,7 +12,5 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity-alias android:name=".MainActivity" android:exported="true"
-            android:targetActivity="com.tabletop.lifepod.MainActivity" />
     </application>
 </manifest>

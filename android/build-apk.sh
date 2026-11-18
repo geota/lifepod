@@ -37,7 +37,7 @@ mkdir -p "$work/dex"
     -o "$work/unsigned.apk" "$work/resources.zip"
 "$kotlin_compiler" -kotlin-home "$kotlin_dir" -jvm-target 11 -no-reflect \
     -classpath "$android_jar:$kotlin_stdlib" -include-runtime \
-    -d "$work/classes.jar" "$android_dir/src/com/tabletop/lifepod/MainActivity.kt"
+    -d "$work/classes.jar" "$android_dir/src/dev/maceiras/lifepod/MainActivity.kt"
 "$build_tools/d8" --lib "$android_jar" --min-api 30 --output "$work/dex" "$work/classes.jar"
 zip -q -j "$work/unsigned.apk" "$work/dex/"classes*.dex
 "$build_tools/zipalign" -f 4 "$work/unsigned.apk" "$work/aligned.apk"
