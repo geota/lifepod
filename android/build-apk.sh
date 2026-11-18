@@ -33,6 +33,7 @@ mkdir -p "$work/dex"
 
 "$build_tools/aapt2" compile --dir "$android_dir/res" -o "$work/resources.zip"
 "$build_tools/aapt2" link -I "$android_jar" --manifest "$android_dir/AndroidManifest.xml" \
+    --version-code "${LIFE_POD_VERSION_CODE:-1}" --version-name "${LIFE_POD_VERSION_NAME:-1.0}" \
     --min-sdk-version 30 --target-sdk-version 36 -A "$android_dir/../web" \
     -o "$work/unsigned.apk" "$work/resources.zip"
 "$kotlin_compiler" -kotlin-home "$kotlin_dir" -jvm-target 11 -no-reflect \
@@ -43,11 +44,19 @@ zip -q -j "$work/unsigned.apk" "$work/dex/"classes*.dex
 "$build_tools/zipalign" -f 4 "$work/unsigned.apk" "$work/aligned.apk"
 
 keystore="$output/debug.keystore"
-if [[ ! -f "$keystore" ]]; then
+keystore_password=pass:android
+apk="$output/lifepod-debug.apk"
+if [[ -n "${LIFE_POD_KEYSTORE:-}" ]]; then
+    : "${LIFE_POD_KEYSTORE_PASSWORD:?Set the Android release keystore password.}"
+    keystore="$LIFE_POD_KEYSTORE"
+    keystore_password=env:LIFE_POD_KEYSTORE_PASSWORD
+    apk="$output/lifepod.apk"
+elif [[ ! -f "$keystore" ]]; then
     keytool -genkeypair -storetype PKCS12 -keystore "$keystore" -storepass android \
         -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
         -validity 10000 -dname 'CN=Android Debug,O=Android,C=US'
 fi
-"$build_tools/apksigner" sign --ks "$keystore" --ks-pass pass:android --v4-signing-enabled false \
-    --out "$output/lifepod-debug.apk" "$work/aligned.apk"
-echo "$output/lifepod-debug.apk"
+"$build_tools/apksigner" sign --ks "$keystore" --ks-pass "$keystore_password" \
+    --key-pass "$keystore_password" --v4-signing-enabled false \
+    --out "$apk" "$work/aligned.apk"
+echo "$apk"

@@ -1,6 +1,34 @@
+<div align="center">
+
+<img src="web/icon.png" alt="LifePod icon" width="96" height="96" />
+
 # LifePod
 
-An ad-free, offline life counter for tabletop games. A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change.
+**An ad-free, offline life counter for tabletop games.**
+
+[![CI](https://github.com/geota/lifepod/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/geota/lifepod/actions/workflows/ci.yml)
+[![Android: Kotlin](https://img.shields.io/badge/Android-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android/)
+[![iOS: Swift](https://img.shields.io/badge/iOS-Swift-F05138?logo=swift&logoColor=white)](ios/)
+[![Web: JavaScript](https://img.shields.io/badge/Web-JavaScript-F7DF1E?logo=javascript&logoColor=333333)](web/)
+
+</div>
+
+A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change.
+
+## Screenshots
+
+<div align="center">
+<a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Default four-player board with seats facing opposite ends of the table" /></a>
+<a href="screenshots/five-players.png"><img src="screenshots/five-players.png" width="180" alt="Five-player board with one seat spanning two slots" /></a>
+<a href="screenshots/eight-players.png"><img src="screenshots/eight-players.png" width="180" alt="Eight-player board mid-game" /></a>
+<a href="screenshots/setup.png"><img src="screenshots/setup.png" width="180" alt="Setup for player count, starting life, screen awake, and seat rotation" /></a>
+<br />
+<sub>Four players · Five players · Eight players · Setup</sub>
+</div>
+
+[Landscape layout](screenshots/five-players-landscape.png) · [Seat rotation](screenshots/rotate-seats.png)
+
+## At the table
 
 Set the phone in the middle of the table. Players in the same row read their totals from the same direction, with **−** and **+** on either side. A seat that fills a side of the board in landscape faces that side. The board fills the screen, and one seat spans two slots when there are 3, 5, or 7 players.
 
@@ -8,7 +36,16 @@ Tap the sliders in the center to choose 2–8 players, set the starting life, re
 
 Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark when finished. Rotation choices carry over when restarting with the same player count.
 
-## Android
+## Install on Android
+
+<p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.maceiras.lifepod%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fgeota%2Flifepod%22%2C%22author%22%3A%22geota%22%2C%22name%22%3A%22LifePod%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%7D%22%7D"><img alt="Get it on Obtainium" height="56" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" /></a>
+  <a href="https://github.com/geota/lifepod/releases"><img alt="Get it on GitHub" height="56" src="https://raw.githubusercontent.com/andOTP/andOTP/master/assets/badges/get-it-on-github.png" /></a>
+</p>
+
+LifePod supports **Android 11 and later**. The Obtainium badge imports `dev.maceiras.lifepod` with **Include prereleases** enabled. You can also add `https://github.com/geota/lifepod` manually in [Obtainium](https://github.com/ImranR98/Obtainium/releases) and enable **Include prereleases**. Install `lifepod.apk` from a signed prerelease, then follow updates in Obtainium.
+
+### Build locally
 
 The debug APK is built at `android/build/lifepod-debug.apk`. Copy it to an Android 11 or newer phone and open it to install. With a device connected and USB debugging enabled, you can also install it using `adb install -r android/build/lifepod-debug.apk`.
 
@@ -34,11 +71,23 @@ Install ktlint and select full Xcode for `swift-format`. Then run `npm ci` and `
 
 [CI](.github/workflows/ci.yml) runs lint and builds for pull requests and pushes to `main`. Each successful run produces a static web ZIP, a debug-signed Android APK, and an iOS Simulator ZIP. CI also compiles the iPhone target with signing disabled.
 
-To publish a preview from a tested commit, push a version tag. GitHub Actions builds the tag and attaches all three files to a GitHub prerelease.
+### Publish a signed alpha
+
+Create a PKCS#12 signing keystore once and back it up. Use the same keystore for every release so Android can install upgrades in place.
 
 ```sh
-git tag v1.0.0
-git push origin v1.0.0
+mkdir -p "$HOME/.config/lifepod"
+keytool -genkeypair -storetype PKCS12 -keystore "$HOME/.config/lifepod/lifepod-release.p12" \
+  -alias lifepod -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=LifePod'
+base64 < "$HOME/.config/lifepod/lifepod-release.p12" | gh secret set ANDROID_KEYSTORE_BASE64 --repo geota/lifepod
+gh secret set ANDROID_KEYSTORE_PASSWORD --repo geota/lifepod
 ```
 
-The Android preview uses a fresh debug signing key per build. Installing these APKs as updates requires a shared signing key. The iOS ZIP is for Simulator, and physical devices require an Xcode build with your development team selected.
+Enter the keystore password when `gh secret set ANDROID_KEYSTORE_PASSWORD` prompts for it. Push a version tag from a tested commit to publish the signed APK, iOS Simulator ZIP, and offline web ZIP as a GitHub prerelease.
+
+```sh
+git tag v0.1.0-alpha.1
+git push origin v0.1.0-alpha.1
+```
+
+Each tagged APK uses the tag for its Android version name and the workflow run number for its version code. A first signed alpha requires a fresh install if you previously used a debug build. The iOS ZIP is for Simulator, and physical devices require an Xcode build with your development team selected.

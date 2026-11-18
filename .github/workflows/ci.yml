@@ -71,13 +71,41 @@ jobs:
           chmod +x ktlint
           printf '%s\n' "$RUNNER_TEMP/kotlinc/bin" "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: ktlint 'android/src/**/*.kt'
-      - run: ./android/build-apk.sh
+      - name: Build Android APK
+        id: apk
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && github.ref_type == 'tag' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && github.ref_type == 'tag' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+        run: |
+          apk=android/build/lifepod-debug.apk
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then
+            if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+              echo '::error::Use a version tag such as v0.1.0-alpha.1.'
+              exit 1
+            fi
+            if [[ -z "$ANDROID_KEYSTORE_BASE64" || -z "$ANDROID_KEYSTORE_PASSWORD" ]]; then
+              echo '::error::Set the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets before publishing an Android release.'
+              exit 1
+            fi
+            LIFE_POD_KEYSTORE=$(mktemp "$RUNNER_TEMP/lifepod-signing.XXXXXXXX")
+            trap 'rm -f "$LIFE_POD_KEYSTORE"' EXIT
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$LIFE_POD_KEYSTORE"
+            export LIFE_POD_KEYSTORE
+            export LIFE_POD_KEYSTORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
+            export LIFE_POD_VERSION_CODE="$GITHUB_RUN_NUMBER"
+            export LIFE_POD_VERSION_NAME="${GITHUB_REF_NAME#v}"
+            apk=android/build/lifepod.apk
+          fi
+          ./android/build-apk.sh
+          printf 'path=%s\n' "$apk" >> "$GITHUB_OUTPUT"
       - name: Verify APK signature
-        run: '"$ANDROID_HOME/build-tools/36.1.0/apksigner" verify android/build/lifepod-debug.apk'
+        env:
+          APK: ${{ steps.apk.outputs.path }}
+        run: '"$ANDROID_HOME/build-tools/36.1.0/apksigner" verify "$APK"'
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: lifepod-android
-          path: android/build/lifepod-debug.apk
+          path: ${{ steps.apk.outputs.path }}
           if-no-files-found: error
 
   ios:
@@ -127,11 +155,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo '::error::Use a version tag such as v1.0.0 or v1.0.0-beta.1.'
-            exit 1
-          fi
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "LifePod $GITHUB_REF_NAME" --verify-tag --prerelease --generate-notes \
-            --notes 'Offline web bundle, debug-signed Android APK, and iOS Simulator app for preview testing.' \
-            assets/lifepod-web.zip assets/lifepod-debug.apk assets/lifepod-ios-simulator.zip
+            --notes 'Signed Android APK for Obtainium, iOS Simulator app, and offline web bundle.' \
+            assets/lifepod.apk assets/lifepod-ios-simulator.zip assets/lifepod-web.zip
