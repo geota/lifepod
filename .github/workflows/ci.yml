@@ -1,0 +1,134 @@
+name: LifePod CI and previews
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lifepod-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  web:
+    name: Web lint and bundle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run lint:web
+      - name: Bundle offline web app
+        working-directory: web
+        run: zip "$RUNNER_TEMP/lifepod-web.zip" index.html app.js styles.css icon.png
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: lifepod-web
+          path: ${{ runner.temp }}/lifepod-web.zip
+          if-no-files-found: error
+
+  android:
+    name: Android lint and APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK packages
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.1.0'
+      - name: Install Kotlin 2.2.21 and ktlint 1.8.0
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.2.21/kotlin-compiler-2.2.21.zip
+          curl --fail --location --retry 3 --silent --show-error \
+            -o ktlint https://github.com/ktlint/ktlint/releases/download/1.8.0/ktlint
+          sha256sum --check <<'CHECKSUMS'
+          a623871f1cd9c938946948b70ef9170879f0758043885bbd30c32f024e511714  kotlin.zip
+          a3fd620207d5c40da6ca789b95e7f823c54e854b7fade7f613e91096a3706d75  ktlint
+          CHECKSUMS
+          unzip -q kotlin.zip
+          chmod +x ktlint
+          printf '%s\n' "$RUNNER_TEMP/kotlinc/bin" "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - run: ktlint 'android/src/**/*.kt'
+      - run: ./android/build-apk.sh
+      - name: Verify APK signature
+        run: '"$ANDROID_HOME/build-tools/36.1.0/apksigner" verify android/build/lifepod-debug.apk'
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: lifepod-android
+          path: android/build/lifepod-debug.apk
+          if-no-files-found: error
+
+  ios:
+    name: iOS lint and builds
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - run: xcrun swift-format lint --strict ios/LifePodApp.swift
+      - name: Build for iOS Simulator
+        run: |
+          xcodebuild -project ios/LifePod.xcodeproj -scheme LifePod -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/build/Simulator \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Build for iPhone
+        run: |
+          xcodebuild -project ios/LifePod.xcodeproj -scheme LifePod -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath ios/build/Device \
+            CODE_SIGNING_ALLOWED=NO build
+      - name: Bundle simulator app
+        run: |
+          ditto -c -k --keepParent ios/build/Simulator/Build/Products/Debug-iphonesimulator/LifePod.app \
+            "$RUNNER_TEMP/lifepod-ios-simulator.zip"
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: lifepod-ios-simulator
+          path: ${{ runner.temp }}/lifepod-ios-simulator.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub prerelease
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [web, android, ios]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          pattern: lifepod-*
+          path: assets
+          merge-multiple: true
+      - name: Publish preview assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo '::error::Use a version tag such as v1.0.0 or v1.0.0-beta.1.'
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "LifePod $GITHUB_REF_NAME" --verify-tag --prerelease --generate-notes \
+            --notes 'Offline web bundle, debug-signed Android APK, and iOS Simulator app for preview testing.' \
+            assets/lifepod-web.zip assets/lifepod-debug.apk assets/lifepod-ios-simulator.zip

@@ -1,0 +1,120 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+		A23000000000000000000001 /* LifePodApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A23000000000000000000005 /* LifePodApp.swift */; };
+		A23000000000000000000002 /* web in Resources */ = {isa = PBXBuildFile; fileRef = A23000000000000000000006 /* web */; };
+		A23000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A23000000000000000000007 /* Assets.xcassets */; };
+		A23000000000000000000004 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A23000000000000000000008 /* PrivacyInfo.xcprivacy */; };
+		A23000000000000000000005 /* LifePodApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LifePodApp.swift; sourceTree = "<group>"; };
+		A23000000000000000000006 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = ../web; sourceTree = "<group>"; };
+		A23000000000000000000007 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A23000000000000000000008 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		A23000000000000000000009 /* LifePod.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LifePod.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A23000000000000000000010 = {
+			isa = PBXGroup;
+			children = (
+				A23000000000000000000005 /* LifePodApp.swift */,
+				A23000000000000000000007 /* Assets.xcassets */,
+				A23000000000000000000008 /* PrivacyInfo.xcprivacy */,
+				A23000000000000000000023 /* App.xcconfig */,
+				A23000000000000000000024 /* Info.plist */,
+				A23000000000000000000006 /* web */,
+				A23000000000000000000011 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A23000000000000000000011 /* Products */ = {
+			isa = PBXGroup;
+			children = (A23000000000000000000009 /* LifePod.app */,);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A23000000000000000000012 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (A23000000000000000000001 /* LifePodApp.swift in Sources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A23000000000000000000013 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A23000000000000000000014 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A23000000000000000000002 /* web in Resources */,
+				A23000000000000000000003 /* Assets.xcassets in Resources */,
+				A23000000000000000000004 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A23000000000000000000015 /* LifePod */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A23000000000000000000018;
+			buildPhases = (A23000000000000000000012, A23000000000000000000013, A23000000000000000000014);
+			buildRules = ();
+			dependencies = ();
+			name = LifePod;
+			productName = LifePod;
+			productReference = A23000000000000000000009;
+			productType = "com.apple.product-type.application";
+		};
+		A23000000000000000000016 /* Project object */ = {
+			isa = PBXProject;
+			attributes = { LastUpgradeCheck = 1600; };
+			buildConfigurationList = A23000000000000000000017;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, Base);
+			mainGroup = A23000000000000000000010;
+			productRefGroup = A23000000000000000000011;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (A23000000000000000000015,);
+		};
+		A23000000000000000000017 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A23000000000000000000019, A23000000000000000000020);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A23000000000000000000018 = {
+			isa = XCConfigurationList;
+			buildConfigurations = (A23000000000000000000021, A23000000000000000000022);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A23000000000000000000019 /* Project Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; };
+			name = Debug;
+		};
+		A23000000000000000000020 /* Project Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; SWIFT_COMPILATION_MODE = wholemodule; };
+			name = Release;
+		};
+		A23000000000000000000021 /* App Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A23000000000000000000023;
+			buildSettings = {};
+			name = Debug;
+		};
+		A23000000000000000000022 /* App Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A23000000000000000000023;
+			buildSettings = {};
+			name = Release;
+		};
+		A23000000000000000000023 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+		A23000000000000000000024 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+	};
+	rootObject = A23000000000000000000016 /* Project object */;
+}

@@ -1,0 +1,9 @@
+/android/build/
+/ios/build/
+/node_modules/
+xcuserdata/
+.DS_Store
+*.keystore
+*.jks
+*.p12
+*.mobileprovision

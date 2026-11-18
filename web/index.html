@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141916">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
+  <title>LifePod</title>
+  <link rel="icon" href="icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="app" aria-label="LifePod">
+    <section class="board" id="board" aria-label="Player life totals"></section>
+    <button class="setup-button" type="button" id="setup-button" aria-label="Game setup" aria-haspopup="dialog">
+      <span class="setup-icon" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span class="rotation-done" aria-hidden="true" hidden>✓</span>
+    </button>
+  </main>
+
+  <template id="player-template">
+    <section class="player">
+      <div class="player-face">
+        <div class="controls">
+          <button type="button" class="subtract">−</button>
+          <output class="score" aria-live="polite"></output>
+          <button type="button" class="add">+</button>
+        </div>
+      </div>
+      <button class="rotate-seat" type="button" hidden><span aria-hidden="true">↻</span></button>
+    </section>
+  </template>
+
+  <dialog id="setup" aria-labelledby="setup-title">
+    <form class="sheet" id="setup-form" novalidate>
+      <div class="sheet-header">
+        <h2 id="setup-title">Game setup</h2>
+        <button class="close" type="button" data-close aria-label="Close setup" autofocus>×</button>
+      </div>
+      <fieldset>
+        <legend>Players</legend>
+        <div class="choices" id="player-choices"></div>
+      </fieldset>
+      <div class="life-setting">
+        <label for="starting-life">Starting life</label>
+        <div class="starting-life-row">
+          <div class="choices" id="life-presets" aria-label="Starting life presets">
+            <button type="button" data-life="20">20</button>
+            <button type="button" data-life="30">30</button>
+            <button type="button" data-life="40">40</button>
+          </div>
+          <input type="text" id="starting-life" inputmode="numeric" pattern="[0-9]+" required autocomplete="off">
+        </div>
+        <p class="field-error" id="life-error" hidden>Enter a positive whole number.</p>
+      </div>
+      <div class="setup-options">
+        <label class="wake-setting">
+          <input type="checkbox" id="keep-awake" role="switch">
+          <span class="switch" aria-hidden="true"></span>
+          <span>Keep awake</span>
+        </label>
+        <button class="secondary" id="rotate-seats" type="button">Rotate seats</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="secondary" type="button" id="restart-button">New game</button>
+        <button class="primary" type="submit" id="save-setup">Done</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="restart" aria-labelledby="restart-title" aria-describedby="restart-message">
+    <form class="sheet" method="dialog">
+      <div class="sheet-header">
+        <h2 id="restart-title">Start a new game?</h2>
+        <button class="close" type="submit" value="cancel" aria-label="Cancel new game" autofocus>×</button>
+      </div>
+      <p id="restart-message"></p>
+      <button class="primary" type="submit" value="restart">Start new game</button>
+    </form>
+  </dialog>
+</body>
+</html>
