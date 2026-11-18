@@ -51,8 +51,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Install Android SDK packages
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.1.0'
+      - name: Ensure Android SDK packages are available
+        run: |
+          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -x "$ANDROID_HOME/build-tools/36.1.0/aapt2" ]]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.1.0'
+          fi
       - name: Install Kotlin 2.2.21 and ktlint 1.8.0
         working-directory: ${{ runner.temp }}
         run: |
