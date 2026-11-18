@@ -19,14 +19,19 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 <div align="center">
 <a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Default four-player board with seats facing opposite ends of the table" /></a>
-<a href="screenshots/five-players.png"><img src="screenshots/five-players.png" width="180" alt="Five-player board with one seat spanning two slots" /></a>
-<a href="screenshots/eight-players.png"><img src="screenshots/eight-players.png" width="180" alt="Eight-player board mid-game" /></a>
+<a href="screenshots/eight-players.png"><img src="screenshots/eight-players.png" width="180" alt="Default eight-player board with four seats facing each end of the table" /></a>
 <a href="screenshots/setup.png"><img src="screenshots/setup.png" width="180" alt="Setup for player count, starting life, screen awake, and seat rotation" /></a>
 <br />
-<sub>Four players · Five players · Eight players · Setup</sub>
+<sub>Four players · Eight players · Setup</sub>
 </div>
 
-[Landscape layout](screenshots/five-players-landscape.png) · [Seat rotation](screenshots/rotate-seats.png)
+<div align="center">
+<a href="screenshots/five-players-landscape.png"><img src="screenshots/five-players-landscape.png" width="548" alt="Five-player landscape with green and blue facing the far edge, red and purple facing the near edge, and yellow facing the right edge" /></a>
+<br />
+<sub>Five players in landscape</sub>
+</div>
+
+[Five-player portrait](screenshots/five-players.png) · [Custom seat rotation](screenshots/rotate-seats.png)
 
 ## At the table
 
