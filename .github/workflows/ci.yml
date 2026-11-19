@@ -246,3 +246,47 @@ jobs:
           releaseName: ${{ github.ref_name }}
           track: ${{ vars.PLAY_TRACK || 'internal' }}
           status: ${{ vars.PLAY_RELEASE_STATUS || 'draft' }}
+
+  testflight:
+    name: Upload to TestFlight
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: [web, android, ios]
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - name: Check for the App Store Connect key
+        id: key
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ vars.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          if [[ -z "$APP_STORE_CONNECT_API_KEY" || -z "$APPLE_TEAM_ID" || -z "$APP_STORE_CONNECT_KEY_ID" || -z "$APP_STORE_CONNECT_ISSUER_ID" ]]; then
+            echo '::notice::Set the APP_STORE_CONNECT_API_KEY secret and the APPLE_TEAM_ID, APP_STORE_CONNECT_KEY_ID, and APP_STORE_CONNECT_ISSUER_ID variables to upload tagged releases to TestFlight.'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.key.outputs.ready == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      # App Store versions are numbers only, so v0.1.0-alpha.3 uploads as version 0.1.0 with the run number as
+      # its build number.
+      - name: Archive and upload
+        if: steps.key.outputs.ready == 'true'
+        env:
+          APP_STORE_CONNECT_API_KEY: ${{ secrets.APP_STORE_CONNECT_API_KEY }}
+          APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
+          APP_STORE_CONNECT_KEY_ID: ${{ vars.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ vars.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          key=$(mktemp "$RUNNER_TEMP/AuthKey.XXXXXXXX")
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$APP_STORE_CONNECT_API_KEY" > "$key"
+          version="${GITHUB_REF_NAME#v}"
+          export APP_STORE_CONNECT_KEY_PATH="$key"
+          export LIFE_POD_VERSION_NAME="${version%%-*}"
+          export LIFE_POD_BUILD_NUMBER="$GITHUB_RUN_NUMBER"
+          ./ios/upload-testflight.sh

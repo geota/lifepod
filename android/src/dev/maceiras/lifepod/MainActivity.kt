@@ -4,6 +4,7 @@ import android.app.Activity
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
+import android.view.HapticFeedbackConstants
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
@@ -117,6 +118,11 @@ class MainActivity : Activity() {
                 val flag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                 if (enabled) window.addFlags(flag) else window.clearFlags(flag)
             }
+        }
+
+        @JavascriptInterface
+        fun haptic() {
+            runOnUiThread { webView.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK) }
         }
 
         @JavascriptInterface

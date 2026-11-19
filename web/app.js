@@ -212,6 +212,13 @@ function bindCounter(button, adjust, label) {
   });
 }
 
+// A light tick for each counted change. Phones follow their own system haptics settings.
+function haptic() {
+  if (android) android.haptic?.();
+  else if (ios) ios.haptic?.postMessage(null);
+  else navigator.vibrate?.(8);
+}
+
 // Announce totals once a burst of changes settles, instead of on every step of a hold.
 function announceLife(index) {
   pendingAnnouncements.add(index);
@@ -280,6 +287,7 @@ function renderBoard() {
       game.scores[index] = next;
       renderScore();
       if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
+      haptic();
       announceLife(index);
       saveGame();
     }

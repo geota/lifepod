@@ -152,4 +152,47 @@ gh variable set PLAY_TRACK --body production --repo geota/lifepod
 
 ## App Store
 
-`store/app-store/` has 6.9-inch iPhone and 13-inch iPad screenshots. App Store publishing is not set up yet.
+Each version tag also uploads the iOS app to App Store Connect for TestFlight once the key below is set. App Store versions are numbers only, so `v0.1.0-alpha.3` uploads as version 0.1.0, with the workflow run number as its build number.
+
+### One-time setup
+
+1. In [App Store Connect](https://appstoreconnect.apple.com), create the app: platform iOS, name **LifePod: Life Counter**, bundle ID `dev.maceiras.lifepod`, SKU `lifepod`.
+2. Under **Users and Access → Integrations → Team Keys**, create a key with the **Admin** role. Xcode's automatic signing needs it to create the distribution certificate. Download `AuthKey_<KEY ID>.p8` (Apple only offers it once) and note the key ID and the issuer ID shown above the list.
+3. Find your team ID under **Membership details** at <https://developer.apple.com/account>.
+
+Store the key in `pass` and give CI the key and IDs (replace the placeholders):
+
+```sh
+pass insert -m dev/lifepod/app-store-connect-api-key.p8 < ~/Downloads/AuthKey_KEYID.p8
+rm ~/Downloads/AuthKey_KEYID.p8
+pass git push
+pass show dev/lifepod/app-store-connect-api-key.p8 | gh secret set APP_STORE_CONNECT_API_KEY --repo geota/lifepod
+gh variable set APPLE_TEAM_ID --body TEAMID --repo geota/lifepod
+gh variable set APP_STORE_CONNECT_KEY_ID --body KEYID --repo geota/lifepod
+gh variable set APP_STORE_CONNECT_ISSUER_ID --body ISSUER-UUID --repo geota/lifepod
+```
+
+The team, key, and issuer IDs aren't secret, so they're repository variables. Only the `.p8` key is a secret.
+
+### Upload from this Mac
+
+CI uploads on every tag. To upload from this Mac instead:
+
+```sh
+key=$(mktemp)
+pass show dev/lifepod/app-store-connect-api-key.p8 > "$key"
+APPLE_TEAM_ID=TEAMID APP_STORE_CONNECT_KEY_ID=KEYID APP_STORE_CONNECT_ISSUER_ID=ISSUER-UUID \
+APP_STORE_CONNECT_KEY_PATH="$key" LIFE_POD_VERSION_NAME=0.1.0 LIFE_POD_BUILD_NUMBER=1 \
+  ./ios/upload-testflight.sh
+rm -f "$key"
+```
+
+Each upload needs a higher build number than the last.
+
+### Store listing
+
+- Screenshots: `store/app-store/` has 6.9-inch iPhone and 13-inch iPad sets.
+- Privacy policy: <https://github.com/geota/lifepod/blob/main/PRIVACY.md>. Privacy label: Data Not Collected.
+- Support URL: <https://github.com/geota/lifepod/issues>
+- Age rating: 4+. Price: free.
+- Review notes: "LifePod is an offline life counter for tabletop games. It needs no account or network connection; everything is available from launch."

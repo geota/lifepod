@@ -32,6 +32,7 @@ private struct TrackerView: UIViewRepresentable {
         let controller = config.userContentController
         controller.add(context.coordinator, name: "game")
         controller.add(context.coordinator, name: "keepAwake")
+        controller.add(context.coordinator, name: "haptic")
 
         let view = WKWebView(frame: .zero, configuration: config)
         view.navigationDelegate = context.coordinator
@@ -53,6 +54,7 @@ private struct TrackerView: UIViewRepresentable {
         let controller = view.configuration.userContentController
         controller.removeScriptMessageHandler(forName: "game")
         controller.removeScriptMessageHandler(forName: "keepAwake")
+        controller.removeScriptMessageHandler(forName: "haptic")
     }
 
     @MainActor
@@ -60,6 +62,7 @@ private struct TrackerView: UIViewRepresentable {
         let startPage = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web")
         private var isActive = false
         private var keepAwake = true
+        private let haptics = UISelectionFeedbackGenerator()
 
         func setActive(_ active: Bool) {
             isActive = active
@@ -86,6 +89,8 @@ private struct TrackerView: UIViewRepresentable {
             case ("keepAwake", let enabled as Bool):
                 keepAwake = enabled
                 updateIdleTimer()
+            case ("haptic", _):
+                haptics.selectionChanged()
             default:
                 break
             }
