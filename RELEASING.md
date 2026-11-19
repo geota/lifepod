@@ -68,7 +68,9 @@ Push a version tag from a tested commit on `main`:
 ```sh
 git tag -m 'LifePod 0.1.0-alpha.1' v0.1.0-alpha.1   # signed when tag.gpgsign is on
 git push origin v0.1.0-alpha.1
-gh run watch --repo geota/lifepod
+sleep 10   # give GitHub a moment to start the run
+gh run watch --repo geota/lifepod --exit-status \
+  "$(gh run list --repo geota/lifepod --branch v0.1.0-alpha.1 --limit 1 --json databaseId -q '.[0].databaseId')"
 gh release view v0.1.0-alpha.1 --repo geota/lifepod --json assets -q '.assets[].name'
 ```
 
