@@ -30,10 +30,10 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run lint:web
-      - name: Check seat layouts in Chromium and WebKit
+      - name: Check seat layouts in Chromium
         run: |
-          npx playwright-core install --with-deps --only-shell chromium webkit
-          npm test
+          npx playwright-core install --only-shell chromium
+          npm test -- --test-name-pattern=chromium
       - name: Bundle offline web app
         working-directory: web
         run: zip "$RUNNER_TEMP/lifepod-web.zip" index.html app.js styles.css icon.png
@@ -113,13 +113,22 @@ jobs:
           if-no-files-found: error
 
   ios:
-    name: iOS lint and builds
+    name: iOS lint, WebKit seating tests, and builds
     runs-on: macos-26
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Check seat layouts in WebKit
+        run: |
+          npx playwright-core install webkit
+          npm test -- --test-name-pattern=webkit
       - run: xcrun swift-format lint --strict ios/LifePodApp.swift
       - name: Build for iOS Simulator
         run: |
