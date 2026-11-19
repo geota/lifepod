@@ -66,7 +66,7 @@ gh secret list --repo geota/lifepod
 Push a version tag from a tested commit on `main`:
 
 ```sh
-git tag v0.1.0-alpha.1
+git tag -m 'LifePod 0.1.0-alpha.1' v0.1.0-alpha.1   # signed when tag.gpgsign is on
 git push origin v0.1.0-alpha.1
 gh run watch --repo geota/lifepod
 gh release view v0.1.0-alpha.1 --repo geota/lifepod --json assets -q '.assets[].name'
