@@ -171,7 +171,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: var(--button);
   color: var(--seat);
 }
-.controls button:active { background: var(--seat); color: var(--button); }
+.controls button:is(:active, [data-pressed]) { background: var(--seat); color: var(--button); }
+/* Each button's touch area covers its half of the tile: − on the reader's left, + on the right. */
+/* z-index keeps the touch areas above the total while its change animation runs. */
+.controls button::after { position: absolute; z-index: 1; top: 0; bottom: 0; content: ''; }
+.controls .subtract::after { left: 0; right: 50%; }
+.controls .add::after { left: 50%; right: 0; }
 
 .rotate-seat {
   position: absolute;

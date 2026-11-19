@@ -13,7 +13,7 @@
 
 </div>
 
-A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change. Several players can tap or hold their own buttons at the same time.
+A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change. Each button's touch area covers its half of the tile, so a tap anywhere on the left half of your tile subtracts and anywhere on the right half adds. A tap counts as soon as your finger touches the screen, and several players can tap or hold at the same time.
 
 ## Screenshots
 

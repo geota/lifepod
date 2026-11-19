@@ -17,6 +17,7 @@ const lifeError = document.querySelector('#life-error');
 const restart = document.querySelector('#restart');
 const announcer = document.querySelector('#announcer');
 const portraitQuery = window.matchMedia('(orientation: portrait)');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
 const quarterTurns = [0, 90, 180, 270];
 // Landscape rows list seats by facing edge and player number. Repeated seats span cells.
@@ -145,55 +146,66 @@ async function syncWakeLock() {
 }
 
 function cancelPresses() {
-  for (const press of [...activePresses]) press.end(false);
+  for (const press of [...activePresses]) press.end();
 }
 
-// Pointer input is handled on pointerup, because browsers may skip click events while several fingers
-// touch the screen. Clicks still handle keyboards and assistive technology.
+// A press counts the moment a finger lands, so a tap can't be lost to a finger drifting off the button
+// or to Android cancelling touches when several fingers land at once. Holding repeats after a pause.
+// Clicks still handle keyboards and assistive technology.
 function bindCounter(button, adjust, label) {
   button.setAttribute('aria-label', label);
+  const tile = button.closest('.player');
   let press;
   let ignoreClicksUntil = 0;
 
   button.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || press) return;
-    button.setPointerCapture(event.pointerId);
+    if (event.button !== 0) return;
+    // A new touch ends any earlier press on this button, even if that press never got its pointerup.
+    press?.end();
     const current = {
       pointerId: event.pointerId,
-      repeated: false,
-      end(apply) {
+      end() {
         clearTimeout(current.timer);
         activePresses.delete(current);
-        if (press === current) press = undefined;
-        if (apply && !current.repeated) adjust();
+        if (press !== current) return;
+        press = undefined;
+        delete button.dataset.pressed;
       },
     };
     function repeat() {
-      current.repeated = true;
       adjust();
       current.timer = setTimeout(repeat, 100);
     }
-    current.timer = setTimeout(repeat, 420);
     press = current;
     activePresses.add(current);
+    button.dataset.pressed = '';
+    ignoreClicksUntil = performance.now() + 800;
+    adjust();
+    current.timer = setTimeout(repeat, 500);
+    try {
+      button.setPointerCapture(event.pointerId);
+    } catch {
+      // The pointer is already gone. The press still counted, and the next touch ends it.
+    }
   });
+  // A hold stops when the finger leaves the player's tile.
   button.addEventListener('pointermove', (event) => {
     if (event.pointerId !== press?.pointerId) return;
-    const bounds = button.getBoundingClientRect();
+    const bounds = tile.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right ||
         event.clientY < bounds.top || event.clientY > bounds.bottom) {
-      press.end(false);
+      press.end();
     }
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     button.addEventListener(type, (event) => {
       if (event.pointerId !== press?.pointerId) return;
       ignoreClicksUntil = performance.now() + 800;
-      press.end(type === 'pointerup');
+      press.end();
     });
   }
   button.addEventListener('contextmenu', (event) => event.preventDefault());
-  // Skip the click that follows a press already counted on pointerup. Keyboard clicks have no detail.
+  // Skip the click that follows a press already counted on pointerdown. Keyboard clicks have no detail.
   button.addEventListener('click', (event) => {
     if (event.detail === 0 || performance.now() >= ignoreClicksUntil) adjust();
   });
@@ -266,6 +278,7 @@ function renderBoard() {
       if (!Number.isSafeInteger(next)) return;
       game.scores[index] = next;
       renderScore();
+      if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
       announceLife(index);
       saveGame();
     }
