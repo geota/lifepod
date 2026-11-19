@@ -117,6 +117,9 @@ async function checkLayouts(t, engine) {
   // can read the old values, so give the writes a moment to land first.
   await page.waitForTimeout(500);
   await page.reload();
+  // A real phone reports its angle on every load. The test's stand-in keeps it in session storage, which a
+  // reload occasionally loses on CI, so report it again. The board's upright angle must come from the saved game.
+  await turnScreen(page, 393, 852, 180);
   const tiles = await checkBoard(page, rotated, 270, 'portrait after reload');
   assert.equal(tiles[5].score, '41');
 
