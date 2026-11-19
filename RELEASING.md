@@ -4,15 +4,20 @@ LifePod ships to GitHub prereleases (installed through Obtainium) and Google Pla
 
 ## Secrets
 
-Keys and passwords live in [`pass`](https://www.passwordstore.org/) under `dev/lifepod/`. Keystores are stored base64-encoded.
+Keys and passwords live in [`pass`](https://www.passwordstore.org/), in a folder of your choosing. Keystores are stored base64-encoded. Set `LIFEPOD_PASS` to that folder before running any command below:
 
-| `pass` entry | What it is | GitHub Actions secret |
+```sh
+export LIFEPOD_PASS=your/pass/folder   # placeholder: where LifePod's entries live in your password store
+```
+
+| Entry in `$LIFEPOD_PASS` | What it is | GitHub Actions secret |
 |---|---|---|
-| `dev/lifepod/android-release-keystore.p12` | Release key (alias `lifepod`). Signs the GitHub APK, and is Google Play's app signing key. | `ANDROID_KEYSTORE_BASE64` |
-| `dev/lifepod/android-release-keystore-password` | Its password | `ANDROID_KEYSTORE_PASSWORD` |
-| `dev/lifepod/android-upload-keystore.p12` | Google Play upload key (alias `upload`). Signs the App Bundle that CI uploads. | `ANDROID_UPLOAD_KEYSTORE_BASE64` |
-| `dev/lifepod/android-upload-keystore-password` | Its password | `ANDROID_UPLOAD_KEYSTORE_PASSWORD` |
-| `dev/lifepod/play-service-account.json` | Google Play API service account key | `PLAY_SERVICE_ACCOUNT_JSON` |
+| `android-release-keystore.p12` | Release key (alias `lifepod`). Signs the GitHub APK, and is Google Play's app signing key. | `ANDROID_KEYSTORE_BASE64` |
+| `android-release-keystore-password` | Its password | `ANDROID_KEYSTORE_PASSWORD` |
+| `android-upload-keystore.p12` | Google Play upload key (alias `upload`). Signs the App Bundle that CI uploads. | `ANDROID_UPLOAD_KEYSTORE_BASE64` |
+| `android-upload-keystore-password` | Its password | `ANDROID_UPLOAD_KEYSTORE_PASSWORD` |
+| `play-service-account.json` | Google Play API service account key | `PLAY_SERVICE_ACCOUNT_JSON` |
+| `app-store-connect-api-key.p8` | App Store Connect API key | `APP_STORE_CONNECT_API_KEY` |
 
 Losing the release key means no update can ever install over existing copies, so push the password store after creating it.
 
@@ -21,18 +26,18 @@ Losing the release key means no update can ever install over existing copies, so
 Run once:
 
 ```sh
-pass generate -n dev/lifepod/android-release-keystore-password 32
-pass generate -n dev/lifepod/android-upload-keystore-password 32
+pass generate -n "$LIFEPOD_PASS/android-release-keystore-password" 32
+pass generate -n "$LIFEPOD_PASS/android-upload-keystore-password" 32
 
 keys=$(mktemp -d)
-LIFEPOD_KEY_PASS=$(pass show dev/lifepod/android-release-keystore-password) \
+LIFEPOD_KEY_PASS=$(pass show "$LIFEPOD_PASS/android-release-keystore-password") \
   keytool -genkeypair -storetype PKCS12 -keystore "$keys/release.p12" -storepass:env LIFEPOD_KEY_PASS \
   -alias lifepod -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=LifePod'
-LIFEPOD_KEY_PASS=$(pass show dev/lifepod/android-upload-keystore-password) \
+LIFEPOD_KEY_PASS=$(pass show "$LIFEPOD_PASS/android-upload-keystore-password") \
   keytool -genkeypair -storetype PKCS12 -keystore "$keys/upload.p12" -storepass:env LIFEPOD_KEY_PASS \
   -alias upload -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=LifePod Upload'
-base64 < "$keys/release.p12" | pass insert -m dev/lifepod/android-release-keystore.p12
-base64 < "$keys/upload.p12" | pass insert -m dev/lifepod/android-upload-keystore.p12
+base64 < "$keys/release.p12" | pass insert -m "$LIFEPOD_PASS/android-release-keystore.p12"
+base64 < "$keys/upload.p12" | pass insert -m "$LIFEPOD_PASS/android-upload-keystore.p12"
 rm -rf "$keys"
 pass git push
 ```
@@ -41,8 +46,8 @@ Print the release key's SHA-256 fingerprint (for Android developer verification)
 
 ```sh
 keys=$(mktemp -d)
-pass show dev/lifepod/android-release-keystore.p12 | base64 --decode > "$keys/release.p12"
-LIFEPOD_KEY_PASS=$(pass show dev/lifepod/android-release-keystore-password) \
+pass show "$LIFEPOD_PASS/android-release-keystore.p12" | base64 --decode > "$keys/release.p12"
+LIFEPOD_KEY_PASS=$(pass show "$LIFEPOD_PASS/android-release-keystore-password") \
   keytool -list -v -keystore "$keys/release.p12" -storepass:env LIFEPOD_KEY_PASS -alias lifepod | grep 'SHA256:'
 rm -rf "$keys"
 ```
@@ -56,7 +61,7 @@ for pair in \
   android-upload-keystore.p12:ANDROID_UPLOAD_KEYSTORE_BASE64 \
   android-upload-keystore-password:ANDROID_UPLOAD_KEYSTORE_PASSWORD
 do
-  pass show "dev/lifepod/${pair%%:*}" | tr -d '\n' | gh secret set "${pair##*:}" --repo geota/lifepod
+  pass show "$LIFEPOD_PASS/${pair%%:*}" | tr -d '\n' | gh secret set "${pair##*:}" --repo geota/lifepod
 done
 gh secret list --repo geota/lifepod
 ```
@@ -94,13 +99,13 @@ When Play Console asks how to sign the app, choose to export and upload a key fr
 ```sh
 mkdir -p android/build/play
 keys=$(mktemp -d)
-pass show dev/lifepod/android-release-keystore.p12 | base64 --decode > "$keys/release.p12"
-pass show dev/lifepod/android-upload-keystore.p12 | base64 --decode > "$keys/upload.p12"
-pass show -c dev/lifepod/android-release-keystore-password   # paste at both pepk password prompts
+pass show "$LIFEPOD_PASS/android-release-keystore.p12" | base64 --decode > "$keys/release.p12"
+pass show "$LIFEPOD_PASS/android-upload-keystore.p12" | base64 --decode > "$keys/upload.p12"
+pass show -c "$LIFEPOD_PASS/android-release-keystore-password"   # paste at both pepk password prompts
 java -jar ~/Downloads/pepk.jar --keystore="$keys/release.p12" --alias=lifepod \
   --output=android/build/play/lifepod-signing-key.zip --include-cert --rsa-aes-encryption \
   --encryption-key-path="$HOME/Downloads/encryption_public_key.pem"
-LIFEPOD_KEY_PASS=$(pass show dev/lifepod/android-upload-keystore-password) \
+LIFEPOD_KEY_PASS=$(pass show "$LIFEPOD_PASS/android-upload-keystore-password") \
   keytool -export -rfc -keystore "$keys/upload.p12" -storepass:env LIFEPOD_KEY_PASS -alias upload \
   -file android/build/play/upload_certificate.pem
 rm -rf "$keys"
@@ -114,12 +119,12 @@ Play only accepts API uploads after the first App Bundle is uploaded by hand. Bu
 
 ```sh
 keys=$(mktemp -d)
-pass show dev/lifepod/android-release-keystore.p12 | base64 --decode > "$keys/release.p12"
-pass show dev/lifepod/android-upload-keystore.p12 | base64 --decode > "$keys/upload.p12"
+pass show "$LIFEPOD_PASS/android-release-keystore.p12" | base64 --decode > "$keys/release.p12"
+pass show "$LIFEPOD_PASS/android-upload-keystore.p12" | base64 --decode > "$keys/upload.p12"
 LIFE_POD_KEYSTORE="$keys/release.p12" \
-LIFE_POD_KEYSTORE_PASSWORD=$(pass show dev/lifepod/android-release-keystore-password) \
+LIFE_POD_KEYSTORE_PASSWORD=$(pass show "$LIFEPOD_PASS/android-release-keystore-password") \
 LIFE_POD_UPLOAD_KEYSTORE="$keys/upload.p12" \
-LIFE_POD_UPLOAD_KEYSTORE_PASSWORD=$(pass show dev/lifepod/android-upload-keystore-password) \
+LIFE_POD_UPLOAD_KEYSTORE_PASSWORD=$(pass show "$LIFEPOD_PASS/android-upload-keystore-password") \
 LIFE_POD_BUNDLETOOL="$HOME/.local/share/bundletool/bundletool-all-1.18.3.jar" \
 LIFE_POD_VERSION_CODE=1 LIFE_POD_VERSION_NAME=0.1.0-alpha.1 \
   ./android/build.sh
@@ -136,9 +141,9 @@ gcloud iam service-accounts create play-upload --project "$project" --display-na
 account="play-upload@$project.iam.gserviceaccount.com"
 key=$(mktemp)
 gcloud iam service-accounts keys create "$key" --iam-account "$account"
-pass insert -m dev/lifepod/play-service-account.json < "$key"
+pass insert -m "$LIFEPOD_PASS/play-service-account.json" < "$key"
 rm -f "$key"
-pass show dev/lifepod/play-service-account.json | gh secret set PLAY_SERVICE_ACCOUNT_JSON --repo geota/lifepod
+pass show "$LIFEPOD_PASS/play-service-account.json" | gh secret set PLAY_SERVICE_ACCOUNT_JSON --repo geota/lifepod
 pass git push
 echo "$account"
 ```
@@ -163,10 +168,10 @@ Each version tag also uploads the iOS app to App Store Connect for TestFlight on
 Store the key in `pass` and give CI the key and IDs (replace the placeholders):
 
 ```sh
-pass insert -m dev/lifepod/app-store-connect-api-key.p8 < ~/Downloads/AuthKey_KEYID.p8
+pass insert -m "$LIFEPOD_PASS/app-store-connect-api-key.p8" < ~/Downloads/AuthKey_KEYID.p8
 rm ~/Downloads/AuthKey_KEYID.p8
 pass git push
-pass show dev/lifepod/app-store-connect-api-key.p8 | gh secret set APP_STORE_CONNECT_API_KEY --repo geota/lifepod
+pass show "$LIFEPOD_PASS/app-store-connect-api-key.p8" | gh secret set APP_STORE_CONNECT_API_KEY --repo geota/lifepod
 gh variable set APPLE_TEAM_ID --body TEAMID --repo geota/lifepod
 gh variable set APP_STORE_CONNECT_KEY_ID --body KEYID --repo geota/lifepod
 gh variable set APP_STORE_CONNECT_ISSUER_ID --body ISSUER-UUID --repo geota/lifepod
@@ -180,7 +185,7 @@ CI uploads on every tag. To upload from this Mac instead:
 
 ```sh
 key=$(mktemp)
-pass show dev/lifepod/app-store-connect-api-key.p8 > "$key"
+pass show "$LIFEPOD_PASS/app-store-connect-api-key.p8" > "$key"
 APPLE_TEAM_ID=TEAMID APP_STORE_CONNECT_KEY_ID=KEYID APP_STORE_CONNECT_ISSUER_ID=ISSUER-UUID \
 APP_STORE_CONNECT_KEY_PATH="$key" LIFE_POD_VERSION_NAME=0.1.0 LIFE_POD_BUILD_NUMBER=1 \
   ./ios/upload-testflight.sh
