@@ -81,7 +81,8 @@ CI signs `lifepod.apk` with the release key and publishes it with the iOS Simula
 ### Store listing
 
 - Privacy policy: <https://github.com/geota/lifepod/blob/main/PRIVACY.md>
-- Images: `store/play/` has the 512 × 512 icon, the 1024 × 500 feature graphic, and phone and 10-inch tablet screenshots. Regenerate them with `npm run store:images`.
+- Listing text: `store/play/listing/` has the app name, short description, and full description.
+- Images: `store/play/` has the 512 × 512 icon, the 1024 × 500 feature graphic, and 16:9 phone, 7-inch tablet, and 10-inch tablet screenshots. Regenerate them with `npm run store:images`.
 - Ads: none. Data safety: no data collected or shared. Target audience: not children only.
 
 New personal developer accounts must run a closed test with at least 12 testers for 14 days before applying for production.

@@ -19,8 +19,10 @@ const scenes = [
 
 // Store sizes. Viewport × scale gives each store's exact pixel size.
 const devices = [
+  // Google Play requires 16:9 for phone and tablet screenshots.
   { dir: 'play/phone', width: 960, height: 540, scale: 2 },          // 1920 × 1080
-  { dir: 'play/tablet-10in', width: 1280, height: 800, scale: 2 },   // 2560 × 1600
+  { dir: 'play/tablet-7in', width: 1024, height: 576, scale: 2 },    // 2048 × 1152
+  { dir: 'play/tablet-10in', width: 1280, height: 720, scale: 2 },   // 2560 × 1440
   { dir: 'app-store/iphone-6.9in', width: 956, height: 440, scale: 3 }, // 2868 × 1320
   { dir: 'app-store/ipad-13in', width: 1376, height: 1032, scale: 2 },  // 2752 × 2064
 ];

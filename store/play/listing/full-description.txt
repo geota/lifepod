@@ -1,0 +1,16 @@
+LifePod keeps every player's life total in front of them. Set your phone in the middle of the table and each total faces its player's seat.
+
+• 2 to 6 players, with seats facing every side of the table
+• Tap anywhere on your half of the tile to change your total, or hold to change it fast
+• Several players can tap at the same time
+• Rotate any seat to match where people are sitting
+• Seats stay in place when the phone turns
+• Start at 20, 30, 40, or any life total you choose
+• Keeps the screen awake during the game
+• Saves your game if you leave the app
+
+No ads, no accounts, no tracking, and no internet permission. LifePod works entirely offline and collects no data.
+
+Built for Commander and other Magic: The Gathering formats, LifePod works for any game that tracks life or points.
+
+LifePod is unofficial and is not affiliated with, endorsed, sponsored, or approved by Wizards of the Coast. Magic: The Gathering is a trademark of Wizards of the Coast LLC.
