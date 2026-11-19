@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from the LifePod icon art: four seats, one highlighted with +. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="1.433" android:pathData="M35.583,32.717 H47.479 A2.866,2.866 0 0 1 50.345,35.583 V47.479 A2.866,2.866 0 0 1 47.479,50.345 H35.583 A2.866,2.866 0 0 1 32.717,47.479 V35.583 A2.866,2.866 0 0 1 35.583,32.717 Z M35.583,57.655 H47.479 A2.866,2.866 0 0 1 50.345,60.521 V72.417 A2.866,2.866 0 0 1 47.479,75.283 H35.583 A2.866,2.866 0 0 1 32.717,72.417 V60.521 A2.866,2.866 0 0 1 35.583,57.655 Z M60.521,57.655 H72.417 A2.866,2.866 0 0 1 75.283,60.521 V72.417 A2.866,2.866 0 0 1 72.417,75.283 H60.521 A2.866,2.866 0 0 1 57.655,72.417 V60.521 A2.866,2.866 0 0 1 60.521,57.655 Z" />
+    <path android:fillColor="#FFFFFF" android:fillType="evenOdd" android:pathData="M60.521,32.0 H72.417 A3.583,3.583 0 0 1 76.0,35.583 V47.479 A3.583,3.583 0 0 1 72.417,51.062 H60.521 A3.583,3.583 0 0 1 56.938,47.479 V35.583 A3.583,3.583 0 0 1 60.521,32.0 Z M62.814,40.743 H70.124 V42.176 H62.814 Z M65.752,37.876 H67.186 V45.186 H65.752 Z" />
+</vector>

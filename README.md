@@ -56,7 +56,7 @@ Before the first prerelease, download the `lifepod-android` artifact from a succ
 
 The debug APK is built at `android/build/lifepod-debug.apk`. Copy it to an Android 11 or newer phone and open it to install. With a device connected and USB debugging enabled, you can also install it using `adb install -r android/build/lifepod-debug.apk`.
 
-To rebuild, install JDK 21, Kotlin 2.2.x (`kotlinc`), Android SDK Platform 36, and Android SDK Build-Tools 36.1.0. Set `ANDROID_HOME` to the SDK directory and run `./android/build-apk.sh` from this directory.
+To rebuild, install JDK 21, Kotlin 2.2.x (`kotlinc`), Android SDK Platform 36, and Android SDK Build-Tools 36.1.0. Set `ANDROID_HOME` to the SDK directory and run `./android/build.sh` from this directory. To also build the App Bundle that Google Play requires, download [bundletool](https://github.com/google/bundletool/releases) and set `LIFE_POD_BUNDLETOOL` to its jar.
 
 ## iOS
 
@@ -78,25 +78,10 @@ Run `npx playwright-core install chromium webkit` and `npm test` to check seat p
 
 ## GitHub Actions
 
-[CI](.github/workflows/ci.yml) runs lint, browser seating tests, and builds for pull requests and pushes to `main`. Each successful run produces a static web ZIP, a debug-signed Android APK, and an iOS Simulator ZIP. CI also compiles the iPhone target with signing disabled.
+[CI](.github/workflows/ci.yml) runs lint, browser seating tests, and builds for pull requests and pushes to `main`. Each successful run produces a static web ZIP, a debug-signed Android APK and App Bundle, and an iOS Simulator ZIP. CI also compiles the iPhone target with signing disabled.
 
-### Publish a signed alpha
+A version tag such as `v0.1.0-alpha.1` publishes a GitHub prerelease with the signed APK, and uploads the App Bundle to Google Play once its secrets are set. [RELEASING.md](RELEASING.md) has the commands for creating the keys and secrets.
 
-Create a dedicated PKCS#12 signing keystore for LifePod and back it up. Use the same LifePod keystore for every release so Android can install upgrades in place.
+## Privacy
 
-```sh
-mkdir -p "$HOME/.config/lifepod"
-keytool -genkeypair -storetype PKCS12 -keystore "$HOME/.config/lifepod/lifepod-release.p12" \
-  -alias lifepod -keyalg RSA -keysize 3072 -validity 10000 -dname 'CN=LifePod'
-base64 < "$HOME/.config/lifepod/lifepod-release.p12" | gh secret set ANDROID_KEYSTORE_BASE64 --repo geota/lifepod
-gh secret set ANDROID_KEYSTORE_PASSWORD --repo geota/lifepod
-```
-
-Enter the keystore password when `gh secret set ANDROID_KEYSTORE_PASSWORD` prompts for it. Push a version tag from a tested commit to publish the signed APK, iOS Simulator ZIP, and offline web ZIP as a GitHub prerelease.
-
-```sh
-git tag v0.1.0-alpha.1
-git push origin v0.1.0-alpha.1
-```
-
-Each tagged APK uses the tag for its Android version name and the workflow run number for its version code. A first signed alpha requires a fresh install if you previously used a debug build. The iOS ZIP is for Simulator, and physical devices require an Xcode build with your development team selected.
+LifePod collects no data. See the [privacy policy](PRIVACY.md).

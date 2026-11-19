@@ -44,7 +44,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: Android ktlint, Android Lint, and APK
+    name: Android ktlint, Android Lint, APK, and App Bundle
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -61,20 +61,24 @@ jobs:
                 ! -x "$ANDROID_HOME/cmdline-tools/23.0/bin/lint" ]]; then
             "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.1.0' 'cmdline-tools;23.0'
           fi
-      - name: Install Kotlin 2.2.21 and ktlint 1.8.0
+      - name: Install Kotlin 2.2.21, ktlint 1.8.0, and bundletool 1.18.3
         working-directory: ${{ runner.temp }}
         run: |
           curl --fail --location --retry 3 --silent --show-error \
             -o kotlin.zip https://github.com/JetBrains/kotlin/releases/download/v2.2.21/kotlin-compiler-2.2.21.zip
           curl --fail --location --retry 3 --silent --show-error \
             -o ktlint https://github.com/ktlint/ktlint/releases/download/1.8.0/ktlint
+          curl --fail --location --retry 3 --silent --show-error \
+            -o bundletool.jar https://github.com/google/bundletool/releases/download/1.18.3/bundletool-all-1.18.3.jar
           sha256sum --check <<'CHECKSUMS'
           a623871f1cd9c938946948b70ef9170879f0758043885bbd30c32f024e511714  kotlin.zip
           a3fd620207d5c40da6ca789b95e7f823c54e854b7fade7f613e91096a3706d75  ktlint
+          a099cfa1543f55593bc2ed16a70a7c67fe54b1747bb7301f37fdfd6d91028e29  bundletool.jar
           CHECKSUMS
           unzip -q kotlin.zip
           chmod +x ktlint
           printf '%s\n' "$RUNNER_TEMP/kotlinc/bin" "$RUNNER_TEMP" >> "$GITHUB_PATH"
+          printf 'LIFE_POD_BUNDLETOOL=%s\n' "$RUNNER_TEMP/bundletool.jar" >> "$GITHUB_ENV"
       - run: ktlint 'android/src/**/*.kt'
       - name: Android Lint
         run: ./android/lint.sh
@@ -84,13 +88,17 @@ jobs:
           name: android-lint-report
           path: android/build/lint-report.html
           if-no-files-found: ignore
-      - name: Build Android APK
-        id: apk
+      - name: Build Android APK and App Bundle
+        id: build
         env:
           ANDROID_KEYSTORE_BASE64: ${{ github.event_name == 'push' && github.ref_type == 'tag' && secrets.ANDROID_KEYSTORE_BASE64 || '' }}
           ANDROID_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && github.ref_type == 'tag' && secrets.ANDROID_KEYSTORE_PASSWORD || '' }}
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ github.event_name == 'push' && github.ref_type == 'tag' && secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 || '' }}
+          ANDROID_UPLOAD_KEYSTORE_PASSWORD: ${{ github.event_name == 'push' && github.ref_type == 'tag' && secrets.ANDROID_UPLOAD_KEYSTORE_PASSWORD || '' }}
         run: |
           apk=android/build/lifepod-debug.apk
+          aab=android/build/lifepod-debug.aab
+          play_ready=false
           if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then
             if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
               echo '::error::Use a version tag such as v0.1.0-alpha.1.'
@@ -100,26 +108,48 @@ jobs:
               echo '::error::Set the ANDROID_KEYSTORE_BASE64 and ANDROID_KEYSTORE_PASSWORD secrets before publishing an Android release.'
               exit 1
             fi
-            LIFE_POD_KEYSTORE=$(mktemp "$RUNNER_TEMP/lifepod-signing.XXXXXXXX")
-            trap 'rm -f "$LIFE_POD_KEYSTORE"' EXIT
-            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$LIFE_POD_KEYSTORE"
-            export LIFE_POD_KEYSTORE
+            keys=$(mktemp -d "$RUNNER_TEMP/lifepod-keys.XXXXXXXX")
+            trap 'rm -rf "$keys"' EXIT
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keys/release.p12"
+            export LIFE_POD_KEYSTORE="$keys/release.p12"
             export LIFE_POD_KEYSTORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD"
             export LIFE_POD_VERSION_CODE="$GITHUB_RUN_NUMBER"
             export LIFE_POD_VERSION_NAME="${GITHUB_REF_NAME#v}"
             apk=android/build/lifepod.apk
+            if [[ -n "$ANDROID_UPLOAD_KEYSTORE_BASE64" && -n "$ANDROID_UPLOAD_KEYSTORE_PASSWORD" ]]; then
+              printf '%s' "$ANDROID_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$keys/upload.p12"
+              export LIFE_POD_UPLOAD_KEYSTORE="$keys/upload.p12"
+              export LIFE_POD_UPLOAD_KEYSTORE_PASSWORD="$ANDROID_UPLOAD_KEYSTORE_PASSWORD"
+              aab=android/build/lifepod.aab
+              play_ready=true
+            else
+              echo '::notice::No Google Play upload key is set, so this release will not be uploaded to Google Play.'
+            fi
           fi
-          ./android/build-apk.sh
-          printf 'path=%s\n' "$apk" >> "$GITHUB_OUTPUT"
-      - name: Verify APK signature
+          ./android/build.sh
+          { printf 'apk=%s\n' "$apk"; printf 'aab=%s\n' "$aab"; printf 'play_ready=%s\n' "$play_ready"; } >> "$GITHUB_OUTPUT"
+      - name: Verify APK signature and App Bundle
         env:
-          APK: ${{ steps.apk.outputs.path }}
-        run: '"$ANDROID_HOME/build-tools/36.1.0/apksigner" verify "$APK"'
+          APK: ${{ steps.build.outputs.apk }}
+          AAB: ${{ steps.build.outputs.aab }}
+        run: |
+          "$ANDROID_HOME/build-tools/36.1.0/apksigner" verify "$APK"
+          java -jar "$LIFE_POD_BUNDLETOOL" validate --bundle="$AAB" > /dev/null
+          # Android keys are self-signed, so check that the bundle is signed rather than trusted by a CA.
+          jarsigner -verify "$AAB" | grep -q '^jar verified'
+          unzip -l "$AAB" | grep -Eq 'META-INF/[^/]+\.(RSA|EC)$'
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: lifepod-android
-          path: ${{ steps.apk.outputs.path }}
+          path: ${{ steps.build.outputs.apk }}
           if-no-files-found: error
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: android-bundle
+          path: ${{ steps.build.outputs.aab }}
+          if-no-files-found: error
+    outputs:
+      play_ready: ${{ steps.build.outputs.play_ready }}
 
   ios:
     name: iOS lint, WebKit seating tests, and builds
@@ -181,3 +211,38 @@ jobs:
             --title "LifePod $GITHUB_REF_NAME" --verify-tag --prerelease --generate-notes \
             --notes 'Signed Android APK for Obtainium, iOS Simulator app, and offline web bundle.' \
             assets/lifepod.apk assets/lifepod-ios-simulator.zip assets/lifepod-web.zip
+
+  google-play:
+    name: Upload to Google Play
+    if: github.event_name == 'push' && github.ref_type == 'tag' && needs.android.outputs.play_ready == 'true'
+    needs: [web, android, ios]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check for the Google Play service account
+        id: account
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [[ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]]; then
+            echo '::notice::Set PLAY_SERVICE_ACCOUNT_JSON to upload tagged releases to Google Play.'
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.account.outputs.ready == 'true'
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: android-bundle
+          path: bundle
+      # A draft release on the internal track by default. Set the PLAY_TRACK and PLAY_RELEASE_STATUS
+      # repository variables to change that, for example to "production" and "completed".
+      - if: steps.account.outputs.ready == 'true'
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: dev.maceiras.lifepod
+          releaseFiles: bundle/lifepod.aab
+          releaseName: ${{ github.ref_name }}
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_RELEASE_STATUS || 'draft' }}
