@@ -5,6 +5,7 @@
         android:theme="@android:style/Theme.Material.NoActionBar"
         android:enableOnBackInvokedCallback="false">
         <activity android:name=".MainActivity" android:exported="true"
+            android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>

@@ -15,30 +15,14 @@ const startingLifeInput = document.querySelector('#starting-life');
 const lifePresets = document.querySelector('#life-presets');
 const lifeError = document.querySelector('#life-error');
 const restart = document.querySelector('#restart');
-const landscape = matchMedia('(orientation: landscape)');
 const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
-// Each row lists seats by facing edge and player number. Repeated seats span cells.
+// Landscape rows list seats by facing edge and player number. Repeated seats span cells.
 const seatLayouts = {
-  2: {
-    portrait: ['top-1', 'bottom-2'],
-    landscape: ['left-1 right-2'],
-  },
-  3: {
-    portrait: ['top-1 top-2', 'bottom-3 bottom-3'],
-    landscape: ['top-1 right-3', 'bottom-2 right-3'],
-  },
-  4: {
-    portrait: ['left-1 right-3', 'left-2 right-4'],
-    landscape: ['top-1 top-2', 'bottom-3 bottom-4'],
-  },
-  5: {
-    portrait: ['top-1 top-2', 'bottom-3 bottom-4', 'bottom-5 bottom-5'],
-    landscape: ['top-1 top-2 right-5', 'bottom-3 bottom-4 right-5'],
-  },
-  6: {
-    portrait: ['left-1 right-3', 'left-2 right-4', 'left-5 right-6'],
-    landscape: ['top-1 top-2 top-5', 'bottom-3 bottom-4 bottom-6'],
-  },
+  2: ['left-1 right-2'],
+  3: ['top-1 right-3', 'bottom-2 right-3'],
+  4: ['top-1 top-2', 'bottom-3 bottom-4'],
+  5: ['top-1 top-2 right-5', 'bottom-3 bottom-4 right-5'],
+  6: ['top-1 top-2 top-5', 'bottom-3 bottom-4 bottom-6'],
 };
 const playerCounts = Object.keys(seatLayouts).map(Number);
 
@@ -152,8 +136,7 @@ function bindCounter(button, adjust, label) {
 }
 
 function layoutBoard() {
-  const layout = seatLayouts[game.scores.length];
-  const rows = landscape.matches ? layout.landscape : layout.portrait;
+  const rows = seatLayouts[game.scores.length];
   board.style.gridTemplateAreas = rows.map(row => `"${row}"`).join(' ');
   for (const seat of new Set(rows.join(' ').split(' '))) {
     const [edge, number] = seat.split('-');
@@ -337,7 +320,5 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) stopRepeating();
   else if (!android && !ios) syncWakeLock();
 });
-landscape.addEventListener('change', layoutBoard);
-
 renderBoard();
 syncWakeLock();

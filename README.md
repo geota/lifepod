@@ -18,24 +18,24 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 ## Screenshots
 
 <div align="center">
-<a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Four-player portrait board with two seats facing each long side" /></a>
-<a href="screenshots/six-players.png"><img src="screenshots/six-players.png" width="180" alt="Six-player portrait board with three seats facing each long side" /></a>
-<a href="screenshots/setup.png"><img src="screenshots/setup.png" width="180" alt="Setup for player count, starting life, screen awake, and seat rotation" /></a>
+<a href="screenshots/board.png"><img src="screenshots/board.png" width="385" alt="Four-player landscape board with two seats facing each long side" /></a>
+<a href="screenshots/six-players.png"><img src="screenshots/six-players.png" width="385" alt="Six-player landscape board with three seats facing each long side" /></a>
 <br />
-<sub>Four players · Six players · Setup</sub>
+<sub>Four players · Six players</sub>
 </div>
 
 <div align="center">
-<a href="screenshots/five-players-landscape.png"><img src="screenshots/five-players-landscape.png" width="548" alt="Five-player landscape with green and blue facing the far edge, red and purple facing the near edge, and yellow facing the right edge" /></a>
+<a href="screenshots/three-players.png"><img src="screenshots/three-players.png" width="385" alt="Three-player board with one seat facing each long side and a larger seat facing the right end" /></a>
+<a href="screenshots/five-players.png"><img src="screenshots/five-players.png" width="385" alt="Five-player board with two seats facing each long side and a larger seat facing the right end" /></a>
 <br />
-<sub>Five players in landscape</sub>
+<sub>Three players · Five players</sub>
 </div>
 
-[Five-player portrait](screenshots/five-players.png) · [Custom seat rotation](screenshots/rotate-seats.png)
+[Game setup](screenshots/setup.png) · [Custom seat rotation](screenshots/rotate-seats.png)
 
 ## At the table
 
-Set the phone in the middle of the table. With four or six players, two or three seats face each long side. With two players, the seats face opposite short ends. With three or five players, one seat spans two slots so the board still fills the screen. Each player reads **−** on the left and **+** on the right from their seat.
+Set the phone in the middle of the table in landscape. The seating arrangement stays fixed when the screen turns or the browser window resizes. With two players, the seats face opposite short ends. With four or six, two or three seats face each long side. With three or five, one or two seats face each long side and one larger seat faces the right end. Each player reads **−** on the left and **+** on the right from their seat.
 
 Tap the sliders in the center to choose 2–6 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
 
@@ -68,7 +68,7 @@ Open `web/index.html` to try the tracker on your computer. The preview uses brow
 
 Install ktlint and select full Xcode for `swift-format`. Then run `npm ci` and `npm run lint` from the project root. Run `npm run lint:web`, `npm run lint:android`, or `npm run lint:ios` to check one platform.
 
-Run `npx playwright-core install chromium webkit` and `npm test` to check each player count in portrait and landscape.
+Run `npx playwright-core install chromium webkit` and `npm test` to check seat placement and facing across both window orientations.
 
 ## Shared code
 
