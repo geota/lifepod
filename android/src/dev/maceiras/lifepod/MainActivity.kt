@@ -2,6 +2,7 @@ package dev.maceiras.lifepod
 
 import android.app.Activity
 import android.graphics.Color
+import android.os.Build
 import android.os.Bundle
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -12,11 +13,16 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import java.io.ByteArrayInputStream
 import java.io.IOException
 
 class MainActivity : Activity() {
     private lateinit var webView: WebView
+
+    // Registered only while the page has a dialog or seat rotation to close, so the system handles back otherwise.
+    private var backCallback: Any? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -36,6 +42,8 @@ class MainActivity : Activity() {
             WindowInsets.CONSUMED
         }
 
+        // JavaScript runs only the bundled files: LocalWebViewClient refuses every other URL.
+        @Suppress("SetJavaScriptEnabled")
         webView =
             WebView(this).apply {
                 setBackgroundColor(background)
@@ -43,6 +51,8 @@ class MainActivity : Activity() {
                     javaScriptEnabled = true
                     allowFileAccess = false
                     allowContentAccess = false
+                    setSupportZoom(false)
+                    builtInZoomControls = false
                 }
                 addJavascriptInterface(GameBridge(), "LifePodAndroid")
                 webViewClient = LocalWebViewClient()
@@ -63,10 +73,24 @@ class MainActivity : Activity() {
         }
     }
 
-    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    // Android 12L and earlier deliver back presses here instead of to an OnBackInvokedCallback.
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION", "GestureBackNavigation")
     override fun onBackPressed() {
-        webView.evaluateJavascript("window.closeOpenDialog?.()") { handled ->
+        webView.evaluateJavascript(CLOSE_DIALOG) { handled ->
             if (handled != "true") super.onBackPressed()
+        }
+    }
+
+    private fun setBackHandling(enabled: Boolean) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val callback = backCallback as? OnBackInvokedCallback
+        if (enabled && callback == null) {
+            val created = OnBackInvokedCallback { webView.evaluateJavascript(CLOSE_DIALOG, null) }
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, created)
+            backCallback = created
+        } else if (!enabled && callback != null) {
+            onBackInvokedDispatcher.unregisterOnBackInvokedCallback(callback)
+            backCallback = null
         }
     }
 
@@ -93,6 +117,11 @@ class MainActivity : Activity() {
                 val flag = WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
                 if (enabled) window.addFlags(flag) else window.clearFlags(flag)
             }
+        }
+
+        @JavascriptInterface
+        fun setBackHandling(enabled: Boolean) {
+            runOnUiThread { this@MainActivity.setBackHandling(enabled) }
         }
     }
 
@@ -132,6 +161,7 @@ class MainActivity : Activity() {
         const val ASSET_HOST = "appassets.androidplatform.net"
         const val START_URL = "https://$ASSET_HOST/index.html"
         const val GAME_KEY = "currentGame"
+        const val CLOSE_DIALOG = "window.closeOpenDialog?.()"
         val MIME_TYPES =
             mapOf(
                 "/index.html" to "text/html",

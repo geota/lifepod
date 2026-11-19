@@ -34,7 +34,7 @@ mkdir -p "$work/dex"
 "$build_tools/aapt2" compile --dir "$android_dir/res" -o "$work/resources.zip"
 "$build_tools/aapt2" link -I "$android_jar" --manifest "$android_dir/AndroidManifest.xml" \
     --version-code "${LIFE_POD_VERSION_CODE:-1}" --version-name "${LIFE_POD_VERSION_NAME:-1.0}" \
-    --min-sdk-version 30 --target-sdk-version 36 -A "$android_dir/../web" \
+    -A "$android_dir/../web" \
     -o "$work/unsigned.apk" "$work/resources.zip"
 "$kotlin_compiler" -kotlin-home "$kotlin_dir" -jvm-target 11 -no-reflect \
     -classpath "$android_jar:$kotlin_stdlib" -include-runtime \
@@ -43,7 +43,8 @@ mkdir -p "$work/dex"
 zip -q -j "$work/unsigned.apk" "$work/dex/"classes*.dex
 "$build_tools/zipalign" -f 4 "$work/unsigned.apk" "$work/aligned.apk"
 
-keystore="$output/debug.keystore"
+# The committed debug key keeps every debug build installable over the last one. It is not secret.
+keystore="$android_dir/debug.keystore"
 keystore_password=pass:android
 apk="$output/lifepod-debug.apk"
 if [[ -n "${LIFE_POD_KEYSTORE:-}" ]]; then

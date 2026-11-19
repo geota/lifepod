@@ -4,6 +4,7 @@
 xcuserdata/
 .DS_Store
 *.keystore
+!/android/debug.keystore
 *.jks
 *.p12
 *.mobileprovision

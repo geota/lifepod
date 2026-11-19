@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
+import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
 
-const app = new URL('../web/index.html', import.meta.url).href;
 const layouts = {
   2: ['1← 2→'],
   3: ['1↑ 3→', '2↓ 3→'],
@@ -12,6 +12,14 @@ const layouts = {
 };
 // The bottom of the life total points toward the player reading it.
 const down = { '↓': [0, 1], '↑': [0, -1], '←': [-1, 0], '→': [1, 0] };
+
+// Where a point or direction on the landscape board lands on screen once the board turns clockwise.
+function turnPoint(turn, long, short, [x, y]) {
+  return { 0: [x, y], 90: [short - y, x], 180: [long - x, short - y], 270: [y, long - x] }[turn];
+}
+function turnDirection(turn, [x, y]) {
+  return { 0: [x, y], 90: [-y, x], 180: [-x, -y], 270: [y, -x] }[turn].map(value => value || 0);
+}
 
 function readTiles(page) {
   return page.locator('.player').evaluateAll(players => {
@@ -40,64 +48,76 @@ function readTiles(page) {
   });
 }
 
+// Checks every seat against a landscape layout after the board has turned `turn` degrees clockwise.
+async function checkBoard(page, layout, turn, view) {
+  const { width, height } = page.viewportSize();
+  const [long, short] = [Math.max(width, height), Math.min(width, height)];
+  const tiles = await readTiles(page);
+  const rows = layout.map(row => row.split(' '));
+  assert.equal(tiles.length, rows.flat().filter((seat, i, all) => all.indexOf(seat) === i).length, view);
+  rows.forEach((row, y) => row.forEach(([number, arrow], x) => {
+    const tile = tiles[Number(number) - 1];
+    const seat = `${view}, seat ${number}`;
+    const [cellX, cellY] = turnPoint(turn, long, short, [(x + 0.5) * long / row.length, (y + 0.5) * short / rows.length]);
+    const { left, right, top, bottom } = tile.bounds;
+    assert.ok(cellX > left && cellX < right && cellY > top && cellY < bottom, `${seat} occupies its cell`);
+    const facing = turnDirection(turn, down[arrow]);
+    assert.deepEqual(tile.down, facing, `${seat} faces ${arrow} relative to the landscape board`);
+    const [dx, dy] = facing;
+    const across = ([px, py]) => px * dy - py * dx;
+    assert.ok(across(tile.minus) < across(tile.center) && across(tile.plus) > across(tile.center), `${seat} reads − total +`);
+  }));
+  const covered = tiles.reduce((area, { bounds }) => area + bounds.width * bounds.height, 0);
+  assert.ok(covered >= width * height * 0.99, `${view} fills the screen`);
+  return tiles;
+}
+
 async function checkLayouts(t, engine) {
   const browser = await engine.launch();
   t.after(() => browser.close());
   const page = await browser.newPage({ isMobile: true, hasTouch: true });
+  await fakeScreenOrientation(page);
   await page.goto(app);
-  const button = name => page.getByRole('button', { name, exact: true });
 
+  // A new game takes the current landscape as upright. In a portrait window it turns the board clockwise.
   for (const [short, long] of [[320, 568], [393, 852], [768, 1024]]) {
-    for (const [width, height] of [[short, long], [long, short]]) {
-      const portraitWindow = width < height;
-      await page.setViewportSize({ width, height });
+    for (const [width, height, angle] of [[short, long, 0], [long, short, 90]]) {
+      await turnScreen(page, width, height, angle);
       for (const [count, layout] of Object.entries(layouts)) {
         const view = `${count} players, ${width}×${height}`;
-        await button('Game setup').tap();
-        await button(`${count} players`).tap();
-        await page.locator('#save-setup').tap();
-        const tiles = await readTiles(page);
-        assert.equal(tiles.length, Number(count), view);
-        const rows = layout.map(row => row.split(' '));
-        rows.forEach((row, y) => row.forEach(([number, arrow], x) => {
-          const tile = tiles[Number(number) - 1];
-          const seat = `${view}, seat ${number}`;
-          const landscapeX = (x + 0.5) * long / row.length;
-          const landscapeY = (y + 0.5) * short / rows.length;
-          const [cellX, cellY] = portraitWindow ? [landscapeY, long - landscapeX] : [landscapeX, landscapeY];
-          const { left, right, top, bottom } = tile.bounds;
-          assert.ok(cellX > left && cellX < right && cellY > top && cellY < bottom, `${seat} occupies its cell`);
-          const [edgeX, edgeY] = down[arrow];
-          const facing = portraitWindow ? [edgeY, -edgeX || 0] : down[arrow];
-          assert.deepEqual(tile.down, facing, `${seat} faces ${arrow} relative to the landscape board`);
-          assert.equal(tile.score, '40', `${seat} starts at 40`);
-          const [dx, dy] = facing;
-          const across = ([px, py]) => px * dy - py * dx;
-          assert.ok(across(tile.minus) < across(tile.center) && across(tile.plus) > across(tile.center), `${seat} reads − 40 +`);
-        }));
-        const covered = tiles.reduce((area, { bounds }) => area + bounds.width * bounds.height, 0);
-        assert.ok(covered >= width * height * 0.99, `${view} fills the screen`);
+        await startGame(page, count);
+        const tiles = await checkBoard(page, layout, height > width ? 90 : 0, view);
+        assert.ok(tiles.every(tile => tile.score === '40'), `${view} starts at 40`);
       }
     }
   }
 
-  // The last game is six players. Rotate one seat, then turn the screen and reload.
-  await page.setViewportSize({ width: 852, height: 393 });
-  await button('Game setup').tap();
-  await button('Rotate seats').tap();
-  await button('Rotate Player 6 clockwise').tap();
-  assert.deepEqual((await readTiles(page))[5].down, down['←']);
-  await button('Done rotating seats').tap();
-  await page.setViewportSize({ width: 393, height: 852 });
-  assert.deepEqual((await readTiles(page))[5].down, down['↓']);
-  await button('Add one life to Player 6').tap();
+  // The last game is six players with a landscape screen at 90°. Rotate one seat, then turn the phone around.
+  await turnScreen(page, 852, 393, 90);
+  await button(page, 'Game setup').tap();
+  await button(page, 'Rotate seats').tap();
+  await button(page, 'Rotate Player 6 clockwise').tap();
+  await button(page, 'Done rotating seats').tap();
+  const rotated = ['1↑ 2↑ 5↑', '3↓ 4↓ 6←'];
+  await checkBoard(page, rotated, 0, 'upright landscape');
+  await turnScreen(page, 852, 393, 270);
+  await checkBoard(page, rotated, 180, 'phone turned end over end');
+  await turnScreen(page, 393, 852, 0);
+  await checkBoard(page, rotated, 90, 'portrait, turned one way');
+  await turnScreen(page, 393, 852, 180);
+  await checkBoard(page, rotated, 270, 'portrait, turned the other way');
+
+  // The seats stay fixed to the device after a reload.
+  await button(page, 'Add one life to Player 6').tap();
   await page.reload();
-  const tiles = await readTiles(page);
-  assert.deepEqual(tiles[5].down, down['↓']);
+  const tiles = await checkBoard(page, rotated, 270, 'portrait after reload');
   assert.equal(tiles[5].score, '41');
-  assert.deepEqual(tiles[4].down, down['←']);
+
+  // In split screen the window can be portrait while the screen is landscape. The board still fits as landscape.
+  await turnScreen(page, 393, 852, 90);
+  await checkBoard(page, rotated, 90, 'portrait window on a landscape screen');
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: the landscape seats stay in place as the window rotates`, { timeout: 60000 }, t => checkLayouts(t, engine));
+  test(`${name}: the landscape seats stay fixed to the device as the screen turns`, { timeout: 90000 }, t => checkLayouts(t, engine));
 }

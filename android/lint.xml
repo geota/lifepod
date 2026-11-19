@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Ignored below API 33, where onBackPressed handles back instead. -->
+    <issue id="UnusedAttribute">
+        <ignore path="AndroidManifest.xml" />
+    </issue>
+    <!-- Android 16 ignores the landscape lock on large screens. app.js keeps the board landscape there. -->
+    <issue id="DiscouragedApi">
+        <ignore path="AndroidManifest.xml" />
+    </issue>
+    <!-- build-apk.sh sets the version code and name from the release tag. -->
+    <issue id="MissingVersion" severity="ignore" />
+    <!-- Raising targetSdkVersion changes platform behavior, so it gets its own change and device testing. -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- Follow-up: replace the square launcher icon with an adaptive icon. -->
+    <issue id="IconLauncherShape" severity="ignore" />
+</lint>

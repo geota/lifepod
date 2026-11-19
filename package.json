@@ -4,7 +4,7 @@
   "scripts": {
     "lint": "npm run lint:web && npm run lint:android && npm run lint:ios",
     "lint:web": "eslint web/app.js",
-    "lint:android": "ktlint 'android/src/**/*.kt'",
+    "lint:android": "ktlint 'android/src/**/*.kt' && ./android/lint.sh",
     "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift",
     "test": "node --test"
   },

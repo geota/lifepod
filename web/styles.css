@@ -21,10 +21,36 @@ button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-colo
 button, .player { -webkit-user-select: none; user-select: none; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
+/* app.js turns the board so seats stay fixed to the device as the screen rotates. */
 .app {
-  position: relative;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100vw;
   height: 100vh;
+  width: 100dvw;
   height: 100dvh;
+  transform: translate(-50%, -50%);
+  /* Several players touch at once, so the browser must not treat touches as zoom or scroll gestures. */
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+.app:is([data-board-turn="90"], [data-board-turn="270"]) {
+  width: 100vh;
+  height: 100vw;
+  width: 100dvh;
+  height: 100dvw;
+}
+.app[data-board-turn="90"] { transform: translate(-50%, -50%) rotate(90deg); }
+.app[data-board-turn="180"] { transform: translate(-50%, -50%) rotate(180deg); }
+.app[data-board-turn="270"] { transform: translate(-50%, -50%) rotate(270deg); }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .board {
@@ -150,26 +176,29 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .rotate-seat {
   position: absolute;
   inset: 0;
-  padding: 8px;
-  text-align: right;
+  padding: 0;
   border: 0;
   background: transparent;
-  color: var(--text);
 }
-.rotate-seat span {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+/* While rotating seats, the badge takes the + button's place, which is always well inside the tile. */
+.controls .subtract { grid-area: 1 / 1; }
+.controls .score { grid-area: 1 / 2; }
+.controls .add { grid-area: 1 / 3; }
+.rotate-badge {
+  grid-area: 1 / 3;
+  justify-self: center;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: clamp(36px, 13cqi, 48px);
+  aspect-ratio: 1;
   border: 1px solid var(--rim);
   border-radius: 50%;
   background: var(--button);
-  font-size: 1.25rem;
+  color: var(--seat);
+  font-size: clamp(1.25rem, 8cqi, 1.625rem);
   line-height: 1;
 }
+.board:not([data-rotating]) .rotate-badge, .board[data-rotating] .controls button { visibility: hidden; }
 .rotate-seat:active { background: #f3f1e51a; }
 .rotate-seat:focus-visible { outline-offset: -3px; }
 .setup-icon[hidden] { display: none; }
@@ -222,29 +251,4 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 @media (max-height: 420px), (max-width: 420px) {
   .sheet { gap: 5px; padding-block: 8px; }
   legend, .life-setting label { margin-bottom: 4px; }
-}
-
-/* Fit the same landscape UI into a portrait window when the OS keeps it upright. */
-@media (orientation: portrait) {
-  .app, dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) rotate(-90deg);
-  }
-  .app {
-    width: 100vh;
-    height: 100vw;
-    width: 100dvh;
-    height: 100dvw;
-  }
-  dialog {
-    right: auto;
-    bottom: auto;
-    margin: 0;
-    width: min(420px, calc(100vh - 30px));
-    max-height: calc(100vw - 12px);
-    width: min(420px, calc(100dvh - 30px));
-    max-height: calc(100dvw - 12px);
-  }
 }

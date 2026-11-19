@@ -13,7 +13,7 @@
 
 </div>
 
-A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change.
+A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change. Several players can tap or hold their own buttons at the same time.
 
 ## Screenshots
 
@@ -35,11 +35,11 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 ## At the table
 
-Set the phone in the middle of the table in landscape. The seating arrangement stays fixed when the screen turns or the browser window resizes. With two players, the seats face opposite short ends. With four or six, two or three seats face each long side. With three or five, one or two seats face each long side and one larger seat faces the right end. Each player reads **−** on the left and **+** on the right from their seat.
+Set the phone in the middle of the table in landscape. The seats stay fixed to the device: if the screen turns to portrait or upside down, the board turns back so every total stays in front of its player. Each new game treats the current landscape as upright. With two players, the seats face opposite short ends. With four or six, two or three seats face each long side. With three or five, one or two seats face each long side and one larger seat faces the right end. Each player reads **−** on the left and **+** on the right from their seat.
 
 Tap the sliders in the center to choose 2–6 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
 
-Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark when finished. Rotation choices carry over when restarting with the same player count.
+Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark or press back when finished. Rotation choices carry over when restarting with the same player count.
 
 ## Install on Android
 
@@ -50,7 +50,7 @@ Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap
 
 LifePod supports **Android 11 and later**. The Obtainium badge imports `dev.maceiras.lifepod` with **Include prereleases** enabled. You can also add `https://github.com/geota/lifepod` manually in [Obtainium](https://github.com/ImranR98/Obtainium/releases) with the same setting. Obtainium can install LifePod once a GitHub prerelease contains the signed `lifepod.apk`.
 
-Before the first prerelease, download the `lifepod-android` artifact from a successful [CI run](https://github.com/geota/lifepod/actions/workflows/ci.yml), unzip it, and open `lifepod-debug.apk` on your phone.
+Before the first prerelease, download the `lifepod-android` artifact from a successful [CI run](https://github.com/geota/lifepod/actions/workflows/ci.yml), unzip it, and open `lifepod-debug.apk` on your phone. Debug builds are signed with the committed, non-secret `android/debug.keystore`, so each newer debug build installs over the last one and keeps the saved game.
 
 ### Build locally
 
@@ -68,9 +68,9 @@ Open `web/index.html` to try the tracker on your computer. The preview uses brow
 
 ## Lint
 
-Install ktlint and select full Xcode for `swift-format`. Then run `npm ci` and `npm run lint` from the project root. Run `npm run lint:web`, `npm run lint:android`, or `npm run lint:ios` to check one platform.
+Install ktlint, Kotlin (`kotlinc`), Android SDK Command-line Tools 23.0 (for Android Lint), and full Xcode for `swift-format`. Then run `npm ci` and `npm run lint` from the project root. Android Lint runs without Gradle through `android/lint.sh`, which describes the app in a lint project file; `android/lint.xml` lists the checks LifePod deliberately ignores and why. Run `npm run lint:web`, `npm run lint:android`, or `npm run lint:ios` to check one platform.
 
-Run `npx playwright-core install chromium webkit` and `npm test` to check seat placement and facing across both window orientations.
+Run `npx playwright-core install chromium webkit` and `npm test` to check seat placement and facing as the screen turns each way, and simultaneous taps and holds by several players.
 
 ## Shared code
 

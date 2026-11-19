@@ -15,7 +15,10 @@ const startingLifeInput = document.querySelector('#starting-life');
 const lifePresets = document.querySelector('#life-presets');
 const lifeError = document.querySelector('#life-error');
 const restart = document.querySelector('#restart');
+const announcer = document.querySelector('#announcer');
+const portraitQuery = window.matchMedia('(orientation: portrait)');
 const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
+const quarterTurns = [0, 90, 180, 270];
 // Landscape rows list seats by facing edge and player number. Repeated seats span cells.
 const seatLayouts = {
   2: ['left-1 right-2'],
@@ -28,14 +31,59 @@ const playerCounts = Object.keys(seatLayouts).map(Number);
 
 let game = loadGame();
 let selectedPlayerCount = game.scores.length;
-let repeatTimer;
-let repeatingPointer;
 let lock;
 let requestingLock = false;
 let rotatingSeats = false;
+let announceTimer;
+const pendingAnnouncements = new Set();
+// Every held counter button, so several players can hold buttons at the same time.
+const activePresses = new Set();
+
+// Read the size directly. Media queries can lag a resize in WebKit.
+function isPortraitWindow() {
+  return window.innerHeight > window.innerWidth;
+}
+
+function normalizeAngle(angle) {
+  return ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
+}
+
+// The angle the OS has turned the screen clockwise from the device's natural orientation.
+function readScreen() {
+  const orientation = window.screen.orientation;
+  if (orientation && Number.isFinite(orientation.angle) && typeof orientation.type === 'string') {
+    return { angle: normalizeAngle(orientation.angle), landscape: orientation.type.startsWith('landscape') };
+  }
+  if (Number.isFinite(window.orientation)) {
+    const angle = normalizeAngle(window.orientation);
+    return { angle, landscape: angle % 180 !== 0 };
+  }
+  // Without an orientation API, treat the window's shape as the screen's.
+  return isPortraitWindow() ? { angle: 0, landscape: false } : { angle: 90, landscape: true };
+}
+
+// The screen angle that shows the board upright in landscape, so the seats can stay fixed to the device.
+function currentLandscapeAngle() {
+  const { angle, landscape } = readScreen();
+  return landscape ? angle : (angle + 90) % 360;
+}
+
+function boardTurn() {
+  let turn = (game.landscapeAngle - readScreen().angle + 360) % 360;
+  // Keep the board landscape when the window shape differs from the screen, as in split screen.
+  if ((turn % 180 !== 0) !== isPortraitWindow()) turn = (turn + 90) % 360;
+  return turn;
+}
+
+function syncBoardTurn() {
+  document.querySelector('.app').dataset.boardTurn = String(boardTurn());
+}
 
 function loadGame() {
-  const defaults = { startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true };
+  const defaults = {
+    startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
+    landscapeAngle: currentLandscapeAngle(),
+  };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
     const saved = JSON.parse(snapshot);
@@ -47,7 +95,10 @@ function loadGame() {
       const turn = saved.rotations?.[index];
       return Number.isInteger(turn) && turn >= 0 && turn < clockwiseEdges.length ? turn : 0;
     });
-    return { startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false };
+    const landscapeAngle = quarterTurns.includes(saved.landscapeAngle) ? saved.landscapeAngle : defaults.landscapeAngle;
+    return {
+      startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false, landscapeAngle,
+    };
   } catch {
     return defaults;
   }
@@ -93,46 +144,75 @@ async function syncWakeLock() {
   }
 }
 
-function stopRepeating() {
-  clearTimeout(repeatTimer);
-  repeatingPointer = undefined;
+function cancelPresses() {
+  for (const press of [...activePresses]) press.end(false);
 }
 
+// Pointer input is handled on pointerup, because browsers may skip click events while several fingers
+// touch the screen. Clicks still handle keyboards and assistive technology.
 function bindCounter(button, adjust, label) {
   button.setAttribute('aria-label', label);
-  let repeated = false;
+  let press;
+  let ignoreClicksUntil = 0;
 
   button.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || repeatingPointer !== undefined) return;
-    repeated = false;
-    repeatingPointer = event.pointerId;
+    if (event.button !== 0 || press) return;
     button.setPointerCapture(event.pointerId);
+    const current = {
+      pointerId: event.pointerId,
+      repeated: false,
+      end(apply) {
+        clearTimeout(current.timer);
+        activePresses.delete(current);
+        if (press === current) press = undefined;
+        if (apply && !current.repeated) adjust();
+      },
+    };
     function repeat() {
-      repeated = true;
+      current.repeated = true;
       adjust();
-      repeatTimer = setTimeout(repeat, 100);
+      current.timer = setTimeout(repeat, 100);
     }
-    repeatTimer = setTimeout(repeat, 420);
+    current.timer = setTimeout(repeat, 420);
+    press = current;
+    activePresses.add(current);
   });
   button.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== repeatingPointer || !button.hasPointerCapture(event.pointerId)) return;
+    if (event.pointerId !== press?.pointerId) return;
     const bounds = button.getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right ||
         event.clientY < bounds.top || event.clientY > bounds.bottom) {
-      repeated = true;
-      stopRepeating();
+      press.end(false);
     }
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     button.addEventListener(type, (event) => {
-      if (event.pointerId === repeatingPointer) stopRepeating();
+      if (event.pointerId !== press?.pointerId) return;
+      ignoreClicksUntil = performance.now() + 800;
+      press.end(type === 'pointerup');
     });
   }
   button.addEventListener('contextmenu', (event) => event.preventDefault());
+  // Skip the click that follows a press already counted on pointerup. Keyboard clicks have no detail.
   button.addEventListener('click', (event) => {
-    if (!repeated || event.detail === 0) adjust();
-    repeated = false;
+    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) adjust();
   });
+}
+
+// Announce totals once a burst of changes settles, instead of on every step of a hold.
+function announceLife(index) {
+  pendingAnnouncements.add(index);
+  clearTimeout(announceTimer);
+  announceTimer = setTimeout(() => {
+    announcer.textContent = [...pendingAnnouncements].sort((a, b) => a - b)
+      .map(player => `Player ${player + 1}, ${game.scores[player]} life`).join('. ');
+    pendingAnnouncements.clear();
+  }, 700);
+}
+
+// Android's back gesture only needs the page while a dialog or seat rotation is open.
+function syncBackHandling() {
+  android?.setBackHandling?.(rotatingSeats || document.querySelector('dialog[open]') !== null);
 }
 
 function layoutBoard() {
@@ -150,21 +230,25 @@ function layoutBoard() {
 
 function setRotationMode(enabled) {
   rotatingSeats = enabled;
-  stopRepeating();
+  cancelPresses();
   for (const player of board.children) {
     player.querySelector('.controls').inert = enabled;
     player.querySelector('.rotate-seat').hidden = !enabled;
   }
+  board.toggleAttribute('data-rotating', enabled);
   setupButton.dataset.rotating = String(enabled);
   setupButton.setAttribute('aria-label', enabled ? 'Done rotating seats' : 'Game setup');
   setupButton.setAttribute('aria-haspopup', enabled ? 'false' : 'dialog');
   setupButton.querySelector('.setup-icon').hidden = enabled;
   setupButton.querySelector('.rotation-done').hidden = !enabled;
   (enabled ? board.querySelector('.rotate-seat') : setupButton).focus();
+  syncBackHandling();
 }
 
 function renderBoard() {
-  stopRepeating();
+  cancelPresses();
+  clearTimeout(announceTimer);
+  pendingAnnouncements.clear();
   const players = game.scores.map((_, index) => {
     const player = playerTemplate.content.firstElementChild.cloneNode(true);
     const name = `Player ${index + 1}`;
@@ -182,6 +266,7 @@ function renderBoard() {
       if (!Number.isSafeInteger(next)) return;
       game.scores[index] = next;
       renderScore();
+      announceLife(index);
       saveGame();
     }
 
@@ -205,7 +290,10 @@ function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
+  // A new game takes the screen's current landscape as upright.
+  game.landscapeAngle = currentLandscapeAngle();
   saveGame();
+  syncBoardTurn();
   renderBoard();
 }
 
@@ -266,6 +354,7 @@ setupButton.addEventListener('click', () => {
   wakeInput.checked = game.keepAwake;
   renderSetup();
   setup.showModal();
+  syncBackHandling();
 });
 setup.querySelector('[data-close]').addEventListener('click', () => setup.close());
 rotateSeatsButton.addEventListener('click', () => {
@@ -291,8 +380,11 @@ document.querySelector('#restart-button').addEventListener('click', () => {
   restart.returnValue = 'cancel';
   setup.close();
   restart.showModal();
+  syncBackHandling();
 });
+setup.addEventListener('close', syncBackHandling);
 restart.addEventListener('close', () => {
+  syncBackHandling();
   if (restart.returnValue === 'restart') startGame(game.scores.length, game.startingLife);
   setupButton.focus();
 });
@@ -317,8 +409,14 @@ wakeInput.addEventListener('change', () => {
   syncWakeLock();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) stopRepeating();
+  if (document.hidden) cancelPresses();
   else if (!android && !ios) syncWakeLock();
 });
+window.screen.orientation?.addEventListener?.('change', syncBoardTurn);
+window.addEventListener('orientationchange', syncBoardTurn);
+window.addEventListener('resize', syncBoardTurn);
+portraitQuery.addEventListener('change', syncBoardTurn);
+syncBoardTurn();
 renderBoard();
 syncWakeLock();
+syncBackHandling();

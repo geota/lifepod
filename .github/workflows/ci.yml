@@ -44,7 +44,7 @@ jobs:
           if-no-files-found: error
 
   android:
-    name: Android lint and APK
+    name: Android ktlint, Android Lint, and APK
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -57,8 +57,9 @@ jobs:
           java-version: '21'
       - name: Ensure Android SDK packages are available
         run: |
-          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -x "$ANDROID_HOME/build-tools/36.1.0/aapt2" ]]; then
-            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.1.0'
+          if [[ ! -f "$ANDROID_HOME/platforms/android-36/android.jar" || ! -x "$ANDROID_HOME/build-tools/36.1.0/aapt2" ||
+                ! -x "$ANDROID_HOME/cmdline-tools/23.0/bin/lint" ]]; then
+            "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-36' 'build-tools;36.1.0' 'cmdline-tools;23.0'
           fi
       - name: Install Kotlin 2.2.21 and ktlint 1.8.0
         working-directory: ${{ runner.temp }}
@@ -75,6 +76,14 @@ jobs:
           chmod +x ktlint
           printf '%s\n' "$RUNNER_TEMP/kotlinc/bin" "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - run: ktlint 'android/src/**/*.kt'
+      - name: Android Lint
+        run: ./android/lint.sh
+      - if: failure()
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: android-lint-report
+          path: android/build/lint-report.html
+          if-no-files-found: ignore
       - name: Build Android APK
         id: apk
         env:
