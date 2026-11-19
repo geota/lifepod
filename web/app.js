@@ -15,6 +15,7 @@ const startingLifeInput = document.querySelector('#starting-life');
 const lifePresets = document.querySelector('#life-presets');
 const lifeError = document.querySelector('#life-error');
 const restart = document.querySelector('#restart');
+const privacy = document.querySelector('#privacy');
 const announcer = document.querySelector('#announcer');
 const portraitQuery = window.matchMedia('(orientation: portrait)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -370,6 +371,16 @@ setupButton.addEventListener('click', () => {
   syncBackHandling();
 });
 setup.querySelector('[data-close]').addEventListener('click', () => setup.close());
+// The privacy summary opens from setup and returns to it. The apps can't open web pages, so it's shown here.
+document.querySelector('#privacy-button').addEventListener('click', () => {
+  setup.close();
+  privacy.showModal();
+  syncBackHandling();
+});
+privacy.addEventListener('close', () => {
+  setup.showModal();
+  syncBackHandling();
+});
 rotateSeatsButton.addEventListener('click', () => {
   setup.close();
   setRotationMode(true);

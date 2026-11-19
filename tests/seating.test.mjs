@@ -116,6 +116,18 @@ async function checkLayouts(t, engine) {
   // In split screen the window can be portrait while the screen is landscape. The board still fits as landscape.
   await turnScreen(page, 393, 852, 90);
   await checkBoard(page, rotated, 90, 'portrait window on a landscape screen');
+
+  // Setup fits the smallest landscape phone, and its privacy summary opens and returns to setup.
+  await turnScreen(page, 568, 320, 90);
+  await button(page, 'Game setup').tap();
+  const setupBox = await page.locator('#setup').boundingBox();
+  assert.ok(setupBox.y >= 0 && setupBox.y + setupBox.height <= 320, `setup fits: ${JSON.stringify(setupBox)}`);
+  await button(page, 'Privacy').tap();
+  assert.match(await page.locator('#privacy').textContent(), /collects no data/);
+  await button(page, 'Close privacy policy').tap();
+  // The dialog close event runs after the click, so wait for setup to reopen.
+  await page.waitForFunction(() => document.querySelector('#setup').open, null, { timeout: 2000 });
+  await button(page, 'Close setup').tap();
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {

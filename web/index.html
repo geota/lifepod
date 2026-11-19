@@ -38,7 +38,10 @@
     <form class="sheet" id="setup-form" novalidate>
       <div class="sheet-header">
         <h2 id="setup-title">Game setup</h2>
-        <button class="close" type="button" data-close aria-label="Close setup" autofocus>×</button>
+        <div class="sheet-header-actions">
+          <button class="text-button" type="button" id="privacy-button" aria-haspopup="dialog">Privacy</button>
+          <button class="close" type="button" data-close aria-label="Close setup" autofocus>×</button>
+        </div>
       </div>
       <fieldset>
         <legend>Players</legend>
@@ -67,6 +70,20 @@
       <div class="sheet-actions">
         <button class="secondary" type="button" id="restart-button">New game</button>
         <button class="primary" type="submit" id="save-setup">Done</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="privacy" aria-labelledby="privacy-title">
+    <form class="sheet" method="dialog">
+      <div class="sheet-header">
+        <h2 id="privacy-title">Privacy</h2>
+        <button class="close" type="submit" aria-label="Close privacy policy" autofocus>×</button>
+      </div>
+      <div class="privacy-text">
+        <p>LifePod collects no data. There are no accounts, ads, analytics, or tracking, and the apps make no network requests.</p>
+        <p>The current game (players, life totals, seat rotations, and Keep awake) is saved only on this device. Removing the app or clearing its data deletes it.</p>
+        <p>Full policy: github.com/geota/lifepod/blob/main/PRIVACY.md</p>
       </div>
     </form>
   </dialog>

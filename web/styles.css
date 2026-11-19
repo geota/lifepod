@@ -223,6 +223,10 @@ dialog::backdrop { background: #0c110dd9; }
 .sheet { display: grid; gap: 19px; padding: 20px; }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .sheet-header h2 { font-size: 1.375rem; letter-spacing: -.022em; }
+.sheet-header-actions { display: flex; align-items: center; gap: 4px; }
+.text-button { min-height: 44px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: .875rem; font-weight: 650; }
+.text-button:active { background: #354137; }
+.privacy-text { display: grid; gap: 10px; max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
 .close, .choices button, .primary, .secondary {
   min-height: 44px;
   border: 1px solid var(--border);
