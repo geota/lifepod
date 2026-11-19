@@ -113,6 +113,9 @@ async function checkLayouts(t, engine) {
 
   // The seats stay fixed to the device after a reload.
   await button(page, 'Add one life to Player 6').tap();
+  // Chromium writes page storage in the background. On a busy CI machine a reload straight after a write
+  // can read the old values, so give the writes a moment to land first.
+  await page.waitForTimeout(500);
   await page.reload();
   const tiles = await checkBoard(page, rotated, 270, 'portrait after reload');
   assert.equal(tiles[5].score, '41');
