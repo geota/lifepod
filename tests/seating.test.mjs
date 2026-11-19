@@ -53,6 +53,7 @@ async function checkBoard(page, layout, turn, view) {
   const { width, height } = page.viewportSize();
   const [long, short] = [Math.max(width, height), Math.min(width, height)];
   const tiles = await readTiles(page);
+  const rendered = await page.locator('.app').getAttribute('data-board-turn');
   const rows = layout.map(row => row.split(' '));
   assert.equal(tiles.length, rows.flat().filter((seat, i, all) => all.indexOf(seat) === i).length, view);
   rows.forEach((row, y) => row.forEach(([number, arrow], x) => {
@@ -60,7 +61,9 @@ async function checkBoard(page, layout, turn, view) {
     const seat = `${view}, seat ${number}`;
     const [cellX, cellY] = turnPoint(turn, long, short, [(x + 0.5) * long / row.length, (y + 0.5) * short / rows.length]);
     const { left, right, top, bottom } = tile.bounds;
-    assert.ok(cellX > left && cellX < right && cellY > top && cellY < bottom, `${seat} occupies its cell`);
+    assert.ok(cellX > left && cellX < right && cellY > top && cellY < bottom,
+      `${seat} occupies its cell: expected (${Math.round(cellX)}, ${Math.round(cellY)}) inside ${JSON.stringify(tile.bounds)} ` +
+      `with the board turned ${turn}°, rendered ${rendered}° in a ${width}×${height} window`);
     const facing = turnDirection(turn, down[arrow]);
     assert.deepEqual(tile.down, facing, `${seat} faces ${arrow} relative to the landscape board`);
     const [dx, dy] = facing;
