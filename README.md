@@ -19,10 +19,10 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 <div align="center">
 <a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Four-player portrait board with two seats facing each long side" /></a>
-<a href="screenshots/eight-players.png"><img src="screenshots/eight-players.png" width="180" alt="Eight-player portrait board with four seats facing each long side" /></a>
+<a href="screenshots/six-players.png"><img src="screenshots/six-players.png" width="180" alt="Six-player board" /></a>
 <a href="screenshots/setup.png"><img src="screenshots/setup.png" width="180" alt="Setup for player count, starting life, screen awake, and seat rotation" /></a>
 <br />
-<sub>Four players · Eight players · Setup</sub>
+<sub>Four players · Six players · Setup</sub>
 </div>
 
 <div align="center">
@@ -35,9 +35,9 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 ## At the table
 
-Set the phone in the middle of the table. With four or eight players, seats face the phone’s two long sides, with **−** and **+** on either side of each total. With three, five, or seven players, one seat spans two slots so the board still fills the screen.
+Set the phone in the middle of the table. With four players, seats face the phone’s two long sides, with **−** and **+** on either side of each total. With three or five players, one seat spans two slots so the board still fills the screen.
 
-Tap the sliders in the center to choose 2–8 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
+Tap the sliders in the center to choose 2–6 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
 
 Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark when finished. Rotation choices carry over when restarting with the same player count.
 

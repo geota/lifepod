@@ -37,15 +37,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .board[data-count="2"] { --columns: 1; }
 .board:where([data-count="5"], [data-count="6"]) { --rows: 3; }
-.board:where([data-count="7"], [data-count="8"]) { --rows: 4; }
-.board:where([data-count="3"], [data-count="5"], [data-count="7"]) .player:last-child { grid-column: 1 / -1; }
-.board[data-landscape="false"]:where([data-count="4"], [data-count="8"]) { grid-auto-flow: column; }
+.board:where([data-count="3"], [data-count="5"]) .player:last-child { grid-column: 1 / -1; }
+.board[data-landscape="false"][data-count="4"] { grid-auto-flow: column; }
 
 .board[data-landscape="true"] { --rows: 2; }
 .board[data-landscape="true"][data-count="2"] { --columns: 2; --rows: 1; }
 .board[data-landscape="true"]:where([data-count="5"], [data-count="6"]) { --columns: 3; }
-.board[data-landscape="true"]:where([data-count="7"], [data-count="8"]) { --columns: 4; }
-.board[data-landscape="true"]:where([data-count="3"], [data-count="5"], [data-count="7"]) .player:last-child {
+.board[data-landscape="true"]:where([data-count="3"], [data-count="5"]) .player:last-child {
   grid-column: -2 / -1;
   grid-row: 1 / -1;
 }
@@ -99,8 +97,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .player:nth-child(4) { --panel: #3a3148; --rim: #6c5880; --seat: #e4cff7; --button: #2d2538; }
 .player:nth-child(5) { --panel: #43391e; --rim: #786642; --seat: #f6de96; --button: #302810; }
 .player:nth-child(6) { --panel: #24413c; --rim: #466e64; --seat: #b4eddd; --button: #1a2f2b; }
-.player:nth-child(7) { --panel: #452f3c; --rim: #77536a; --seat: #f2c7e4; --button: #31222c; }
-.player:nth-child(8) { --panel: #373c3e; --rim: #656f71; --seat: #d7e6e9; --button: #272d2e; }
 
 .player-face {
   --control-size: clamp(44px, 18cqi, 74px);

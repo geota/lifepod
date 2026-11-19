@@ -23,9 +23,8 @@ const seatEdges = {
   4: [['left', 'left', 'right', 'right'], ['top', 'top', 'bottom', 'bottom']],
   5: [['top', 'top', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'bottom', 'bottom', 'right']],
   6: [['top', 'top', 'bottom', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'top', 'bottom', 'bottom', 'bottom']],
-  7: [['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'right']],
-  8: [['left', 'left', 'left', 'left', 'right', 'right', 'right', 'right'], ['top', 'top', 'top', 'top', 'bottom', 'bottom', 'bottom', 'bottom']],
 };
+const playerCounts = Object.keys(seatEdges).map(Number);
 
 let game = loadGame();
 let selectedPlayerCount = game.scores.length;
@@ -40,7 +39,7 @@ function loadGame() {
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
     const saved = JSON.parse(snapshot);
-    if (!saved || !Array.isArray(saved.scores) || saved.scores.length < 2 || saved.scores.length > 8 ||
+    if (!saved || !Array.isArray(saved.scores) || !playerCounts.includes(saved.scores.length) ||
         !saved.scores.every(Number.isSafeInteger) || !Number.isSafeInteger(saved.startingLife) || saved.startingLife < 1) {
       return defaults;
     }
@@ -234,7 +233,7 @@ function renderSetup() {
   startingLifeInput.removeAttribute('aria-describedby');
 }
 
-for (let count = 2; count <= 8; count += 1) {
+for (const count of playerCounts) {
   const choice = document.createElement('button');
   choice.type = 'button';
   choice.value = count;
