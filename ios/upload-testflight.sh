@@ -37,10 +37,12 @@ auth=(
     -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
 )
 
+# Archive unsigned, then let the export sign for App Store distribution. Signing the archive itself would need a
+# development profile, which Apple only issues once a device is registered to the team.
 xcodebuild -project "$ios_dir/LifePod.xcodeproj" -scheme LifePod -configuration Release \
     -destination 'generic/platform=iOS' -archivePath "$work/LifePod.xcarchive" \
     DEVELOPMENT_TEAM="$APPLE_TEAM_ID" MARKETING_VERSION="$LIFE_POD_VERSION_NAME" \
-    CURRENT_PROJECT_VERSION="$LIFE_POD_BUILD_NUMBER" "${auth[@]}" archive
+    CURRENT_PROJECT_VERSION="$LIFE_POD_BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO archive
 
 cat > "$work/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
