@@ -48,7 +48,9 @@ Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap
   <a href="https://github.com/geota/lifepod/releases"><img alt="Get it on GitHub" height="56" src="https://raw.githubusercontent.com/andOTP/andOTP/master/assets/badges/get-it-on-github.png" /></a>
 </p>
 
-LifePod supports **Android 11 and later**. The Obtainium badge imports `dev.maceiras.lifepod` with **Include prereleases** enabled. You can also add `https://github.com/geota/lifepod` manually in [Obtainium](https://github.com/ImranR98/Obtainium/releases) and enable **Include prereleases**. Install `lifepod.apk` from a signed prerelease, then follow updates in Obtainium.
+LifePod supports **Android 11 and later**. The Obtainium badge imports `dev.maceiras.lifepod` with **Include prereleases** enabled. You can also add `https://github.com/geota/lifepod` manually in [Obtainium](https://github.com/ImranR98/Obtainium/releases) with the same setting. Obtainium can install LifePod once a GitHub prerelease contains the signed `lifepod.apk`.
+
+Before the first prerelease, download the `lifepod-android` artifact from a successful [CI run](https://github.com/geota/lifepod/actions/workflows/ci.yml), unzip it, and open `lifepod-debug.apk` on your phone.
 
 ### Build locally
 
@@ -80,7 +82,7 @@ Run `npx playwright-core install chromium webkit` and `npm test` to check seat p
 
 ### Publish a signed alpha
 
-Create a PKCS#12 signing keystore once and back it up. Use the same keystore for every release so Android can install upgrades in place.
+Create a dedicated PKCS#12 signing keystore for LifePod and back it up. Use the same LifePod keystore for every release so Android can install upgrades in place.
 
 ```sh
 mkdir -p "$HOME/.config/lifepod"
