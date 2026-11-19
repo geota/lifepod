@@ -27,6 +27,15 @@ const devices = [
   { dir: 'app-store/ipad-13in', width: 1376, height: 1032, scale: 2 },  // 2752 × 2064
 ];
 
+// The README screenshots, at the 852 × 393 phone size, saved under the names the README uses.
+const readme = {
+  dir: '../screenshots', width: 852, height: 393, scale: 2,
+  names: {
+    '01-four-players': 'board', '02-six-players': 'six-players', '03-three-players': 'three-players',
+    '04-five-players': 'five-players', '06-setup': 'setup', '07-rotate-seats': 'rotate-seats',
+  },
+};
+
 async function renderScene(browser, device, scene) {
   const page = await browser.newPage({
     viewport: { width: device.width, height: device.height },
@@ -51,7 +60,7 @@ async function renderScene(browser, device, scene) {
     if (scene.open === 'rotate') await button(page, 'Rotate seats').tap();
     await page.evaluate(() => document.activeElement?.blur());
   }
-  const path = `${out}${device.dir}/${scene.name}.png`;
+  const path = `${out}${device.dir}/${device.names?.[scene.name] ?? scene.name}.png`;
   await page.screenshot({ path });
   await page.close();
   return path;
@@ -64,6 +73,7 @@ try {
     mkdirSync(`${out}${device.dir}`, { recursive: true });
     for (const scene of scenes) await renderScene(browser, device, scene);
   }
+  for (const scene of scenes.filter(({ name }) => readme.names[name])) await renderScene(browser, readme, scene);
 
   // Play's feature graphic is drawn from the four-player phone screenshot.
   const graphic = await browser.newPage({ viewport: { width: 1024, height: 500 } });

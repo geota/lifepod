@@ -68,7 +68,8 @@ async function checkBoard(page, layout, turn, view) {
     assert.ok(across(tile.minus) < across(tile.center) && across(tile.plus) > across(tile.center), `${seat} reads − total +`);
   }));
   const covered = tiles.reduce((area, { bounds }) => area + bounds.width * bounds.height, 0);
-  assert.ok(covered >= width * height * 0.99, `${view} fills the screen`);
+  // The 2px seams between tiles take up to about 1.2% of the smallest screens.
+  assert.ok(covered >= width * height * 0.98, `${view} fills the screen`);
   return tiles;
 }
 
