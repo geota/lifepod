@@ -1,0 +1,101 @@
+/*
+ * LifePod design tokens.
+ * Taken from web/styles.css and adjusted only where design/AUDIT.md found a problem.
+ * Every changed value is marked CHANGED with the old value and the audit finding.
+ * The app is dark only (color-scheme: dark), so there is no light theme here.
+ */
+:root {
+  color-scheme: dark;
+
+  /* ---- Surfaces and text ---- */
+  --background: #141916;          /* page, board seams, setup button fill */
+  --surface: #202720;             /* dialogs, secondary buttons */
+  --surface-pressed: #354137;     /* CHANGED: also replaces #3c4b3f on .setup-button:active (one pressed tone; ΔE < 3) */
+  --border: #3b473d;              /* dialog and choice outlines (decorative: labels identify the controls) */
+  --control-border: #819084;      /* switch outline; CHANGED: now also the setup ring (was #627266, 2.2:1 on panels → 3.05:1 minimum) [A3] */
+  --switch-off: #38423a;
+  --text: #f3f1e5;                /* 13.5:1 on surface, ≥ 9:1 on every player panel */
+  --text-soft: #d6e1d5;           /* CHANGED: merges #d4ded0 (setup icon) and #d6e1d5 (switch knob) */
+  --muted: #bcc7b8;               /* 8.7:1 on surface */
+  --accent: #def09a;              /* selected, primary, rotation done */
+  --accent-pressed: #c5d882;
+  --ink: #202914;                 /* text on accent, 12.3:1 */
+  --danger-text: #ffc7b2;         /* field error; same as player 3 seat, 10.3:1 on surface */
+  --press-overlay: #f3f1e51a;     /* rotate-seat tap feedback */
+  --scrim: #0c110dd9;             /* dialog backdrop */
+  --shadow-dialog: 0 24px 80px #0e130fd9;
+  --shadow-float: 0 2px 7px #10161291;
+
+  /* ---- Board ---- */
+  --seam: var(--background);
+  --seam-width: 2px;              /* CHANGED: was 1px (gap: 1px); seams read at 1.3–1.7:1, so tiles merge at a distance [A1] */
+  --ring-opacity: 0.08;           /* seat ripple decoration */
+
+  /* ---- Players ----
+   * Every panel keeps its hue and chroma (OKLCH C ≈ 0.04, the muted range).
+   * CHANGED: panels, rims and buttons are shifted ±0.025 in OKLab lightness: seats 1, 2 and 5 (the top row
+   * in landscape) lighter, seats 3, 4 and 6 darker. Vertical neighbours now differ in lightness as well as
+   * hue, so they stay apart for red-green colour-blind players [A1]. Seat (glyph) colours are unchanged.
+   */
+  --p1-panel: #2f432f;  --p1-rim: #556e4e;  --p1-seat: #d3eeaa;  --p1-button: #233324;  /* green   was #293c29 #4e6747 · #1d2d1e */
+  --p2-panel: #2c4352;  --p2-rim: #517187;  --p2-seat: #b6e0f7;  --p2-button: #21323e;  /* blue    was #263c4b #4a6a80 · #1b2c37 */
+  --p3-panel: #432a27;  --p3-rim: #7b4f44;  --p3-seat: #ffc7b2;  --p3-button: #301d1a;  /* red     was #4a302d #83564b · #372320 */
+  --p4-panel: #342b41;  --p4-rim: #655179;  --p4-seat: #e4cff7;  --p4-button: #271f32;  /* violet  was #3a3148 #6c5880 · #2d2538 */
+  --p5-panel: #4a4024;  --p5-rim: #7f6d49;  --p5-seat: #f6de96;  --p5-button: #362e16;  /* ochre   was #43391e #786642 · #302810 */
+  --p6-panel: #1d3a36;  --p6-rim: #3f675d;  --p6-seat: #b4eddd;  --p6-button: #142925;  /* teal    was #24413c #466e64 · #1a2f2b */
+
+  /* ---- Brand (icon and logo) ---- */
+  --brand-field: #283621;         /* adaptive icon background, iOS icon field */
+  --brand-outline: #8da975;       /* the three open seats, 4.9:1 on the field */
+  --brand-accent: var(--accent);  /* the highlighted seat */
+  --brand-ink: var(--ink);        /* the + */
+
+  /* ---- Type ----
+   * System UI stack, kept on purpose: offline, no font payload, native numerals on each platform.
+   */
+  --font-ui: system-ui, -apple-system, sans-serif;
+  --leading: 1.35;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 650;
+  --weight-bold: 700;
+  --weight-heavy: 750;
+
+  --type-score: clamp(2rem, 19vmin, 7rem);   /* heavy, tabular-nums, tracking -0.055em, line-height 1 */
+  --type-score-tracking: -0.055em;
+  --type-control: clamp(1.375rem, 10cqi, 1.75rem); /* − and + (size of the SVG icons once glyphs are replaced [A4]) */
+  --type-badge: clamp(1.25rem, 8cqi, 1.625rem);
+  --type-title: 1.375rem;                    /* dialog titles, bold, tracking -0.022em */
+  --type-title-tracking: -0.022em;
+  --type-body: 1rem;
+  --type-label: 0.875rem;                    /* legends, labels, switch text, semibold */
+  --type-small: 0.8125rem;                   /* field error */
+  --type-display: 4rem;                      /* store art headline, heavy, tracking -0.04em */
+  --type-tagline: 1.5rem;                    /* store art tagline, weight 550 */
+
+  /* ---- Radii ---- */
+  --radius-sm: 8px;               /* choice buttons, text input */
+  --radius-md: 10px;              /* CHANGED: counter buttons were 9px, sheet buttons 10px; one value */
+  --radius-lg: 18px;              /* dialogs */
+  --radius-full: 999px;           /* setup button, rotate badge, switch */
+  --radius-seat: 0.19;            /* logo seats: corner radius as a fraction of seat size */
+
+  /* ---- Spacing (4 px steps) ---- */
+  --space-1: 4px;                 /* choice gap; CHANGED: field error margin was 5px */
+  --space-2: 8px;                 /* action gap; CHANGED: label margin was 7px */
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;                /* sheet padding; CHANGED: sheet gap was 19px */
+
+  /* ---- Controls ---- */
+  --tap-min: 44px;
+  --control-size: clamp(44px, 18cqi, 74px);
+  --control-gap: clamp(4px, 3cqi, 16px);
+  --control-height: clamp(44px, 15cqi, 57px);
+  --setup-button: 48px;           /* 36px visible disc inside a 48px target */
+  --setup-icon-stroke: 2px;       /* CHANGED: slider lines were 1px [A3] */
+  --focus-ring: 2px solid var(--accent);
+
+  /* ---- Motion ---- */
+  --score-bump: 160ms;            /* scale 1.08 → 1; skipped under prefers-reduced-motion */
+}
