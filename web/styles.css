@@ -27,25 +27,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 
 .board {
-  --columns: 2;
-  --rows: 2;
   display: grid;
-  grid-template-columns: repeat(var(--columns), minmax(0, 1fr));
-  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
   gap: 1px;
   height: 100%;
-}
-.board[data-count="2"] { --columns: 1; }
-.board:where([data-count="5"], [data-count="6"]) { --rows: 3; }
-.board:where([data-count="3"], [data-count="5"]) .player:last-child { grid-column: 1 / -1; }
-.board[data-landscape="false"][data-count="4"] { grid-auto-flow: column; }
-
-.board[data-landscape="true"] { --rows: 2; }
-.board[data-landscape="true"][data-count="2"] { --columns: 2; --rows: 1; }
-.board[data-landscape="true"]:where([data-count="5"], [data-count="6"]) { --columns: 3; }
-.board[data-landscape="true"]:where([data-count="3"], [data-count="5"]) .player:last-child {
-  grid-column: -2 / -1;
-  grid-row: 1 / -1;
 }
 
 .setup-button {

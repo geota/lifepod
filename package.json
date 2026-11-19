@@ -5,11 +5,13 @@
     "lint": "npm run lint:web && npm run lint:android && npm run lint:ios",
     "lint:web": "eslint web/app.js",
     "lint:android": "ktlint 'android/src/**/*.kt'",
-    "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift"
+    "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift",
+    "test": "node --test"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "eslint": "9.39.5",
-    "globals": "14.0.0"
+    "globals": "14.0.0",
+    "playwright-core": "1.65.0"
   }
 }

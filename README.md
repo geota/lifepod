@@ -19,7 +19,7 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 <div align="center">
 <a href="screenshots/board.png"><img src="screenshots/board.png" width="180" alt="Four-player portrait board with two seats facing each long side" /></a>
-<a href="screenshots/six-players.png"><img src="screenshots/six-players.png" width="180" alt="Six-player board" /></a>
+<a href="screenshots/six-players.png"><img src="screenshots/six-players.png" width="180" alt="Six-player portrait board with three seats facing each long side" /></a>
 <a href="screenshots/setup.png"><img src="screenshots/setup.png" width="180" alt="Setup for player count, starting life, screen awake, and seat rotation" /></a>
 <br />
 <sub>Four players · Six players · Setup</sub>
@@ -35,7 +35,7 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 ## At the table
 
-Set the phone in the middle of the table. With four players, seats face the phone’s two long sides, with **−** and **+** on either side of each total. With three or five players, one seat spans two slots so the board still fills the screen.
+Set the phone in the middle of the table. With four or six players, two or three seats face each long side. With two players, the seats face opposite short ends. With three or five players, one seat spans two slots so the board still fills the screen. Each player reads **−** on the left and **+** on the right from their seat.
 
 Tap the sliders in the center to choose 2–6 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
 
@@ -68,13 +68,15 @@ Open `web/index.html` to try the tracker on your computer. The preview uses brow
 
 Install ktlint and select full Xcode for `swift-format`. Then run `npm ci` and `npm run lint` from the project root. Run `npm run lint:web`, `npm run lint:android`, or `npm run lint:ios` to check one platform.
 
+Run `npx playwright-core install chromium webkit` and `npm test` to check each player count in portrait and landscape.
+
 ## Shared code
 
 `web/` contains the interface, seat layouts, rotations, scoring, and saved-game format. Android and iOS bundle those files directly. Their Kotlin and Swift wrappers handle native screen-awake behavior, local storage, and fullscreen presentation. Browser preview uses the equivalent browser APIs. App icons, build settings, and package metadata live in the platform projects.
 
 ## GitHub Actions
 
-[CI](.github/workflows/ci.yml) runs lint and builds for pull requests and pushes to `main`. Each successful run produces a static web ZIP, a debug-signed Android APK, and an iOS Simulator ZIP. CI also compiles the iPhone target with signing disabled.
+[CI](.github/workflows/ci.yml) runs lint, browser seating tests, and builds for pull requests and pushes to `main`. Each successful run produces a static web ZIP, a debug-signed Android APK, and an iOS Simulator ZIP. CI also compiles the iPhone target with signing disabled.
 
 ### Publish a signed alpha
 

@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   web:
-    name: Web lint and bundle
+    name: Web lint, seating tests, and bundle
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -30,6 +30,10 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run lint:web
+      - name: Check seat layouts in Chromium and WebKit
+        run: |
+          npx playwright-core install --with-deps --only-shell chromium webkit
+          npm test
       - name: Bundle offline web app
         working-directory: web
         run: zip "$RUNNER_TEMP/lifepod-web.zip" index.html app.js styles.css icon.png

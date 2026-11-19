@@ -17,14 +17,30 @@ const lifeError = document.querySelector('#life-error');
 const restart = document.querySelector('#restart');
 const landscape = matchMedia('(orientation: landscape)');
 const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
-const seatEdges = {
-  2: [['top', 'bottom'], ['left', 'right']],
-  3: [['top', 'top', 'bottom'], ['top', 'bottom', 'right']],
-  4: [['left', 'left', 'right', 'right'], ['top', 'top', 'bottom', 'bottom']],
-  5: [['top', 'top', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'bottom', 'bottom', 'right']],
-  6: [['top', 'top', 'bottom', 'bottom', 'bottom', 'bottom'], ['top', 'top', 'top', 'bottom', 'bottom', 'bottom']],
+// Each row lists seats by facing edge and player number. Repeated seats span cells.
+const seatLayouts = {
+  2: {
+    portrait: ['top-1', 'bottom-2'],
+    landscape: ['left-1 right-2'],
+  },
+  3: {
+    portrait: ['top-1 top-2', 'bottom-3 bottom-3'],
+    landscape: ['top-1 right-3', 'bottom-2 right-3'],
+  },
+  4: {
+    portrait: ['left-1 right-3', 'left-2 right-4'],
+    landscape: ['top-1 top-2', 'bottom-3 bottom-4'],
+  },
+  5: {
+    portrait: ['top-1 top-2', 'bottom-3 bottom-4', 'bottom-5 bottom-5'],
+    landscape: ['top-1 top-2 right-5', 'bottom-3 bottom-4 right-5'],
+  },
+  6: {
+    portrait: ['left-1 right-3', 'left-2 right-4', 'left-5 right-6'],
+    landscape: ['top-1 top-2 top-5', 'bottom-3 bottom-4 bottom-6'],
+  },
 };
-const playerCounts = Object.keys(seatEdges).map(Number);
+const playerCounts = Object.keys(seatLayouts).map(Number);
 
 let game = loadGame();
 let selectedPlayerCount = game.scores.length;
@@ -135,12 +151,16 @@ function bindCounter(button, adjust, label) {
   });
 }
 
-function orientBoard() {
-  const [portraitEdges, landscapeEdges] = seatEdges[game.scores.length];
-  const edges = landscape.matches ? landscapeEdges : portraitEdges;
-  board.dataset.landscape = String(landscape.matches);
-  for (const [index, player] of Array.from(board.children).entries()) {
-    const turn = (clockwiseEdges.indexOf(edges[index]) + game.rotations[index]) % clockwiseEdges.length;
+function layoutBoard() {
+  const layout = seatLayouts[game.scores.length];
+  const rows = landscape.matches ? layout.landscape : layout.portrait;
+  board.style.gridTemplateAreas = rows.map(row => `"${row}"`).join(' ');
+  for (const seat of new Set(rows.join(' ').split(' '))) {
+    const [edge, number] = seat.split('-');
+    const index = Number(number) - 1;
+    const player = board.children[index];
+    const turn = (clockwiseEdges.indexOf(edge) + game.rotations[index]) % clockwiseEdges.length;
+    player.style.gridArea = seat;
     player.dataset.edge = clockwiseEdges[turn];
   }
 }
@@ -162,7 +182,6 @@ function setRotationMode(enabled) {
 
 function renderBoard() {
   stopRepeating();
-  board.dataset.count = game.scores.length;
   const players = game.scores.map((_, index) => {
     const player = playerTemplate.content.firstElementChild.cloneNode(true);
     const name = `Player ${index + 1}`;
@@ -189,14 +208,14 @@ function renderBoard() {
     rotateSeat.setAttribute('aria-label', `Rotate ${name} clockwise`);
     rotateSeat.addEventListener('click', () => {
       game.rotations[index] = (game.rotations[index] + 1) % clockwiseEdges.length;
-      orientBoard();
+      layoutBoard();
       saveGame();
     });
     renderScore();
     return player;
   });
   board.replaceChildren(...players);
-  orientBoard();
+  layoutBoard();
 }
 
 function startGame(playerCount, startingLife) {
@@ -318,7 +337,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) stopRepeating();
   else if (!android && !ios) syncWakeLock();
 });
-landscape.addEventListener('change', orientBoard);
+landscape.addEventListener('change', layoutBoard);
 
 renderBoard();
 syncWakeLock();
