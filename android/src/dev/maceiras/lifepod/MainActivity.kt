@@ -173,6 +173,7 @@ class MainActivity : Activity() {
                 "/index.html" to "text/html",
                 "/styles.css" to "text/css",
                 "/app.js" to "application/javascript",
+                "/dice.js" to "application/javascript",
                 "/icon.png" to "image/png",
                 "/favicon-32.png" to "image/png",
             )

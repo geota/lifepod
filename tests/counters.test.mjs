@@ -168,10 +168,10 @@ test('chromium: a life total at 0 or below turns red', async (t) => {
   const add = button(page, 'Add one life to Player 1');
   await subtract.click();
   assert.equal(await score.evaluate(output => output.value), '0');
-  assert.equal(await color(), 'rgb(255, 143, 128)', 'zero is red');
+  assert.equal(await color(), 'rgb(244, 153, 147)', 'zero is red');
   await subtract.click();
   assert.equal(await score.evaluate(output => output.value), '−1');
-  assert.equal(await color(), 'rgb(255, 143, 128)', 'below zero is red');
+  assert.equal(await color(), 'rgb(244, 153, 147)', 'below zero is red');
   await add.click();
   await add.click();
   assert.equal(await color(), normal, 'back above zero is the usual colour');

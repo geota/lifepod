@@ -13,7 +13,7 @@
 
 </div>
 
-A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change. Each button's touch area covers its half of the tile, so a tap anywhere on the left half of your tile subtracts and anywhere on the right half adds. A tap counts as soon as your finger touches the screen, and several players can tap or hold at the same time.
+A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change. Each button's touch area covers its half of the tile, so a tap anywhere on the left half of your tile subtracts and anywhere on the right half adds. A tap counts as soon as your finger touches the screen, and several players can tap or hold at the same time. A total at 0 or below turns red.
 
 ## Screenshots
 
@@ -37,7 +37,9 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 
 Set the phone in the middle of the table in landscape. The seats stay fixed to the device: if the screen turns to portrait or upside down, the board turns back so every total stays in front of its player. Each new game treats the current landscape as upright. With two players, the seats face opposite short ends. With four or six, two or three seats face each long side. With three or five, one or two seats face each long side and one larger seat faces the right end. Each player reads **−** on the left and **+** on the right from their seat.
 
-Tap the sliders in the center to choose 2–6 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
+Tap the die in the center to roll a d4, d6, d8, d10, d12 or d20. Each die is drawn in its own shape, and every roll comes from the device's cryptographic random number generator, so no face is favoured.
+
+Tap the sliders beside it to choose 2–6 players, set the starting life, restart, or toggle **Keep awake**. Changing the player count or starting life starts a new game. **Keep awake** is on by default. Scores and settings are saved between launches.
 
 Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark or press back when finished. Rotation choices carry over when restarting with the same player count.
 

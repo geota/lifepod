@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LifePod Dice</title>
+  <link rel="stylesheet" href="../../web/styles.css">
+  <link rel="stylesheet" href="dice.css">
+  <link rel="stylesheet" href="preview.css">
+  <script type="module" src="preview.js"></script>
+</head>
+<body class="preview">
+  <main>
+    <header class="preview-head">
+      <h1>Dice</h1>
+      <p>Six flat dice for LifePod, drawn from <code>shapes.js</code> with the tokens in <code>dice.css</code>. Serve the repo root over HTTP to open this page (ES modules don't load from file://).</p>
+      <button class="primary" type="button" id="open-sheet">Open the dice sheet</button>
+    </header>
+
+    <section aria-labelledby="h-results">
+      <h2 id="h-results">On the stage, widest labels</h2>
+      <div class="dice-row" id="row-results"></div>
+    </section>
+
+    <section aria-labelledby="h-idle">
+      <h2 id="h-idle">Before the first roll</h2>
+      <div class="dice-row" id="row-idle"></div>
+    </section>
+
+    <section aria-labelledby="h-icons">
+      <h2 id="h-icons">Picker icons</h2>
+      <div class="icon-rows">
+        <div class="dice-picker" id="picker-demo"></div>
+        <div class="icon-scale" id="icon-scale"></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="h-roll">
+      <h2 id="h-roll">The roll, frame by frame (720 ms)</h2>
+      <div class="filmstrip" id="filmstrip"></div>
+    </section>
+
+    <section aria-labelledby="h-out">
+      <h2 id="h-out">Life at 0 or below</h2>
+      <div class="out-row" id="out-row"></div>
+    </section>
+  </main>
+</body>
+</html>

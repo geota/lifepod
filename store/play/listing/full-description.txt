@@ -6,6 +6,8 @@ LifePod keeps every player's life total in front of them. Set your phone in the 
 • Rotate any seat to match where people are sitting
 • Seats stay in place when the phone turns
 • Start at 20, 30, 40, or any life total you choose
+• Roll a d4, d6, d8, d10, d12 or d20 with true randomness
+• Totals at 0 or below turn red
 • Keeps the screen awake during the game
 • Saves your game if you leave the app
 

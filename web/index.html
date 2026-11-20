@@ -10,15 +10,19 @@
   <link rel="icon" href="favicon-32.png" sizes="32x32">
   <link rel="icon" href="icon.png" sizes="192x192">
   <link rel="stylesheet" href="styles.css">
+  <script src="dice.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
   <main class="app" aria-label="LifePod">
     <section class="board" id="board" aria-label="Player life totals"></section>
-    <button class="setup-button" type="button" id="setup-button" aria-label="Game setup" aria-haspopup="dialog">
-      <span class="setup-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M40,92H70.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24H137.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24Zm64-24A12,12,0,1,1,92,80,12,12,0,0,1,104,68Zm112,96H201.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24h94.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24Zm-48,24a12,12,0,1,1,12-12A12,12,0,0,1,168,188Z"/></svg></span>
-      <span class="rotation-done" aria-hidden="true" hidden><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></span>
-    </button>
+    <div class="board-controls" id="board-controls">
+      <button class="dice-button" type="button" id="dice-button" aria-label="Roll dice" aria-haspopup="dialog"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M192,28H64A36,36,0,0,0,28,64V192a36,36,0,0,0,36,36H192a36,36,0,0,0,36-36V64A36,36,0,0,0,192,28Zm12,164a12,12,0,0,1-12,12H64a12,12,0,0,1-12-12V64A12,12,0,0,1,64,52H192a12,12,0,0,1,12,12ZM104,88A16,16,0,1,1,88,72,16,16,0,0,1,104,88Zm40,40a16,16,0,1,1-16-16A16,16,0,0,1,144,128Zm40-40a16,16,0,1,1-16-16A16,16,0,0,1,184,88Zm-80,80a16,16,0,1,1-16-16A16,16,0,0,1,104,168Zm80,0a16,16,0,1,1-16-16A16,16,0,0,1,184,168Z"/></svg></button>
+      <button class="setup-button" type="button" id="setup-button" aria-label="Game setup" aria-haspopup="dialog">
+        <span class="setup-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M40,92H70.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24H137.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24Zm64-24A12,12,0,1,1,92,80,12,12,0,0,1,104,68Zm112,96H201.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24h94.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24Zm-48,24a12,12,0,1,1,12-12A12,12,0,0,1,168,188Z"/></svg></span>
+        <span class="rotation-done" aria-hidden="true" hidden><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></span>
+      </button>
+    </div>
     <p class="visually-hidden" id="announcer" aria-live="polite"></p>
   </main>
 
@@ -35,6 +39,20 @@
       <button class="rotate-seat" type="button" hidden></button>
     </section>
   </template>
+
+  <dialog id="dice" aria-labelledby="dice-title">
+    <div class="sheet dice-sheet">
+      <div class="sheet-header">
+        <h2 id="dice-title">Dice</h2>
+        <button class="close" type="button" data-close aria-label="Close dice"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+      </div>
+      <!-- Tapping the die rolls it too. The Roll button is the control for keyboards and screen readers. -->
+      <div class="dice-stage" id="dice-stage"></div>
+      <div class="dice-picker" id="dice-picker" role="group" aria-label="Sides"></div>
+      <button class="primary dice-roll" type="button" id="dice-roll" autofocus></button>
+      <p class="visually-hidden" id="dice-result" aria-live="polite"></p>
+    </div>
+  </dialog>
 
   <dialog id="setup" aria-labelledby="setup-title">
     <form class="sheet" id="setup-form" novalidate>

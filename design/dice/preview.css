@@ -1,0 +1,27 @@
+/* Preview page only. */
+body.preview { overflow: auto; background: var(--background); }
+.preview main { display: grid; gap: 40px; max-width: 1180px; margin: 0 auto; padding: 32px 16px 64px; }
+.preview-head { display: grid; gap: var(--space-3); justify-items: start; max-width: 62ch; }
+.preview-head h1 { font-size: 2rem; letter-spacing: -.03em; }
+.preview-head p { color: var(--muted); }
+.preview-head code, .preview code { font-size: .9em; color: var(--text-soft); }
+.preview-head .primary { padding-inline: var(--space-5); }
+.preview h2 { margin: 0 0 var(--space-3); font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--muted); }
+.dice-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-3); }
+.dice-row figure { display: grid; gap: var(--space-2); margin: 0; }
+.preview .dice-stage, .preview .dice-picker { grid-area: auto; }
+.dice-row .dice-stage { block-size: auto; inline-size: auto; aspect-ratio: 1; cursor: default; }
+.dice-row figcaption, .filmstrip figcaption { color: var(--muted); font-size: var(--type-small); text-align: center; font-variant-numeric: tabular-nums; }
+.icon-rows { display: grid; gap: var(--space-4); max-width: 420px; }
+.icon-scale { display: flex; flex-wrap: wrap; align-items: end; gap: var(--space-4); color: var(--text-soft); }
+.icon-scale svg { overflow: visible; }
+.filmstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: var(--space-2); }
+.filmstrip figure { display: grid; gap: var(--space-1); margin: 0; }
+.filmstrip .dice-stage { block-size: auto; inline-size: auto; aspect-ratio: 1; }
+.out-row { display: flex; flex-wrap: wrap; gap: var(--seam-width); }
+.out-row div { display: grid; place-items: center; width: 150px; height: 110px; border-radius: var(--radius-sm); }
+.out-row output { font-size: 4rem; font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.055em; font-variant-numeric: tabular-nums; color: var(--life-out); }
+.out-row .p1 { background: var(--p1-panel); } .out-row .p2 { background: var(--p2-panel); }
+.out-row .p3 { background: var(--p3-panel); } .out-row .p4 { background: var(--p4-panel); }
+.out-row .p5 { background: var(--p5-panel); } .out-row .p6 { background: var(--p6-panel); }
+.out-row .alive output { color: var(--text); }

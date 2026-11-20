@@ -16,8 +16,20 @@
   --accent-pressed: #c5d882;
   --ink: #202914;
   --danger-text: #ffc7b2;
-  /* A life total at 0 or below. At least 4.6:1 on every player panel. */
-  --life-out: #ff8f80;
+  /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
+  --life-out: #f49993;
+
+  /* Dice: a pale sage die, its side faces darker away from the light. See design/dice/SPEC.md. */
+  --die-front: #dfe4d3;
+  --die-side-1: #b8c2ab;
+  --die-side-2: #97a28b;
+  --die-side-3: #78836d;
+  --die-edge: #566152;
+  --die-outline: #2a332b;
+  --die-ink: #1b2218;
+  --die-ink-idle: #5b6656;
+  --die-shadow: #070a08;
+  --dice-stage-pressed: #1a201c;
   --press-overlay: #f3f1e51a;
   --scrim: #0c110dd9;
   --shadow-dialog: 0 24px 80px #0e130fd9;
@@ -113,24 +125,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   height: 100%;
 }
 
-.setup-button {
+.board-controls {
   position: absolute;
   z-index: 1;
   top: 50%;
   left: 50%;
-  display: grid;
-  place-items: center;
-  width: var(--setup-button);
-  height: var(--setup-button);
-  padding: 0;
+  display: flex;
   transform: translate(-50%, -50%);
-  border: 0;
-  border-radius: var(--radius-full);
-  background: transparent;
-  color: var(--text-soft);
-  font-size: 1.25rem;
 }
-.setup-button::before {
+/* One pill behind the dice and setup buttons, with a divider between them. Each button is a 48px target. */
+.board-controls::before {
   position: absolute;
   inset: 6px;
   content: '';
@@ -139,11 +143,43 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: var(--background);
   box-shadow: var(--shadow-float);
 }
-.setup-button:active::before { background: var(--surface-pressed); }
-.setup-icon, .rotation-done { position: relative; display: grid; }
+.board-controls::after {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 50%;
+  width: 1px;
+  content: '';
+  background: var(--border);
+}
+.dice-button, .setup-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--setup-button);
+  height: var(--setup-button);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 1.25rem;
+}
+.dice-button::before, .setup-button::before {
+  position: absolute;
+  inset: 7px 2px 7px 7px;
+  content: '';
+  border-radius: var(--radius-full);
+}
+.setup-button::before { inset: 7px 7px 7px 2px; }
+.dice-button:active::before, .setup-button:active::before { background: var(--surface-pressed); }
+.dice-button .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
-.setup-button[data-rotating="true"]::before { background: var(--accent); border-color: var(--accent); }
-.setup-button[data-rotating="true"] { color: var(--ink); }
+/* While rotating seats, only the Done disc stays. */
+.board-controls[data-rotating]::after, .board-controls[data-rotating] .dice-button { display: none; }
+.board-controls[data-rotating]::before { background: var(--accent); border-color: var(--accent); }
+.board-controls[data-rotating] .setup-button { color: var(--ink); }
+.board-controls[data-rotating] .setup-button::before { content: none; }
 
 .player {
   --panel: var(--p1-panel);
@@ -350,6 +386,105 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 .primary { background: var(--accent); border-color: var(--accent); color: var(--ink); }
 .primary:active { background: var(--accent-pressed); }
 #restart-message { color: var(--muted); }
+
+/* Dice sheet: the die on a stage, the sides picker and Roll. Landscape puts the stage on the left.
+   #dice keeps these gaps over the compact sheet spacing for small screens below. */
+#dice { width: min(420px, calc(100% - 32px)); }
+#dice .dice-sheet {
+  grid-template-areas: "header" "stage" "picker" "roll";
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.dice-sheet .sheet-header { grid-area: header; }
+.dice-stage {
+  grid-area: stage;
+  display: grid;
+  place-items: center;
+  block-size: clamp(176px, calc(100dvh - 340px), 340px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+  container-type: size;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dice-stage:active { background: var(--dice-stage-pressed); }
+.dice-stage > svg { grid-area: 1 / 1; width: 74cqmin; height: 74cqmin; overflow: visible; }
+.dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
+.dice-picker button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--text-soft);
+  font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.dice-picker button:active { background: var(--surface-pressed); }
+.dice-picker button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+.dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
+.dice-roll { grid-area: roll; min-height: 48px; font-size: 1.0625rem; }
+@media (orientation: landscape) {
+  #dice { width: fit-content; max-width: calc(100% - 32px); }
+  #dice .dice-sheet {
+    grid-template-columns: auto minmax(212px, 260px);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "stage header" "stage picker" "stage roll";
+    column-gap: var(--space-4);
+    padding: var(--space-3);
+  }
+  /* The stage is a size container, so it needs both sizes set. */
+  .dice-stage { block-size: min(calc(100dvh - 38px), 400px); inline-size: min(calc(100dvh - 38px), 400px); }
+  .dice-picker { align-content: start; }
+}
+
+/* The die, shared by the stage and the picker icons. */
+.die-face, .die-outline { stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.die-body .die-face { stroke: var(--die-edge); stroke-width: 1.5px; }
+.die-body .die-outline { fill: none; stroke: var(--die-outline); stroke-width: 2.5px; }
+.die-body .tone-0 { fill: var(--die-front); }
+.die-body .tone-1 { fill: var(--die-side-1); }
+.die-body .tone-2 { fill: var(--die-side-2); }
+.die-body .tone-3 { fill: var(--die-side-3); }
+.die-shadow polygon { fill: var(--die-shadow); }
+/* Both layers are positioned so the translucent shadow can't paint over the die. */
+.die-shadow { position: relative; z-index: 0; opacity: .6; transform: translate(2%, 4%); }
+.die-body { position: relative; z-index: 1; }
+.die-number {
+  fill: var(--die-ink);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.die-number[data-idle] { fill: var(--die-ink-idle); font-weight: var(--weight-semibold); letter-spacing: -.02em; }
+.die-icon .die-face, .die-icon .die-outline { stroke: currentColor; }
+.die-icon .die-face { stroke-width: 1.25px; }
+.die-icon .die-outline { fill: none; stroke-width: 1.75px; }
+.die-icon .tone-0 { fill: none; }
+.die-icon .tone-1 { fill: currentColor; fill-opacity: .14; }
+.die-icon .tone-2 { fill: currentColor; fill-opacity: .3; }
+.die-icon .tone-3 { fill: currentColor; fill-opacity: .46; }
+
+/* Mouse pointers get a hover state on the board and sheet controls. */
+@media (hover: hover) {
+  .dice-button:hover::before, .setup-button:hover::before, .dice-picker button:not([aria-pressed="true"]):hover,
+  .close:hover, .choices button:not([aria-pressed="true"]):hover, .secondary:hover, .text-button:hover { background: var(--surface-pressed); }
+  .board-controls[data-rotating] .setup-button:hover::before { content: none; }
+  .primary:hover { background: var(--accent-pressed); }
+  .dice-stage:hover { background: var(--dice-stage-pressed); }
+}
 @media (max-height: 420px), (max-width: 420px) {
   .sheet { gap: var(--space-1); padding-block: var(--space-2); }
   legend, .life-setting label { margin-bottom: var(--space-1); }

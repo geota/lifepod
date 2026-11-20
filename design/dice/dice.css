@@ -1,0 +1,189 @@
+/*
+ * Reference CSS for the dice roller (design/dice/SPEC.md). It builds on the tokens in web/styles.css and
+ * adds only the tokens below. The preview and the renders load it after web/styles.css.
+ */
+:root {
+  /* Die body: a pale sage "bone" die. Front face lightest, side faces step darker away from the light. */
+  --die-front: #dfe4d3;
+  --die-side-1: #b8c2ab;
+  --die-side-2: #97a28b;
+  --die-side-3: #78836d;
+  --die-edge: #566152;      /* facet edges */
+  --die-outline: #2a332b;   /* silhouette; separates the die from the stage */
+  --die-ink: #1b2218;       /* the number, 12.6:1 on --die-front */
+  --die-ink-idle: #5b6656;  /* "d20" before the first roll, 4.7:1 on --die-front */
+  --die-shadow: #070a08;
+  --dice-stage: var(--background);
+  --dice-stage-pressed: #1a201c;
+
+  /* Life total at 0 or below. 4.8:1 on the lightest panel (p5), 6.3:1 on the darkest (p4). */
+  --life-out: #f49993;
+
+  --dice-pill-divider: var(--border);
+  --roll-duration: 720ms;
+}
+
+/* ---- Board: dice | setup pill at the board's centre ---- */
+.board-controls {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  transform: translate(-50%, -50%);
+}
+/* One pill behind both 48px targets: 84 x 36 visible, the same 36px height and ring as today's disc. */
+.board-controls::before {
+  position: absolute;
+  inset: 6px;
+  content: '';
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-full);
+  background: var(--background);
+  box-shadow: var(--shadow-float);
+}
+.board-controls::after {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 50%;
+  width: 1px;
+  content: '';
+  background: var(--dice-pill-divider);
+}
+.board-controls .setup-button, .dice-button {
+  position: relative;
+  top: auto;
+  left: auto;
+  display: grid;
+  place-items: center;
+  width: var(--setup-button);
+  height: var(--setup-button);
+  padding: 0;
+  transform: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 1.25rem;
+}
+/* The pill draws the ring now; each half shows its own pressed state inside it. */
+.board-controls .setup-button::before, .dice-button::before {
+  position: absolute;
+  inset: 7px 2px;
+  content: '';
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  box-shadow: none;
+}
+.board-controls .setup-button:active::before, .dice-button:active::before { background: var(--surface-pressed); }
+.dice-button .icon { position: relative; }
+.board-controls .setup-button:first-child::before, .dice-button:first-child::before { inset-inline-start: 7px; }
+.board-controls .setup-button:last-child::before, .dice-button:last-child::before { inset-inline-end: 7px; }
+/* Seat rotation: only Done stays, back to a single 36px accent disc. */
+.board-controls[data-rotating]::after, .board-controls[data-rotating] .dice-button { display: none; }
+.board-controls[data-rotating]::before { background: var(--accent); border-color: var(--accent); }
+.board-controls[data-rotating] .setup-button { color: var(--ink); }
+
+/* ---- Life total at 0 or below ---- */
+.score[data-out] { color: var(--life-out); }
+
+/* ---- Dice sheet ---- */
+#dice { width: min(420px, calc(100% - 32px)); }
+.dice-sheet {
+  display: grid;
+  grid-template-areas: "header" "stage" "picker" "roll";
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.dice-sheet .sheet-header { grid-area: header; }
+.dice-stage {
+  grid-area: stage;
+  position: relative;
+  display: grid;
+  place-items: center;
+  block-size: clamp(176px, calc(100dvh - 340px), 340px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--dice-stage);
+  container-type: size;
+  overflow: hidden;
+}
+.dice-stage:active { background: var(--dice-stage-pressed); }
+.dice-stage:focus-visible { outline-offset: -4px; }
+.dice-stage > svg {
+  grid-area: 1 / 1;
+  width: 74cqmin;
+  height: 74cqmin;
+  overflow: visible;
+}
+.dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
+.dice-picker button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--text-soft);
+  font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.dice-picker button:active { background: var(--surface-pressed); }
+.dice-picker button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+.dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
+.dice-roll { grid-area: roll; min-height: 48px; font-size: 1.0625rem; }
+
+/* Landscape: the stage on the left at full sheet height, the controls in a column on the right. */
+@media (orientation: landscape) {
+  #dice { width: fit-content; max-width: calc(100% - 32px); }
+  .dice-sheet {
+    grid-template-columns: auto minmax(212px, 260px);
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "stage header" "stage picker" "stage roll";
+    column-gap: var(--space-4);
+    row-gap: var(--space-3);
+    padding: var(--space-3);
+  }
+  /* Size containment hides the stage's content size, so give both axes. */
+  .dice-stage { block-size: min(calc(100dvh - 38px), 400px); inline-size: min(calc(100dvh - 38px), 400px); }
+  .dice-picker { align-content: start; }
+}
+
+/* ---- Die drawing (shared by the stage and the picker icons) ---- */
+.die-face, .die-outline { stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.die-stage-body .die-face { stroke: var(--die-edge); stroke-width: 1.5px; }
+.die-stage-body .die-outline { fill: none; stroke: var(--die-outline); stroke-width: 2.5px; }
+.die-stage-body .tone-0 { fill: var(--die-front); }
+.die-stage-body .tone-1 { fill: var(--die-side-1); }
+.die-stage-body .tone-2 { fill: var(--die-side-2); }
+.die-stage-body .tone-3 { fill: var(--die-side-3); }
+.die-shadow polygon { fill: var(--die-shadow); }
+/* Both layers are positioned so the translucent shadow can't paint over the die. */
+.die-shadow { position: relative; z-index: 0; opacity: .6; }
+.die-stage-body { position: relative; z-index: 1; }
+.die-number {
+  fill: var(--die-ink);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.die-number[data-idle] { fill: var(--die-ink-idle); font-weight: var(--weight-semibold); letter-spacing: -.02em; }
+
+/* Picker icons: one colour (currentColor), side faces as tints, so the selected chip inverts cleanly. */
+.die-icon .die-face, .die-icon .die-outline { stroke: currentColor; }
+.die-icon .die-face { stroke-width: 1.25px; }
+.die-icon .die-outline { fill: none; stroke-width: 1.75px; }
+.die-icon .tone-0 { fill: none; }
+.die-icon .tone-1 { fill: currentColor; fill-opacity: .14; }
+.die-icon .tone-2 { fill: currentColor; fill-opacity: .3; }
+.die-icon .tone-3 { fill: currentColor; fill-opacity: .46; }

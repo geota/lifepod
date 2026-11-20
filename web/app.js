@@ -6,7 +6,14 @@ const ios = window.webkit?.messageHandlers;
 const board = document.querySelector('#board');
 const playerTemplate = document.querySelector('#player-template');
 const wakeInput = document.querySelector('#keep-awake');
+const boardControls = document.querySelector('#board-controls');
 const setupButton = document.querySelector('#setup-button');
+const diceButton = document.querySelector('#dice-button');
+const diceDialog = document.querySelector('#dice');
+const diceStage = document.querySelector('#dice-stage');
+const dicePicker = document.querySelector('#dice-picker');
+const diceRoll = document.querySelector('#dice-roll');
+const diceResult = document.querySelector('#dice-result');
 const rotateSeatsButton = document.querySelector('#rotate-seats');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
@@ -38,6 +45,9 @@ let requestingLock = false;
 let rotatingSeats = false;
 let announceTimer;
 const pendingAnnouncements = new Set();
+let diceSides = 20;
+let die;
+let stopRoll;
 // Every held counter button, so several players can hold buttons at the same time.
 const activePresses = new Set();
 
@@ -256,7 +266,7 @@ function setRotationMode(enabled) {
     player.querySelector('.rotate-seat').hidden = !enabled;
   }
   board.toggleAttribute('data-rotating', enabled);
-  setupButton.dataset.rotating = String(enabled);
+  boardControls.toggleAttribute('data-rotating', enabled);
   setupButton.setAttribute('aria-label', enabled ? 'Done rotating seats' : 'Game setup');
   setupButton.setAttribute('aria-haspopup', enabled ? 'false' : 'dialog');
   setupButton.querySelector('.setup-icon').hidden = enabled;
@@ -420,6 +430,57 @@ restart.addEventListener('close', () => {
   syncBackHandling();
   if (restart.returnValue === 'restart') startGame(game.scores.length, game.startingLife);
   setupButton.focus();
+});
+
+// Shows the chosen die without a result. A roll in progress stops.
+function showDie(sides) {
+  stopRoll?.();
+  stopRoll = undefined;
+  diceSides = sides;
+  die = window.lifePodDice.stageDie(sides);
+  die.showIdle();
+  diceStage.replaceChildren(die.shadow, die.die);
+  diceRoll.textContent = `Roll d${sides}`;
+  diceResult.textContent = '';
+  for (const choice of dicePicker.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === sides));
+}
+
+// Taps during a roll are ignored, so every roll shows its result.
+function rollDie() {
+  if (stopRoll) return;
+  diceResult.textContent = '';
+  const sides = diceSides;
+  stopRoll = window.lifePodDice.roll(die, {
+    reducedMotion: reducedMotion.matches,
+    onLand(result) {
+      haptic();
+      diceResult.textContent = `Rolled ${result} on a d${sides}`;
+    },
+    done() { stopRoll = undefined; },
+  });
+}
+
+for (const sides of window.lifePodDice.sides) {
+  const choice = document.createElement('button');
+  choice.type = 'button';
+  choice.value = sides;
+  choice.append(window.lifePodDice.icon(sides), `d${sides}`);
+  choice.addEventListener('click', () => {
+    if (!stopRoll) showDie(sides);
+  });
+  dicePicker.append(choice);
+}
+diceButton.addEventListener('click', () => {
+  showDie(diceSides);
+  diceDialog.showModal();
+  syncBackHandling();
+});
+diceStage.addEventListener('click', rollDie);
+diceRoll.addEventListener('click', rollDie);
+diceDialog.querySelector('[data-close]').addEventListener('click', () => diceDialog.close());
+diceDialog.addEventListener('close', () => {
+  showDie(diceSides);
+  syncBackHandling();
 });
 
 window.closeOpenDialog = () => {
