@@ -153,7 +153,8 @@ jobs:
 
   ios:
     name: iOS lint, WebKit seating tests, and builds
-    runs-on: macos-26
+    # Xcode 27 (iOS 27 SDK) is on GitHub's preview image; move to the standard macOS runner once it ships Xcode 27.
+    runs-on: xcode-27
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -168,6 +169,10 @@ jobs:
         run: |
           npx playwright-core install webkit
           npm test -- --test-name-pattern=webkit
+      - name: Show the Xcode and iOS SDK in use
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
       - run: xcrun swift-format lint --strict ios/LifePodApp.swift
       - name: Build for iOS Simulator
         run: |
@@ -251,7 +256,8 @@ jobs:
     name: Upload to TestFlight
     if: github.event_name == 'push' && github.ref_type == 'tag'
     needs: [web, android, ios]
-    runs-on: macos-26
+    # App Store Connect requires the iOS 27 SDK from April 2027.
+    runs-on: xcode-27
     timeout-minutes: 30
     steps:
       - name: Check for the App Store Connect key
@@ -274,6 +280,11 @@ jobs:
           persist-credentials: false
       # App Store versions are numbers only, so v0.1.0-alpha.3 uploads as version 0.1.0 with the run number as
       # its build number.
+      - name: Show the Xcode and iOS SDK in use
+        if: steps.key.outputs.ready == 'true'
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
       - name: Archive and upload
         if: steps.key.outputs.ready == 'true'
         env:
