@@ -6,15 +6,16 @@ import { app, button, fakeScreenOrientation } from '../tests/helpers.mjs';
 
 const out = new URL('./', import.meta.url).pathname;
 
-// Each scene is a saved game, optionally with a dialog or seat rotation open.
+// Each scene is a saved game, optionally with a dialog or seat rotation open. The dice scene shows a d20 roll of 17.
 const scenes = [
   { name: '01-four-players', startingLife: 40, scores: [31, 24, 40, 17] },
   { name: '02-six-players', startingLife: 40, scores: [40, 33, 28, 12, 36, 21] },
   { name: '03-three-players', startingLife: 20, scores: [18, 11, 20] },
   { name: '04-five-players', startingLife: 40, scores: [27, 40, 35, 19, 32] },
   { name: '05-two-players', startingLife: 20, scores: [14, 6] },
-  { name: '06-setup', startingLife: 40, scores: [31, 24, 40, 17], open: 'setup' },
-  { name: '07-rotate-seats', startingLife: 40, scores: [40, 33, 28, 12, 36, 21], rotations: [1, 0, 0, 0, 0, 1], open: 'rotate' },
+  { name: '06-dice', startingLife: 40, scores: [31, 24, 40, 17], open: 'dice', roll: 17 },
+  { name: '07-setup', startingLife: 40, scores: [31, 24, 40, 17], open: 'setup' },
+  { name: '08-rotate-seats', startingLife: 40, scores: [40, 33, 28, 12, 36, 21], rotations: [1, 0, 0, 0, 0, 1], open: 'rotate' },
 ];
 
 // Store sizes. Viewport × scale gives each store's exact pixel size.
@@ -32,14 +33,14 @@ const readme = {
   dir: '../screenshots', width: 852, height: 393, scale: 2,
   names: {
     '01-four-players': 'board', '02-six-players': 'six-players', '03-three-players': 'three-players',
-    '04-five-players': 'five-players', '06-setup': 'setup', '07-rotate-seats': 'rotate-seats',
+    '04-five-players': 'five-players', '06-dice': 'dice', '07-setup': 'setup', '08-rotate-seats': 'rotate-seats',
   },
 };
 
 async function renderScene(browser, device, scene) {
   const page = await browser.newPage({
     viewport: { width: device.width, height: device.height },
-    deviceScaleFactor: device.scale, isMobile: true, hasTouch: true,
+    deviceScaleFactor: device.scale, isMobile: true, hasTouch: true, reducedMotion: 'reduce',
   });
   // Runs before the fake screen reads its angle: a landscape phone at 90°, so the board is upright.
   await page.addInitScript(game => {
@@ -55,11 +56,23 @@ async function renderScene(browser, device, scene) {
   await page.goto(app);
   const turn = await page.locator('.app').getAttribute('data-board-turn');
   if (turn !== '0') throw new Error(`${scene.name} rendered with the board turned ${turn}°`);
-  if (scene.open) {
+  if (scene.open === 'dice') {
+    await button(page, 'Roll dice').tap();
+    // Fix the roll for the picture. The app draws from crypto.getRandomValues, so answer with the wanted face.
+    await page.evaluate(face => {
+      crypto.getRandomValues = (array) => {
+        array[0] = face - 1;
+        return array;
+      };
+    }, scene.roll);
+    await button(page, 'Roll d20').tap();
+    await page.locator('#dice-result').filter({ hasText: `Rolled ${scene.roll}` }).waitFor();
+    await page.waitForTimeout(300);
+  } else if (scene.open) {
     await button(page, 'Game setup').tap();
     if (scene.open === 'rotate') await button(page, 'Rotate seats').tap();
-    await page.evaluate(() => document.activeElement?.blur());
   }
+  await page.evaluate(() => document.activeElement?.blur());
   const path = `${out}${device.dir}/${device.names?.[scene.name] ?? scene.name}.png`;
   await page.screenshot({ path });
   await page.close();

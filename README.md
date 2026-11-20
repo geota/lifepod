@@ -31,7 +31,7 @@ A fresh install opens with four players at 40 life. Tap **−** or **+** to adju
 <sub>Three players · Five players</sub>
 </div>
 
-[Game setup](screenshots/setup.png) · [Custom seat rotation](screenshots/rotate-seats.png)
+[Dice](screenshots/dice.png) · [Game setup](screenshots/setup.png) · [Custom seat rotation](screenshots/rotate-seats.png)
 
 ## At the table
 
