@@ -152,3 +152,28 @@ test('chromium: several players can tap and hold their totals at the same time',
   // Pinch and double-tap zoom are off across the board.
   assert.equal(await page.locator('.app').evaluate(element => getComputedStyle(element).touchAction), 'none');
 });
+
+test('chromium: a life total at 0 or below turns red', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ isMobile: true, hasTouch: true });
+  await page.goto(app);
+  await button(page, 'Game setup').tap();
+  await page.locator('#starting-life').fill('1');
+  await page.locator('#save-setup').tap();
+  const score = page.locator('.player:nth-child(1) .score');
+  const color = () => score.evaluate(output => getComputedStyle(output).color);
+  const normal = await color();
+  const subtract = button(page, 'Subtract one life from Player 1');
+  const add = button(page, 'Add one life to Player 1');
+  await subtract.click();
+  assert.equal(await score.evaluate(output => output.value), '0');
+  assert.equal(await color(), 'rgb(255, 143, 128)', 'zero is red');
+  await subtract.click();
+  assert.equal(await score.evaluate(output => output.value), '−1');
+  assert.equal(await color(), 'rgb(255, 143, 128)', 'below zero is red');
+  await add.click();
+  await add.click();
+  assert.equal(await color(), normal, 'back above zero is the usual colour');
+  assert.equal(await page.locator('.score[data-out]').count(), 0, 'no other total is red');
+});

@@ -16,6 +16,8 @@
   --accent-pressed: #c5d882;
   --ink: #202914;
   --danger-text: #ffc7b2;
+  /* A life total at 0 or below. At least 4.6:1 on every player panel. */
+  --life-out: #ff8f80;
   --press-overlay: #f3f1e51a;
   --scrim: #0c110dd9;
   --shadow-dialog: 0 24px 80px #0e130fd9;
@@ -199,6 +201,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   padding-inline-end: .055em;
   color: var(--text);
 }
+.score[data-out] { color: var(--life-out); }
 .controls {
   display: grid;
   grid-template-columns: var(--control-size) auto var(--control-size);

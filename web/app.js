@@ -280,6 +280,7 @@ function renderBoard() {
       score.value = value;
       score.setAttribute('aria-label', `${game.scores[index]} life`);
       score.style.setProperty('--digits', value.length);
+      score.toggleAttribute('data-out', game.scores[index] <= 0);
     }
     function changeLife(delta) {
       const next = game.scores[index] + delta;
