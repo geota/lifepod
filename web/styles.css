@@ -19,15 +19,7 @@
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
 
-  /* Dice: a pale sage die, its side faces darker away from the light. See design/dice/SPEC.md. */
-  --die-front: #dfe4d3;
-  --die-side-1: #b8c2ab;
-  --die-side-2: #97a28b;
-  --die-side-3: #78836d;
-  --die-edge: #566152;
-  --die-outline: #2a332b;
-  --die-ink: #1b2218;
-  --die-ink-idle: #5b6656;
+  /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
   --die-shadow: #070a08;
   --dice-stage-pressed: #1a201c;
   --press-overlay: #f3f1e51a;
@@ -447,6 +439,33 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
   .dice-picker { align-content: start; }
 }
 
+/* Die colours. Each die keeps one hue, with the sage die's lightness steps: a pale front face, side faces
+   darker away from the light, and dark ink. Ink is at least 12:1 on the front face and the quieter "d20" label
+   at least 4.9:1. The hues follow the seat colours, so the six dice are told apart at a glance. */
+[data-sides="4"] { /* coral */
+  --die-front: #ffd7cf; --die-side-1: #eaaca1; --die-side-2: #cd8a7e; --die-side-3: #ab6b60;
+  --die-edge: #804e45; --die-outline: #422924; --die-ink: #301814; --die-ink-idle: #7e4f48;
+}
+[data-sides="6"] { /* amber */
+  --die-front: #f3debd; --die-side-1: #d7b986; --die-side-2: #b9985f; --die-side-3: #997940;
+  --die-edge: #72582c; --die-outline: #3b2e18; --die-ink: #291d07; --die-ink-idle: #715931;
+}
+[data-sides="8"] { /* green */
+  --die-front: #d3e9c8; --die-side-1: #a9c999; --die-side-2: #87aa74; --die-side-3: #688a56;
+  --die-edge: #4c663d; --die-outline: #273520; --die-ink: #172410; --die-ink-idle: #4e6640;
+}
+[data-sides="10"] { /* teal */
+  --die-front: #bdede5; --die-side-1: #84cec4; --die-side-2: #59afa4; --die-side-3: #368f85;
+  --die-edge: #246a62; --die-outline: #153733; --die-ink: #032622; --die-ink-idle: #2b6a62;
+}
+[data-sides="12"] { /* blue */
+  --die-front: #c9e5ff; --die-side-1: #95c3eb; --die-side-2: #70a3cf; --die-side-3: #5184ae;
+  --die-edge: #396182; --die-outline: #1e3243; --die-ink: #0e2131; --die-ink-idle: #3d6180;
+}
+[data-sides="20"] { /* violet */
+  --die-front: #e9dafd; --die-side-1: #c9b2e5; --die-side-2: #aa90c8; --die-side-3: #8a71a7;
+  --die-edge: #66537d; --die-outline: #352b41; --die-ink: #241a2f; --die-ink-idle: #66547b;
+}
 /* The die, shared by the stage and the picker icons. */
 .die-face, .die-outline { stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .die-body .die-face { stroke: var(--die-edge); stroke-width: 1.5px; }
@@ -469,6 +488,8 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
   transform-origin: center;
 }
 .die-number[data-idle] { fill: var(--die-ink-idle); font-weight: var(--weight-semibold); letter-spacing: -.02em; }
+/* Unselected, the picker icon draws in the die's colour. Selected, it takes the button's dark ink. */
+.dice-picker button:not([aria-pressed="true"]) .die-icon { color: var(--die-front); }
 .die-icon .die-face, .die-icon .die-outline { stroke: currentColor; }
 .die-icon .die-face { stroke-width: 1.25px; }
 .die-icon .die-outline { fill: none; stroke-width: 1.75px; }

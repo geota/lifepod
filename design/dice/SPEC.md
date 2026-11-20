@@ -1,6 +1,6 @@
 # Dice roller: design spec
 
-**Status:** applied in `web/dice.js`, `web/app.js` and `web/styles.css`. The app uses `#f49993` for life totals at 0 or below.
+**Status:** applied in `web/dice.js`, `web/app.js` and `web/styles.css`. The app uses `#f49993` for life totals at 0 or below. Each die now has its own colour; see "Die colours" below.
 
 The muted, dark palette stays as it is. This adds one die body (pale sage "bone", built from the palette's greens) and one red for life totals that hit zero. Every value below is in `dice.css` (tokens and reference CSS), `shapes.js` (geometry) and `dice.js` (drawing, randomness, animation), and all of it is drawn in `renders/`.
 
@@ -65,7 +65,7 @@ Each die is drawn on a 100 × 100 viewBox, upright, with light from the upper le
 
 Visual weight: the square is drawn smaller (82) and the triangle and diamond use the full box, so the six sit at a similar optical size in a row (`renders/dice-large.png`). Single digits are capped at 40, so a d6 doesn't shout next to a d20.
 
-Stage colours (new tokens):
+Stage colours (the original sage die; each die now swaps these for its own ramp):
 
 | Token | Value | Use |
 |---|---|---|
@@ -78,6 +78,10 @@ Stage colours (new tokens):
 | `--die-ink` | `#1b2218` | number, 12.6:1 on the front face |
 | `--die-ink-idle` | `#5b6656` | "d20" before the first roll, 4.7:1 |
 | `--die-shadow` | `#070a08` at opacity .6 | outline copy offset (2%, 4%) under the die |
+
+### Die colours
+
+Each die has its own hue, set by `[data-sides]` on its SVGs in `web/styles.css`. The ramp keeps the sage die's OKLCH lightness steps (front .91, sides .80 / .70 / .59, edge .48, outline .31, ink .24, idle ink .48) with more chroma (.05 on the front, up to .085 on the sides). Hues follow the seat colours: d4 coral (30°), d6 amber (80°), d8 green (135°), d10 teal (185°), d12 blue (245°), d20 violet (305°). On every die the ink is at least 12.5:1 on the front face and the idle "d20" label at least 4.9:1. Unselected picker icons draw in their die's front colour, at least 13:1 on the sheet. The shadow is unchanged.
 
 Strokes use `vector-effect: non-scaling-stroke` and `stroke-linejoin: round` (set in CSS), so they stay 1.5px and 2.5px whatever the stage size. Give the shadow and body SVGs `position: relative` with z-index 0 and 1. The shadow's opacity makes a stacking context that would otherwise paint over the die.
 

@@ -88,8 +88,11 @@ window.lifePodDice = (() => {
     return node;
   }
 
-  function svg(className) {
-    return element('svg', { viewBox: '0 0 100 100', class: className, 'aria-hidden': 'true', focusable: 'false' });
+  // data-sides picks the die's colour in styles.css.
+  function svg(className, count) {
+    return element('svg', {
+      viewBox: '0 0 100 100', class: className, 'data-sides': count, 'aria-hidden': 'true', focusable: 'false',
+    });
   }
 
   function body(count) {
@@ -101,9 +104,9 @@ window.lifePodDice = (() => {
     return group;
   }
 
-  // A small one-colour die for the sides picker.
+  // A small line drawing of the die, in its colour, for the sides picker.
   function icon(count) {
-    const picture = svg('die-icon');
+    const picture = svg('die-icon', count);
     picture.append(body(count));
     return picture;
   }
@@ -111,9 +114,9 @@ window.lifePodDice = (() => {
   // The die on the stage: a shadow, then the body with its number.
   function stageDie(count) {
     const shape = shapes[count];
-    const shadow = svg('die-shadow');
+    const shadow = svg('die-shadow', count);
     shadow.append(element('polygon', { points: shape.outline }));
-    const die = svg('die-body');
+    const die = svg('die-body', count);
     die.append(body(count));
     const number = element('text', { class: 'die-number', x: shape.number.x, 'text-anchor': 'middle' });
     die.append(number);

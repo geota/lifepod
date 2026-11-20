@@ -28,9 +28,11 @@ async function checkDice(t, engine) {
   assert.equal(await page.evaluate(() => document.activeElement.id), 'dice-roll', 'Roll has focus');
   assert.equal(await page.locator('#dice-picker [aria-pressed="true"]').textContent(), 'd20', 'a d20 to start');
 
+  const fronts = new Set();
   for (const [sides, faces] of Object.entries(faceCounts)) {
     await button(page, `d${sides}`).click();
     assert.equal(await page.locator('#dice-stage .die-face').count(), faces, `d${sides} draws its faces`);
+    fronts.add(await page.locator('#dice-stage .tone-0').evaluate(face => getComputedStyle(face).fill));
     assert.equal(await shownNumber(page), `d${sides}`, `d${sides} names itself before a roll`);
     for (let roll = 0; roll < 3; roll++) {
       await button(page, `Roll d${sides}`).click();
@@ -42,6 +44,7 @@ async function checkDice(t, engine) {
       assert.equal(await shownNumber(page), value, 'the die shows the announced result');
     }
   }
+  assert.equal(fronts.size, 6, `every die has its own colour: ${[...fronts]}`);
 
   // Tapping the die rolls it too.
   await page.locator('#dice-stage').click();
