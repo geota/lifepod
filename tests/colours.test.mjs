@@ -105,6 +105,9 @@ async function checkColours(t, engine) {
   await button(page, 'Game setup').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  // The restart dialog's close event, which starts the game, runs after the tap.
+  await page.waitForFunction(() => !document.querySelector('#restart').open);
+  await page.waitForTimeout(100);
   assert.deepEqual(await colours(page), ['rose', 'sky', 'sage', 'violet', 'amber', 'teal'], 'a new game keeps the colours');
 
   // Fewer players keep their colours. When a seat comes back and its default is taken, it gets the first free one.

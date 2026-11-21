@@ -16,6 +16,15 @@ const diceRoll = document.querySelector('#dice-roll');
 const diceResult = document.querySelector('#dice-result');
 const rotateSeatsButton = document.querySelector('#rotate-seats');
 const tileColoursButton = document.querySelector('#tile-colours');
+const countersButton = document.querySelector('#counters-button');
+const undoButton = document.querySelector('#undo-button');
+const saveButton = document.querySelector('#save-button');
+const cancelButton = document.querySelector('#cancel-button');
+const commanderSwitch = document.querySelector('#commander-switch');
+const poisonSwitch = document.querySelector('#poison-switch');
+const playerSheet = document.querySelector('#player-sheet');
+const identityToggles = document.querySelector('#identity-toggles');
+const discardDialog = document.querySelector('#discard');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
 const playerChoices = document.querySelector('#player-choices');
@@ -48,15 +57,40 @@ const swatches = [
 const topRowPlayers = [0, 1, 4];
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours' };
+// Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
+const editingModes = ['counters'];
+const discardMessages = {
+  counters: 'Counts, tile colours and colour identities go back to how they were when you opened counters.',
+};
+// Colour identity in W U B R G order, then colourless, which goes alone.
+const identityColours = [
+  { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
+  { id: 'R', name: 'red' }, { id: 'G', name: 'green' }, { id: 'C', name: 'colourless' },
+];
+// Poison and casts stop at this, which keeps every tile readable.
+const maxCount = 99;
+const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
+// Phosphor Icons (MIT, phosphoricons.com), Bold weight, for controls drawn by this script.
+const iconPaths = {
+  minus: 'M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z',
+  plus: 'M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z',
+  flask: 'M225.15,197.71,164,95.81V44h4a12,12,0,0,0,0-24H88a12,12,0,0,0,0,24h4V95.81L30.85,197.71A20,20,0,0,0,48,228H208a20,20,0,0,0,17.15-30.29ZM140,44V99.14a12,12,0,0,0,1.71,6.17l35.13,58.54c-10.79.86-25.15-1.31-43.42-10.56-14-7.08-27.46-11.33-40.27-12.76l21.14-35.22A12,12,0,0,0,116,99.14V44ZM55.06,204,79,164.19c13-1.11,27.62,2.42,43.62,10.52,19.61,9.92,36.25,13.31,49.85,13.31A75.44,75.44,0,0,0,190.11,186l10.83,18Z',
+  crown: 'M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z',
+  palette: 'M203.57,51A107.9,107.9,0,0,0,20,128c0,44.72,27.6,82.25,72,97.94A36,36,0,0,0,140,192a12,12,0,0,1,12-12h46.21a35.79,35.79,0,0,0,35.1-28A108.6,108.6,0,0,0,236,127.09,107.23,107.23,0,0,0,203.57,51Zm6.34,95.67a11.91,11.91,0,0,1-11.7,9.3H152a36,36,0,0,0-36,36,12,12,0,0,1-16,11.3c-16.65-5.88-30.65-15.76-40.48-28.56A76,76,0,0,1,44,128a84,84,0,0,1,83.13-84H128a84.35,84.35,0,0,1,84,83.29A84.72,84.72,0,0,1,209.91,146.71ZM144,76a16,16,0,1,1-16-16A16,16,0,0,1,144,76Zm-44,24A16,16,0,1,1,84,84,16,16,0,0,1,100,100Zm0,56a16,16,0,1,1-16-16A16,16,0,0,1,100,156Zm88-56a16,16,0,1,1-16-16A16,16,0,0,1,188,100Z',
+};
 
 let game = loadGame();
 let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
-// The open board mode: 'rotate' or 'colours', or null at rest.
+// The open board mode: 'rotate', 'colours' or 'counters', or null at rest.
 let boardMode = null;
+// While an editing mode is open: every change made in it, newest last, so it can be undone or discarded.
+let edits = null;
+let sheetPlayer = null;
+let sheetOpener = null;
 let announceTimer;
-const pendingAnnouncements = new Set();
+const pendingAnnouncements = new Map();
 let diceSides = 20;
 let die;
 let stopRoll;
@@ -123,10 +157,31 @@ function fitColors(saved, count) {
   return colors;
 }
 
+// One count per player. Anything that isn't a whole number from 0 to the maximum starts at 0.
+function fitCounts(saved, count) {
+  return Array.from({ length: count }, (_, index) => {
+    const value = Array.isArray(saved) ? saved[index] : undefined;
+    return Number.isInteger(value) && value >= 0 && value <= maxCount ? value : 0;
+  });
+}
+
+// Colour identity as letters in W U B R G order, or 'C' alone for colourless.
+function normalizeIdentity(value) {
+  if (typeof value !== 'string' || !/^[WUBRGC]*$/.test(value)) return '';
+  if (value.includes('C')) return value === 'C' ? 'C' : '';
+  return identityColours.map(colour => colour.id).filter(id => value.includes(id)).join('');
+}
+
+function fitIdentities(saved, count) {
+  return Array.from({ length: count }, (_, index) => normalizeIdentity(Array.isArray(saved) ? saved[index] : undefined));
+}
+
 function loadGame() {
   const defaults = {
     startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
+    counters: { commander: false, poison: false }, poison: fitCounts([], 4), casts: fitCounts([], 4),
+    identities: fitIdentities([], 4),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -143,6 +198,10 @@ function loadGame() {
     return {
       startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false, landscapeAngle,
       colors: fitColors(saved.colors, saved.scores.length),
+      counters: { commander: saved.counters?.commander === true, poison: saved.counters?.poison === true },
+      poison: fitCounts(saved.poison, saved.scores.length),
+      casts: fitCounts(saved.casts, saved.scores.length),
+      identities: fitIdentities(saved.identities, saved.scores.length),
     };
   } catch {
     return defaults;
@@ -262,20 +321,53 @@ function haptic() {
   else navigator.vibrate?.(8);
 }
 
-// Announce totals once a burst of changes settles, instead of on every step of a hold.
-function announceLife(index) {
-  pendingAnnouncements.add(index);
+// Announce totals once a burst of changes settles, instead of on every step of a hold. Each player's news is
+// read in seat order, and describe() runs when it's read, so it gives the settled value.
+function announce(index, kind, describe) {
+  pendingAnnouncements.set(`${index} ${kind}`, { index, describe });
   clearTimeout(announceTimer);
   announceTimer = setTimeout(() => {
-    announcer.textContent = [...pendingAnnouncements].sort((a, b) => a - b)
-      .map(player => `Player ${player + 1}, ${game.scores[player]} life`).join('. ');
+    announcer.textContent = [...pendingAnnouncements.values()].sort((a, b) => a.index - b.index)
+      .map(item => item.describe()).join('. ');
     pendingAnnouncements.clear();
   }, 700);
+}
+
+function announceLife(index) {
+  announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
+}
+
+function identityText(identity) {
+  if (!identity) return 'no colour identity';
+  return `colour identity ${[...identity].map(id => identityColours.find(colour => colour.id === id).name).join(', ')}`;
 }
 
 // Android's back gesture only needs the page while a dialog or board mode is open.
 function syncBackHandling() {
   android?.setBackHandling?.(boardMode !== null || document.querySelector('dialog[open]') !== null);
+}
+
+function icon(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'icon');
+  svg.setAttribute('viewBox', '0 0 256 256');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', iconPaths[name]);
+  svg.append(path);
+  return svg;
+}
+
+function element(tag, className, ...children) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  node.append(...children);
+  return node;
+}
+
+function visuallyHidden(text) {
+  return element('span', 'visually-hidden', text);
 }
 
 // For buttons that act once per press: a press counts the moment a finger lands, as on the life buttons.
@@ -351,8 +443,13 @@ function syncAllSwatches() {
   for (const group of document.querySelectorAll('.swatches')) syncSwatches(group);
 }
 
+// In colours mode a choice is saved at once. In counters mode it's an edit that can be undone or discarded.
 function chooseColour(index, colour) {
   if (game.colors.includes(colour)) return;
+  if (edits) {
+    commitEdit({ kind: 'colour', index, from: game.colors[index], to: colour });
+    return;
+  }
   game.colors[index] = colour;
   paintColours();
   syncAllSwatches();
@@ -360,41 +457,266 @@ function chooseColour(index, colour) {
   saveGame();
 }
 
+function setIdentity(index, identity) {
+  if (identity !== game.identities[index]) commitEdit({ kind: 'identity', index, from: game.identities[index], to: identity });
+}
+
+// Applies an edit forwards (1) or takes it back (-1).
+function applyEdit(edit, direction) {
+  if (edit.kind === 'poison' || edit.kind === 'casts') game[edit.kind][edit.index] += edit.delta * direction;
+  else if (edit.kind === 'colour') game.colors[edit.index] = direction > 0 ? edit.to : edit.from;
+  else if (edit.kind === 'identity') game.identities[edit.index] = direction > 0 ? edit.to : edit.from;
+}
+
+// Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
+function showEdit(edit) {
+  const { index } = edit;
+  if (edit.kind === 'colour') {
+    paintColours();
+    syncAllSwatches();
+    syncSheet();
+    announce(index, 'colour', () => `Player ${index + 1}, ${swatches[game.colors[index]].name} tile`);
+  } else if (edit.kind === 'identity') {
+    syncSheet();
+    announce(index, 'identity', () => `Player ${index + 1}, ${identityText(game.identities[index])}`);
+  } else if (edit.kind === 'poison') {
+    announce(index, 'poison', () => `Player ${index + 1}, ${game.poison[index]} poison`);
+  } else if (edit.kind === 'casts') {
+    announce(index, 'casts', () => `Player ${index + 1}, commander tax ${game.casts[index] * 2}`);
+  }
+  syncCounterRows(index);
+  renderBadges(index);
+  syncPill();
+  haptic();
+  saveGame();
+}
+
+function commitEdit(edit) {
+  applyEdit(edit, 1);
+  edits.push(edit);
+  showEdit(edit);
+}
+
+function undoEdit() {
+  const edit = edits?.pop();
+  if (!edit) return;
+  applyEdit(edit, -1);
+  showEdit(edit);
+}
+
+function stepCount(kind, index, delta) {
+  const next = game[kind][index] + delta;
+  if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
+}
+
+// A counter row laid out like the life controls: − on the reader's left, the count, + on the right.
+function buildCounterRow(kind, index) {
+  const name = `Player ${index + 1}`;
+  const [subtract, add] = ['minus', 'plus'].map((glyph) => {
+    const button = element('button', '', icon(glyph));
+    button.type = 'button';
+    return button;
+  });
+  const value = element('output', 'counter-value', icon(kind === 'poison' ? 'flask' : 'crown'), element('b'));
+  value.dataset.kind = kind;
+  const row = element('div', 'counter-row', subtract, value, add);
+  if (kind === 'poison') {
+    bindCounter(subtract, () => stepCount('poison', index, -1), `Remove one poison counter from ${name}`);
+    bindCounter(add, () => stepCount('poison', index, 1), `Add one poison counter to ${name}`);
+  } else {
+    bindCounter(subtract, () => stepCount('casts', index, -1), `Remove one commander cast from ${name}`);
+    bindCounter(add, () => stepCount('casts', index, 1), `Add one commander cast for ${name}`);
+  }
+  return row;
+}
+
+function syncCounterRows(index) {
+  const layer = board.children[index]?.querySelector('.counter-rows');
+  if (!layer) return;
+  for (const value of layer.querySelectorAll('.counter-value')) {
+    const poison = value.dataset.kind === 'poison';
+    value.querySelector('b').textContent = poison ? game.poison[index] : `+${game.casts[index] * 2}`;
+    value.setAttribute('aria-label', poison ? `${game.poison[index]} poison`
+      : `Commander tax ${game.casts[index] * 2}, ${game.casts[index]} ${game.casts[index] === 1 ? 'cast' : 'casts'}`);
+  }
+}
+
 // Each tile's layer for the open mode, facing its player.
 function renderModeLayer(player, index) {
   const layer = player.querySelector('.mode-layer');
   layer.replaceChildren();
   if (boardMode === 'colours') {
-    const hint = document.createElement('p');
-    hint.className = 'layer-hint';
-    hint.textContent = 'Your tile colour';
+    const hint = element('p', 'layer-hint', 'Your tile colour');
     hint.setAttribute('aria-hidden', 'true');
     layer.append(hint, buildSwatches(index, colour => chooseColour(index, colour)));
+  } else if (boardMode === 'counters') {
+    const rows = element('div', 'counter-rows');
+    if (game.counters.poison) rows.append(buildCounterRow('poison', index));
+    if (game.counters.commander) rows.append(buildCounterRow('casts', index));
+    const palette = element('button', 'palette-button', icon('palette'), element('span', 'word', 'Colour'));
+    palette.type = 'button';
+    palette.setAttribute('aria-label', game.counters.commander
+      ? `Tile colour and colour identity for Player ${index + 1}` : `Tile colour for Player ${index + 1}`);
+    palette.setAttribute('aria-haspopup', 'dialog');
+    palette.addEventListener('click', () => openPlayerSheet(index, palette));
+    rows.append(palette);
+    layer.append(rows);
   }
   layer.hidden = layer.childElementCount === 0;
+  syncCounterRows(index);
 }
 
-// Board-wide modes: seat rotation and tile colours end with the check mark that replaces the setup button.
+// The near-edge badges: colour identity, poison and tax, each only when it's set and its switch is on.
+function renderBadges(index) {
+  const player = board.children[index];
+  if (!player) return;
+  const near = player.querySelector('.badges.near');
+  const chips = [];
+  const identity = game.counters.commander ? game.identities[index] : '';
+  if (identity) {
+    const pips = [...identity].map((id) => {
+      const pip = element('span', 'pip');
+      pip.dataset.pip = id;
+      return pip;
+    });
+    chips.push(element('span', 'chip pips', ...pips, visuallyHidden(identityText(identity))));
+  }
+  if (game.counters.poison && game.poison[index] > 0) {
+    chips.push(element('span', 'chip', icon('flask'), String(game.poison[index]), visuallyHidden(' poison')));
+  }
+  if (game.counters.commander && game.casts[index] > 0) {
+    chips.push(element('span', 'chip', visuallyHidden('Commander tax '), icon('crown'), `+${game.casts[index] * 2}`));
+  }
+  for (const chip of chips) chip.setAttribute('role', 'listitem');
+  near.replaceChildren(...chips);
+  near.hidden = chips.length === 0;
+}
+
+// The centre pill: counters (when a counter is on), dice and setup at rest; Undo, save and ✕ while editing.
+function syncPill() {
+  const editing = editingModes.includes(boardMode);
+  countersButton.hidden = boardMode !== null || !(game.counters.commander || game.counters.poison);
+  diceButton.hidden = boardMode !== null;
+  setupButton.hidden = editing;
+  for (const button of [undoButton, saveButton, cancelButton]) button.hidden = !editing;
+  undoButton.disabled = !edits?.length;
+}
+
+// The player sheet: tile colour, and colour identity when Commander is on. It faces the player who opened it.
+function openPlayerSheet(index, opener) {
+  sheetPlayer = index;
+  sheetOpener = opener;
+  const player = board.children[index];
+  const angle = (Number(document.querySelector('.app').dataset.boardTurn) + faceAngles[player.dataset.edge]) % 360;
+  playerSheet.style.setProperty('--sheet-angle', `${angle}deg`);
+  playerSheet.toggleAttribute('data-sideways', angle % 180 !== 0);
+  playerSheet.dataset.colour = player.dataset.colour;
+  playerSheet.dataset.row = player.dataset.row;
+  document.querySelector('#player-sheet-name').textContent = `Player ${index + 1}`;
+  document.querySelector('#sheet-swatches').replaceChildren(buildSwatches(index, colour => chooseColour(index, colour)));
+  document.querySelector('#sheet-identity').hidden = !game.counters.commander;
+  syncSheet();
+  playerSheet.showModal();
+  syncBackHandling();
+}
+
+// Keeps the open sheet's identity toggles and colour dot up to date.
+function syncSheet() {
+  if (sheetPlayer === null) return;
+  const identity = game.identities[sheetPlayer];
+  for (const toggle of identityToggles.children) toggle.setAttribute('aria-pressed', String(identity.includes(toggle.value)));
+  playerSheet.dataset.colour = swatches[game.colors[sheetPlayer]].id;
+}
+
+for (const colour of identityColours) {
+  const pip = element('span', 'pip');
+  pip.dataset.pip = colour.id;
+  const toggle = element('button', 'identity-toggle', pip, colour.id);
+  toggle.type = 'button';
+  toggle.value = colour.id;
+  toggle.setAttribute('aria-label', colour.name[0].toUpperCase() + colour.name.slice(1));
+  // Colourless can't be combined with a colour, so choosing one clears the other.
+  toggle.addEventListener('click', () => {
+    const identity = game.identities[sheetPlayer];
+    let next;
+    if (colour.id === 'C') next = identity === 'C' ? '' : 'C';
+    else if (identity.includes(colour.id)) next = identity.replace(colour.id, '');
+    else next = normalizeIdentity(identity.replace('C', '') + colour.id);
+    setIdentity(sheetPlayer, next);
+  });
+  identityToggles.append(toggle);
+}
+playerSheet.querySelector('[data-close]').addEventListener('click', () => playerSheet.close());
+playerSheet.addEventListener('close', () => {
+  sheetPlayer = null;
+  document.querySelector('#sheet-swatches').replaceChildren();
+  syncBackHandling();
+  if (sheetOpener?.isConnected) sheetOpener.focus();
+  sheetOpener = null;
+});
+
+// Board-wide modes. Seat rotation and tile colours end with the check mark that replaces the setup button.
+// Counters mode ends with save or ✕, and keeps a list of its edits until then.
 function setBoardMode(mode) {
   cancelPresses();
   boardMode = mode;
+  edits = editingModes.includes(mode) ? [] : null;
   [...board.children].forEach((player, index) => {
     player.querySelector('.controls').inert = mode !== null;
     player.querySelector('.rotate-seat').hidden = mode !== 'rotate';
     renderModeLayer(player, index);
+    renderBadges(index);
   });
-  for (const element of [board, boardControls]) {
-    if (mode) element.dataset.mode = mode;
-    else delete element.dataset.mode;
+  for (const node of [board, boardControls]) {
+    if (mode) node.dataset.mode = mode;
+    else delete node.dataset.mode;
   }
-  setupButton.setAttribute('aria-label', mode ? doneLabels[mode] : 'Game setup');
+  setupButton.setAttribute('aria-label', mode ? doneLabels[mode] ?? 'Game setup' : 'Game setup');
   setupButton.setAttribute('aria-haspopup', mode ? 'false' : 'dialog');
   setupButton.querySelector('.setup-icon').hidden = mode !== null;
   setupButton.querySelector('.rotation-done').hidden = mode === null;
+  syncPill();
   const focusTarget = mode === 'rotate' ? board.querySelector('.rotate-seat')
-    : mode === 'colours' ? board.querySelector('.swatch[aria-pressed="true"]') : setupButton;
-  focusTarget.focus();
+    : mode === 'colours' ? board.querySelector('.swatch[aria-pressed="true"]')
+    : mode ? board.querySelector('.mode-layer button') : setupButton;
+  focusTarget?.focus();
   syncBackHandling();
+}
+
+// ✕ in an editing mode: with no changes it just closes; otherwise it asks first, and Keep editing is the default.
+function cancelEditing() {
+  if (!edits.length) {
+    setBoardMode(null);
+    return;
+  }
+  document.querySelector('#discard-title').textContent = `Discard ${edits.length} ${edits.length === 1 ? 'change' : 'changes'}?`;
+  document.querySelector('#discard-message').textContent = discardMessages[boardMode];
+  discardDialog.returnValue = 'keep';
+  discardDialog.showModal();
+  syncBackHandling();
+}
+
+function discardEdits() {
+  while (edits.length) applyEdit(edits.pop(), -1);
+  paintColours();
+  saveGame();
+  setBoardMode(null);
+  announcer.textContent = 'Changes discarded';
+}
+
+// Leaves the open board mode the way ✕ or the check mark would without saving anything new.
+function leaveBoardMode() {
+  if (editingModes.includes(boardMode)) cancelEditing();
+  else setBoardMode(null);
+}
+
+function renderScore(index) {
+  const score = board.children[index].querySelector('.score');
+  const value = String(game.scores[index]).replace('-', '−');
+  score.value = value;
+  score.setAttribute('aria-label', `${game.scores[index]} life`);
+  score.style.setProperty('--digits', value.length);
+  score.toggleAttribute('data-out', game.scores[index] <= 0);
 }
 
 function renderBoard() {
@@ -407,18 +729,11 @@ function renderBoard() {
     player.setAttribute('aria-label', name);
     const score = player.querySelector('.score');
 
-    function renderScore() {
-      const value = String(game.scores[index]).replace('-', '−');
-      score.value = value;
-      score.setAttribute('aria-label', `${game.scores[index]} life`);
-      score.style.setProperty('--digits', value.length);
-      score.toggleAttribute('data-out', game.scores[index] <= 0);
-    }
     function changeLife(delta) {
       const next = game.scores[index] + delta;
       if (!Number.isSafeInteger(next)) return;
       game.scores[index] = next;
-      renderScore();
+      renderScore(index);
       if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
       haptic();
       announceLife(index);
@@ -434,17 +749,24 @@ function renderBoard() {
       layoutBoard();
       saveGame();
     });
-    renderScore();
     return player;
   });
   board.replaceChildren(...players);
   layoutBoard();
   paintColours();
+  game.scores.forEach((_, index) => {
+    renderScore(index);
+    renderBadges(index);
+  });
 }
 
 function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
   game.colors = fitColors(game.colors, playerCount);
+  // A new game resets the counts and keeps the counter switches, colours and colour identities.
+  game.poison = fitCounts([], playerCount);
+  game.casts = fitCounts([], playerCount);
+  game.identities = fitIdentities(game.identities, playerCount);
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
   // A new game takes the screen's current landscape as upright.
@@ -510,6 +832,8 @@ setupButton.addEventListener('click', () => {
   selectedPlayerCount = game.scores.length;
   startingLifeInput.value = game.startingLife;
   wakeInput.checked = game.keepAwake;
+  commanderSwitch.checked = game.counters.commander;
+  poisonSwitch.checked = game.counters.poison;
   renderSetup();
   setup.showModal();
   syncBackHandling();
@@ -612,7 +936,20 @@ diceDialog.addEventListener('close', () => {
   syncBackHandling();
 });
 
-// Android's back gesture closes the open dialog, then the open board mode.
+countersButton.addEventListener('click', () => setBoardMode('counters'));
+undoButton.addEventListener('click', undoEdit);
+saveButton.addEventListener('click', () => {
+  saveGame();
+  setBoardMode(null);
+});
+cancelButton.addEventListener('click', cancelEditing);
+discardDialog.addEventListener('close', () => {
+  syncBackHandling();
+  if (discardDialog.returnValue === 'discard') discardEdits();
+  else cancelButton.focus();
+});
+
+// Android's back gesture closes the open dialog, then leaves the open board mode the way ✕ does.
 window.closeOpenDialog = () => {
   const openDialog = document.querySelector('dialog[open]');
   if (openDialog) {
@@ -620,11 +957,11 @@ window.closeOpenDialog = () => {
     return true;
   }
   if (!boardMode) return false;
-  setBoardMode(null);
+  leaveBoardMode();
   return true;
 };
 document.addEventListener('keydown', (event) => {
-  if (boardMode && event.key === 'Escape' && !document.querySelector('dialog[open]')) setBoardMode(null);
+  if (boardMode && event.key === 'Escape' && !document.querySelector('dialog[open]')) leaveBoardMode();
 });
 
 wakeInput.addEventListener('change', () => {
@@ -632,6 +969,15 @@ wakeInput.addEventListener('change', () => {
   saveGame();
   syncWakeLock();
 });
+// The counter switches are saved at once and stay on across launches and new games.
+for (const [input, key] of [[commanderSwitch, 'commander'], [poisonSwitch, 'poison']]) {
+  input.addEventListener('change', () => {
+    game.counters[key] = input.checked;
+    saveGame();
+    game.scores.forEach((_, index) => renderBadges(index));
+    syncPill();
+  });
+}
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();
   else if (!android && !ios) syncWakeLock();
@@ -642,5 +988,6 @@ window.addEventListener('resize', syncBoardTurn);
 portraitQuery.addEventListener('change', syncBoardTurn);
 syncBoardTurn();
 renderBoard();
+syncPill();
 syncWakeLock();
 syncBackHandling();

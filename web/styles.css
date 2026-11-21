@@ -18,6 +18,12 @@
   --danger-text: #ffc7b2;
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
+  /* Badges at rest sit on a translucent dark chip. Colour dots get a thin dark rim. */
+  --chip-background: #0a0e0b70;
+  --dot-rim: #0a0e0b;
+  /* Colour identity discs: white, blue, black (with a light rim), red, green and colourless grey. */
+  --pip-w: #f3ecd2; --pip-u: #6fb0e8; --pip-b: #2c2729; --pip-r: #ec7160; --pip-g: #5fb06e; --pip-c: #b3b1ab;
+  --pip-b-rim: #a89ea4;
 
   /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
   --die-shadow: #070a08;
@@ -85,7 +91,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-body, h1, h2, p { margin: 0; }
+body, h1, h2, h3, p { margin: 0; }
 body { overflow: hidden; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -142,7 +148,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   display: flex;
   transform: translate(-50%, -50%);
 }
-/* One pill behind the dice and setup buttons, with a divider between them. Each button is a 48px target. */
+/* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target.
+   app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
 .board-controls::before {
   position: absolute;
   inset: 6px;
@@ -152,16 +159,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: var(--background);
   box-shadow: var(--shadow-float);
 }
-.board-controls::after {
-  position: absolute;
-  top: 14px;
-  bottom: 14px;
-  left: 50%;
-  width: 1px;
-  content: '';
-  background: var(--border);
-}
-.dice-button, .setup-button {
+.pill-button {
   position: relative;
   display: grid;
   place-items: center;
@@ -174,21 +172,38 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: var(--text-soft);
   font-size: 1.25rem;
 }
-.dice-button::before, .setup-button::before {
+.pill-button[hidden] { display: none; }
+.pill-button::before {
   position: absolute;
-  inset: 7px 2px 7px 7px;
+  inset: 7px 2px;
   content: '';
   border-radius: var(--radius-full);
 }
-.setup-button::before { inset: 7px 7px 7px 2px; }
-.dice-button:active::before, .setup-button:active::before { background: var(--surface-pressed); }
-.dice-button .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
+.pill-button:nth-child(1 of :not([hidden]))::before { inset-inline-start: 7px; }
+.pill-button:nth-last-child(1 of :not([hidden]))::before { inset-inline-end: 7px; }
+.pill-button:not([hidden]) ~ .pill-button::after {
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: 0;
+  width: 1px;
+  content: '';
+  background: var(--border);
+}
+.pill-button:active::before { background: var(--surface-pressed); }
+.pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
 /* While rotating seats or choosing colours, only the Done disc stays. */
-.board-controls[data-mode]::after, .board-controls[data-mode] .dice-button { display: none; }
-.board-controls[data-mode]::before { background: var(--accent); border-color: var(--accent); }
-.board-controls[data-mode] .setup-button { color: var(--ink); }
-.board-controls[data-mode] .setup-button::before { content: none; }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"])::before { background: var(--accent); border-color: var(--accent); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button { color: var(--ink); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button::before { content: none; }
+/* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
+.save-button { color: var(--ink); }
+.save-button::before, .save-button:active::before { inset: 7px 3px; background: var(--accent); }
+.save-button:active::before { background: var(--accent-pressed); }
+#board-controls .save-button::after, #board-controls .save-button + .pill-button::after { content: none; }
+.pill-button:disabled { opacity: .38; cursor: default; }
+.pill-button:disabled::before { content: none; }
 
 /* app.js gives each tile, swatch and colour dot a data-colour and data-row, which pick its palette. */
 .player, .swatch {
@@ -370,6 +385,160 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .swatches { --swatch-size: 44px; gap: 3px; }
 }
 
+/* Counters mode: each tile shows [− flask n +] for poison and [− crown +2n +] for tax, laid out like the life
+   controls, and a palette button for the player's colour and identity. */
+.counter-rows { display: grid; justify-items: center; gap: 6px; }
+.counter-row {
+  display: grid;
+  grid-template-columns: auto minmax(4.2em, auto) auto;
+  align-items: center;
+  gap: clamp(4px, 3cqi, 14px);
+}
+.counter-row button {
+  display: grid;
+  place-items: center;
+  width: clamp(44px, 14cqi, 60px);
+  height: var(--tap-min);
+  padding: 0;
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-md);
+  background: var(--button);
+  color: var(--seat);
+  font-size: 1.125rem;
+}
+.counter-row button:is(:active, [data-pressed]) { background: var(--seat); color: var(--button); }
+.counter-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: clamp(1.25rem, 7cqi, 1.875rem);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+}
+.counter-value .icon { color: var(--seat); font-size: .78em; }
+.palette-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-full);
+  background: var(--button);
+  color: var(--seat);
+  font-size: 1.125rem;
+}
+.palette-button:active { background: var(--seat); color: var(--button); }
+.palette-button .word { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
+.palette-button:active .word { color: var(--button); }
+@container (max-width: 240px) {
+  .counter-rows { gap: 3px; }
+  .counter-row { gap: 4px; }
+  .palette-button { width: var(--tap-min); padding: 0; }
+  .palette-button .word { display: none; }
+}
+
+/* Badge rows at rest. They are display-only and appear only when they have something to show: the near edge
+   (the player's own) holds colour identity, poison and tax. */
+.badges {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  font-size: clamp(.78125rem, 3.6cqi, 1rem);
+  pointer-events: none;
+}
+.badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
+.badges.near { bottom: 8px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .16em;
+  height: 1.7em;
+  padding: 0 .4em;
+  border-radius: var(--radius-full);
+  background: var(--chip-background);
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.chip .icon { width: .95em; height: .95em; }
+.chip.pips { gap: 2px; }
+/* Colour identity: plain discs in our own colours, never mana symbols. */
+.pip {
+  --pip: var(--pip-c);
+  flex: none;
+  width: .62em;
+  height: .62em;
+  border-radius: 50%;
+  background: var(--pip);
+  box-shadow: 0 0 0 1.5px var(--dot-rim);
+}
+.pip[data-pip="W"] { --pip: var(--pip-w); }
+.pip[data-pip="U"] { --pip: var(--pip-u); }
+.pip[data-pip="B"] { --pip: var(--pip-b); box-shadow: 0 0 0 1.5px var(--pip-b-rim); }
+.pip[data-pip="R"] { --pip: var(--pip-r); }
+.pip[data-pip="G"] { --pip: var(--pip-g); }
+
+/* The player sheet faces the player who opened it, so app.js turns it with the board and the tile. */
+#player-sheet {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  max-width: calc(100dvw - 32px);
+  max-height: calc(100vh - 12px);
+  max-height: calc(100dvh - 12px);
+  margin: 0;
+  transform: translate(-50%, -50%) rotate(var(--sheet-angle, 0deg));
+}
+#player-sheet[data-sideways] {
+  max-width: calc(100vh - 32px);
+  max-width: calc(100dvh - 32px);
+  max-height: calc(100vw - 12px);
+  max-height: calc(100dvw - 12px);
+}
+#player-sheet .sheet { gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); }
+#player-sheet h2 { display: flex; align-items: center; gap: 10px; font-size: 1.125rem; letter-spacing: -.015em; }
+.sheet-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--seat); }
+.player-sheet-body { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
+.player-sheet-body h3 { margin-bottom: 6px; font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
+#player-sheet .swatches { --swatch-size: 44px; }
+.identity { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; }
+.identity-toggle {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--background);
+  color: var(--muted);
+  font-size: .6875rem;
+  font-weight: var(--weight-semibold);
+}
+.identity-toggle .pip { width: 16px; height: 16px; }
+.identity-toggle:not([aria-pressed="true"]) .pip { opacity: .45; }
+.identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); color: var(--text); box-shadow: 0 0 0 1px var(--text); }
+
+#discard { width: min(360px, calc(100% - 32px)); }
+#discard h2 { font-size: var(--type-title); letter-spacing: -.022em; }
+#discard-message { color: var(--muted); }
+#discard .discard { color: var(--danger-text); }
+
 dialog {
   width: min(420px, calc(100% - 32px));
   max-height: calc(100% - 12px);
@@ -427,7 +596,7 @@ legend, .life-setting label {
   background: var(--background);
 }
 .field-error { margin-top: var(--space-1); color: var(--danger-text); font-size: var(--type-small); }
-.wake-setting {
+.switch-setting {
   position: relative;
   display: flex;
   align-items: center;
@@ -436,8 +605,8 @@ legend, .life-setting label {
   font-size: var(--type-label);
   cursor: pointer;
 }
-.wake-setting input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
-.wake-setting input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+.switch-setting input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
+.switch-setting input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 3px; }
 .switch {
   position: relative;
   flex: none;
@@ -459,6 +628,7 @@ legend, .life-setting label {
 }
 input:checked + .switch { background: var(--accent); border-color: var(--accent); }
 input:checked + .switch::after { transform: translateX(13px); background: var(--ink); }
+.counter-switches { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
 .setup-options { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
 .setup-mode-buttons { display: flex; gap: var(--space-2); }
@@ -590,13 +760,20 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 
 /* Mouse pointers get a hover state on the board and sheet controls. */
 @media (hover: hover) {
-  .dice-button:hover::before, .setup-button:hover::before, .dice-picker button:not([aria-pressed="true"]):hover,
+  .pill-button:not(:disabled, .save-button):hover::before, .dice-picker button:not([aria-pressed="true"]):hover,
   .close:hover, .choices button:not([aria-pressed="true"]):hover, .secondary:hover, .text-button:hover { background: var(--surface-pressed); }
-  .board-controls[data-mode] .setup-button:hover::before { content: none; }
+  .board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button:hover::before { content: none; }
+  .save-button:hover::before { background: var(--accent-pressed); }
   .primary:hover { background: var(--accent-pressed); }
   .dice-stage:hover { background: var(--dice-stage-pressed); }
 }
 @media (max-height: 420px), (max-width: 420px) {
   .sheet { gap: var(--space-1); padding-block: var(--space-2); }
   legend, .life-setting label { margin-bottom: var(--space-1); }
+}
+/* The smallest landscape phones put each setup label beside its controls, so the sheet fits without scrolling. */
+@media (max-height: 360px) and (min-width: 500px) {
+  #setup-form :is(legend, .life-setting > label) { float: left; width: 7.25rem; margin: 0; line-height: var(--tap-min); }
+  #setup-form :is(.choices, .starting-life-row, .counter-switches, .field-error) { margin-inline-start: 7.25rem; }
+  #setup-form .starting-life-row .choices { margin-inline-start: 0; }
 }

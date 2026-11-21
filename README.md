@@ -43,6 +43,8 @@ Tap the sliders beside it to choose 2–6 players, set the starting life, restar
 
 Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark or press back when finished. Rotation choices carry over when restarting with the same player count.
 
+Turn on **Commander** or **Poison** under Counters in Setup to track commander tax, colour identity and poison. Both are off by default and stay as you set them across launches and new games. With either on, a counters button joins the center controls. Tap it and each tile shows poison as **−** count **+** and commander tax as **−** +2 per cast **+**, facing its player; hold **−** or **+** to repeat. Each tile's palette button opens that player's tile colour and, with Commander on, their colour identity (white, blue, black, red, green, or colourless), turned to face them. While counters are open, the center shows Undo, a check mark and ✕: Undo steps back one change at a time, the check mark saves, and ✕ discards every change made since opening, asking first if there are any. Android back works like ✕. At rest, a row along each player's own edge shows their colour identity, poison and tax, each only when set. Starting a new game resets the counts and keeps the switches, colours and identities.
+
 Choose **Colours** in Setup to change tile colours. Every tile shows nine swatches facing its player, so everyone can pick at once. No two players can have the same colour: a swatch another player has is struck through and can't be picked. Tap the center check mark or press back when finished. Colours carry over to new games and player-count changes.
 
 ## Install on Android
