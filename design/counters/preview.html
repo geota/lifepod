@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LifePod Counters</title>
+  <link rel="stylesheet" href="../../web/styles.css">
+  <link rel="stylesheet" href="mock.css">
+  <style>
+    /* Index, strip and swatch pages. Board frames use only styles.css and mock.css. */
+    body.index, body.strip, body.swatch-page { overflow: auto; padding: 20px; font-family: var(--font-ui); }
+    .index header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
+    .index h1, .strip h1, .swatch-page h1 { font-size: 1.25rem; letter-spacing: -.01em; }
+    .index select { min-height: 44px; padding: 0 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; }
+    .index iframe { display: block; border: 1px solid var(--border); border-radius: 12px; background: var(--background); }
+    .index .caption, .strip figcaption { color: var(--text-soft); font-size: 14px; }
+    .index nav { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .index nav a { color: var(--accent); font-size: 14px; }
+    .strip h1 { margin-bottom: 14px; }
+    .strip .frames { display: flex; flex-wrap: wrap; gap: 18px 16px; align-items: flex-start; }
+    .strip figure { margin: 0; display: grid; gap: 6px; }
+    .strip .shot { position: relative; overflow: hidden; border-radius: 10px; outline: 1px solid var(--border); }
+    .strip .shot img { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(var(--turn, 0deg)); }
+    .strip figcaption { max-width: 34em; }
+    .strip figcaption b { color: var(--text); margin-inline-end: 6px; }
+    .swatch-grid { display: grid; grid-template-columns: repeat(6, 168px); gap: 16px 12px; margin-top: 14px; }
+    .swatch-cell { display: grid; gap: 4px; }
+    .swatch-cell .player { width: 168px; height: 96px; border-radius: 8px; }
+    .swatch-cell .name { font-weight: 650; font-size: 14px; }
+    .swatch-cell .ratios { color: var(--text-soft); font-size: 12px; font-variant-numeric: tabular-nums; line-height: 1.35; }
+    .swatch-page h2.sub { font-size: 15px; margin: 18px 0 8px; color: var(--text); }
+    .icon-row, .icon-head { display: grid; grid-template-columns: 140px repeat(4, 200px) 150px; gap: 10px; align-items: center; margin-top: 10px; }
+    .icon-head { color: var(--text-soft); font-size: 12px; margin-top: 16px; }
+    .icon-name { font-weight: 650; font-size: 14px; }
+    .icon-row .player .player-face { display: grid; place-items: center; }
+    .ratios-table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .ratios-table td, .ratios-table th { padding: 3px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    .ratios-table th { color: var(--text-soft); font-weight: 650; }
+    .swatch-page p { color: var(--text-soft); font-size: 14px; max-width: 60em; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import scenes, { strips } from './scenes.js';
+    import { renderBoard, renderSetup, paletteFor, icon } from './mock.js';
+    import palette from './palette.js';
+
+    const params = new URLSearchParams(location.search);
+    const id = params.get('scene');
+    const strip = params.get('strip');
+
+    function swatchPage() {
+      document.body.className = 'swatch-page';
+      const cells = palette.swatches.flatMap((s, i) => ['top', 'bottom'].map(row => {
+        const p = s[row];
+        const c = palette.checks.find(r => r.name === s.name && r.row === row);
+        return `<div class="swatch-cell">
+          <section class="player" data-edge="bottom" style="--panel:${p.panel};--rim:${p.rim};--seat:${p.seat};--button:${p.button}">
+            <div class="player-face">
+              <div class="badges far" style="top:6px"><span class="chip pips">${[...'WUBRGC'].map(k => `<span class="pip" data-c="${k}" style="--pip:var(--pip-${k.toLowerCase()})"></span>`).join('')}</span></div>
+              <div class="controls">
+                <button type="button" class="subtract">${icon('minus')}</button>
+                <output class="score" style="--digits:2">40</output>
+                <button type="button" class="add" data-pressed>${icon('plus')}</button>
+              </div>
+            </div>
+          </section>
+          <div class="name">${i + 1}. ${s.name} · ${row} row</div>
+          <div class="ratios">life ${c.life} · small ${c.small} · pressed ${c.pressed}<br>at 0 ${c.lifeOut} · amber ${c.warn}</div>
+        </div>`;
+      }));
+      document.body.innerHTML = `<h1>Tile colour swatches</h1>
+        <p>Twelve hues in OKLCH at today's lightness per role (panel, rim, seat, button). Swatches 1–6 are today's seat palettes; each is shown at both row lightnesses, because the top row stays lighter and the bottom row darker. The + button is drawn pressed. Ratios are WCAG contrast: life total on the panel, small text (--text-soft) on the panel, pressed button ink on the seat colour, the 0-life red and the amber on the panel. Worst case: ${palette.worst}:1.</p>
+        <div class="swatch-grid">${cells.join('')}</div>`;
+    }
+
+
+    function miniTile(p, inner, style = '') {
+      return `<section class="player" data-edge="bottom" style="--panel:${p.panel};--rim:${p.rim};--seat:${p.seat};--button:${p.button};${style}"><div class="player-face">${inner}</div></section>`;
+    }
+    const lifeControls = (v = 40) => `<div class="controls"><button type="button" class="subtract">${icon('minus')}</button><output class="score" style="--digits:2">${v}</output><button type="button" class="add">${icon('plus')}</button></div>`;
+
+    function poisonPage() {
+      document.body.className = 'swatch-page';
+      const sw = palette.swatches;
+      const tiles = [['Sage, top', sw[0].top], ['Teal, bottom', sw[5].bottom], ['Coral, bottom', sw[2].bottom], ['Violet, top', sw[3].top]];
+      const greenTint = '#93d98a';
+      const variants = [
+        ['drop', 'drop', ''], ['drop, tinted green', 'drop', greenTint], ['drop-half', 'drop-half', ''], ['skull', 'skull', ''],
+        ['biohazard', 'biohazard', ''], ['flask', 'flask', ''], ['test-tube', 'test-tube', ''], ['virus', 'virus', ''],
+      ];
+      const rows = variants.map(([label, name, tint]) => {
+        const ic = tint ? icon(name).replace('class="icon"', `class="icon" style="color:${tint}"`) : icon(name);
+        const cells = tiles.map(([, p]) => miniTile(p, `<div class="badges far" style="top:auto;bottom:auto;position:relative;left:0;right:0;--chip-font:13px">
+            <span class="chip pips"><span class="pip" style="--pip:var(--pip-g)"></span><span class="pip" style="--pip:var(--pip-u)"></span></span>
+            <span class="chip"><span class="dot" style="--c:${sw[1].top.seat}"></span>7</span>
+            <span class="chip">${ic}3</span></div>`, 'width:200px;height:52px;border-radius:8px')).join('');
+        const panel = miniTile(sw[0].top, `<button class="count-button" type="button" style="min-height:60px;width:110px"><span class="count-main">${ic.replace('class="icon"', 'class="icon"')}<b>3</b></span><span class="count-label">Poison</span></button>`, 'width:150px;height:76px;border-radius:8px');
+        return `<div class="icon-row"><div class="icon-name">${label}</div>${cells}${panel}</div>`;
+      }).join('');
+      document.body.innerHTML = `<h1>Poison icons (Phosphor Bold)</h1>
+        <p>Each icon at chip size (13px text) next to a green and blue identity chip and a commander damage chip, on four tile colours, then at panel size in the counters-mode button. Paths are copied from @phosphor-icons/core (phosphor-extra.js).</p>
+        <div class="icon-head"><span></span>${tiles.map(([n]) => `<span>${n}</span>`).join('')}<span>Panel size</span></div>${rows}`;
+    }
+
+    function r2SwatchPage() {
+      document.body.className = 'swatch-page';
+      const r2 = palette.r2.swatches, old = palette.swatches;
+      const strip = (list, row) => `<div class="tile-strip">${list.map(s => miniTile(s[row] ?? s, lifeControls())).join('')}</div>
+        <div class="tile-strip-names">${list.map(s => `<span>${s.label ?? s.name}</span>`).join('')}</div>`;
+      const byName = (set, n) => set.find(s => s.name === n);
+      const pair = (...items) => items.map(([set, n, label]) => ({ ...byName(set, n), label: label ?? n }));
+      const table = palette.r2.checks.map(c => `<tr><td>${c.name}</td><td>${c.row}</td><td>${c.life}</td><td>${c.small}</td><td>${c.pressed}</td><td>${c.lifeOut}</td><td>${c.warn}</td><td>${c.warnChip}</td><td>${c.outChip}</td></tr>`).join('');
+      document.body.innerHTML = `<h1>Nine swatches</h1>
+        <p>Today's six, then Rose and Indigo with more chroma (1.6× and 1.8×) so their panels sit as far from today's as today's closest pair, then Slate. Tiles touch with the board's 2px seam, so neighbours can be judged as they would sit on the table. Worst contrast: ${palette.r2.worst}:1.</p>
+        <h2 class="sub">Top row (lighter)</h2>${strip(r2, 'top')}
+        <h2 class="sub">Bottom row (darker)</h2>${strip(r2, 'bottom')}
+        <h2 class="sub">Why the other three went, bottom row</h2>
+        ${strip(pair([old, 'Coral'], [old, 'Orange', 'Orange (dropped)'], [old, 'Amber'], [old, 'Sage'], [old, 'Lime', 'Lime (dropped)'], [old, 'Teal'], [old, 'Cyan', 'Cyan (dropped)'], [old, 'Sky']), 'bottom')}
+        <h2 class="sub">Rose and Indigo, round 1 against round 2</h2>
+        ${strip(pair([old, 'Coral'], [old, 'Rose', 'Rose, round 1'], [r2, 'Rose', 'Rose, round 2'], [old, 'Violet'], [old, 'Indigo', 'Indigo, round 1'], [r2, 'Indigo', 'Indigo, round 2'], [old, 'Sky']), 'bottom')}
+        <h2 class="sub">Contrast (WCAG)</h2>
+        <table class="ratios-table"><tr><th>Swatch</th><th>Row</th><th>Life</th><th>Small text</th><th>Pressed</th><th>Life at 0</th><th>Amber</th><th>Amber chip</th><th>Red chip</th></tr>${table}</table>`;
+    }
+
+    function stripPage(name) {
+      const s = strips[name];
+      document.body.className = 'strip';
+      const figures = s.ids.map((frame, n) => {
+        const sc = scenes[frame];
+        const portraitBoard = sc.h > sc.w && sc.kind !== 'setup' && !sc.noTurn;
+        const scale = sc.w >= 1000 ? 0.5 : sc.w <= 320 ? 0.74 : 0.6;
+        const [w, h] = [sc.w * scale, sc.h * scale];
+        const [bw, bh] = portraitBoard ? [h, w] : [w, h];
+        return `<figure><div class="shot" style="width:${bw}px;height:${bh}px;${portraitBoard ? '--turn:-90deg' : ''}">
+            <img src="renders/frames/${frame}.png" width="${w}" height="${h}" alt=""></div>
+          <figcaption><b>${n + 1}</b>${sc.caption}${portraitBoard ? ' <i>(320 × 568 portrait, shown turned)</i>' : ''}</figcaption></figure>`;
+      }).join('');
+      document.body.innerHTML = `<h1>${s.title}</h1><div class="frames">${figures}</div>`;
+    }
+
+    function indexPage() {
+      document.body.className = 'index';
+      const options = Object.entries(scenes).map(([k, v]) => `<option value="${k}">${k} — ${v.caption}</option>`).join('');
+      document.body.innerHTML = `<header><h1>Counters mock-ups</h1><select id="pick" aria-label="State">${options}</select><span class="caption" id="cap"></span></header>
+        <iframe id="frame" title="Mock-up"></iframe>
+        <nav>${Object.keys(strips).map(k => `<a href="?strip=${k}">${k}</a>`).join('')}<a href="?scene=swatches">swatches</a></nav>`;
+      const pick = document.querySelector('#pick'), frame = document.querySelector('#frame');
+      const show = () => {
+        const sc = scenes[pick.value];
+        frame.width = sc.w; frame.height = sc.h;
+        frame.src = `?scene=${pick.value}`;
+        document.querySelector('#cap').textContent = `${sc.w} × ${sc.h}`;
+        history.replaceState(null, '', `?pick=${pick.value}`);
+      };
+      pick.value = params.get('pick') ?? 'a1';
+      pick.addEventListener('change', show);
+      show();
+    }
+
+    if (id === 'swatches') swatchPage();
+    else if (id === 'r2-poison-icons') poisonPage();
+    else if (id === 'r2-swatches') r2SwatchPage();
+    else if (id) {
+      const scene = scenes[id];
+      document.body.className = 'frame';
+      if (scene.kind === 'setup') { renderBoard({ ...scene, noPill: false }); renderSetup(scene); }
+      else renderBoard(scene);
+    } else if (strip) stripPage(strip);
+    else indexPage();
+    await document.fonts.ready;
+    await Promise.all([...document.images].map(img => img.decode().catch(() => {})));
+    window.mockReady = true;
+  </script>
+</body>
+</html>

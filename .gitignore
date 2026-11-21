@@ -8,3 +8,4 @@ xcuserdata/
 *.jks
 *.p12
 *.mobileprovision
+/design/counters/renders/frames/
