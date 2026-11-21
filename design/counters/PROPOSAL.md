@@ -43,6 +43,17 @@ These replace anything below that disagrees. The mock-ups behind them are in `OP
 - **The centre pill** has four buttons: sword, counters, dice and setup.
 - **Setting colours:** a Colours button in Game setup, next to Rotate seats, opens a board mode. Each tile shows its nine swatches, facing its player, so everyone picks at once, and ✓ ends it. This works whether or not the switches are on. With Commander on, the counters-mode palette button also opens colour and identity.
 
+## Decisions from round 4 (21 November 2026)
+
+These follow feedback on v0.1.0-alpha.9. The mock-ups are in OPTIONS.md, Round 4.
+
+- **Map seats (C):** at 0, a seat is the attacker's panel colour inside a 2px ring in their seat colour. Once it has damage, it fills solid with the seat colour. No transparency anywhere.
+- **Taken swatches (B):** full colour, with the owner ("P2") in place of the seat dot. No transparency.
+- **Sword (S1):** a sword in its own circle starts the far (commander damage) badge row.
+- **Pips (a):** the same thin light ring on every pip. Unchosen identity toggles show at full colour.
+- **Colour identity is any combination of W U B R G.** Colourless (C) is removed, so a colourless commander has no identity set. The white pip must read as white, not grey.
+- **Game setup** must fit without scrolling on a landscape phone about 427px tall, such as a Pixel 10 Pro.
+
 ## Goals
 
 - Nothing new shows on the board until a game uses it. A plain 20-life game looks exactly as it does today, and players who keep counters on dice never see these features.

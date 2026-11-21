@@ -499,3 +499,87 @@ All round 3 frames use these.
 **Recommendation: C.**
 - Colour identity only matters in Commander, so it stays in the player sheet behind the counters-mode palette button. That button is only there when Commander or Poison is on.
 - The Colours button can stay in setup even when counters are on, so tile colour always has the same home.
+
+---
+
+# Round 4
+
+**Status:** 20 November 2026. Colour and pip fixes after v0.1.0-alpha.9.
+
+All frames are rendered from the real app (`web/index.html`) with variant CSS and JS injected, by `design/counters/r4.mjs`. The 4-player frames use Sage, Sky, Coral and Violet; the 6-player frames use Amber, Teal, Rose, Indigo, Slate and Sage, so between them all nine swatches show. Contrast figures cover all nine swatches in both rows.
+
+## R4.1 Map cells in the attacker's colour
+
+![Map cells](renders/r4-map-colours.png)
+
+**The problem:** cells use the pale seat colour, and zero cells add `opacity: .7`. So a zero cell takes on the defender's panel underneath, and the same attacker looks different on every tile.
+
+| | Cell | Distinct from the defender's panel | Numbers |
+|---|---|---|---|
+| A · Mini tile | Attacker's panel, rim border, number in their seat colour | **Weak.** Panels can be 1.00:1 (Sage and Teal, Sky and Slate), so only the rim separates them, at 1.45–2.67:1 | 7.4–9.4:1 |
+| B · Solid seat | Seat colour, solid. Zero shows a muted number: a solid 40/60 mix of the attacker's button and rim colours, semibold | Yes, 6.9–10.6:1 | 9.4–11.7:1; zero 5.4–7.1:1 |
+| C · Outlined at zero, filled once hit | Zero: the attacker's panel inside a 2px ring in their seat colour, with a seat-colour 0. Any damage fills the cell with the seat colour, as in B | Yes: the ring and the fill are both 6.9–10.6:1 | 7.4–9.4:1 at zero; 9.4–11.7:1 filled |
+
+**Trade-offs:**
+- A matches the tile most literally, but it fails the distinctness check. On neighbouring hues the cells sink into the tile, and they look like your own seat, which is also an outlined box.
+- B is the smallest change and matches the seat-colour dots in the badge rows. Zero and non-zero differ only by the number's shade.
+- C shows at a glance who has hit you: those seats are filled. Zero seats show the attacker's real tile colour. The first tap visibly fills the cell, which is useful feedback.
+
+**Build notes:**
+- C draws its zero ring with an inset `box-shadow`. The `[data-changed]` and `[data-pressed]` rules also set `box-shadow`, so they need to keep the ring, for example when a seat goes back to 0.
+- B's colour mix can be written as `color-mix(in oklab, …)`, or generated as a token for each palette in `palette.mjs`.
+
+**Recommendation: C.** B is the fallback if a single cell style is preferred.
+
+## R4.2 Taken swatches
+
+![Taken swatches](renders/r4-taken-swatches.png)
+
+Each frame shows both places: Game setup → Colours, where every tile picks at once, and the counters-mode palette sheet. The 6-player sheet is turned upright here so it can be read.
+
+| | Treatment | Text contrast |
+|---|---|---|
+| A · Strike and owner tag | Full colour, a light strike with a dark edge, and a 10px "P2" tag in the corner | 15.7:1 |
+| B · Owner in place of the dot | Full colour, and the seat dot becomes the owner, "P2", in the seat colour. No strike | 7.4–9.4:1 |
+
+**Trade-offs:**
+- A says "can't choose" twice, but at 44px the tag is tiny and the strike crosses the dot, so the colour is harder to read.
+- B keeps the panel, the rim and the seat colour intact. "Taken" is told by shape: a dot means free and a label means taken. The label also answers "who has it?" at a readable 14px.
+- Both keep the existing label "Sage, taken by Player 2".
+
+**Recommendation: B.** A is the fallback if the table wants an explicit strike.
+
+## R4.3 Sword on the commander damage row
+
+![Sword chip](renders/r4-sword-chip.png)
+
+The worst case is 6 players on a 320 × 568 phone, with damage of 18, 12, 9, 7 and 4 from all five opponents, on P1 (outer seat) and P4 (middle seat). Each row has 180px of room.
+
+| | Treatment | Type after `fitBadgeRow` | Width used |
+|---|---|---|---|
+| Today | No sword | 12.5px (no shrink) | 155px |
+| S1 · Own circle | One 1.7em circle leads the row, with the pill's Phosphor sword in the muted text colour (8.2–9.3:1) | 12.5px (no shrink) | 178px |
+| S2 · In every chip | Sword · dot · amount in each chip | 9.8px | 172px |
+
+**Trade-offs:**
+- S1 labels the row once and echoes the pill's sword button. It still fits at full size, but with only 2px to spare, so five two-digit amounts would shrink the row slightly.
+- S2 repeats the sword five times, and the row's type drops to 9.8px, the smallest text on the board.
+
+**Recommendation: S1.** The sword chip should be hidden from screen readers, because each chip already says "commander damage from Player N".
+
+## R4.4 Colour identity pips
+
+![Pips](renders/r4-pips.png)
+
+The near row on all nine tile colours, and the sheet's W U B R G C toggles at 2×. Today, black is 1.00–1.11:1 against the chip, which is why it got its own light rim.
+
+| | Treatment | Notes |
+|---|---|---|
+| a · One thin ring | A 1px light ring (#a89ea4) on every pip | Black is no longer the odd one out. The smallest change |
+| b · White capsule, no rings | The user's suggestion as stated | Black reads at 13:1, but white vanishes (1.04:1) and blue, red, green and grey sit at 1.9–2.6:1. A lone colourless pip is grey on white |
+| b2 · Light capsule, dark hairline | An off-white capsule (#e6e2d3), with today's dark rim on all six pips | Black reads as black and every disc has the same edge. The capsule is the brightest thing on the tile after the life total, and unlike every other chip |
+| c · Charcoal, no ring | Black becomes #6b6468 | Still only 2.5–2.8:1 on the chip, and 2.7:1 from colourless grey, so it reads as a second grey. Rejected |
+
+In every variant, unchosen toggles show their pip at full colour instead of at 45% opacity, because that dimming is transparency too. The chosen state is still clear from the toggle's light ring and fill.
+
+**Recommendation: a.** It removes the inconsistency without adding a new shape. b2 is the choice if black should read as solid black, at the cost of a bright capsule on every tile.
