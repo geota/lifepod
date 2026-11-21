@@ -499,14 +499,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
    toward the table, holds commander damage and sits clear of the centre controls; the near edge (the player's
    own) holds colour identity, poison and tax. Tight chips keep the busiest row on one line at 6 players on a
-   320 × 568 phone. */
+   320 × 568 phone. A row never wraps: if a wider font would still overflow the tile, app.js shrinks that row's
+   type until every chip fits. */
 .badges {
   position: absolute;
   left: 4px;
   right: 4px;
   z-index: 2;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
   gap: 2px;
   font-size: clamp(.78125rem, 3.6cqi, 1rem);
@@ -514,7 +515,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
 .badges.far { top: 22px; }
-.badges.near { bottom: 8px; flex-wrap: wrap-reverse; }
+.badges.near { bottom: 8px; }
 .chip {
   display: inline-flex;
   align-items: center;

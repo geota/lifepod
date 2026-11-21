@@ -144,6 +144,26 @@ function boardTurn() {
 
 function syncBoardTurn() {
   document.querySelector('.app').dataset.boardTurn = String(boardTurn());
+  fitAllBadges();
+}
+
+// Keeps a badge row on one line whatever the font's width: a row wider than its tile shrinks its type, and
+// with it the chips' padding, until every chip fits. Rows that aren't shown are fitted when they next are.
+function fitBadgeRow(row) {
+  row.style.removeProperty('font-size');
+  if (row.hidden || row.offsetParent === null || row.childElementCount === 0) return;
+  const room = row.clientWidth;
+  const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+  const width = () => [...row.children].reduce((sum, chip) => sum + chip.offsetWidth, 0) + gap * (row.childElementCount - 1);
+  let size = parseFloat(getComputedStyle(row).fontSize);
+  for (let step = 0; step < 10 && width() > room && size > 6; step++) {
+    size = Math.max(6, Math.floor(size * Math.min(room / width(), 0.97) * 10) / 10);
+    row.style.fontSize = `${size}px`;
+  }
+}
+
+function fitAllBadges() {
+  for (const row of document.querySelectorAll('.badges')) fitBadgeRow(row);
 }
 
 function seatRow(index) {
@@ -413,6 +433,8 @@ function layoutBoard() {
     player.style.gridArea = seat;
     player.dataset.edge = clockwiseEdges[turn];
   }
+  // A rotated seat changes its tile's width.
+  fitAllBadges();
 }
 
 function paintColours() {
@@ -791,6 +813,7 @@ function renderBadges(index) {
     return chip;
   }));
   far.hidden = damage.length === 0;
+  fitBadgeRow(far);
   const near = player.querySelector('.badges.near');
   const chips = [];
   const identity = game.counters.commander ? game.identities[index] : '';
@@ -814,6 +837,7 @@ function renderBadges(index) {
   for (const chip of chips) chip.setAttribute('role', 'listitem');
   near.replaceChildren(...chips);
   near.hidden = chips.length === 0;
+  fitBadgeRow(near);
 }
 
 // The centre pill: commander damage (when Commander is on), counters (when a counter is on), dice and setup
@@ -898,6 +922,8 @@ function setBoardMode(mode) {
     if (mode) node.dataset.mode = mode;
     else delete node.dataset.mode;
   }
+  // The badges were hidden while the mode was open, so they're measured now that they show again.
+  fitAllBadges();
   setupButton.setAttribute('aria-label', mode ? doneLabels[mode] ?? 'Game setup' : 'Game setup');
   setupButton.setAttribute('aria-haspopup', mode ? 'false' : 'dialog');
   setupButton.querySelector('.setup-icon').hidden = mode !== null;

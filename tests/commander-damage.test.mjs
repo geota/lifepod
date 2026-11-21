@@ -261,7 +261,7 @@ test('chromium: commander damage and the busiest badges fit six players on the s
   }, { busy, twoDigits });
   await page.reload();
   await turnScreen(page, 320, 568, 0);
-  const badgeProblems = await page.evaluate(() => {
+  const findBadgeProblems = () => page.evaluate(() => {
     const found = [];
     document.querySelectorAll('.player').forEach((player, index) => {
       const bounds = player.getBoundingClientRect();
@@ -283,9 +283,24 @@ test('chromium: commander damage and the busiest badges fit six players on the s
     });
     return found;
   });
-  assert.deepEqual(badgeProblems, []);
+  assert.deepEqual(await findBadgeProblems(), []);
   assert.equal(await tile(page, 1).locator('.badges.far .chip').count(), 5);
   assert.equal(await tile(page, 2).locator('.badges.far .chip').count(), 5);
+
+  // The guarantee holds whatever the font: give every row a much wider face, as some Linux and Android
+  // system fonts are, and the rows still fit on one line with every amount shown.
+  await page.evaluate(() => {
+    for (const row of document.querySelectorAll('.badges')) {
+      row.style.fontFamily = 'monospace';
+      row.style.letterSpacing = '.15em';
+      row.style.fontStretch = 'expanded';
+    }
+    window.dispatchEvent(new Event('resize'));
+  });
+  assert.deepEqual(await findBadgeProblems(), [], 'a wide font still fits');
+  assert.equal(await tile(page, 2).locator('.badges.far .chip').count(), 5, 'every amount stays');
+  const smallest = await page.locator('.badges:not([hidden])').evaluateAll(rows => Math.min(...rows.map(row => parseFloat(getComputedStyle(row).fontSize))));
+  assert.ok(smallest >= 6, `type stays readable: ${smallest}px`);
 
   // Commander damage mode keeps every seat a whole 44px target, inside its tile and clear of the centre controls.
   await button(page, 'Commander damage').tap();
