@@ -358,9 +358,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* Tile colour swatches: the panel with the seat colour as a dot. The chosen one has a ring inside it, so a
    tile edge can't clip it. A swatch another player has keeps its full colour, shows its owner ("P2") in the
-   seat colour in place of the dot, and can't be chosen. */
-.swatches {
+   seat colour in place of the dot, and can't be chosen. With Commander on, colour identity sits beside them:
+   five toggles the swatches' size where the tile has room, otherwise a 44px button that opens the player
+   sheet. Every target stays at least 44px. */
+.colour-picker {
   --swatch-size: clamp(44px, min((100cqi - 20px) / 3, (100cqb - 70px) / 3), 60px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.colour-picker[data-identity] { --swatch-size: clamp(44px, min((100cqi - 76px) / 3, (100cqb - 70px) / 3), 60px); }
+.colour-picker .identity { display: none; grid-template-columns: repeat(2, var(--swatch-size)); grid-auto-rows: var(--swatch-size); }
+.colour-picker .identity-toggle { width: var(--swatch-size); height: var(--swatch-size); }
+@container (min-width: 264px) {
+  .colour-picker[data-identity] { --swatch-size: clamp(44px, min((100cqi - 40px) / 5, (100cqb - 70px) / 3), 60px); }
+  .colour-picker .identity { display: grid; }
+  .colour-picker .identity-button { display: none; }
+}
+.swatches {
   display: grid;
   grid-template-columns: repeat(3, var(--swatch-size));
   grid-auto-rows: var(--swatch-size);
@@ -380,10 +395,41 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .swatch:disabled { cursor: default; }
 .swatch:disabled::before { content: none; }
 .swatch .owner { color: var(--seat); font-size: 14px; font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
+/* The identity button: the tile's own colours, with the identity as a wheel of pips in W U B R G order. */
+.identity-button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0;
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-md);
+  background: var(--button);
+}
+.identity-button:active { background: var(--surface-pressed); }
+.pip-wheel { position: relative; width: 30px; height: 30px; }
+.pip-wheel .pip { position: absolute; width: 9px; height: 9px; transform: translate(-50%, -50%); }
+.pip-wheel .pip:nth-child(1) { left: 50%; top: 13%; }
+.pip-wheel .pip:nth-child(2) { left: 85%; top: 39%; }
+.pip-wheel .pip:nth-child(3) { left: 72%; top: 80%; }
+.pip-wheel .pip:nth-child(4) { left: 28%; top: 80%; }
+.pip-wheel .pip:nth-child(5) { left: 15%; top: 39%; }
+/* A colour not in the identity is a small placeholder dot, so it can't be mistaken for black. */
+.pip-wheel .pip[data-off] { width: 5px; height: 5px; background: var(--rim); box-shadow: none; }
 @container (max-width: 240px) {
   .mode-layer { padding: 20px 4px 1px; }
+  .mode-layer:has(.colour-picker[data-identity]) { padding-inline: 1px; }
   .layer-hint { display: none; }
-  .swatches { --swatch-size: 44px; gap: 3px; }
+  .colour-picker { --swatch-size: 44px; gap: 3px; }
+  .swatches { gap: 3px; }
+}
+/* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches and toggles fit. */
+@container (max-height: 200px) {
+  .mode-layer:has(.colour-picker) { padding-block: 20px 1px; }
+  .mode-layer:has(.colour-picker) .layer-hint { display: none; }
+  .colour-picker { --swatch-size: 44px; gap: 3px; }
+  .colour-picker :is(.swatches, .identity) { gap: 3px; }
 }
 
 /* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat in their colour
@@ -446,7 +492,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 
 /* Counters mode: each tile shows [− flask n +] for poison and [− crown +2n +] for tax, laid out like the life
-   controls, and a palette button for the player's colour and identity. */
+   controls. */
 .counter-rows { display: grid; justify-items: center; gap: 6px; }
 .counter-row {
   display: grid;
@@ -478,28 +524,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   letter-spacing: -.03em;
 }
 .counter-value .icon { color: var(--seat); font-size: .78em; }
-.palette-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: var(--tap-min);
-  height: var(--tap-min);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--rim);
-  border-radius: var(--radius-full);
-  background: var(--button);
-  color: var(--seat);
-  font-size: 1.125rem;
-}
-.palette-button:active { background: var(--seat); color: var(--button); }
-.palette-button .word { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
-.palette-button:active .word { color: var(--button); }
 @container (max-width: 240px) {
   .counter-rows { gap: 3px; }
   .counter-row { gap: 4px; }
-  .palette-button { width: var(--tap-min); padding: 0; }
-  .palette-button .word { display: none; }
 }
 
 /* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
@@ -588,10 +615,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 #player-sheet .sheet { gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); }
 #player-sheet h2 { display: flex; align-items: center; gap: 10px; font-size: 1.125rem; letter-spacing: -.015em; }
 .sheet-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--seat); }
-.player-sheet-body { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); }
-.player-sheet-body h3 { margin-bottom: 6px; font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
-#player-sheet .swatches { --swatch-size: 44px; }
-.identity { display: grid; grid-template-columns: repeat(3, 44px); gap: 4px; }
+.sheet-subtitle { margin-bottom: calc(6px - var(--space-3)); font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
+.identity { display: grid; grid-template-columns: repeat(5, 44px); gap: 4px; }
 .identity-toggle {
   display: grid;
   place-items: center;

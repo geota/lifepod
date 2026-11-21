@@ -24,7 +24,7 @@ const cancelButton = document.querySelector('#cancel-button');
 const commanderSwitch = document.querySelector('#commander-switch');
 const poisonSwitch = document.querySelector('#poison-switch');
 const playerSheet = document.querySelector('#player-sheet');
-const identityToggles = document.querySelector('#identity-toggles');
+const sheetIdentity = document.querySelector('#sheet-identity');
 const discardDialog = document.querySelector('#discard');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
@@ -62,7 +62,7 @@ const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colo
 const editingModes = ['damage', 'counters'];
 const discardMessages = {
   damage: 'Commander damage and life go back to how they were when you opened commander damage.',
-  counters: 'Counts, tile colours and colour identities go back to how they were when you opened counters.',
+  counters: 'Poison and commander tax go back to how they were when you opened counters.',
 };
 // Losing amounts (CR 903.10a and 704.5c), and where the warning starts.
 const commanderLethal = 21;
@@ -84,7 +84,6 @@ const iconPaths = {
   flask: 'M225.15,197.71,164,95.81V44h4a12,12,0,0,0,0-24H88a12,12,0,0,0,0,24h4V95.81L30.85,197.71A20,20,0,0,0,48,228H208a20,20,0,0,0,17.15-30.29ZM140,44V99.14a12,12,0,0,0,1.71,6.17l35.13,58.54c-10.79.86-25.15-1.31-43.42-10.56-14-7.08-27.46-11.33-40.27-12.76l21.14-35.22A12,12,0,0,0,116,99.14V44ZM55.06,204,79,164.19c13-1.11,27.62,2.42,43.62,10.52,19.61,9.92,36.25,13.31,49.85,13.31A75.44,75.44,0,0,0,190.11,186l10.83,18Z',
   crown: 'M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z',
   sword: 'M216,28H152a12,12,0,0,0-9.33,4.45L79.5,110.51l-4.66-4.65a20,20,0,0,0-28.29,0L29.86,122.55a20,20,0,0,0,0,28.29h0L45,166,23.86,187.17a20,20,0,0,0,0,28.28l16.69,16.69a20,20,0,0,0,28.28,0L90,211l15.17,15.16a20,20,0,0,0,28.29,0l16.69-16.69a20,20,0,0,0,0-28.3l-4.65-4.65,78.06-63.17A12,12,0,0,0,228,104V40A12,12,0,0,0,216,28ZM54.69,212.34l-11-11L62,183l11,11Zm64.61-6L49.65,136.7l11.05-11,69.65,69.65ZM204,98.27l-75.58,61.17L121,152l47.51-47.5a12,12,0,0,0-17-17L104,135l-7.45-7.44L157.73,52H204Z',
-  palette: 'M203.57,51A107.9,107.9,0,0,0,20,128c0,44.72,27.6,82.25,72,97.94A36,36,0,0,0,140,192a12,12,0,0,1,12-12h46.21a35.79,35.79,0,0,0,35.1-28A108.6,108.6,0,0,0,236,127.09,107.23,107.23,0,0,0,203.57,51Zm6.34,95.67a11.91,11.91,0,0,1-11.7,9.3H152a36,36,0,0,0-36,36,12,12,0,0,1-16,11.3c-16.65-5.88-30.65-15.76-40.48-28.56A76,76,0,0,1,44,128a84,84,0,0,1,83.13-84H128a84.35,84.35,0,0,1,84,83.29A84.72,84.72,0,0,1,209.91,146.71ZM144,76a16,16,0,1,1-16-16A16,16,0,0,1,144,76Zm-44,24A16,16,0,1,1,84,84,16,16,0,0,1,100,100Zm0,56a16,16,0,1,1-16-16A16,16,0,0,1,100,156Zm88-56a16,16,0,1,1-16-16A16,16,0,0,1,188,100Z',
 };
 
 let game = loadGame();
@@ -97,7 +96,6 @@ let boardMode = null;
 // and the life totals when it opened.
 let edits = null;
 let editStartScores = [];
-let sheetPlayer = null;
 let sheetOpener = null;
 let announceTimer;
 const pendingAnnouncements = new Map();
@@ -644,13 +642,9 @@ function syncAllSwatches() {
   for (const group of document.querySelectorAll('.swatches')) syncSwatches(group);
 }
 
-// In colours mode a choice is saved at once. In counters mode it's an edit that can be undone or discarded.
+// Colours mode saves each choice at once.
 function chooseColour(index, colour) {
   if (game.colors.includes(colour)) return;
-  if (edits) {
-    commitEdit({ kind: 'colour', index, from: game.colors[index], to: colour });
-    return;
-  }
   game.colors[index] = colour;
   paintColours();
   syncAllSwatches();
@@ -658,15 +652,71 @@ function chooseColour(index, colour) {
   saveGame();
 }
 
-function setIdentity(index, identity) {
-  if (identity !== game.identities[index]) commitEdit({ kind: 'identity', index, from: game.identities[index], to: identity });
+// Colour identity is set in colours mode too, and saved at once in the same way.
+function toggleIdentity(index, id) {
+  const identity = game.identities[index];
+  game.identities[index] = identity.includes(id) ? identity.replace(id, '') : normalizeIdentity(identity + id);
+  syncIdentity();
+  renderBadges(index);
+  haptic();
+  saveGame();
+}
+
+// Five toggles for one player's colour identity, in W U B R G order. Any combination can be on.
+function buildIdentity(index) {
+  const group = element('div', 'identity');
+  group.dataset.player = index;
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', `Colour identity for Player ${index + 1}`);
+  for (const colour of identityColours) {
+    const pip = element('span', 'pip');
+    pip.dataset.pip = colour.id;
+    const toggle = element('button', 'identity-toggle', pip, colour.id);
+    toggle.type = 'button';
+    toggle.value = colour.id;
+    toggle.setAttribute('aria-label', colour.name[0].toUpperCase() + colour.name.slice(1));
+    bindTap(toggle, () => toggleIdentity(index, colour.id));
+    group.append(toggle);
+  }
+  return group;
+}
+
+// On tiles too small for the toggles, a button with the player's identity as a wheel of pips opens the
+// player sheet, facing them. Pips not in the identity show as empty rings.
+function buildIdentityButton(index) {
+  const wheel = element('span', 'pip-wheel', ...identityColours.map((colour) => {
+    const pip = element('span', 'pip');
+    pip.dataset.pip = colour.id;
+    return pip;
+  }));
+  wheel.setAttribute('aria-hidden', 'true');
+  const button = element('button', 'identity-button', wheel);
+  button.type = 'button';
+  button.dataset.player = index;
+  button.setAttribute('aria-haspopup', 'dialog');
+  button.addEventListener('click', () => openPlayerSheet(index, button));
+  return button;
+}
+
+// Shows every player's identity on their toggles and identity button, wherever they are.
+function syncIdentity() {
+  for (const node of document.querySelectorAll('.identity[data-player], .identity-button')) {
+    const index = Number(node.dataset.player);
+    const identity = game.identities[index];
+    for (const pip of node.querySelectorAll('.pip')) {
+      const chosen = identity.includes(pip.dataset.pip);
+      pip.closest('.identity-toggle')?.setAttribute('aria-pressed', String(chosen));
+      pip.toggleAttribute('data-off', !chosen);
+    }
+    if (node.matches('.identity-button')) {
+      node.setAttribute('aria-label', `Colour identity for Player ${index + 1}: ${identity ? identityText(identity).replace('colour identity ', '') : 'none'}`);
+    }
+  }
 }
 
 // Applies an edit forwards (1) or takes it back (-1).
 function applyEdit(edit, direction) {
   if (edit.kind === 'poison' || edit.kind === 'casts') game[edit.kind][edit.index] += edit.delta * direction;
-  else if (edit.kind === 'colour') game.colors[edit.index] = direction > 0 ? edit.to : edit.from;
-  else if (edit.kind === 'identity') game.identities[edit.index] = direction > 0 ? edit.to : edit.from;
   else if (edit.kind === 'damage') {
     // Commander damage is damage, so the defender loses the same life in the same save.
     game.commanderDamage[edit.index][edit.attacker] += edit.delta * direction;
@@ -677,16 +727,7 @@ function applyEdit(edit, direction) {
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
 function showEdit(edit) {
   const { index } = edit;
-  if (edit.kind === 'colour') {
-    paintColours();
-    syncAllSwatches();
-    syncSheet();
-    game.scores.forEach((_, player) => renderBadges(player));
-    announce(index, 'colour', () => `Player ${index + 1}, ${swatches[game.colors[index]].name} tile`);
-  } else if (edit.kind === 'identity') {
-    syncSheet();
-    announce(index, 'identity', () => `Player ${index + 1}, ${identityText(game.identities[index])}`);
-  } else if (edit.kind === 'poison') {
+  if (edit.kind === 'poison') {
     announce(index, 'poison', () => `Player ${index + 1}, ${game.poison[index]} poison`);
   } else if (edit.kind === 'casts') {
     announce(index, 'casts', () => `Player ${index + 1}, commander tax ${game.casts[index] * 2}`);
@@ -765,9 +806,17 @@ function renderModeLayer(player, index) {
   const layer = player.querySelector('.mode-layer');
   layer.replaceChildren();
   if (boardMode === 'colours') {
-    const hint = element('p', 'layer-hint', 'Your tile colour');
+    // With Commander on, colour identity sits beside the swatches: five toggles where the tile has room,
+    // otherwise a button that opens them in the player sheet. CSS shows one or the other.
+    const commander = game.counters.commander;
+    const hint = element('p', 'layer-hint', commander ? 'Your tile colour and identity' : 'Your tile colour');
     hint.setAttribute('aria-hidden', 'true');
-    layer.append(hint, buildSwatches(index, colour => chooseColour(index, colour)));
+    const picker = element('div', 'colour-picker', buildSwatches(index, colour => chooseColour(index, colour)));
+    if (commander) {
+      picker.dataset.identity = '';
+      picker.append(buildIdentity(index), buildIdentityButton(index));
+    }
+    layer.append(hint, picker);
   } else if (boardMode === 'damage') {
     const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
     hint.setAttribute('aria-hidden', 'true');
@@ -776,16 +825,10 @@ function renderModeLayer(player, index) {
     const rows = element('div', 'counter-rows');
     if (game.counters.poison) rows.append(buildCounterRow('poison', index));
     if (game.counters.commander) rows.append(buildCounterRow('casts', index));
-    const palette = element('button', 'palette-button', icon('palette'), element('span', 'word', 'Colour'));
-    palette.type = 'button';
-    palette.setAttribute('aria-label', game.counters.commander
-      ? `Tile colour and colour identity for Player ${index + 1}` : `Tile colour for Player ${index + 1}`);
-    palette.setAttribute('aria-haspopup', 'dialog');
-    palette.addEventListener('click', () => openPlayerSheet(index, palette));
-    rows.append(palette);
     layer.append(rows);
   }
   layer.hidden = layer.childElementCount === 0;
+  syncIdentity();
   syncCounterRows(index);
   syncSeatMap(index);
 }
@@ -862,9 +905,9 @@ function syncPill() {
   undoButton.disabled = !edits?.length;
 }
 
-// The player sheet: tile colour, and colour identity when Commander is on. It faces the player who opened it.
+// The player sheet: colour identity, for tiles in colours mode too small to hold the toggles. It faces the
+// player who opened it.
 function openPlayerSheet(index, opener) {
-  sheetPlayer = index;
   sheetOpener = opener;
   const player = board.children[index];
   const angle = (Number(document.querySelector('.app').dataset.boardTurn) + faceAngles[player.dataset.edge]) % 360;
@@ -873,38 +916,15 @@ function openPlayerSheet(index, opener) {
   playerSheet.dataset.colour = player.dataset.colour;
   playerSheet.dataset.row = player.dataset.row;
   document.querySelector('#player-sheet-name').textContent = `Player ${index + 1}`;
-  document.querySelector('#sheet-swatches').replaceChildren(buildSwatches(index, colour => chooseColour(index, colour)));
-  document.querySelector('#sheet-identity').hidden = !game.counters.commander;
-  syncSheet();
+  sheetIdentity.replaceChildren(buildIdentity(index));
+  syncIdentity();
   playerSheet.showModal();
   syncBackHandling();
 }
 
-// Keeps the open sheet's identity toggles and colour dot up to date.
-function syncSheet() {
-  if (sheetPlayer === null) return;
-  const identity = game.identities[sheetPlayer];
-  for (const toggle of identityToggles.children) toggle.setAttribute('aria-pressed', String(identity.includes(toggle.value)));
-  playerSheet.dataset.colour = swatches[game.colors[sheetPlayer]].id;
-}
-
-for (const colour of identityColours) {
-  const pip = element('span', 'pip');
-  pip.dataset.pip = colour.id;
-  const toggle = element('button', 'identity-toggle', pip, colour.id);
-  toggle.type = 'button';
-  toggle.value = colour.id;
-  toggle.setAttribute('aria-label', colour.name[0].toUpperCase() + colour.name.slice(1));
-  toggle.addEventListener('click', () => {
-    const identity = game.identities[sheetPlayer];
-    setIdentity(sheetPlayer, identity.includes(colour.id) ? identity.replace(colour.id, '') : normalizeIdentity(identity + colour.id));
-  });
-  identityToggles.append(toggle);
-}
 playerSheet.querySelector('[data-close]').addEventListener('click', () => playerSheet.close());
 playerSheet.addEventListener('close', () => {
-  sheetPlayer = null;
-  document.querySelector('#sheet-swatches').replaceChildren();
+  sheetIdentity.replaceChildren();
   syncBackHandling();
   if (sheetOpener?.isConnected) sheetOpener.focus();
   sheetOpener = null;
@@ -956,7 +976,6 @@ function cancelEditing() {
 
 function discardEdits() {
   while (edits.length) applyEdit(edits.pop(), -1);
-  paintColours();
   game.scores.forEach((_, index) => renderScore(index));
   saveGame();
   setBoardMode(null);

@@ -139,71 +139,92 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: counters mode edits poison and tax with undo, save and discard`, { timeout: 60000 }, t => checkCountersMode(t, engine));
 }
 
-async function checkPlayerSheet(t, engine) {
+// Colour identity is set in Setup → Colours, beside the swatches, each player facing their own seat. Counters
+// mode only holds poison and tax.
+async function checkIdentity(t, engine) {
   const page = await openPage(t, engine);
+  await fakeScreenOrientation(page);
   await page.goto(app);
+  await turnScreen(page, 852, 393, 90);
+  const openColours = async () => {
+    await button(page, 'Game setup').tap();
+    await button(page, 'Colours').tap();
+  };
+  const pressed = (scope) => scope.locator('.identity-toggle[aria-pressed="true"]').evaluateAll(toggles => toggles.map(toggle => toggle.value).join(''));
+
+  // With Commander off, Colours shows only the swatches, and counters mode has no colour button.
   await setSwitches(page, { Poison: true });
-
-  // With Commander off, the sheet holds only the tile colour.
+  await openColours(page);
+  assert.equal(await page.locator('.player .swatch').count(), 36);
+  assert.equal(await page.locator('.player :is(.identity, .identity-button)').count(), 0, 'no identity without Commander');
+  await button(page, 'Done choosing colours').tap();
   await button(page, 'Counters').tap();
-  await button(page, 'Tile colour for Player 1').tap();
-  assert.ok(await isOpen(page, 'player-sheet'));
-  assert.ok(!(await page.locator('#sheet-identity').isVisible()), 'no colour identity without Commander');
-  // Player 1 sits at the top edge, so the sheet is turned to face them.
-  const turn = await page.locator('#player-sheet').evaluate(sheet => new DOMMatrixReadOnly(getComputedStyle(sheet).transform).a);
-  assert.equal(Math.round(turn), -1, 'the sheet faces player 1');
-  await page.locator('#player-sheet').getByRole('button', { name: 'Rose', exact: true }).tap();
-  assert.equal(await tile(page, 1).getAttribute('data-colour'), 'rose');
-  // A taken swatch keeps its full colour and shows its owner in place of the dot.
-  const taken = page.locator('#player-sheet').getByRole('button', { name: 'Sky, taken by Player 2' });
-  assert.ok(await taken.isDisabled());
-  assert.deepEqual(await taken.evaluate(swatch => ({
-    owner: swatch.textContent, opacity: getComputedStyle(swatch).opacity, dot: getComputedStyle(swatch, '::before').content,
-    colour: getComputedStyle(swatch.querySelector('.owner')).color === getComputedStyle(swatch).getPropertyValue('--seat').trim()
-      .replace(/^#(..)(..)(..)$/, (_, r, g, b) => `rgb(${[r, g, b].map(pair => parseInt(pair, 16)).join(', ')})`),
-  })), { owner: 'P2', opacity: '1', dot: 'none', colour: true });
-  assert.equal(await page.locator('#player-sheet').getByRole('button', { name: 'Sage', exact: true }).textContent(), '', 'a free swatch has its dot');
-  await page.locator('#player-sheet').getByRole('button', { name: 'Done' }).tap();
-  assert.ok(!(await isOpen(page, 'player-sheet')));
-  await button(page, 'Save').tap();
+  assert.equal(await page.locator('.mode-layer button').count(), 8, 'only the poison steppers');
+  assert.equal(await page.locator('.palette-button, .mode-layer .swatch, .mode-layer .identity-toggle').count(), 0, 'no colour button in counters mode');
+  await button(page, 'Cancel').tap();
 
-  // With Commander on, the sheet adds colour identity: any combination of W U B R G, with no colourless.
+  // With Commander on, a 4-player tile has room for the five toggles beside its swatches.
   await setSwitches(page, { Commander: true });
   await button(page, 'Counters').tap();
-  await button(page, 'Tile colour and colour identity for Player 3').tap();
-  const sheet = page.locator('#player-sheet');
-  assert.equal(Math.round(await sheet.evaluate(node => new DOMMatrixReadOnly(getComputedStyle(node).transform).a)), 1, 'player 3 sits at the bottom');
-  assert.deepEqual(await sheet.locator('.identity-toggle').evaluateAll(toggles => toggles.map(toggle => toggle.getAttribute('aria-label'))),
+  assert.equal(await page.locator('.mode-layer button').count(), 16, 'poison and tax steppers only');
+  await button(page, 'Cancel').tap();
+  await openColours(page);
+  const group = page.getByRole('group', { name: 'Colour identity for Player 3' });
+  assert.ok(await group.isVisible(), 'the toggles sit on the tile');
+  assert.equal(await page.locator('.identity-button:visible').count(), 0);
+  assert.deepEqual(await group.getByRole('button').evaluateAll(toggles => toggles.map(toggle => toggle.getAttribute('aria-label'))),
     ['White', 'Blue', 'Black', 'Red', 'Green'], 'five colours, no colourless');
   // Every pip has the same thin light ring, and an unchosen toggle shows its pip at full colour.
-  const pips = await sheet.locator('.identity-toggle .pip').evaluateAll(nodes => nodes.map(pip => `${getComputedStyle(pip).opacity} ${getComputedStyle(pip).boxShadow}`));
+  const pips = await group.locator('.pip').evaluateAll(nodes => nodes.map(pip => `${getComputedStyle(pip).opacity} ${getComputedStyle(pip).boxShadow}`));
   assert.deepEqual(new Set(pips), new Set(['1 rgb(168, 158, 164) 0px 0px 0px 1.5px']), `pips: ${pips}`);
-  for (const name of ['Black', 'Blue', 'Red', 'Green', 'White']) await sheet.getByRole('button', { name }).tap();
-  assert.equal(await sheet.locator('.identity-toggle[aria-pressed="true"]').count(), 5, 'all five can be chosen');
-  await sheet.getByRole('button', { name: 'Done' }).tap();
-  await button(page, 'Save').tap();
-  assert.equal(await nearBadges(page, 3), 'colour identity white, blue, black, red, green', 'all five, in W U B R G order');
+  // Each tile's toggles face its player, like the swatches.
+  const facing = await page.locator('.player .identity').evaluateAll(groups => groups.map(node => Math.round(new DOMMatrixReadOnly(getComputedStyle(node.closest('.player-face')).transform).a)));
+  assert.deepEqual(facing, [-1, -1, 1, 1]);
+  for (const name of ['Black', 'Blue', 'Red', 'Green', 'White']) await group.getByRole('button', { name }).tap();
+  assert.equal(await pressed(group), 'WUBRG', 'all five can be chosen');
+  for (const name of ['Blue', 'Black', 'Red']) await group.getByRole('button', { name }).tap();
+  assert.equal(await pressed(group), 'WG');
+  assert.equal(await pressed(page.getByRole('group', { name: 'Colour identity for Player 1' })), '', 'only that player changes');
+  // A choice is saved at once, like a colour, and the check mark ends the mode.
+  await reload(page);
+  await turnScreen(page, 852, 393, 90);
+  assert.equal(await nearBadges(page, 3), 'colour identity white, green', 'saved, and shown in W U B R G order');
   const nearPips = await tile(page, 3).locator('.badges.near .pip').evaluateAll(nodes => nodes.map(pip => getComputedStyle(pip).boxShadow));
-  assert.deepEqual(nearPips, Array(5).fill('rgb(168, 158, 164) 0px 0px 0px 1px'), 'the same ring on every pip, black included');
+  assert.deepEqual(nearPips, Array(2).fill('rgb(168, 158, 164) 0px 0px 0px 1px'), 'the same ring on every pip');
   assert.equal(await tile(page, 3).locator('.badges.near .pip[data-pip="W"]').evaluate(pip => getComputedStyle(pip).backgroundColor),
     'rgb(255, 254, 250)', 'white reads as white');
-  await button(page, 'Counters').tap();
-  await button(page, 'Tile colour and colour identity for Player 3').tap();
-  for (const name of ['Blue', 'Black', 'Red']) await sheet.getByRole('button', { name }).tap();
-  assert.equal(await sheet.getByRole('button', { name: 'Blue' }).getAttribute('aria-pressed'), 'false');
-  await sheet.getByRole('button', { name: 'Slate' }).tap();
-  assert.equal(await sheet.locator('.sheet-dot').evaluate(dot => getComputedStyle(dot).backgroundColor), 'rgb(207, 219, 232)',
-    'the sheet’s dot follows the colour');
 
-  // Android back closes the sheet first. Undo then steps back through the sheet's changes too.
-  assert.equal(await page.evaluate(() => window.closeOpenDialog()), true);
+  // Six players on the smallest phone: the tiles are too small for the toggles, so a 44px identity button beside
+  // the swatches opens the player sheet, facing that player, with identity only.
+  await turnScreen(page, 320, 568, 0);
+  await startGame(page, 6);
+  await openColours(page);
+  assert.equal(await page.locator('.player .identity:visible').count(), 0);
+  assert.equal(await page.locator('.identity-button:visible').count(), 6);
+  const identityButton = button(page, 'Colour identity for Player 3: white, green');
+  await identityButton.tap();
+  assert.ok(await isOpen(page, 'player-sheet'));
+  const sheet = page.locator('#player-sheet');
+  assert.equal(await sheet.locator('.swatch').count(), 0, 'the sheet holds identity only');
+  assert.equal(await pressed(sheet), 'WG');
+  await sheet.getByRole('button', { name: 'Black' }).tap();
+  assert.equal(await pressed(sheet), 'WBG');
+  await sheet.getByRole('button', { name: 'Done' }).tap();
   assert.ok(!(await isOpen(page, 'player-sheet')));
-  assert.equal(await mode(page), 'counters');
-  await button(page, 'Undo').tap();
-  assert.equal(await tile(page, 3).getAttribute('data-colour'), 'coral', 'undo takes back the colour');
-  await button(page, 'Save').tap();
-  assert.equal(await nearBadges(page, 3), 'colour identity white, green', 'identity dots in W U B R G order');
-  assert.equal(await tile(page, 3).locator('.badges.near .pip').count(), 2);
+  assert.ok(await button(page, 'Colour identity for Player 3: white, black, green').isVisible(), 'the button shows the new identity');
+  // Each sheet fits whichever way it faces, and Android back closes it before the mode.
+  for (const number of [1, 3, 5]) {
+    await page.locator(`.identity-button[data-player="${number - 1}"]`).tap();
+    const box = await sheet.boundingBox();
+    assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= 320 && box.y + box.height <= 568, `player ${number}’s sheet fits: ${JSON.stringify(box)}`);
+    assert.equal(await page.evaluate(() => window.closeOpenDialog()), true);
+    assert.ok(!(await isOpen(page, 'player-sheet')));
+    assert.equal(await mode(page), 'colours');
+  }
+  await button(page, 'Done choosing colours').tap();
+  await reload(page);
+  await turnScreen(page, 320, 568, 0);
+  assert.equal(await nearBadges(page, 3), 'colour identity white, black, green', 'a sheet choice is saved at once too');
 
   // A new game resets the counts and keeps the switches, colours and identities.
   await button(page, 'Counters').tap();
@@ -212,16 +233,53 @@ async function checkPlayerSheet(t, engine) {
   await button(page, 'Game setup').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
-  await eventually(() => nearBadges(page, 3), 'colour identity white, green', 'a new game resets poison and keeps the identity');
-  assert.equal(await tile(page, 1).getAttribute('data-colour'), 'rose');
-  assert.ok(await button(page, 'Counters').isVisible());
+  await eventually(() => nearBadges(page, 3), 'colour identity white, black, green', 'a new game resets poison and keeps the identity');
   await button(page, 'Counters').tap();
   assert.equal(await count(page, 3, 'poison'), '0');
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: the palette button opens a sheet facing its player`, { timeout: 60000 }, t => checkPlayerSheet(t, engine));
+  test(`${name}: colour identity is set beside the swatches in Colours`, { timeout: 60000 }, t => checkIdentity(t, engine));
 }
+
+// Every swatch, toggle and identity button is a whole 44px target inside its tile and clear of the check mark,
+// at every player count on the smallest phone and on a common landscape one.
+test('chromium: Colours with identity fits every player count', { timeout: 60000 }, async (t) => {
+  const page = await openPage(t, chromium);
+  await fakeScreenOrientation(page);
+  await page.goto(app);
+  await setSwitches(page, { Commander: true });
+  for (const [width, height, angle] of [[320, 568, 0], [852, 393, 90]]) {
+    await turnScreen(page, width, height, angle);
+    for (const players of [2, 3, 4, 5, 6]) {
+      await startGame(page, players);
+      await button(page, 'Game setup').tap();
+      await button(page, 'Colours').tap();
+      const problems = await page.evaluate(() => {
+        const controls = document.querySelector('#board-controls').getBoundingClientRect();
+        const disc = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
+        const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+        return [...document.querySelectorAll('.player')].flatMap((player, index) => {
+          const bounds = player.getBoundingClientRect();
+          const targets = [...player.querySelectorAll('.mode-layer button')].filter(target => target.offsetParent);
+          const issues = targets.map((target) => {
+            const box = target.getBoundingClientRect();
+            const found = [];
+            if (Math.min(box.width, box.height) < 43.5) found.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
+            if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) found.push('outside its tile');
+            if (overlaps(box, disc)) found.push('under the check mark');
+            return found.length ? `P${index + 1} ${target.getAttribute('aria-label')}: ${found.join(', ')}` : '';
+          }).filter(Boolean);
+          // Nine swatches, and either five toggles or the identity button.
+          if (targets.length !== 14 && targets.length !== 10) issues.push(`P${index + 1} has ${targets.length} targets`);
+          return issues;
+        });
+      });
+      assert.deepEqual(problems, [], `${players} players, ${width} × ${height}`);
+      await button(page, 'Done choosing colours').tap();
+    }
+  }
+});
 
 test('chromium: counters mode fits six players on the smallest phone', { timeout: 60000 }, async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 } });
@@ -250,15 +308,7 @@ test('chromium: counters mode fits six players on the smallest phone', { timeout
     });
   });
   assert.deepEqual(problems, []);
-  assert.equal(await page.locator('.mode-layer button').count(), 30, 'two rows and a colour button per tile');
-
-  // The player sheet fits whichever way it faces.
-  for (const number of [1, 3, 5]) {
-    await button(page, `Tile colour and colour identity for Player ${number}`).tap();
-    const box = await page.locator('#player-sheet').boundingBox();
-    assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= 320 && box.y + box.height <= 568, `player ${number}’s sheet fits: ${JSON.stringify(box)}`);
-    await page.locator('#player-sheet').getByRole('button', { name: 'Done' }).tap();
-  }
+  assert.equal(await page.locator('.mode-layer button').count(), 24, 'two rows of steppers per tile');
 
   // Setup with the Counters group still fits the smallest landscape phone.
   await button(page, 'Cancel').tap();

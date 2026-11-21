@@ -121,23 +121,15 @@
     </form>
   </dialog>
 
-  <!-- A player's tile colour and colour identity, turned to face that player. -->
+  <!-- A player's colour identity, turned to face that player, for tiles too small to hold the toggles. -->
   <dialog id="player-sheet" aria-labelledby="player-sheet-title">
     <div class="sheet player-sheet">
       <div class="sheet-header">
         <h2 id="player-sheet-title"><span class="sheet-dot" aria-hidden="true"></span><span id="player-sheet-name"></span></h2>
         <button class="close" type="button" data-close aria-label="Done" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></button>
       </div>
-      <div class="player-sheet-body">
-        <section aria-labelledby="sheet-colour-title">
-          <h3 id="sheet-colour-title">Tile colour</h3>
-          <div id="sheet-swatches"></div>
-        </section>
-        <section id="sheet-identity" aria-labelledby="sheet-identity-title">
-          <h3 id="sheet-identity-title">Colour identity</h3>
-          <div class="identity" id="identity-toggles" role="group" aria-labelledby="sheet-identity-title"></div>
-        </section>
-      </div>
+      <h3 class="sheet-subtitle">Colour identity</h3>
+      <div id="sheet-identity"></div>
     </div>
   </dialog>
 
