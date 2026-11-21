@@ -18,6 +18,10 @@
   --danger-text: #ffc7b2;
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
+  /* Close to losing: amber text from 15 commander damage or 7 poison, at least 6:1 on its tinted chip. */
+  --warn: #f2c46d;
+  --warn-tint: #f2c46d29;
+  --life-out-tint: #f4999329;
   /* Badges at rest sit on a translucent dark chip. Colour dots get a thin dark rim. */
   --chip-background: #0a0e0b70;
   --dot-rim: #0a0e0b;
@@ -232,6 +236,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 [data-colour="slate"][data-row="bottom"] { --panel: var(--slate-bottom-panel); --rim: var(--slate-bottom-rim); --seat: var(--slate-bottom-seat); --button: var(--slate-bottom-button); }
 
 .player {
+  /* The tile's own panel, for rings on cells drawn in another player's colour. */
+  --tile-panel: var(--panel);
   position: relative;
   container-type: size;
   overflow: hidden;
@@ -385,6 +391,54 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .swatches { --swatch-size: 44px; gap: 3px; }
 }
 
+/* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat in their colour
+   showing the damage their commander has dealt this player. Cells are at least 44px; the hint goes on narrow
+   tiles. app.js sets the grid's rows and columns and places each seat. */
+.seat-map {
+  --hint-space: 24px;
+  display: grid;
+  grid-template-columns: repeat(var(--columns), minmax(44px, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(44px, 1fr));
+  gap: 4px;
+  width: min(100cqi - 12px, var(--columns) * 120px);
+  height: min(100cqb - 30px - var(--hint-space), var(--rows) * 80px);
+}
+.map-cell {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--seat);
+  color: var(--button);
+  font-size: clamp(1.0625rem, 6cqi, 1.625rem);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+}
+.map-cell[data-zero] { opacity: .7; }
+/* Seats changed since the mode opened get a ring, and a held seat looks pressed. */
+.map-cell[data-changed] { box-shadow: 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
+.map-cell[data-pressed] { box-shadow: inset 0 0 0 3px var(--button); }
+.map-cell[data-changed][data-pressed] { box-shadow: inset 0 0 0 3px var(--button), 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
+.map-cell:has(+ .map-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+.map-cell.self {
+  align-content: center;
+  gap: 0;
+  border: 1.5px solid var(--rim);
+  background: transparent;
+  color: var(--text);
+  font-size: clamp(1rem, 5.4cqi, 1.5rem);
+  line-height: 1.05;
+}
+.map-cell.self strong[data-out] { color: var(--life-out); }
+.life-change { font-size: .75rem; font-weight: var(--weight-semibold); color: var(--text-soft); letter-spacing: normal; }
+.life-change[data-loss] { color: var(--life-out); }
+@container (max-width: 240px) {
+  .seat-map { --hint-space: 0px; }
+}
+
 /* Counters mode: each tile shows [− flask n +] for poison and [− crown +2n +] for tax, laid out like the life
    controls, and a palette button for the player's colour and identity. */
 .counter-rows { display: grid; justify-items: center; gap: 6px; }
@@ -442,27 +496,31 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .palette-button .word { display: none; }
 }
 
-/* Badge rows at rest. They are display-only and appear only when they have something to show: the near edge
-   (the player's own) holds colour identity, poison and tax. */
+/* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
+   toward the table, holds commander damage and sits clear of the centre controls; the near edge (the player's
+   own) holds colour identity, poison and tax. Tight chips keep the busiest row on one line at 6 players on a
+   320 × 568 phone. */
 .badges {
   position: absolute;
-  left: 8px;
-  right: 8px;
+  left: 4px;
+  right: 4px;
   z-index: 2;
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 2px;
   font-size: clamp(.78125rem, 3.6cqi, 1rem);
   pointer-events: none;
 }
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
-.badges.near { bottom: 8px; }
+.badges.far { top: 22px; }
+.badges.near { bottom: 8px; flex-wrap: wrap-reverse; }
 .chip {
   display: inline-flex;
   align-items: center;
   gap: .16em;
   height: 1.7em;
-  padding: 0 .4em;
+  padding: 0 .3em;
   border-radius: var(--radius-full);
   background: var(--chip-background);
   color: var(--text);
@@ -472,6 +530,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   white-space: nowrap;
 }
 .chip .icon { width: .95em; height: .95em; }
+.chip .dot { flex: none; width: .66em; height: .66em; border-radius: 50%; background: var(--seat); box-shadow: 0 0 0 1.5px var(--dot-rim); }
+/* Close to losing: amber tinted text from 15 commander damage or 7 poison; at 21 or 10, red tinted text and a
+   thin red ring, and the life total turns red. Both pass 4.89:1 on every tile colour (palette.mjs). */
+.chip[data-level] { font-weight: var(--weight-heavy); }
+.chip[data-level="warn"] { color: var(--warn); background: linear-gradient(var(--warn-tint), var(--warn-tint)), var(--chip-background); }
+.chip[data-level="out"] {
+  color: var(--life-out);
+  background: linear-gradient(var(--life-out-tint), var(--life-out-tint)), var(--chip-background);
+  box-shadow: inset 0 0 0 1.5px var(--life-out);
+}
 .chip.pips { gap: 2px; }
 /* Colour identity: plain discs in our own colours, never mana symbols. */
 .pip {

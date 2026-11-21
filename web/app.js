@@ -16,6 +16,7 @@ const diceRoll = document.querySelector('#dice-roll');
 const diceResult = document.querySelector('#dice-result');
 const rotateSeatsButton = document.querySelector('#rotate-seats');
 const tileColoursButton = document.querySelector('#tile-colours');
+const damageButton = document.querySelector('#damage-button');
 const countersButton = document.querySelector('#counters-button');
 const undoButton = document.querySelector('#undo-button');
 const saveButton = document.querySelector('#save-button');
@@ -58,16 +59,22 @@ const topRowPlayers = [0, 1, 4];
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours' };
 // Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
-const editingModes = ['counters'];
+const editingModes = ['damage', 'counters'];
 const discardMessages = {
+  damage: 'Commander damage and life go back to how they were when you opened commander damage.',
   counters: 'Counts, tile colours and colour identities go back to how they were when you opened counters.',
 };
+// Losing amounts (CR 903.10a and 704.5c), and where the warning starts.
+const commanderLethal = 21;
+const commanderWarning = 15;
+const poisonLethal = 10;
+const poisonWarning = 7;
 // Colour identity in W U B R G order, then colourless, which goes alone.
 const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
   { id: 'R', name: 'red' }, { id: 'G', name: 'green' }, { id: 'C', name: 'colourless' },
 ];
-// Poison and casts stop at this, which keeps every tile readable.
+// Poison, casts and commander damage stop at this, which keeps every tile readable.
 const maxCount = 99;
 const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
 // Phosphor Icons (MIT, phosphoricons.com), Bold weight, for controls drawn by this script.
@@ -83,10 +90,12 @@ let game = loadGame();
 let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
-// The open board mode: 'rotate', 'colours' or 'counters', or null at rest.
+// The open board mode: 'rotate', 'colours', 'damage' or 'counters', or null at rest.
 let boardMode = null;
-// While an editing mode is open: every change made in it, newest last, so it can be undone or discarded.
+// While an editing mode is open: every change made in it, newest last, so it can be undone or discarded,
+// and the life totals when it opened.
 let edits = null;
+let editStartScores = [];
 let sheetPlayer = null;
 let sheetOpener = null;
 let announceTimer;
@@ -172,6 +181,14 @@ function normalizeIdentity(value) {
   return identityColours.map(colour => colour.id).filter(id => value.includes(id)).join('');
 }
 
+// Commander damage taken, by defender then attacker. A player never damages themselves.
+function fitDamage(saved, count) {
+  return Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) => {
+    const value = Array.isArray(saved?.[defender]) ? saved[defender][attacker] : undefined;
+    return defender !== attacker && Number.isInteger(value) && value >= 0 && value <= maxCount ? value : 0;
+  }));
+}
+
 function fitIdentities(saved, count) {
   return Array.from({ length: count }, (_, index) => normalizeIdentity(Array.isArray(saved) ? saved[index] : undefined));
 }
@@ -181,7 +198,7 @@ function loadGame() {
     startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
     counters: { commander: false, poison: false }, poison: fitCounts([], 4), casts: fitCounts([], 4),
-    identities: fitIdentities([], 4),
+    identities: fitIdentities([], 4), commanderDamage: fitDamage([], 4),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -202,6 +219,7 @@ function loadGame() {
       poison: fitCounts(saved.poison, saved.scores.length),
       casts: fitCounts(saved.casts, saved.scores.length),
       identities: fitIdentities(saved.identities, saved.scores.length),
+      commanderDamage: fitDamage(saved.commanderDamage, saved.scores.length),
     };
   } catch {
     return defaults;
@@ -402,6 +420,160 @@ function paintColours() {
     player.dataset.colour = swatches[game.colors[index]].id;
     player.dataset.row = seatRow(index);
   });
+  // Map seats and badge dots in another player's colour.
+  for (const node of board.querySelectorAll('[data-player-colour]')) {
+    const player = Number(node.dataset.playerColour);
+    node.dataset.colour = swatches[game.colors[player]].id;
+    node.dataset.row = seatRow(player);
+  }
+}
+
+function inColourOf(node, player) {
+  node.dataset.playerColour = player;
+  node.dataset.colour = swatches[game.colors[player]].id;
+  node.dataset.row = seatRow(player);
+  return node;
+}
+
+// The board's seats as rows and columns of the landscape grid, with the cells each seat spans.
+function seatGrid() {
+  const rows = seatLayouts[game.scores.length].map(row => row.split(' ').map(seat => Number(seat.split('-')[1]) - 1));
+  const areas = new Map();
+  rows.forEach((row, y) => row.forEach((player, x) => {
+    const area = areas.get(player) ?? { top: y, bottom: y, left: x, right: x };
+    areas.set(player, {
+      top: Math.min(area.top, y), bottom: Math.max(area.bottom, y), left: Math.min(area.left, x), right: Math.max(area.right, x),
+    });
+  }));
+  return { rows: rows.length, columns: rows[0].length, areas };
+}
+
+// Where a board cell lands in a tile's own frame, which is turned clockwise by angle. Drawing the map there
+// makes it match the table from every seat.
+function toFace(angle, rows, columns, row, column) {
+  if (angle === 90) return [columns - 1 - column, row];
+  if (angle === 180) return [rows - 1 - row, columns - 1 - column];
+  if (angle === 270) return [column, rows - 1 - row];
+  return [row, column];
+}
+
+// A map seat: a tap adds one. Holding takes one away once the hold registers, then repeats on the same timing
+// as the life buttons. Whether a press is a tap is only known when it ends, so a tap counts then, however
+// the press ends, and a hold never adds.
+function bindSeat(button, add, remove) {
+  const tile = button.closest('.player');
+  let press;
+  let ignoreClicksUntil = 0;
+
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    press?.finish();
+    const current = {
+      pointerId: event.pointerId,
+      held: false,
+      end() {
+        clearTimeout(current.timer);
+        activePresses.delete(current);
+        if (press !== current) return;
+        press = undefined;
+        delete button.dataset.pressed;
+      },
+      finish() {
+        const tap = press === current && !current.held;
+        current.end();
+        if (tap) add();
+      },
+    };
+    function repeat() {
+      current.held = true;
+      remove();
+      current.timer = setTimeout(repeat, 100);
+    }
+    press = current;
+    activePresses.add(current);
+    button.dataset.pressed = '';
+    ignoreClicksUntil = performance.now() + 800;
+    current.timer = setTimeout(repeat, 500);
+    try {
+      button.setPointerCapture(event.pointerId);
+    } catch {
+      // The pointer is already gone. The next touch ends this press.
+    }
+  });
+  button.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== press?.pointerId) return;
+    const bounds = tile.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right ||
+        event.clientY < bounds.top || event.clientY > bounds.bottom) {
+      press.finish();
+    }
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    button.addEventListener(type, (event) => {
+      if (event.pointerId !== press?.pointerId) return;
+      ignoreClicksUntil = performance.now() + 800;
+      press.finish();
+    });
+  }
+  button.addEventListener('contextmenu', (event) => event.preventDefault());
+  button.addEventListener('click', (event) => {
+    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) add();
+  });
+}
+
+// Commander damage mode: a map of the table on every tile, in board coordinates. Each opponent's seat shows
+// the damage their commander has dealt this player; the player's own seat shows their life and its change.
+function buildSeatMap(index) {
+  const { rows, columns, areas } = seatGrid();
+  const angle = faceAngles[board.children[index].dataset.edge];
+  const sideways = angle % 180 !== 0;
+  const map = element('div', 'seat-map');
+  map.style.setProperty('--rows', sideways ? columns : rows);
+  map.style.setProperty('--columns', sideways ? rows : columns);
+  for (const [player, area] of [...areas].sort(([a], [b]) => a - b)) {
+    const [top, left] = toFace(angle, rows, columns, area.top, area.left);
+    const [bottom, right] = toFace(angle, rows, columns, area.bottom, area.right);
+    let cell;
+    if (player === index) {
+      cell = element('div', 'map-cell self', element('strong'), element('span', 'life-change'), visuallyHidden(''));
+    } else {
+      cell = inColourOf(element('button', 'map-cell'), player);
+      cell.type = 'button';
+      cell.dataset.attacker = player;
+      const remove = element('button', 'visually-hidden map-remove');
+      remove.type = 'button';
+      remove.setAttribute('aria-label', `Remove one commander damage from Player ${player + 1}'s commander`);
+      remove.addEventListener('click', () => stepDamage(index, player, -1));
+      bindSeat(cell, () => stepDamage(index, player, 1), () => stepDamage(index, player, -1));
+      map.append(cell, remove);
+    }
+    cell.style.gridRow = `${Math.min(top, bottom) + 1} / ${Math.max(top, bottom) + 2}`;
+    cell.style.gridColumn = `${Math.min(left, right) + 1} / ${Math.max(left, right) + 2}`;
+    if (player === index) map.append(cell);
+  }
+  return map;
+}
+
+function syncSeatMap(index) {
+  const map = board.children[index]?.querySelector('.seat-map');
+  if (!map) return;
+  for (const cell of map.querySelectorAll('.map-cell[data-attacker]')) {
+    const attacker = Number(cell.dataset.attacker);
+    const damage = game.commanderDamage[index][attacker];
+    cell.textContent = damage;
+    cell.toggleAttribute('data-zero', damage === 0);
+    cell.toggleAttribute('data-changed', Boolean(edits?.some(edit => edit.kind === 'damage' && edit.index === index && edit.attacker === attacker)));
+    cell.setAttribute('aria-label', `Player ${attacker + 1}'s commander, ${damage} damage. Add one`);
+  }
+  const self = map.querySelector('.self');
+  const life = game.scores[index];
+  const change = life - (editStartScores[index] ?? life);
+  self.querySelector('strong').textContent = String(life).replace('-', '−');
+  self.querySelector('strong').toggleAttribute('data-out', isOut(index));
+  const changeText = self.querySelector('.life-change');
+  changeText.textContent = change < 0 ? `−${-change}` : change > 0 ? `+${change}` : 'you';
+  changeText.toggleAttribute('data-loss', change < 0);
+  self.querySelector('.visually-hidden').textContent = `Your life, ${life}`;
 }
 
 // A grid of the nine swatches for one player, in that player's row lightness.
@@ -466,6 +638,11 @@ function applyEdit(edit, direction) {
   if (edit.kind === 'poison' || edit.kind === 'casts') game[edit.kind][edit.index] += edit.delta * direction;
   else if (edit.kind === 'colour') game.colors[edit.index] = direction > 0 ? edit.to : edit.from;
   else if (edit.kind === 'identity') game.identities[edit.index] = direction > 0 ? edit.to : edit.from;
+  else if (edit.kind === 'damage') {
+    // Commander damage is damage, so the defender loses the same life in the same save.
+    game.commanderDamage[edit.index][edit.attacker] += edit.delta * direction;
+    game.scores[edit.index] -= edit.delta * direction;
+  }
 }
 
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
@@ -475,6 +652,7 @@ function showEdit(edit) {
     paintColours();
     syncAllSwatches();
     syncSheet();
+    game.scores.forEach((_, player) => renderBadges(player));
     announce(index, 'colour', () => `Player ${index + 1}, ${swatches[game.colors[index]].name} tile`);
   } else if (edit.kind === 'identity') {
     syncSheet();
@@ -483,8 +661,15 @@ function showEdit(edit) {
     announce(index, 'poison', () => `Player ${index + 1}, ${game.poison[index]} poison`);
   } else if (edit.kind === 'casts') {
     announce(index, 'casts', () => `Player ${index + 1}, commander tax ${game.casts[index] * 2}`);
+  } else if (edit.kind === 'damage') {
+    const { attacker } = edit;
+    announce(index, `damage ${attacker}`, () =>
+      `Player ${attacker + 1}'s commander, ${game.commanderDamage[index][attacker]} damage to Player ${index + 1}`);
+    announceLife(index);
+    syncSeatMap(index);
   }
   syncCounterRows(index);
+  renderScore(index);
   renderBadges(index);
   syncPill();
   haptic();
@@ -502,6 +687,11 @@ function undoEdit() {
   if (!edit) return;
   applyEdit(edit, -1);
   showEdit(edit);
+}
+
+function stepDamage(defender, attacker, delta) {
+  const next = game.commanderDamage[defender][attacker] + delta;
+  if (next >= 0 && next <= maxCount) commitEdit({ kind: 'damage', index: defender, attacker, delta });
 }
 
 function stepCount(kind, index, delta) {
@@ -549,6 +739,10 @@ function renderModeLayer(player, index) {
     const hint = element('p', 'layer-hint', 'Your tile colour');
     hint.setAttribute('aria-hidden', 'true');
     layer.append(hint, buildSwatches(index, colour => chooseColour(index, colour)));
+  } else if (boardMode === 'damage') {
+    const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
+    hint.setAttribute('aria-hidden', 'true');
+    layer.append(hint, buildSeatMap(index));
   } else if (boardMode === 'counters') {
     const rows = element('div', 'counter-rows');
     if (game.counters.poison) rows.append(buildCounterRow('poison', index));
@@ -564,12 +758,39 @@ function renderModeLayer(player, index) {
   }
   layer.hidden = layer.childElementCount === 0;
   syncCounterRows(index);
+  syncSeatMap(index);
 }
 
-// The near-edge badges: colour identity, poison and tax, each only when it's set and its switch is on.
+// Close to losing: a warning from 15 commander damage or 7 poison, and out at 21 or 10.
+function dangerLevel(value, warning, lethal) {
+  return value >= lethal ? 'out' : value >= warning ? 'warn' : '';
+}
+
+function isOut(index) {
+  return game.scores[index] <= 0 ||
+    (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) ||
+    (game.counters.poison && game.poison[index] >= poisonLethal);
+}
+
+// The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
+// damage, one chip per opponent with a dot in their colour, largest first. The near edge holds colour
+// identity, poison and tax, each only when it's set and its switch is on.
 function renderBadges(index) {
   const player = board.children[index];
   if (!player) return;
+  const far = player.querySelector('.badges.far');
+  const damage = game.counters.commander ? game.commanderDamage[index]
+    .map((amount, attacker) => ({ amount, attacker })).filter(({ amount }) => amount > 0)
+    .sort((a, b) => b.amount - a.amount || a.attacker - b.attacker) : [];
+  far.replaceChildren(...damage.map(({ amount, attacker }) => {
+    const chip = element('span', 'chip', inColourOf(element('span', 'dot'), attacker), String(amount),
+      visuallyHidden(` commander damage from Player ${attacker + 1}`));
+    chip.setAttribute('role', 'listitem');
+    const level = dangerLevel(amount, commanderWarning, commanderLethal);
+    if (level) chip.dataset.level = level;
+    return chip;
+  }));
+  far.hidden = damage.length === 0;
   const near = player.querySelector('.badges.near');
   const chips = [];
   const identity = game.counters.commander ? game.identities[index] : '';
@@ -582,7 +803,10 @@ function renderBadges(index) {
     chips.push(element('span', 'chip pips', ...pips, visuallyHidden(identityText(identity))));
   }
   if (game.counters.poison && game.poison[index] > 0) {
-    chips.push(element('span', 'chip', icon('flask'), String(game.poison[index]), visuallyHidden(' poison')));
+    const chip = element('span', 'chip', icon('flask'), String(game.poison[index]), visuallyHidden(' poison'));
+    const level = dangerLevel(game.poison[index], poisonWarning, poisonLethal);
+    if (level) chip.dataset.level = level;
+    chips.push(chip);
   }
   if (game.counters.commander && game.casts[index] > 0) {
     chips.push(element('span', 'chip', visuallyHidden('Commander tax '), icon('crown'), `+${game.casts[index] * 2}`));
@@ -592,9 +816,11 @@ function renderBadges(index) {
   near.hidden = chips.length === 0;
 }
 
-// The centre pill: counters (when a counter is on), dice and setup at rest; Undo, save and ✕ while editing.
+// The centre pill: commander damage (when Commander is on), counters (when a counter is on), dice and setup
+// at rest; Undo, save and ✕ while editing.
 function syncPill() {
   const editing = editingModes.includes(boardMode);
+  damageButton.hidden = boardMode !== null || !game.counters.commander;
   countersButton.hidden = boardMode !== null || !(game.counters.commander || game.counters.poison);
   diceButton.hidden = boardMode !== null;
   setupButton.hidden = editing;
@@ -661,6 +887,7 @@ function setBoardMode(mode) {
   cancelPresses();
   boardMode = mode;
   edits = editingModes.includes(mode) ? [] : null;
+  editStartScores = [...game.scores];
   [...board.children].forEach((player, index) => {
     player.querySelector('.controls').inert = mode !== null;
     player.querySelector('.rotate-seat').hidden = mode !== 'rotate';
@@ -699,6 +926,7 @@ function cancelEditing() {
 function discardEdits() {
   while (edits.length) applyEdit(edits.pop(), -1);
   paintColours();
+  game.scores.forEach((_, index) => renderScore(index));
   saveGame();
   setBoardMode(null);
   announcer.textContent = 'Changes discarded';
@@ -716,7 +944,7 @@ function renderScore(index) {
   score.value = value;
   score.setAttribute('aria-label', `${game.scores[index]} life`);
   score.style.setProperty('--digits', value.length);
-  score.toggleAttribute('data-out', game.scores[index] <= 0);
+  score.toggleAttribute('data-out', isOut(index));
 }
 
 function renderBoard() {
@@ -767,6 +995,7 @@ function startGame(playerCount, startingLife) {
   game.poison = fitCounts([], playerCount);
   game.casts = fitCounts([], playerCount);
   game.identities = fitIdentities(game.identities, playerCount);
+  game.commanderDamage = fitDamage([], playerCount);
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
   // A new game takes the screen's current landscape as upright.
@@ -936,6 +1165,7 @@ diceDialog.addEventListener('close', () => {
   syncBackHandling();
 });
 
+damageButton.addEventListener('click', () => setBoardMode('damage'));
 countersButton.addEventListener('click', () => setBoardMode('counters'));
 undoButton.addEventListener('click', undoEdit);
 saveButton.addEventListener('click', () => {
@@ -974,7 +1204,10 @@ for (const [input, key] of [[commanderSwitch, 'commander'], [poisonSwitch, 'pois
   input.addEventListener('change', () => {
     game.counters[key] = input.checked;
     saveGame();
-    game.scores.forEach((_, index) => renderBadges(index));
+    game.scores.forEach((_, index) => {
+      renderScore(index);
+      renderBadges(index);
+    });
     syncPill();
   });
 }

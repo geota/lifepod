@@ -10,7 +10,7 @@ LifePod saves the current game on your device so it is still there the next time
 
 - the player count, starting life, and each player's life total
 - each seat's rotation and tile colour
-- each player's poison, commander tax and colour identity
+- each player's commander damage, poison, commander tax and colour identity
 - whether **Keep awake** and the **Commander** and **Poison** counters are on
 
 This stays on your device: in the app's private storage on Android and iOS, or in your browser's local storage on the web. Deleting the app or clearing its data removes it.

@@ -6,6 +6,8 @@ LifePod keeps every player's life total in front of them. Set your phone in the 
 • Rotate any seat to match where people are sitting
 • Give each player their own tile colour from nine
 • Optional commander tax, colour identity and poison counters, shown only when set
+• Commander damage on a map of the table, taken from life in the same tap
+• Warnings as commander damage or poison nears the losing amount
 • Seats stay in place when the phone turns
 • Start at 20, 30, 40, or any life total you choose
 • Roll a d4, d6, d8, d10, d12 or d20 with true randomness
