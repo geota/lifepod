@@ -27,16 +27,33 @@
   --shadow-dialog: 0 24px 80px #0e130fd9;
   --shadow-float: 0 2px 7px #10161291;
 
-  /* Board. Top-row seats (1, 2, 5) are a little lighter and bottom-row seats (3, 4, 6) a little darker,
-     so neighbours stay apart for colour-blind players. */
+  /* Board */
   --seam-width: 2px;
   --ring-opacity: .08;
-  --p1-panel: #2f432f; --p1-rim: #556e4e; --p1-seat: #d3eeaa; --p1-button: #233324;
-  --p2-panel: #2c4352; --p2-rim: #517187; --p2-seat: #b6e0f7; --p2-button: #21323e;
-  --p3-panel: #432a27; --p3-rim: #7b4f44; --p3-seat: #ffc7b2; --p3-button: #301d1a;
-  --p4-panel: #342b41; --p4-rim: #655179; --p4-seat: #e4cff7; --p4-button: #271f32;
-  --p5-panel: #4a4024; --p5-rim: #7f6d49; --p5-seat: #f6de96; --p5-button: #362e16;
-  --p6-panel: #1d3a36; --p6-rim: #3f675d; --p6-seat: #b4eddd; --p6-button: #142925;
+
+  /* Tile colours: nine swatches, each a full tile palette. Players 1, 2 and 5 use the lighter top-row version
+     and players 3, 4 and 6 the darker bottom-row one, so neighbours stay apart for colour-blind players even
+     when their hues are close. Players 1–6 default to Sage, Sky, Coral, Violet, Amber and Teal. Generated in
+     OKLCH by design/counters/palette.mjs: on every panel the life total is at least 9:1, small text 7.6:1 and
+     the red of a life total at 0 or below 4.79:1. */
+  --sage-top-panel: #2f432f; --sage-top-rim: #556e4e; --sage-top-seat: #d3eeaa; --sage-top-button: #233324;
+  --sage-bottom-panel: #253725; --sage-bottom-rim: #476548; --sage-bottom-seat: #bde7bd; --sage-bottom-button: #19281a;
+  --sky-top-panel: #2c4352; --sky-top-rim: #517187; --sky-top-seat: #b6e0f7; --sky-top-button: #21323e;
+  --sky-bottom-panel: #1d3544; --sky-bottom-rim: #3c6179; --sky-bottom-seat: #b4e1ff; --sky-bottom-button: #132632;
+  --coral-top-panel: #523734; --coral-top-rim: #8a5e59; --coral-top-seat: #ffd2cc; --coral-top-button: #3e2926;
+  --coral-bottom-panel: #432a27; --coral-bottom-rim: #7b4f44; --coral-bottom-seat: #ffc7b2; --coral-bottom-button: #301d1a;
+  --violet-top-panel: #433a51; --violet-top-rim: #726387; --violet-top-seat: #e5d5fe; --violet-top-button: #322b3d;
+  --violet-bottom-panel: #342b41; --violet-bottom-rim: #655179; --violet-bottom-seat: #e4cff7; --violet-bottom-button: #271f32;
+  --amber-top-panel: #4a4024; --amber-top-rim: #7f6d49; --amber-top-seat: #f6de96; --amber-top-button: #362e16;
+  --amber-bottom-panel: #3a3119; --amber-bottom-rim: #695b35; --amber-bottom-seat: #ecd8a3; --amber-bottom-button: #2a2310;
+  --teal-top-panel: #254642; --teal-top-rim: #42766f; --teal-top-seat: #a8eee3; --teal-top-button: #1b3531;
+  --teal-bottom-panel: #1d3a36; --teal-bottom-rim: #3f675d; --teal-bottom-seat: #b4eddd; --teal-bottom-button: #142925;
+  --rose-top-panel: #573147; --rose-top-rim: #915477; --rose-top-seat: #ffcde8; --rose-top-button: #422435;
+  --rose-bottom-panel: #482339; --rose-bottom-rim: #804568; --rose-bottom-seat: #fec7e5; --rose-bottom-button: #351829;
+  --indigo-top-panel: #343b65; --indigo-top-rim: #5a65a7; --indigo-top-seat: #d4dcfe; --indigo-top-button: #262c4d;
+  --indigo-bottom-panel: #282e56; --indigo-bottom-rim: #4c5696; --indigo-bottom-seat: #cfd8fe; --indigo-bottom-button: #1b2040;
+  --slate-top-panel: #3b4045; --slate-top-rim: #646c76; --slate-top-seat: #d3e0ec; --slate-top-button: #2b3034;
+  --slate-bottom-panel: #2d3238; --slate-bottom-rim: #555d66; --slate-bottom-seat: #cfdbe8; --slate-bottom-button: #202428;
 
   /* Type */
   --font-ui: system-ui, -apple-system, sans-serif;
@@ -167,27 +184,44 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .dice-button:active::before, .setup-button:active::before { background: var(--surface-pressed); }
 .dice-button .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
-/* While rotating seats, only the Done disc stays. */
-.board-controls[data-rotating]::after, .board-controls[data-rotating] .dice-button { display: none; }
-.board-controls[data-rotating]::before { background: var(--accent); border-color: var(--accent); }
-.board-controls[data-rotating] .setup-button { color: var(--ink); }
-.board-controls[data-rotating] .setup-button::before { content: none; }
+/* While rotating seats or choosing colours, only the Done disc stays. */
+.board-controls[data-mode]::after, .board-controls[data-mode] .dice-button { display: none; }
+.board-controls[data-mode]::before { background: var(--accent); border-color: var(--accent); }
+.board-controls[data-mode] .setup-button { color: var(--ink); }
+.board-controls[data-mode] .setup-button::before { content: none; }
+
+/* app.js gives each tile, swatch and colour dot a data-colour and data-row, which pick its palette. */
+.player, .swatch {
+  --panel: var(--sage-top-panel);
+  --rim: var(--sage-top-rim);
+  --seat: var(--sage-top-seat);
+  --button: var(--sage-top-button);
+}
+[data-colour="sage"][data-row="top"] { --panel: var(--sage-top-panel); --rim: var(--sage-top-rim); --seat: var(--sage-top-seat); --button: var(--sage-top-button); }
+[data-colour="sage"][data-row="bottom"] { --panel: var(--sage-bottom-panel); --rim: var(--sage-bottom-rim); --seat: var(--sage-bottom-seat); --button: var(--sage-bottom-button); }
+[data-colour="sky"][data-row="top"] { --panel: var(--sky-top-panel); --rim: var(--sky-top-rim); --seat: var(--sky-top-seat); --button: var(--sky-top-button); }
+[data-colour="sky"][data-row="bottom"] { --panel: var(--sky-bottom-panel); --rim: var(--sky-bottom-rim); --seat: var(--sky-bottom-seat); --button: var(--sky-bottom-button); }
+[data-colour="coral"][data-row="top"] { --panel: var(--coral-top-panel); --rim: var(--coral-top-rim); --seat: var(--coral-top-seat); --button: var(--coral-top-button); }
+[data-colour="coral"][data-row="bottom"] { --panel: var(--coral-bottom-panel); --rim: var(--coral-bottom-rim); --seat: var(--coral-bottom-seat); --button: var(--coral-bottom-button); }
+[data-colour="violet"][data-row="top"] { --panel: var(--violet-top-panel); --rim: var(--violet-top-rim); --seat: var(--violet-top-seat); --button: var(--violet-top-button); }
+[data-colour="violet"][data-row="bottom"] { --panel: var(--violet-bottom-panel); --rim: var(--violet-bottom-rim); --seat: var(--violet-bottom-seat); --button: var(--violet-bottom-button); }
+[data-colour="amber"][data-row="top"] { --panel: var(--amber-top-panel); --rim: var(--amber-top-rim); --seat: var(--amber-top-seat); --button: var(--amber-top-button); }
+[data-colour="amber"][data-row="bottom"] { --panel: var(--amber-bottom-panel); --rim: var(--amber-bottom-rim); --seat: var(--amber-bottom-seat); --button: var(--amber-bottom-button); }
+[data-colour="teal"][data-row="top"] { --panel: var(--teal-top-panel); --rim: var(--teal-top-rim); --seat: var(--teal-top-seat); --button: var(--teal-top-button); }
+[data-colour="teal"][data-row="bottom"] { --panel: var(--teal-bottom-panel); --rim: var(--teal-bottom-rim); --seat: var(--teal-bottom-seat); --button: var(--teal-bottom-button); }
+[data-colour="rose"][data-row="top"] { --panel: var(--rose-top-panel); --rim: var(--rose-top-rim); --seat: var(--rose-top-seat); --button: var(--rose-top-button); }
+[data-colour="rose"][data-row="bottom"] { --panel: var(--rose-bottom-panel); --rim: var(--rose-bottom-rim); --seat: var(--rose-bottom-seat); --button: var(--rose-bottom-button); }
+[data-colour="indigo"][data-row="top"] { --panel: var(--indigo-top-panel); --rim: var(--indigo-top-rim); --seat: var(--indigo-top-seat); --button: var(--indigo-top-button); }
+[data-colour="indigo"][data-row="bottom"] { --panel: var(--indigo-bottom-panel); --rim: var(--indigo-bottom-rim); --seat: var(--indigo-bottom-seat); --button: var(--indigo-bottom-button); }
+[data-colour="slate"][data-row="top"] { --panel: var(--slate-top-panel); --rim: var(--slate-top-rim); --seat: var(--slate-top-seat); --button: var(--slate-top-button); }
+[data-colour="slate"][data-row="bottom"] { --panel: var(--slate-bottom-panel); --rim: var(--slate-bottom-rim); --seat: var(--slate-bottom-seat); --button: var(--slate-bottom-button); }
 
 .player {
-  --panel: var(--p1-panel);
-  --rim: var(--p1-rim);
-  --seat: var(--p1-seat);
-  --button: var(--p1-button);
   position: relative;
   container-type: size;
   overflow: hidden;
   background: var(--panel);
 }
-.player:nth-child(2) { --panel: var(--p2-panel); --rim: var(--p2-rim); --seat: var(--p2-seat); --button: var(--p2-button); }
-.player:nth-child(3) { --panel: var(--p3-panel); --rim: var(--p3-rim); --seat: var(--p3-seat); --button: var(--p3-button); }
-.player:nth-child(4) { --panel: var(--p4-panel); --rim: var(--p4-rim); --seat: var(--p4-seat); --button: var(--p4-button); }
-.player:nth-child(5) { --panel: var(--p5-panel); --rim: var(--p5-rim); --seat: var(--p5-seat); --button: var(--p5-button); }
-.player:nth-child(6) { --panel: var(--p6-panel); --rim: var(--p6-rim); --seat: var(--p6-seat); --button: var(--p6-button); }
 
 .player-face {
   --control-size: clamp(44px, 18cqi, 74px);
@@ -198,7 +232,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   width: 100%;
   height: 100%;
   transform: translate(-50%, -50%) rotate(var(--angle, 0deg));
-  container-type: inline-size;
+  container-type: size;
   isolation: isolate;
   display: grid;
   place-items: center;
@@ -279,9 +313,62 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: var(--seat);
   font-size: clamp(1.125rem, 7cqi, 1.5rem);
 }
-.board:not([data-rotating]) .rotate-badge, .board[data-rotating] .controls button { visibility: hidden; }
+.board:not([data-mode="rotate"]) .rotate-badge, .board[data-mode="rotate"] .controls button { visibility: hidden; }
 .rotate-seat:active { background: var(--press-overlay); }
 .rotate-seat:focus-visible { outline-offset: -3px; }
+
+/* Board modes other than seat rotation swap the life controls for a layer facing the tile's player. It keeps
+   22px clear on its far side, where the centre controls reach up to 18px into the tiles next to them. */
+.board[data-mode]:not([data-mode="rotate"]) .controls { visibility: hidden; }
+.mode-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 22px 6px 4px;
+  text-align: center;
+}
+.mode-layer[hidden] { display: none; }
+.layer-hint { font-size: clamp(.75rem, 3.6cqi, .875rem); font-weight: var(--weight-semibold); color: var(--text-soft); }
+
+/* Tile colour swatches: the panel with the seat colour as a dot. The chosen one has a ring inside it, so a
+   tile edge can't clip it. A swatch another player has is struck through and can't be chosen. */
+.swatches {
+  --swatch-size: clamp(44px, min((100cqi - 20px) / 3, (100cqb - 70px) / 3), 60px);
+  display: grid;
+  grid-template-columns: repeat(3, var(--swatch-size));
+  grid-auto-rows: var(--swatch-size);
+  gap: 4px;
+}
+.swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+.swatch::before { width: 36%; aspect-ratio: 1; border-radius: 50%; background: var(--seat); content: ''; }
+.swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--text), inset 0 0 0 4px var(--panel); }
+.swatch:disabled { opacity: .4; cursor: default; }
+.swatch:disabled::after {
+  position: absolute;
+  width: 70%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--seat);
+  transform: rotate(-45deg);
+  content: '';
+}
+@container (max-width: 240px) {
+  .mode-layer { padding: 20px 4px 1px; }
+  .layer-hint { display: none; }
+  .swatches { --swatch-size: 44px; gap: 3px; }
+}
 
 dialog {
   width: min(420px, calc(100% - 32px));
@@ -374,7 +461,10 @@ input:checked + .switch { background: var(--accent); border-color: var(--accent)
 input:checked + .switch::after { transform: translateX(13px); background: var(--ink); }
 .sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
 .setup-options { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
-#rotate-seats { padding-inline: var(--space-3); font-size: var(--type-label); }
+.setup-mode-buttons { display: flex; gap: var(--space-2); }
+#rotate-seats, #tile-colours { padding-inline: var(--space-3); font-size: var(--type-label); }
+#tile-colours { display: flex; align-items: center; gap: 6px; }
+#tile-colours[hidden] { display: none; }
 .primary { background: var(--accent); border-color: var(--accent); color: var(--ink); }
 .primary:active { background: var(--accent-pressed); }
 #restart-message { color: var(--muted); }
@@ -502,7 +592,7 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 @media (hover: hover) {
   .dice-button:hover::before, .setup-button:hover::before, .dice-picker button:not([aria-pressed="true"]):hover,
   .close:hover, .choices button:not([aria-pressed="true"]):hover, .secondary:hover, .text-button:hover { background: var(--surface-pressed); }
-  .board-controls[data-rotating] .setup-button:hover::before { content: none; }
+  .board-controls[data-mode] .setup-button:hover::before { content: none; }
   .primary:hover { background: var(--accent-pressed); }
   .dice-stage:hover { background: var(--dice-stage-pressed); }
 }

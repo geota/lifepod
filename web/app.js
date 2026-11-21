@@ -15,6 +15,7 @@ const dicePicker = document.querySelector('#dice-picker');
 const diceRoll = document.querySelector('#dice-roll');
 const diceResult = document.querySelector('#dice-result');
 const rotateSeatsButton = document.querySelector('#rotate-seats');
+const tileColoursButton = document.querySelector('#tile-colours');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
 const playerChoices = document.querySelector('#player-choices');
@@ -37,12 +38,23 @@ const seatLayouts = {
   6: ['top-1 top-2 top-5', 'bottom-3 bottom-4 bottom-6'],
 };
 const playerCounts = Object.keys(seatLayouts).map(Number);
+// Tile colours, in order. Players 1–6 default to the first six. Each has a lighter top-row and a darker
+// bottom-row version in styles.css: players 1, 2 and 5 use the top row, so neighbours differ in lightness too.
+const swatches = [
+  { id: 'sage', name: 'Sage' }, { id: 'sky', name: 'Sky' }, { id: 'coral', name: 'Coral' },
+  { id: 'violet', name: 'Violet' }, { id: 'amber', name: 'Amber' }, { id: 'teal', name: 'Teal' },
+  { id: 'rose', name: 'Rose' }, { id: 'indigo', name: 'Indigo' }, { id: 'slate', name: 'Slate' },
+];
+const topRowPlayers = [0, 1, 4];
+// The centre button's label while a board mode that ends with the single check mark is open.
+const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours' };
 
 let game = loadGame();
 let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
-let rotatingSeats = false;
+// The open board mode: 'rotate' or 'colours', or null at rest.
+let boardMode = null;
 let announceTimer;
 const pendingAnnouncements = new Set();
 let diceSides = 20;
@@ -91,10 +103,30 @@ function syncBoardTurn() {
   document.querySelector('.app').dataset.boardTurn = String(boardTurn());
 }
 
+function seatRow(index) {
+  return topRowPlayers.includes(index) ? 'top' : 'bottom';
+}
+
+// One distinct swatch per player. Valid saved choices are kept in seat order. A seat with no choice, or with
+// one already taken, gets its default if that's free and otherwise the first free swatch.
+function fitColors(saved, count) {
+  const colors = [];
+  for (let index = 0; index < count; index++) {
+    const colour = Array.isArray(saved) ? saved[index] : undefined;
+    const valid = Number.isInteger(colour) && colour >= 0 && colour < swatches.length && !colors.includes(colour);
+    colors.push(valid ? colour : null);
+  }
+  for (let index = 0; index < count; index++) {
+    if (colors[index] !== null) continue;
+    colors[index] = [index, ...swatches.keys()].find(colour => !colors.includes(colour));
+  }
+  return colors;
+}
+
 function loadGame() {
   const defaults = {
     startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
-    landscapeAngle: currentLandscapeAngle(),
+    landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -110,6 +142,7 @@ function loadGame() {
     const landscapeAngle = quarterTurns.includes(saved.landscapeAngle) ? saved.landscapeAngle : defaults.landscapeAngle;
     return {
       startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false, landscapeAngle,
+      colors: fitColors(saved.colors, saved.scores.length),
     };
   } catch {
     return defaults;
@@ -240,9 +273,23 @@ function announceLife(index) {
   }, 700);
 }
 
-// Android's back gesture only needs the page while a dialog or seat rotation is open.
+// Android's back gesture only needs the page while a dialog or board mode is open.
 function syncBackHandling() {
-  android?.setBackHandling?.(rotatingSeats || document.querySelector('dialog[open]') !== null);
+  android?.setBackHandling?.(boardMode !== null || document.querySelector('dialog[open]') !== null);
+}
+
+// For buttons that act once per press: a press counts the moment a finger lands, as on the life buttons.
+function bindTap(button, action) {
+  let ignoreClicksUntil = 0;
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || button.disabled) return;
+    ignoreClicksUntil = performance.now() + 800;
+    action();
+  });
+  button.addEventListener('contextmenu', (event) => event.preventDefault());
+  button.addEventListener('click', (event) => {
+    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) action();
+  });
 }
 
 function layoutBoard() {
@@ -258,20 +305,95 @@ function layoutBoard() {
   }
 }
 
-function setRotationMode(enabled) {
-  rotatingSeats = enabled;
-  cancelPresses();
-  for (const player of board.children) {
-    player.querySelector('.controls').inert = enabled;
-    player.querySelector('.rotate-seat').hidden = !enabled;
+function paintColours() {
+  [...board.children].forEach((player, index) => {
+    player.dataset.colour = swatches[game.colors[index]].id;
+    player.dataset.row = seatRow(index);
+  });
+}
+
+// A grid of the nine swatches for one player, in that player's row lightness.
+function buildSwatches(index, choose) {
+  const group = document.createElement('div');
+  group.className = 'swatches';
+  group.dataset.player = index;
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', `Tile colour for Player ${index + 1}`);
+  swatches.forEach((swatch, colour) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'swatch';
+    button.value = colour;
+    button.dataset.colour = swatch.id;
+    button.dataset.row = seatRow(index);
+    bindTap(button, () => choose(colour));
+    group.append(button);
+  });
+  syncSwatches(group);
+  return group;
+}
+
+// Marks each swatch as chosen, free, or taken by another player. Taken swatches can't be chosen.
+function syncSwatches(group) {
+  const index = Number(group.dataset.player);
+  for (const button of group.children) {
+    const colour = Number(button.value);
+    const owner = game.colors.indexOf(colour);
+    const taken = owner !== -1 && owner !== index;
+    button.disabled = taken;
+    button.setAttribute('aria-pressed', String(owner === index));
+    const name = swatches[colour].name;
+    button.setAttribute('aria-label', taken ? `${name}, taken by Player ${owner + 1}` : name);
   }
-  board.toggleAttribute('data-rotating', enabled);
-  boardControls.toggleAttribute('data-rotating', enabled);
-  setupButton.setAttribute('aria-label', enabled ? 'Done rotating seats' : 'Game setup');
-  setupButton.setAttribute('aria-haspopup', enabled ? 'false' : 'dialog');
-  setupButton.querySelector('.setup-icon').hidden = enabled;
-  setupButton.querySelector('.rotation-done').hidden = !enabled;
-  (enabled ? board.querySelector('.rotate-seat') : setupButton).focus();
+}
+
+function syncAllSwatches() {
+  for (const group of document.querySelectorAll('.swatches')) syncSwatches(group);
+}
+
+function chooseColour(index, colour) {
+  if (game.colors.includes(colour)) return;
+  game.colors[index] = colour;
+  paintColours();
+  syncAllSwatches();
+  haptic();
+  saveGame();
+}
+
+// Each tile's layer for the open mode, facing its player.
+function renderModeLayer(player, index) {
+  const layer = player.querySelector('.mode-layer');
+  layer.replaceChildren();
+  if (boardMode === 'colours') {
+    const hint = document.createElement('p');
+    hint.className = 'layer-hint';
+    hint.textContent = 'Your tile colour';
+    hint.setAttribute('aria-hidden', 'true');
+    layer.append(hint, buildSwatches(index, colour => chooseColour(index, colour)));
+  }
+  layer.hidden = layer.childElementCount === 0;
+}
+
+// Board-wide modes: seat rotation and tile colours end with the check mark that replaces the setup button.
+function setBoardMode(mode) {
+  cancelPresses();
+  boardMode = mode;
+  [...board.children].forEach((player, index) => {
+    player.querySelector('.controls').inert = mode !== null;
+    player.querySelector('.rotate-seat').hidden = mode !== 'rotate';
+    renderModeLayer(player, index);
+  });
+  for (const element of [board, boardControls]) {
+    if (mode) element.dataset.mode = mode;
+    else delete element.dataset.mode;
+  }
+  setupButton.setAttribute('aria-label', mode ? doneLabels[mode] : 'Game setup');
+  setupButton.setAttribute('aria-haspopup', mode ? 'false' : 'dialog');
+  setupButton.querySelector('.setup-icon').hidden = mode !== null;
+  setupButton.querySelector('.rotation-done').hidden = mode === null;
+  const focusTarget = mode === 'rotate' ? board.querySelector('.rotate-seat')
+    : mode === 'colours' ? board.querySelector('.swatch[aria-pressed="true"]') : setupButton;
+  focusTarget.focus();
   syncBackHandling();
 }
 
@@ -317,10 +439,12 @@ function renderBoard() {
   });
   board.replaceChildren(...players);
   layoutBoard();
+  paintColours();
 }
 
 function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
+  game.colors = fitColors(game.colors, playerCount);
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
   // A new game takes the screen's current landscape as upright.
@@ -351,6 +475,7 @@ function renderSetup() {
   document.querySelector('#save-setup').textContent = changesGame ? 'Start new game' : 'Done';
   document.querySelector('#restart-button').hidden = changesGame;
   rotateSeatsButton.hidden = changesGame;
+  tileColoursButton.hidden = changesGame;
   lifeError.hidden = true;
   startingLifeInput.removeAttribute('aria-invalid');
   startingLifeInput.removeAttribute('aria-describedby');
@@ -378,8 +503,8 @@ for (const preset of lifePresets.children) {
 
 startingLifeInput.addEventListener('input', renderSetup);
 setupButton.addEventListener('click', () => {
-  if (rotatingSeats) {
-    setRotationMode(false);
+  if (boardMode) {
+    setBoardMode(null);
     return;
   }
   selectedPlayerCount = game.scores.length;
@@ -402,7 +527,11 @@ privacy.addEventListener('close', () => {
 });
 rotateSeatsButton.addEventListener('click', () => {
   setup.close();
-  setRotationMode(true);
+  setBoardMode('rotate');
+});
+tileColoursButton.addEventListener('click', () => {
+  setup.close();
+  setBoardMode('colours');
 });
 setupForm.addEventListener('submit', (event) => {
   event.preventDefault();
@@ -483,18 +612,19 @@ diceDialog.addEventListener('close', () => {
   syncBackHandling();
 });
 
+// Android's back gesture closes the open dialog, then the open board mode.
 window.closeOpenDialog = () => {
-  if (rotatingSeats) {
-    setRotationMode(false);
+  const openDialog = document.querySelector('dialog[open]');
+  if (openDialog) {
+    openDialog.close('cancel');
     return true;
   }
-  const openDialog = document.querySelector('dialog[open]');
-  if (!openDialog) return false;
-  openDialog.close('cancel');
+  if (!boardMode) return false;
+  setBoardMode(null);
   return true;
 };
 document.addEventListener('keydown', (event) => {
-  if (rotatingSeats && event.key === 'Escape') setRotationMode(false);
+  if (boardMode && event.key === 'Escape' && !document.querySelector('dialog[open]')) setBoardMode(null);
 });
 
 wakeInput.addEventListener('change', () => {

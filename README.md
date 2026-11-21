@@ -43,6 +43,8 @@ Tap the sliders beside it to choose 2–6 players, set the starting life, restar
 
 Choose **Rotate seats** in Setup, then tap a tile to turn it 90° clockwise. Tap the center check mark or press back when finished. Rotation choices carry over when restarting with the same player count.
 
+Choose **Colours** in Setup to change tile colours. Every tile shows nine swatches facing its player, so everyone can pick at once. No two players can have the same colour: a swatch another player has is struck through and can't be picked. Tap the center check mark or press back when finished. Colours carry over to new games and player-count changes.
+
 ## Install on Android
 
 <p align="center">

@@ -1,6 +1,6 @@
 # LifePod privacy policy
 
-Effective November 19, 2026
+Effective November 20, 2026
 
 LifePod is a life counter for tabletop games. It does not collect, transmit, sell, or share any personal or usage data.
 
@@ -9,7 +9,7 @@ LifePod is a life counter for tabletop games. It does not collect, transmit, sel
 LifePod saves the current game on your device so it is still there the next time you open the app:
 
 - the player count, starting life, and each player's life total
-- each seat's rotation
+- each seat's rotation and tile colour
 - whether **Keep awake** is on
 
 This stays on your device: in the app's private storage on Android and iOS, or in your browser's local storage on the web. Deleting the app or clearing its data removes it.

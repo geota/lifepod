@@ -35,6 +35,7 @@
           <button type="button" class="add"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z"/></svg></button>
           <span class="rotate-badge" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg></span>
         </div>
+        <div class="mode-layer" hidden></div>
       </div>
       <button class="rotate-seat" type="button" hidden></button>
     </section>
@@ -85,7 +86,10 @@
           <span class="switch" aria-hidden="true"></span>
           <span>Keep awake</span>
         </label>
-        <button class="secondary" id="rotate-seats" type="button">Rotate seats</button>
+        <div class="setup-mode-buttons">
+          <button class="secondary" id="tile-colours" type="button"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M203.57,51A107.9,107.9,0,0,0,20,128c0,44.72,27.6,82.25,72,97.94A36,36,0,0,0,140,192a12,12,0,0,1,12-12h46.21a35.79,35.79,0,0,0,35.1-28A108.6,108.6,0,0,0,236,127.09,107.23,107.23,0,0,0,203.57,51Zm6.34,95.67a11.91,11.91,0,0,1-11.7,9.3H152a36,36,0,0,0-36,36,12,12,0,0,1-16,11.3c-16.65-5.88-30.65-15.76-40.48-28.56A76,76,0,0,1,44,128a84,84,0,0,1,83.13-84H128a84.35,84.35,0,0,1,84,83.29A84.72,84.72,0,0,1,209.91,146.71ZM144,76a16,16,0,1,1-16-16A16,16,0,0,1,144,76Zm-44,24A16,16,0,1,1,84,84,16,16,0,0,1,100,100Zm0,56a16,16,0,1,1-16-16A16,16,0,0,1,100,156Zm88-56a16,16,0,1,1-16-16A16,16,0,0,1,188,100Z"/></svg>Colours</button>
+          <button class="secondary" id="rotate-seats" type="button">Rotate seats</button>
+        </div>
       </div>
       <div class="sheet-actions">
         <button class="secondary" type="button" id="restart-button">New game</button>
@@ -102,7 +106,7 @@
       </div>
       <div class="privacy-text">
         <p>LifePod collects no data. There are no accounts, ads, analytics, or tracking, and the apps make no network requests.</p>
-        <p>The current game (players, life totals, seat rotations, and Keep awake) is saved only on this device. Removing the app or clearing its data deletes it.</p>
+        <p>The current game (players, life totals, seat rotations, tile colours, and Keep awake) is saved only on this device. Removing the app or clearing its data deletes it.</p>
         <p>Full policy: github.com/geota/lifepod/blob/main/PRIVACY.md</p>
       </div>
     </form>
