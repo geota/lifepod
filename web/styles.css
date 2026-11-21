@@ -25,9 +25,10 @@
   /* Badges at rest sit on a translucent dark chip. Colour dots get a thin dark rim. */
   --chip-background: #0a0e0b70;
   --dot-rim: #0a0e0b;
-  /* Colour identity discs: white, blue, black (with a light rim), red, green and colourless grey. */
-  --pip-w: #f3ecd2; --pip-u: #6fb0e8; --pip-b: #2c2729; --pip-r: #ec7160; --pip-g: #5fb06e; --pip-c: #b3b1ab;
-  --pip-b-rim: #a89ea4;
+  /* Colour identity discs: white, blue, black, red and green, each with the same thin light ring. White is a
+     clean white, so it never reads as grey on any tile. */
+  --pip-w: #fffefa; --pip-u: #6fb0e8; --pip-b: #2c2729; --pip-r: #ec7160; --pip-g: #5fb06e;
+  --pip-rim: #a89ea4;
 
   /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
   --die-shadow: #070a08;
@@ -356,7 +357,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .layer-hint { font-size: clamp(.75rem, 3.6cqi, .875rem); font-weight: var(--weight-semibold); color: var(--text-soft); }
 
 /* Tile colour swatches: the panel with the seat colour as a dot. The chosen one has a ring inside it, so a
-   tile edge can't clip it. A swatch another player has is struck through and can't be chosen. */
+   tile edge can't clip it. A swatch another player has keeps its full colour, shows its owner ("P2") in the
+   seat colour in place of the dot, and can't be chosen. */
 .swatches {
   --swatch-size: clamp(44px, min((100cqi - 20px) / 3, (100cqb - 70px) / 3), 60px);
   display: grid;
@@ -375,16 +377,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .swatch::before { width: 36%; aspect-ratio: 1; border-radius: 50%; background: var(--seat); content: ''; }
 .swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--text), inset 0 0 0 4px var(--panel); }
-.swatch:disabled { opacity: .4; cursor: default; }
-.swatch:disabled::after {
-  position: absolute;
-  width: 70%;
-  height: 2px;
-  border-radius: 1px;
-  background: var(--seat);
-  transform: rotate(-45deg);
-  content: '';
-}
+.swatch:disabled { cursor: default; }
+.swatch:disabled::before { content: none; }
+.swatch .owner { color: var(--seat); font-size: 14px; font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
 @container (max-width: 240px) {
   .mode-layer { padding: 20px 4px 1px; }
   .layer-hint { display: none; }
@@ -392,7 +387,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 
 /* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat in their colour
-   showing the damage their commander has dealt this player. Cells are at least 44px; the hint goes on narrow
+   showing the damage their commander has dealt this player. A seat at 0 is that player's panel inside a ring
+   in their seat colour; once it has damage it fills solid with the seat colour. Nothing is transparent. Cells are at least 44px; the hint goes on narrow
    tiles. app.js sets the grid's rows and columns and places each seat. */
 .seat-map {
   --hint-space: 24px;
@@ -404,6 +400,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   height: min(100cqb - 30px - var(--hint-space), var(--rows) * 80px);
 }
 .map-cell {
+  /* The seat's own ring, kept under the changed and pressed rings below. */
+  --seat-ring: 0 0 0 0 transparent;
+  --pressed-ring: inset 0 0 0 3px var(--button);
   display: grid;
   place-items: center;
   min-width: 0;
@@ -416,12 +415,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.03em;
+  box-shadow: var(--seat-ring);
 }
-.map-cell[data-zero] { opacity: .7; }
-/* Seats changed since the mode opened get a ring, and a held seat looks pressed. */
-.map-cell[data-changed] { box-shadow: 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
-.map-cell[data-pressed] { box-shadow: inset 0 0 0 3px var(--button); }
-.map-cell[data-changed][data-pressed] { box-shadow: inset 0 0 0 3px var(--button), 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
+/* The 0 is the seat colour on the panel, at least 7.4:1, and the ring at least 6.9:1 on any tile. */
+.map-cell[data-zero] {
+  --seat-ring: inset 0 0 0 2px var(--seat);
+  --pressed-ring: inset 0 0 0 3px var(--seat);
+  background: var(--panel);
+  color: var(--seat);
+  font-weight: var(--weight-semibold);
+}
+/* Seats changed since the mode opened get a ring outside, and a held seat looks pressed. */
+.map-cell[data-pressed] { --seat-ring: var(--pressed-ring); }
+.map-cell[data-changed] { box-shadow: var(--seat-ring), 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
 .map-cell:has(+ .map-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
 .map-cell.self {
   align-content: center;
@@ -497,7 +503,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 
 /* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
-   toward the table, holds commander damage and sits clear of the centre controls; the near edge (the player's
+   toward the table, holds commander damage, led by a sword in its own circle, and sits clear of the centre
+   controls; the near edge (the player's
    own) holds colour identity, poison and tax. Tight chips keep the busiest row on one line at 6 players on a
    320 × 568 phone. A row never wraps: if a wider font would still overflow the tile, app.js shrinks that row's
    type until every chip fits. */
@@ -531,6 +538,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   white-space: nowrap;
 }
 .chip .icon { width: .95em; height: .95em; }
+.chip.sword { width: 1.7em; padding: 0; justify-content: center; color: var(--muted); }
+.chip.sword .icon { width: 1em; height: 1em; }
 .chip .dot { flex: none; width: .66em; height: .66em; border-radius: 50%; background: var(--seat); box-shadow: 0 0 0 1.5px var(--dot-rim); }
 /* Close to losing: amber tinted text from 15 commander damage or 7 poison; at 21 or 10, red tinted text and a
    thin red ring, and the life total turns red. Both pass 4.89:1 on every tile colour (palette.mjs). */
@@ -544,17 +553,16 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chip.pips { gap: 2px; }
 /* Colour identity: plain discs in our own colours, never mana symbols. */
 .pip {
-  --pip: var(--pip-c);
   flex: none;
   width: .62em;
   height: .62em;
   border-radius: 50%;
   background: var(--pip);
-  box-shadow: 0 0 0 1.5px var(--dot-rim);
+  box-shadow: 0 0 0 1px var(--pip-rim);
 }
 .pip[data-pip="W"] { --pip: var(--pip-w); }
 .pip[data-pip="U"] { --pip: var(--pip-u); }
-.pip[data-pip="B"] { --pip: var(--pip-b); box-shadow: 0 0 0 1.5px var(--pip-b-rim); }
+.pip[data-pip="B"] { --pip: var(--pip-b); }
 .pip[data-pip="R"] { --pip: var(--pip-r); }
 .pip[data-pip="G"] { --pip: var(--pip-g); }
 
@@ -599,8 +607,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-size: .6875rem;
   font-weight: var(--weight-semibold);
 }
-.identity-toggle .pip { width: 16px; height: 16px; }
-.identity-toggle:not([aria-pressed="true"]) .pip { opacity: .45; }
+.identity-toggle .pip { width: 16px; height: 16px; box-shadow: 0 0 0 1.5px var(--pip-rim); }
 .identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 
 #discard { width: min(360px, calc(100% - 32px)); }
@@ -840,9 +847,14 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
   .sheet { gap: var(--space-1); padding-block: var(--space-2); }
   legend, .life-setting label { margin-bottom: var(--space-1); }
 }
-/* The smallest landscape phones put each setup label beside its controls, so the sheet fits without scrolling. */
-@media (max-height: 360px) and (min-width: 500px) {
+/* Landscape phones put each setup label beside its controls, so the sheet fits without scrolling: from the
+   smallest (568 × 320) to tall ones such as a Pixel 10 Pro (952 × 427). The smallest also tighten the gaps. */
+@media (max-height: 500px) and (min-width: 500px) {
+  #setup-form { gap: var(--space-3); padding-block: var(--space-3) var(--space-4); }
   #setup-form :is(legend, .life-setting > label) { float: left; width: 7.25rem; margin: 0; line-height: var(--tap-min); }
   #setup-form :is(.choices, .starting-life-row, .counter-switches, .field-error) { margin-inline-start: 7.25rem; }
   #setup-form .starting-life-row .choices { margin-inline-start: 0; }
+}
+@media (max-height: 360px) and (min-width: 500px) {
+  #setup-form { gap: var(--space-1); padding-block: var(--space-2); }
 }

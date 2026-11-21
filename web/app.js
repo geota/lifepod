@@ -69,10 +69,10 @@ const commanderLethal = 21;
 const commanderWarning = 15;
 const poisonLethal = 10;
 const poisonWarning = 7;
-// Colour identity in W U B R G order, then colourless, which goes alone.
+// Colour identity: any combination of the five colours, in W U B R G order. A colourless commander has none.
 const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
-  { id: 'R', name: 'red' }, { id: 'G', name: 'green' }, { id: 'C', name: 'colourless' },
+  { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
 ];
 // Poison, casts and commander damage stop at this, which keeps every tile readable.
 const maxCount = 99;
@@ -83,6 +83,7 @@ const iconPaths = {
   plus: 'M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z',
   flask: 'M225.15,197.71,164,95.81V44h4a12,12,0,0,0,0-24H88a12,12,0,0,0,0,24h4V95.81L30.85,197.71A20,20,0,0,0,48,228H208a20,20,0,0,0,17.15-30.29ZM140,44V99.14a12,12,0,0,0,1.71,6.17l35.13,58.54c-10.79.86-25.15-1.31-43.42-10.56-14-7.08-27.46-11.33-40.27-12.76l21.14-35.22A12,12,0,0,0,116,99.14V44ZM55.06,204,79,164.19c13-1.11,27.62,2.42,43.62,10.52,19.61,9.92,36.25,13.31,49.85,13.31A75.44,75.44,0,0,0,190.11,186l10.83,18Z',
   crown: 'M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z',
+  sword: 'M216,28H152a12,12,0,0,0-9.33,4.45L79.5,110.51l-4.66-4.65a20,20,0,0,0-28.29,0L29.86,122.55a20,20,0,0,0,0,28.29h0L45,166,23.86,187.17a20,20,0,0,0,0,28.28l16.69,16.69a20,20,0,0,0,28.28,0L90,211l15.17,15.16a20,20,0,0,0,28.29,0l16.69-16.69a20,20,0,0,0,0-28.3l-4.65-4.65,78.06-63.17A12,12,0,0,0,228,104V40A12,12,0,0,0,216,28ZM54.69,212.34l-11-11L62,183l11,11Zm64.61-6L49.65,136.7l11.05-11,69.65,69.65ZM204,98.27l-75.58,61.17L121,152l47.51-47.5a12,12,0,0,0-17-17L104,135l-7.45-7.44L157.73,52H204Z',
   palette: 'M203.57,51A107.9,107.9,0,0,0,20,128c0,44.72,27.6,82.25,72,97.94A36,36,0,0,0,140,192a12,12,0,0,1,12-12h46.21a35.79,35.79,0,0,0,35.1-28A108.6,108.6,0,0,0,236,127.09,107.23,107.23,0,0,0,203.57,51Zm6.34,95.67a11.91,11.91,0,0,1-11.7,9.3H152a36,36,0,0,0-36,36,12,12,0,0,1-16,11.3c-16.65-5.88-30.65-15.76-40.48-28.56A76,76,0,0,1,44,128a84,84,0,0,1,83.13-84H128a84.35,84.35,0,0,1,84,83.29A84.72,84.72,0,0,1,209.91,146.71ZM144,76a16,16,0,1,1-16-16A16,16,0,0,1,144,76Zm-44,24A16,16,0,1,1,84,84,16,16,0,0,1,100,100Zm0,56a16,16,0,1,1-16-16A16,16,0,0,1,100,156Zm88-56a16,16,0,1,1-16-16A16,16,0,0,1,188,100Z',
 };
 
@@ -194,10 +195,10 @@ function fitCounts(saved, count) {
   });
 }
 
-// Colour identity as letters in W U B R G order, or 'C' alone for colourless.
+// Colour identity as letters in W U B R G order. Anything else, including colourless ('C') from saves made
+// before it was removed, means no identity.
 function normalizeIdentity(value) {
-  if (typeof value !== 'string' || !/^[WUBRGC]*$/.test(value)) return '';
-  if (value.includes('C')) return value === 'C' ? 'C' : '';
+  if (typeof value !== 'string' || !/^[WUBRG]*$/.test(value)) return '';
   return identityColours.map(colour => colour.id).filter(id => value.includes(id)).join('');
 }
 
@@ -630,6 +631,12 @@ function syncSwatches(group) {
     button.setAttribute('aria-pressed', String(owner === index));
     const name = swatches[colour].name;
     button.setAttribute('aria-label', taken ? `${name}, taken by Player ${owner + 1}` : name);
+    // A free swatch shows the seat colour as a dot. A taken one shows its owner, such as "P2", in its place.
+    const tag = taken ? `P${owner + 1}` : '';
+    if (button.textContent !== tag) {
+      button.replaceChildren(...(taken ? [element('span', 'owner', tag)] : []));
+      button.firstChild?.setAttribute('aria-hidden', 'true');
+    }
   }
 }
 
@@ -795,7 +802,7 @@ function isOut(index) {
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
-// damage, one chip per opponent with a dot in their colour, largest first. The near edge holds colour
+// damage: a sword, like the pill's, then one chip per opponent with a dot in their colour, largest first. The near edge holds colour
 // identity, poison and tax, each only when it's set and its switch is on.
 function renderBadges(index) {
   const player = board.children[index];
@@ -804,7 +811,10 @@ function renderBadges(index) {
   const damage = game.counters.commander ? game.commanderDamage[index]
     .map((amount, attacker) => ({ amount, attacker })).filter(({ amount }) => amount > 0)
     .sort((a, b) => b.amount - a.amount || a.attacker - b.attacker) : [];
-  far.replaceChildren(...damage.map(({ amount, attacker }) => {
+  // The sword only labels the row: each chip already says whose commander it counts.
+  const sword = element('span', 'chip sword', icon('sword'));
+  sword.setAttribute('aria-hidden', 'true');
+  far.replaceChildren(...(damage.length ? [sword] : []), ...damage.map(({ amount, attacker }) => {
     const chip = element('span', 'chip', inColourOf(element('span', 'dot'), attacker), String(amount),
       visuallyHidden(` commander damage from Player ${attacker + 1}`));
     chip.setAttribute('role', 'listitem');
@@ -885,14 +895,9 @@ for (const colour of identityColours) {
   toggle.type = 'button';
   toggle.value = colour.id;
   toggle.setAttribute('aria-label', colour.name[0].toUpperCase() + colour.name.slice(1));
-  // Colourless can't be combined with a colour, so choosing one clears the other.
   toggle.addEventListener('click', () => {
     const identity = game.identities[sheetPlayer];
-    let next;
-    if (colour.id === 'C') next = identity === 'C' ? '' : 'C';
-    else if (identity.includes(colour.id)) next = identity.replace(colour.id, '');
-    else next = normalizeIdentity(identity.replace('C', '') + colour.id);
-    setIdentity(sheetPlayer, next);
+    setIdentity(sheetPlayer, identity.includes(colour.id) ? identity.replace(colour.id, '') : normalizeIdentity(identity + colour.id));
   });
   identityToggles.append(toggle);
 }

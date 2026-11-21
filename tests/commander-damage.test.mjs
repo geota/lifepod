@@ -9,8 +9,30 @@ const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const seat = (page, defender, attacker) => tile(page, defender).locator(`.map-cell[data-attacker="${attacker - 1}"]`);
 const ownSeat = (page, number) => tile(page, number).locator('.map-cell.self').evaluate(cell =>
   [cell.querySelector('strong').textContent, cell.querySelector('.life-change').textContent]);
+// The far row's chips, after the sword that leads it.
 const farBadges = (page, number) => tile(page, number).locator('.badges.far')
-  .evaluate(row => (row.hidden ? '' : [...row.children].map(chip => chip.textContent).join(' | ')));
+  .evaluate(row => (row.hidden ? '' : [...row.querySelectorAll('[role="listitem"]')].map(chip => chip.textContent).join(' | ')));
+// How each opponent's seat looks on a defender's map, and the contrast of its number.
+const seatLooks = (page, defender) => tile(page, defender).locator('.map-cell[data-attacker]').evaluateAll(cells => {
+  const rgba = value => value.match(/[\d.]+/g).map(Number);
+  const luminance = ([r, g, b]) => [r, g, b].map(channel => {
+    const c = channel / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  }).reduce((sum, c, index) => sum + c * [0.2126, 0.7152, 0.0722][index], 0);
+  return cells.map(cell => {
+    const style = getComputedStyle(cell);
+    const seat = getComputedStyle(cell).getPropertyValue('--seat').trim();
+    const panel = getComputedStyle(cell).getPropertyValue('--panel').trim();
+    const [text, fill] = [luminance(rgba(style.color)), luminance(rgba(style.backgroundColor))];
+    return {
+      attacker: Number(cell.dataset.attacker) + 1, zero: cell.hasAttribute('data-zero'), seat, panel,
+      color: style.color, background: style.backgroundColor, shadow: style.boxShadow, opacity: style.opacity,
+      opaque: rgba(style.color)[3] ?? 1, solid: rgba(style.backgroundColor)[3] ?? 1,
+      contrast: (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05),
+    };
+  });
+});
+const hex = value => `rgb(${value.match(/\w\w/g).map(pair => parseInt(pair, 16)).join(', ')})`;
 const mode = page => page.locator('#board').getAttribute('data-mode');
 const damageTo = (page, number) => page.locator('.player').nth(number - 1).locator('.map-cell[data-attacker]')
   .evaluateAll(cells => cells.reduce((sum, cell) => sum + Number(cell.textContent), 0));
@@ -62,9 +84,28 @@ async function checkDamage(t, engine) {
   assert.ok(await button(page, 'Undo').isDisabled());
   assert.deepEqual(await ownSeat(page, 3), ['40', 'you']);
 
+  // A seat at 0 is the attacker's own panel inside a 2px ring in their seat colour, with the 0 in that colour.
+  // Nothing is transparent, and every number keeps at least 4.5:1.
+  for (const looks of await seatLooks(page, 3)) {
+    assert.ok(looks.zero, `P${looks.attacker} starts at 0`);
+    assert.equal(looks.background, hex(looks.panel), `P${looks.attacker}'s seat at 0 is their panel`);
+    assert.equal(looks.color, hex(looks.seat), `P${looks.attacker}'s 0 is in their seat colour`);
+    assert.match(looks.shadow, new RegExp(`^${hex(looks.seat).replace(/[()]/g, '\\$&')} 0px 0px 0px 2px inset$`), `P${looks.attacker}'s ring`);
+    assert.deepEqual([looks.opacity, looks.opaque, looks.solid], ['1', 1, 1], 'no transparency');
+    assert.ok(looks.contrast >= 4.5, `P${looks.attacker}'s 0 at ${looks.contrast.toFixed(2)}:1`);
+  }
+  assert.notEqual((await seatLooks(page, 3))[0].panel, (await seatLooks(page, 3))[1].panel, 'each seat is its own player’s panel');
+
   // Each tap on an opponent's seat adds 1 commander damage from them and takes 1 life, together.
   for (let tap = 0; tap < 6; tap++) await seat(page, 3, 2).tap();
   assert.equal(await seat(page, 3, 2).textContent(), '6');
+  // With damage the seat fills solid with the seat colour. Changed seats add a ring outside, over the tile.
+  const hit = (await seatLooks(page, 3)).find(looks => looks.attacker === 2);
+  assert.equal(hit.background, hex(hit.seat), 'a seat with damage fills with the seat colour');
+  assert.ok(!hit.shadow.includes('inset'), `no zero ring once hit: ${hit.shadow}`);
+  assert.match(hit.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px/, 'the changed ring');
+  assert.deepEqual([hit.opacity, hit.opaque, hit.solid], ['1', 1, 1], 'no transparency');
+  assert.ok(hit.contrast >= 4.5, `the 6 at ${hit.contrast.toFixed(2)}:1`);
   assert.deepEqual(await ownSeat(page, 3), ['34', '−6'], 'your own seat shows your life and the change');
   assert.equal((await scores(page))[2], 34);
   await eventually(() => page.locator('#announcer').textContent(), "Player 2's commander, 6 damage to Player 3. Player 3, 34 life");
@@ -103,6 +144,17 @@ async function checkDamage(t, engine) {
   await tile(page, 3).getByRole('button', { name: "Remove one commander damage from Player 4's commander" }).focus();
   await page.keyboard.press('Enter');
   assert.equal(await seat(page, 3, 4).textContent(), '0');
+  // Back at 0 after a change, the seat keeps its zero ring inside the changed ring.
+  const back = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
+  assert.equal(back.background, hex(back.panel));
+  assert.ok(back.shadow.startsWith(`${hex(back.seat)} 0px 0px 0px 2px inset, `), `zero ring kept: ${back.shadow}`);
+  assert.match(back.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px$/, 'changed ring kept');
+  // A held seat at 0 thickens its ring, and keeps the changed ring.
+  await seat(page, 3, 4).evaluate(cell => { cell.dataset.pressed = ''; });
+  const held = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
+  assert.ok(held.shadow.startsWith(`${hex(held.seat)} 0px 0px 0px 3px inset, `), `held ring: ${held.shadow}`);
+  assert.match(held.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px$/);
+  await seat(page, 3, 4).evaluate(cell => { delete cell.dataset.pressed; });
 
   // ✕ asks before discarding, then puts damage and life back as they were.
   await button(page, 'Cancel').tap();
@@ -121,6 +173,14 @@ async function checkDamage(t, engine) {
   assert.equal(await mode(page), null);
   assert.deepEqual(await scores(page), [39, 40, 36, 40]);
   assert.equal(await farBadges(page, 3), '3 commander damage from Player 2 | 1 commander damage from Player 4');
+  // The pill's sword leads the row in its own circle, hidden from screen readers. A row with nothing hides it too.
+  const lead = await tile(page, 3).locator('.badges.far > :first-child').evaluate(chip => ({
+    sword: chip.matches('.chip.sword'), hidden: chip.getAttribute('aria-hidden'),
+    path: chip.querySelector('path').getAttribute('d') === document.querySelector('#damage-button path').getAttribute('d'),
+  }));
+  assert.deepEqual(lead, { sword: true, hidden: 'true', path: true });
+  assert.equal(await page.locator('.badges.far .chip.sword').count(), 2, 'a sword only on rows that show');
+  assert.ok(!(await tile(page, 2).locator('.badges.far .chip.sword').count()));
   const dot = await tile(page, 3).locator('.badges.far .dot').first().evaluate(node => getComputedStyle(node).backgroundColor);
   assert.equal(dot, 'rgb(182, 224, 247)', 'the dot is in the attacker’s tile colour');
   assert.equal(await farBadges(page, 2), '');
@@ -212,7 +272,7 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
     await page.reload();
     return page.evaluate(() => [...document.querySelectorAll('.player')].map(player => ({
       out: player.querySelector('.score').hasAttribute('data-out'),
-      chips: [...player.querySelectorAll('.badges:not([hidden]) .chip')].map(chip => {
+      chips: [...player.querySelectorAll('.badges:not([hidden]) .chip[role="listitem"]')].map(chip => {
         const style = getComputedStyle(chip);
         return `${chip.textContent} ${chip.dataset.level ?? 'plain'} ${style.color} ${style.boxShadow === 'none' ? 'no ring' : 'ring'}`;
       }),
@@ -284,8 +344,14 @@ test('chromium: commander damage and the busiest badges fit six players on the s
     return found;
   });
   assert.deepEqual(await findBadgeProblems(), []);
-  assert.equal(await tile(page, 1).locator('.badges.far .chip').count(), 5);
-  assert.equal(await tile(page, 2).locator('.badges.far .chip').count(), 5);
+  assert.equal(await tile(page, 1).locator('.badges.far .chip:not(.sword)').count(), 5);
+  assert.equal(await tile(page, 2).locator('.badges.far .chip:not(.sword)').count(), 5);
+  assert.equal(await page.locator('.badges.far:not([hidden]) > .chip.sword:first-child').count(), 4, 'each far row leads with the sword');
+  // The design's worst case, the sword and five chips of 18, 12, 9, 7 and 4, fits at full size. Five two-digit
+  // amounts shrink the row's type a little, and no further than 10px.
+  const sizes = await page.locator('.badges.far').evaluateAll(rows => rows.map(row => [row.style.fontSize, parseFloat(getComputedStyle(row).fontSize)]));
+  assert.deepEqual([sizes[0][0], sizes[3][0]], ['', ''], `the worst case keeps its type: ${sizes}`);
+  assert.ok(Math.min(...sizes.map(([, size]) => size)) >= 10, `two-digit rows stay readable: ${sizes}`);
 
   // The guarantee holds whatever the font: give every row a much wider face, as some Linux and Android
   // system fonts are, and the rows still fit on one line with every amount shown.
@@ -298,7 +364,7 @@ test('chromium: commander damage and the busiest badges fit six players on the s
     window.dispatchEvent(new Event('resize'));
   });
   assert.deepEqual(await findBadgeProblems(), [], 'a wide font still fits');
-  assert.equal(await tile(page, 2).locator('.badges.far .chip').count(), 5, 'every amount stays');
+  assert.equal(await tile(page, 2).locator('.badges.far .chip:not(.sword)').count(), 5, 'every amount stays');
   const smallest = await page.locator('.badges:not([hidden])').evaluateAll(rows => Math.min(...rows.map(row => parseFloat(getComputedStyle(row).fontSize))));
   assert.ok(smallest >= 6, `type stays readable: ${smallest}px`);
 

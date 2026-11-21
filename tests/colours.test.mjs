@@ -50,6 +50,21 @@ async function checkColours(t, engine) {
   assert.equal(await swatch(page, 1, 'Sage').getAttribute('aria-pressed'), 'true');
   assert.ok(await swatch(page, 2, 'Sage, taken by Player 1').isDisabled(), 'player 1’s colour is taken for player 2');
   assert.equal(await tile(page, 1).locator('.swatch:disabled').count(), 5, 'five colours are taken by the others');
+  // A taken swatch keeps its full colour, with no strike, and shows its owner in the seat colour in place of the dot.
+  const looks = name => swatch(page, 2, name).evaluate((button) => {
+    const style = getComputedStyle(button);
+    const tag = button.querySelector('.owner');
+    return {
+      text: button.textContent, opacity: style.opacity, background: style.backgroundColor,
+      dot: getComputedStyle(button, '::before').content, strike: getComputedStyle(button, '::after').content,
+      tag: tag && { color: getComputedStyle(tag).color, opacity: getComputedStyle(tag).opacity, hidden: tag.getAttribute('aria-hidden') },
+    };
+  });
+  assert.deepEqual(await looks('Sage, taken by Player 1'), {
+    text: 'P1', opacity: '1', background: 'rgb(47, 67, 47)', dot: 'none', strike: 'none',
+    tag: { color: 'rgb(211, 238, 170)', opacity: '1', hidden: 'true' },
+  });
+  assert.deepEqual(await looks('Rose'), { text: '', opacity: '1', background: rosePanels.top, dot: '""', strike: 'none', tag: null });
   assert.ok(!(await tile(page, 1).locator('.subtract').isVisible()), 'the life controls make way for the swatches');
 
   // Player 1 picks Rose. Sage frees up and Rose is taken for everyone else.
@@ -58,6 +73,8 @@ async function checkColours(t, engine) {
   assert.equal(await swatch(page, 1, 'Rose').getAttribute('aria-pressed'), 'true');
   assert.ok(await swatch(page, 4, 'Rose, taken by Player 1').isDisabled());
   assert.ok(!(await swatch(page, 4, 'Sage').isDisabled()), 'sage is free again');
+  assert.equal(await swatch(page, 4, 'Sage').textContent(), '', 'a freed swatch drops its owner');
+  assert.equal(await swatch(page, 4, 'Rose, taken by Player 1').textContent(), 'P1');
 
   // A press on a taken swatch changes nothing, even if it reaches the button.
   await swatch(page, 4, 'Rose, taken by Player 1').evaluate(taken => {

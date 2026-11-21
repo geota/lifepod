@@ -154,25 +154,43 @@ async function checkPlayerSheet(t, engine) {
   assert.equal(Math.round(turn), -1, 'the sheet faces player 1');
   await page.locator('#player-sheet').getByRole('button', { name: 'Rose', exact: true }).tap();
   assert.equal(await tile(page, 1).getAttribute('data-colour'), 'rose');
-  assert.ok(await page.locator('#player-sheet').getByRole('button', { name: 'Sky, taken by Player 2' }).isDisabled());
+  // A taken swatch keeps its full colour and shows its owner in place of the dot.
+  const taken = page.locator('#player-sheet').getByRole('button', { name: 'Sky, taken by Player 2' });
+  assert.ok(await taken.isDisabled());
+  assert.deepEqual(await taken.evaluate(swatch => ({
+    owner: swatch.textContent, opacity: getComputedStyle(swatch).opacity, dot: getComputedStyle(swatch, '::before').content,
+    colour: getComputedStyle(swatch.querySelector('.owner')).color === getComputedStyle(swatch).getPropertyValue('--seat').trim()
+      .replace(/^#(..)(..)(..)$/, (_, r, g, b) => `rgb(${[r, g, b].map(pair => parseInt(pair, 16)).join(', ')})`),
+  })), { owner: 'P2', opacity: '1', dot: 'none', colour: true });
+  assert.equal(await page.locator('#player-sheet').getByRole('button', { name: 'Sage', exact: true }).textContent(), '', 'a free swatch has its dot');
   await page.locator('#player-sheet').getByRole('button', { name: 'Done' }).tap();
   assert.ok(!(await isOpen(page, 'player-sheet')));
   await button(page, 'Save').tap();
 
-  // With Commander on, the sheet adds colour identity. Colourless goes alone.
+  // With Commander on, the sheet adds colour identity: any combination of W U B R G, with no colourless.
   await setSwitches(page, { Commander: true });
   await button(page, 'Counters').tap();
   await button(page, 'Tile colour and colour identity for Player 3').tap();
   const sheet = page.locator('#player-sheet');
   assert.equal(Math.round(await sheet.evaluate(node => new DOMMatrixReadOnly(getComputedStyle(node).transform).a)), 1, 'player 3 sits at the bottom');
-  await sheet.getByRole('button', { name: 'Black' }).tap();
-  await sheet.getByRole('button', { name: 'Blue' }).tap();
-  assert.equal(await sheet.getByRole('button', { name: 'Blue' }).getAttribute('aria-pressed'), 'true');
-  await sheet.getByRole('button', { name: 'Colourless' }).tap();
-  assert.equal(await sheet.locator('.identity-toggle[aria-pressed="true"]').count(), 1, 'colourless clears the colours');
-  await sheet.getByRole('button', { name: 'Green' }).tap();
-  await sheet.getByRole('button', { name: 'White' }).tap();
-  assert.equal(await sheet.getByRole('button', { name: 'Colourless' }).getAttribute('aria-pressed'), 'false');
+  assert.deepEqual(await sheet.locator('.identity-toggle').evaluateAll(toggles => toggles.map(toggle => toggle.getAttribute('aria-label'))),
+    ['White', 'Blue', 'Black', 'Red', 'Green'], 'five colours, no colourless');
+  // Every pip has the same thin light ring, and an unchosen toggle shows its pip at full colour.
+  const pips = await sheet.locator('.identity-toggle .pip').evaluateAll(nodes => nodes.map(pip => `${getComputedStyle(pip).opacity} ${getComputedStyle(pip).boxShadow}`));
+  assert.deepEqual(new Set(pips), new Set(['1 rgb(168, 158, 164) 0px 0px 0px 1.5px']), `pips: ${pips}`);
+  for (const name of ['Black', 'Blue', 'Red', 'Green', 'White']) await sheet.getByRole('button', { name }).tap();
+  assert.equal(await sheet.locator('.identity-toggle[aria-pressed="true"]').count(), 5, 'all five can be chosen');
+  await sheet.getByRole('button', { name: 'Done' }).tap();
+  await button(page, 'Save').tap();
+  assert.equal(await nearBadges(page, 3), 'colour identity white, blue, black, red, green', 'all five, in W U B R G order');
+  const nearPips = await tile(page, 3).locator('.badges.near .pip').evaluateAll(nodes => nodes.map(pip => getComputedStyle(pip).boxShadow));
+  assert.deepEqual(nearPips, Array(5).fill('rgb(168, 158, 164) 0px 0px 0px 1px'), 'the same ring on every pip, black included');
+  assert.equal(await tile(page, 3).locator('.badges.near .pip[data-pip="W"]').evaluate(pip => getComputedStyle(pip).backgroundColor),
+    'rgb(255, 254, 250)', 'white reads as white');
+  await button(page, 'Counters').tap();
+  await button(page, 'Tile colour and colour identity for Player 3').tap();
+  for (const name of ['Blue', 'Black', 'Red']) await sheet.getByRole('button', { name }).tap();
+  assert.equal(await sheet.getByRole('button', { name: 'Blue' }).getAttribute('aria-pressed'), 'false');
   await sheet.getByRole('button', { name: 'Slate' }).tap();
   assert.equal(await sheet.locator('.sheet-dot').evaluate(dot => getComputedStyle(dot).backgroundColor), 'rgb(207, 219, 232)',
     'the sheet’s dot follows the colour');
@@ -250,6 +268,35 @@ test('chromium: counters mode fits six players on the smallest phone', { timeout
   assert.ok(setupBox.y >= 0 && setupBox.y + setupBox.height <= 320, `setup fits: ${JSON.stringify(setupBox)}`);
 });
 
+// Game setup fits landscape phones without scrolling, from the smallest to a Pixel 10 Pro, with both Counters
+// switches, New game and Done on screen.
+async function checkSetupFits(t, engine) {
+  const page = await openPage(t, engine);
+  await fakeScreenOrientation(page);
+  await page.goto(app);
+  for (const [width, height] of [[952, 427], [852, 393], [568, 320]]) {
+    await turnScreen(page, width, height, 90);
+    await button(page, 'Game setup').tap();
+    const problems = await page.locator('#setup').evaluate((dialog) => {
+      const found = [];
+      if (dialog.scrollHeight > dialog.clientHeight + 0.5) found.push(`scrolls ${dialog.scrollHeight} > ${dialog.clientHeight}`);
+      const sheet = dialog.getBoundingClientRect();
+      if (sheet.top < 0 || sheet.bottom > window.innerHeight) found.push(`sheet ${sheet.top}–${sheet.bottom}`);
+      for (const selector of ['label:has(#commander-switch)', 'label:has(#poison-switch)', '#restart-button', '#save-setup']) {
+        const box = dialog.querySelector(selector).getBoundingClientRect();
+        if (box.top < sheet.top || box.bottom > sheet.bottom || box.left < sheet.left || box.right > sheet.right) found.push(`${selector} off the sheet`);
+      }
+      return found;
+    });
+    assert.deepEqual(problems, [], `${width} × ${height}`);
+    await button(page, 'Close setup').tap();
+  }
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: game setup fits landscape phones without scrolling`, { timeout: 60000 }, t => checkSetupFits(t, engine));
+}
+
 test('chromium: Android back cancels counters mode the way ✕ does', async (t) => {
   const page = await openPage(t, chromium);
   await page.addInitScript(() => {
@@ -307,5 +354,8 @@ test('chromium: saved counters are checked when a game loads', async (t) => {
     ...game, counters: { commander: true, poison: 'yes' }, poison: [3, -1, 1.5, 100], casts: [2, 'x'], identities: ['BU', 'CW', 7, 'Q'],
   }), { counters: true, near: ['colour identity blue, black | Commander tax +4', '', '', ''] },
   'bad counts start at 0, bad identities are cleared, and only a true switch is on');
+  // Colourless was removed: a saved 'C', or anything with C in it, loads as no identity.
+  assert.deepEqual((await load({ ...game, counters: { commander: true }, identities: ['C', 'GRBUW', 'UC', 'WW'] })).near,
+    ['', 'colour identity white, blue, black, red, green', '', 'colour identity white']);
   assert.deepEqual((await load({ ...game, counters: { poison: true }, poison: [3, 0, 0, 99] })).near, ['3 poison', '', '', '99 poison']);
 });
