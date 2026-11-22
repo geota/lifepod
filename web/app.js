@@ -18,6 +18,10 @@ const rotateSeatsButton = document.querySelector('#rotate-seats');
 const tileColoursButton = document.querySelector('#tile-colours');
 const damageButton = document.querySelector('#damage-button');
 const countersButton = document.querySelector('#counters-button');
+const roundButton = document.querySelector('#round-button');
+const roundBackButton = document.querySelector('#round-back');
+const manaButton = document.querySelector('#mana-button');
+const shuffleButton = document.querySelector('#shuffle-button');
 const undoButton = document.querySelector('#undo-button');
 const saveButton = document.querySelector('#save-button');
 const cancelButton = document.querySelector('#cancel-button');
@@ -32,6 +36,10 @@ const lifeValue = document.querySelector('#life-value');
 const trackButton = document.querySelector('#track-button');
 const trackSummary = document.querySelector('#track-summary');
 const trackDialog = document.querySelector('#track');
+const manaSwitch = document.querySelector('#mana-switch');
+const autoEmptySwitch = document.querySelector('#auto-empty-switch');
+const autoEmptyRow = document.querySelector('#auto-empty-row');
+const turnChoices = document.querySelector('#turn-choices');
 const identityNav = document.querySelector('#identity-nav');
 const identityDialog = document.querySelector('#identity-sheet');
 const identityShowChoices = document.querySelector('#identity-show');
@@ -66,10 +74,11 @@ const topRowPlayers = [0, 1, 4];
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
 // Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
-const editingModes = ['damage', 'counters'];
+const editingModes = ['damage', 'counters', 'mana'];
 const discardMessages = {
   damage: 'Commander damage and life go back to how they were when you opened commander damage.',
   counters: 'Every counter goes back to how it was when you opened counters.',
+  mana: 'Every mana pool goes back to how it was when you opened mana.',
 };
 // Player counters (design/polish/SPEC.md §6), in the order they appear everywhere: counters mode, the near badge row,
 // the Track sheet and its summary. Each is one count per player in game[kind], shown while its Track switch is on.
@@ -110,18 +119,32 @@ const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
   { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
 ];
-// Player counters and commander damage stop at this, which keeps every tile readable.
+// Floating mana (design/polish/SPEC.md §9): one count per colour in each player's pool, in W U B R G C order.
+const manaColours = [...identityColours, { id: 'C', name: 'colourless' }];
+// Turns (design/polish/SPEC.md §8): off, rounds (the first player's flag counts rounds) or turn by turn.
+const turnModes = ['off', 'rounds', 'turns'];
+// Play order is clockwise on screen, which is passing to the left. Seat rotation doesn't change it.
+const playOrders = { 2: [0, 1], 3: [0, 2, 1], 4: [0, 1, 3, 2], 5: [0, 1, 4, 3, 2], 6: [0, 1, 4, 5, 3, 2] };
+const maxRound = 999;
+// How long a hold takes to register on the turn chip and the pill's round button, and how long "Undo clear" stays.
+const holdDelay = 500;
+const undoClearTime = 5000;
+// "Who goes first?": the shuffle lights tiles in turn for about 0.8s, and the chosen tile shows "Goes first" for a beat.
+const shuffleTick = 90;
+const shuffleTicks = 9;
+const firstBeat = 700;
+// Player counters, commander damage and mana stop at this, which keeps every tile readable.
 const maxCount = 99;
 // The custom starting life stepper's range.
 const maxStartingLife = 999;
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
 // tile. A drop step hides something on every tile (CSS reads its token from #board's data-drop); a floor step
 // shrinks the type, but no smaller than the floor; wrap lets the row take a second line, growing toward the total.
-// On the near row the identity's name goes first, then its symbol where the indicator also shows (one colour mark
-// is enough). The turn chip's word joins the name step when turns are built.
+// On the near row the identity's name and the turn chip's word "Turn" go first, leaving the untap symbol and the round,
+// then the identity's symbol where the indicator also shows (one colour mark is enough).
 const dropSteps = {
   near: [
-    { drop: 'name', selector: '.ci-chip .id-name' }, { drop: 'symbol', selector: '.ci-chip .ci ~ .id-symbol' }, { floor: 11 },
+    { drop: 'name', selector: '.ci-chip .id-name, .turn-chip .turn-word' }, { drop: 'symbol', selector: '.ci-chip .ci ~ .id-symbol' }, { floor: 11 },
     { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true },
   ],
   far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
@@ -138,13 +161,19 @@ const iconPaths = {
   crown: 'M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z',
   'graduation-cap': 'M176,207.24a119,119,0,0,0,16-7.73V240a8,8,0,0,1-16,0Zm11.76-88.43-56-29.87a8,8,0,0,0-7.52,14.12L171,128l17-9.06Zm64-29.87-120-64a8,8,0,0,0-7.52,0l-120,64a8,8,0,0,0,0,14.12L32,117.87v48.42a15.91,15.91,0,0,0,4.06,10.65C49.16,191.53,78.51,216,128,216a130,130,0,0,0,48-8.76V130.67L171,128l-43,22.93L43.83,106l0,0L25,96,128,41.07,231,96l-18.78,10-.06,0L188,118.94a8,8,0,0,1,4,6.93v73.64a115.63,115.63,0,0,0,27.94-22.57A15.91,15.91,0,0,0,224,166.29V117.87l27.76-14.81a8,8,0,0,0,0-14.12Z',
   sword: 'M216,28H152a12,12,0,0,0-9.33,4.45L79.5,110.51l-4.66-4.65a20,20,0,0,0-28.29,0L29.86,122.55a20,20,0,0,0,0,28.29h0L45,166,23.86,187.17a20,20,0,0,0,0,28.28l16.69,16.69a20,20,0,0,0,28.28,0L90,211l15.17,15.16a20,20,0,0,0,28.29,0l16.69-16.69a20,20,0,0,0,0-28.3l-4.65-4.65,78.06-63.17A12,12,0,0,0,228,104V40A12,12,0,0,0,216,28ZM54.69,212.34l-11-11L62,183l11,11Zm64.61-6L49.65,136.7l11.05-11,69.65,69.65ZM204,98.27l-75.58,61.17L121,152l47.51-47.5a12,12,0,0,0-17-17L104,135l-7.45-7.44L157.73,52H204Z',
+  // Fill weight, like the Track icon.
+  flag: 'M232,56V176a8,8,0,0,1-2.76,6c-15.28,13.23-29.89,18-43.82,18-18.91,0-36.57-8.74-53-16.85C105.87,170,82.79,158.61,56,179.77V224a8,8,0,0,1-16,0V56a8,8,0,0,1,2.77-6h0c36-31.18,68.31-15.21,96.79-1.12C167,62.46,190.79,74.2,218.76,50A8,8,0,0,1,232,56Z',
+  'hand-tap': 'M228,156v36c0,13.85-1.63,26.52-4.58,35.68a12,12,0,1,1-22.84-7.36c2.14-6.65,3.42-17.24,3.42-28.32V156a8,8,0,0,0-16,0v4a12,12,0,0,1-24,0V140a8,8,0,0,0-16,0v12a12,12,0,0,1-24,0V84a8,8,0,0,0-16,0V192a12,12,0,0,1-22.18,6.34l-18.68-30-.21-.34A8,8,0,0,0,53,175.92L78.27,217.8a12,12,0,0,1-20.56,12.39l-25.31-42-.12-.2A32,32,0,0,1,84,150.83V84a32,32,0,0,1,64,0v25a32,32,0,0,1,36.78,17A32,32,0,0,1,228,156ZM56,96A12,12,0,0,0,68,84a48,48,0,0,1,96,0,12,12,0,0,0,24,0A72,72,0,0,0,44,84,12,12,0,0,0,56,96Z',
+  eraser: 'M216,204H141l86.84-86.84a28,28,0,0,0,0-39.6L186.43,36.19a28,28,0,0,0-39.6,0L28.19,154.82a28,28,0,0,0,0,39.6l30.06,30.07A12,12,0,0,0,66.74,228H216a12,12,0,0,0,0-24ZM163.8,53.16a4,4,0,0,1,5.66,0l41.38,41.38a4,4,0,0,1,0,5.65L160,151l-47-47ZM71.71,204,45.16,177.45a4,4,0,0,1,0-5.65L96,121l47,47-36,36Z',
+  undo: 'M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z',
 };
 
 let game = loadGame();
 let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
-// The open board mode: 'rotate', 'colours', 'identity', 'damage' or 'counters', or null at rest.
+// The open board mode: 'rotate', 'colours', 'identity', 'damage', 'counters', 'mana' or 'first' ("Who goes first?"),
+// or null at rest.
 let boardMode = null;
 // While an editing mode is open: every change made in it, newest last, so it can be undone or discarded,
 // and the life totals when it opened.
@@ -163,6 +192,14 @@ let die;
 let stopRoll;
 // Every held counter button, so several players can hold buttons at the same time.
 const activePresses = new Set();
+// Turn steps, newest last, so holding the turn chip or the pill steps back exactly, restoring any pools the step
+// emptied. Not saved: after a relaunch, a hold steps back by the play order instead.
+let turnSteps = [];
+// "Who goes first?" waits until setup and its sheets have closed, then opens.
+let askFirst = false;
+let shuffleTimer;
+// Pools cleared with the eraser in the last 5 seconds, by player, so "Undo clear" can put them back. Not saved.
+const clearedPools = new Map();
 
 // Read the size directly. Media queries can lag a resize in WebKit.
 function isPortraitWindow() {
@@ -371,6 +408,21 @@ function fitIdentitySettings(saved) {
   return { show, background: identityBackgrounds.includes(saved?.background) ? saved.background : 'symbol' };
 }
 
+// Each player's pool: one count per colour, W U B R G C. Anything that isn't a whole number from 0 to the maximum is 0.
+function fitPools(saved, count) {
+  return Array.from({ length: count }, (_, index) => fitCounts(Array.isArray(saved) ? saved[index] : undefined, manaColours.length));
+}
+
+// Who went first, whose turn it is and the round. A seat that isn't on the board means nobody.
+function fitTurn(saved, count) {
+  const seat = value => (Number.isInteger(value) && value >= 0 && value < count ? value : null);
+  const round = saved?.round;
+  return {
+    first: seat(saved?.first), active: seat(saved?.active),
+    round: Number.isInteger(round) && round >= 1 && round <= maxRound ? round : 1,
+  };
+}
+
 // Which trackers are on. Each is off unless it was saved as exactly true.
 function fitTrackers(saved) {
   return Object.fromEntries(trackers.map(tracker => [tracker, saved?.[tracker] === true]));
@@ -382,6 +434,7 @@ function loadGame() {
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
     counters: fitTrackers(), ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)])),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
+    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -403,6 +456,11 @@ function loadGame() {
       identities: fitIdentities(saved.identities, saved.scores.length),
       identity: fitIdentitySettings(saved.identity),
       commanderDamage: fitDamage(saved.commanderDamage, saved.scores.length),
+      manaPool: saved.manaPool === true,
+      autoEmpty: saved.autoEmpty !== false,
+      pools: fitPools(saved.pools, saved.scores.length),
+      turns: turnModes.includes(saved.turns) ? saved.turns : 'off',
+      turn: fitTurn(saved.turn, saved.scores.length),
     };
   } catch {
     return defaults;
@@ -453,6 +511,12 @@ function cancelPresses() {
   for (const press of [...activePresses]) press.end();
 }
 
+// A press counts on pointerdown (or, for map seats and turn steps, when it ends), so the click that follows is skipped.
+// Presses often redraw what's under the finger, such as a mana strip that shrinks or a turn chip that moves to the
+// next player, and that click can land on a different button. So the window that skips it is shared by every
+// button, not kept per button. Keyboard clicks have no detail and always count.
+let ignoreClicksUntil = 0;
+
 // A press counts the moment a finger lands, so a tap can't be lost to a finger drifting off the button
 // or to Android cancelling touches when several fingers land at once. Holding repeats after a pause.
 // Clicks still handle keyboards and assistive technology.
@@ -461,7 +525,6 @@ function bindCounter(button, adjust, label) {
   button.setAttribute('aria-label', label);
   const tile = button.closest('.player') ?? button;
   let press;
-  let ignoreClicksUntil = 0;
 
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
@@ -585,7 +648,6 @@ function visuallyHidden(text) {
 
 // For buttons that act once per press: a press counts the moment a finger lands, as on the life buttons.
 function bindTap(button, action) {
-  let ignoreClicksUntil = 0;
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || button.disabled) return;
     ignoreClicksUntil = performance.now() + 800;
@@ -660,7 +722,6 @@ function toFace(angle, rows, columns, row, column) {
 function bindSeat(button, add, remove) {
   const tile = button.closest('.player');
   let press;
-  let ignoreClicksUntil = 0;
 
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
@@ -715,6 +776,59 @@ function bindSeat(button, add, remove) {
   button.addEventListener('contextmenu', (event) => event.preventDefault());
   button.addEventListener('click', (event) => {
     if (event.detail === 0 || performance.now() >= ignoreClicksUntil) add();
+  });
+}
+
+// The turn chip and the pill's round button: a tap steps forward when the finger lifts, and a hold steps back once
+// when it registers. A hold never repeats, so a long press can't rewind several turns.
+function bindStep(button, forward, back) {
+  let press;
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0) return;
+    press?.end();
+    const current = {
+      pointerId: event.pointerId,
+      held: false,
+      end() {
+        clearTimeout(current.timer);
+        activePresses.delete(current);
+        if (press !== current) return;
+        press = undefined;
+        delete button.dataset.pressed;
+      },
+      finish() {
+        const tap = press === current && !current.held;
+        current.end();
+        if (tap) forward();
+      },
+    };
+    press = current;
+    activePresses.add(current);
+    button.dataset.pressed = '';
+    ignoreClicksUntil = performance.now() + 800;
+    current.timer = setTimeout(() => {
+      current.held = true;
+      delete button.dataset.pressed;
+      back();
+    }, holdDelay);
+    try {
+      button.setPointerCapture(event.pointerId);
+    } catch {
+      // The pointer is already gone. The next touch ends this press.
+    }
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    button.addEventListener(type, (event) => {
+      if (event.pointerId !== press?.pointerId) return;
+      ignoreClicksUntil = performance.now() + 800;
+      // A cancelled touch is no tap.
+      if (type === 'pointerup') press.finish();
+      else press.end();
+    });
+  }
+  button.addEventListener('contextmenu', (event) => event.preventDefault());
+  button.addEventListener('click', (event) => {
+    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) forward();
   });
 }
 
@@ -940,6 +1054,7 @@ function renderWatermark(index) {
 // Applies an edit forwards (1) or takes it back (-1).
 function applyEdit(edit, direction) {
   if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += edit.delta * direction;
+  else if (edit.kind === 'mana') game.pools[edit.index][edit.colour] += edit.delta * direction;
   else if (edit.kind === 'damage') {
     // Commander damage is damage, so the defender loses the same life in the same save.
     game.commanderDamage[edit.index][edit.attacker] += edit.delta * direction;
@@ -960,8 +1075,11 @@ function showEdit(edit) {
       `Player ${attacker + 1}'s commander, ${game.commanderDamage[index][attacker]} damage to Player ${index + 1}`);
     announceLife(index);
     syncSeatMap(index);
+  } else if (edit.kind === 'mana') {
+    announcePool(index);
   }
   syncCounterCells(index);
+  syncManaCells(index);
   renderScore(index);
   renderBadges(index);
   syncPill();
@@ -1024,7 +1142,7 @@ function buildCounterCell({ kind, phrase }, index) {
 function syncCounterCells(index) {
   const layer = board.children[index]?.querySelector('.counter-cells');
   if (!layer) return;
-  for (const cell of layer.querySelectorAll('.counter-cell')) {
+  for (const cell of layer.querySelectorAll('.counter-cell[data-kind]')) {
     const name = `Player ${index + 1}`;
     const { kind } = cell.dataset;
     const value = game[kind][index];
@@ -1057,10 +1175,20 @@ function renderModeLayer(player, index) {
     const cells = element('div', 'counter-cells');
     for (const counter of shownCounters()) cells.append(...buildCounterCell(counter, index));
     layer.append(hint, cells);
+  } else if (boardMode === 'mana') {
+    // Six circles, W U B R G over colourless, three to a row.
+    const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
+    hint.setAttribute('aria-hidden', 'true');
+    const cells = element('div', 'counter-cells mana-cells');
+    manaColours.forEach((colour, at) => cells.append(...buildManaCell(colour, at, index)));
+    layer.append(hint, cells);
+  } else if (boardMode === 'first') {
+    layer.append(buildFirstPicker(index));
   }
   layer.hidden = layer.childElementCount === 0;
   syncIdentity();
   syncCounterCells(index);
+  syncManaCells(index);
   syncSeatMap(index);
 }
 
@@ -1073,6 +1201,349 @@ function isOut(index) {
   return game.scores[index] <= 0 ||
     (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) ||
     (game.counters.poison && game.poison[index] >= poisonLethal);
+}
+
+// A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
+function randomBelow(count) {
+  const limit = Math.floor(0x100000000 / count) * count;
+  const value = new Uint32Array(1);
+  do crypto.getRandomValues(value); while (value[0] >= limit);
+  return value[0] % count;
+}
+
+function playOrder() {
+  return playOrders[game.scores.length];
+}
+
+function hasMana(index) {
+  return game.pools[index].some(amount => amount > 0);
+}
+
+// Empties every pool when the turn passes, if that's switched on, and returns what it emptied so a step back can put
+// it back. The turn passing also ends any "Undo clear": the pool would have emptied anyway.
+function autoEmptyPools() {
+  if (!game.manaPool || !game.autoEmpty) return null;
+  endUndoClears();
+  if (!game.pools.some((_, index) => hasMana(index))) return null;
+  const emptied = game.pools.map(pool => [...pool]);
+  game.pools = fitPools([], game.scores.length);
+  return emptied;
+}
+
+// Shows a turn step on every tile and the pill, saves it at once and announces it.
+function showTurn() {
+  saveGame();
+  haptic();
+  game.scores.forEach((_, index) => renderBadges(index));
+  syncPill();
+  const { active, round } = game.turn;
+  announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `Player ${active + 1}'s turn, round ${round}` : `Round ${round}`));
+}
+
+function recordStep(before, emptied) {
+  turnSteps.push({ turn: before, emptied });
+  if (turnSteps.length > 200) turnSteps.shift();
+}
+
+// The next step forward. Rounds: the next round. Turn by turn: the next player in play order who isn't out, and the
+// round goes up when play passes the first player's seat. With nobody's turn yet, the pill asks who goes first.
+function stepTurn() {
+  if (game.turns === 'off') return;
+  const before = { ...game.turn };
+  if (game.turns === 'rounds') {
+    game.turn.round = Math.min(maxRound, game.turn.round + 1);
+  } else {
+    const { active, first } = game.turn;
+    if (active === null) {
+      askFirst = true;
+      maybeAskFirst();
+      return;
+    }
+    const order = playOrder();
+    const position = order.indexOf(active);
+    let next = active;
+    let crossed = false;
+    for (let step = 1; step <= order.length; step++) {
+      const player = order[(position + step) % order.length];
+      if (player === first) crossed = true;
+      if (!isOut(player) || step === order.length) {
+        next = player;
+        break;
+      }
+    }
+    game.turn.active = next;
+    if (crossed) game.turn.round = Math.min(maxRound, game.turn.round + 1);
+  }
+  recordStep(before, autoEmptyPools());
+  showTurn();
+}
+
+// Turn by turn with nobody's turn yet: a tile's turn chip starts that player's turn, and they go first if nobody has.
+function startTurn(index) {
+  const before = { ...game.turn };
+  game.turn.active = index;
+  game.turn.first ??= index;
+  recordStep(before, null);
+  showTurn();
+}
+
+// One step back: the last step taken, with any pools it emptied, or after a relaunch the previous player in play
+// order (or the previous round). The round never goes below 1.
+function stepBack() {
+  if (game.turns === 'off') return;
+  const step = turnSteps.pop();
+  if (step) {
+    game.turn = step.turn;
+    step.emptied?.forEach((pool, index) => pool.forEach((amount, colour) => {
+      game.pools[index][colour] = Math.min(maxCount, game.pools[index][colour] + amount);
+    }));
+  } else if (game.turns === 'rounds') {
+    if (game.turn.round === 1) return;
+    game.turn.round -= 1;
+  } else {
+    const { active, first } = game.turn;
+    if (active === null) return;
+    const order = playOrder();
+    const position = order.indexOf(active);
+    let previous = active;
+    let crossed = false;
+    for (let step = 1; step <= order.length; step++) {
+      if (order[(position - step + 1 + order.length) % order.length] === first) crossed = true;
+      const player = order[(position - step + order.length) % order.length];
+      if (!isOut(player) || step === order.length) {
+        previous = player;
+        break;
+      }
+    }
+    if (crossed && game.turn.round === 1) return;
+    game.turn.active = previous;
+    if (crossed) game.turn.round -= 1;
+  }
+  showTurn();
+}
+
+// "Who goes first?" opens once nothing else is open: after a new game while Turns is on, and when Turns goes from Off
+// to on in a game with no first player.
+function maybeAskFirst() {
+  if (!askFirst || game.turns === 'off' || boardMode !== null || document.querySelector('dialog[open]')) return;
+  askFirst = false;
+  setBoardMode('first');
+}
+
+// The chosen player goes first and, turn by turn, takes the first turn. Their tile shows "Goes first" for a beat.
+function chooseFirst(index) {
+  if (boardMode !== 'first' || board.hasAttribute('data-picked')) return;
+  clearTimeout(shuffleTimer);
+  game.turn.first = index;
+  game.turn.active = index;
+  turnSteps = [];
+  saveGame();
+  haptic();
+  board.dataset.picked = '';
+  [...board.children].forEach((player, seat) => player.toggleAttribute('data-lit', seat === index));
+  const go = board.children[index].querySelector('.first-go');
+  go.replaceChildren(icon('flag'), 'Goes first');
+  go.nextElementSibling.textContent = game.turns === 'rounds' ? 'Tap the flag to start each round' : 'Tap Turn when your turn ends';
+  announcer.textContent = `Player ${index + 1} goes first`;
+  shuffleTimer = setTimeout(() => setBoardMode(null), reducedMotion.matches ? 0 : firstBeat);
+}
+
+// The centre shuffle picks a random player who isn't out, lighting tiles around the table before landing on them.
+function shuffleFirst() {
+  if (boardMode !== 'first' || board.hasAttribute('data-shuffling') || board.hasAttribute('data-picked')) return;
+  const order = playOrder();
+  const live = order.filter(player => !isOut(player));
+  const candidates = live.length ? live : order;
+  const pick = candidates[randomBelow(candidates.length)];
+  if (reducedMotion.matches) {
+    chooseFirst(pick);
+    return;
+  }
+  board.dataset.shuffling = '';
+  // A run around the table in play order that ends on the pick.
+  const end = order.indexOf(pick) + order.length * shuffleTicks;
+  const lights = Array.from({ length: shuffleTicks }, (_, step) => order[(end - shuffleTicks + 1 + step) % order.length]);
+  const tick = () => {
+    const player = lights.shift();
+    if (!lights.length) {
+      delete board.dataset.shuffling;
+      chooseFirst(player);
+      return;
+    }
+    [...board.children].forEach((tile, seat) => tile.toggleAttribute('data-lit', seat === player));
+    shuffleTimer = setTimeout(tick, shuffleTick);
+  };
+  tick();
+}
+
+// "Who goes first?" on one tile: Me first, facing its player.
+function buildFirstPicker(index) {
+  const go = element('button', 'first-go', icon('hand-tap'), 'Me first');
+  go.type = 'button';
+  go.setAttribute('aria-label', `Player ${index + 1} goes first`);
+  bindTap(go, () => chooseFirst(index));
+  const hint = element('p', 'layer-hint', 'or the centre button picks at random');
+  hint.setAttribute('aria-hidden', 'true');
+  return element('div', 'first-picker', go, hint);
+}
+
+// The turn chips that lead a tile's near row (or its mana strip). Rounds: the first player's flag carries the round
+// and steps it. Turn by turn: the active player's chip passes the turn, and the first player keeps a small flag; with
+// nobody's turn yet, every player who isn't out has a chip to start theirs.
+function turnChips(index) {
+  const { turns } = game;
+  const { first, active, round } = game.turn;
+  const chips = [];
+  if (turns === 'rounds' && first === index) {
+    const chip = element('button', 'chip turn-chip round-chip', icon('flag'), String(round));
+    chip.setAttribute('aria-label', `Round ${round}. Next round`);
+    bindStep(chip, stepTurn, stepBack);
+    chips.push(chip);
+  } else if (turns === 'turns') {
+    if (active === index || (active === null && !isOut(index))) {
+      const chip = element('button', `chip turn-chip ${active === index ? 'active-chip' : 'start-chip'}`, manaIcon('untap'),
+        element('span', 'turn-word', 'Turn'), String(round));
+      chip.setAttribute('aria-label', active === index ? `Player ${index + 1}'s turn, round ${round}. Pass the turn`
+        : `Start Player ${index + 1}'s turn`);
+      if (active === index) bindStep(chip, stepTurn, stepBack);
+      else bindTap(chip, () => startTurn(index));
+      chips.push(chip);
+    }
+    if (first === index) {
+      const flag = element('span', 'chip flag-chip', icon('flag'), visuallyHidden('Went first'));
+      chips.push(flag);
+    }
+  }
+  for (const chip of chips) {
+    if (chip.tagName === 'BUTTON') chip.type = 'button';
+    else chip.setAttribute('role', 'listitem');
+  }
+  return chips;
+}
+
+// Mana mode's edit: one colour in one player's pool, one up or down.
+function stepMana(index, colour, delta) {
+  const next = game.pools[index][colour] + delta;
+  if (next >= 0 && next <= maxCount) commitEdit({ kind: 'mana', index, colour, delta });
+}
+
+function poolText(index) {
+  const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
+  return held.length ? held.map(({ colour, amount }) => `${amount} ${colour.name}`).join(', ') : 'empty';
+}
+
+function announcePool(index) {
+  announce(index, 'mana', () => `Player ${index + 1}, mana pool ${poolText(index)}`);
+}
+
+// A mana cell: a circle with the colour's mana symbol over its amount, like a counter cell.
+function buildManaCell(colour, at, index) {
+  const pip = element('span', 'pip');
+  pip.dataset.pip = colour.id;
+  pip.setAttribute('aria-hidden', 'true');
+  const cell = element('button', 'counter-cell mana-cell', pip, element('b'));
+  cell.type = 'button';
+  cell.dataset.colour = colour.id;
+  const remove = element('button', 'visually-hidden counter-remove');
+  remove.type = 'button';
+  remove.setAttribute('aria-label', `Remove one ${colour.name} mana from Player ${index + 1}`);
+  remove.addEventListener('click', () => stepMana(index, at, -1));
+  bindSeat(cell, () => stepMana(index, at, 1), () => stepMana(index, at, -1));
+  return [cell, remove];
+}
+
+function syncManaCells(index) {
+  const layer = board.children[index]?.querySelector('.mana-cells');
+  if (!layer) return;
+  for (const cell of layer.querySelectorAll('.mana-cell')) {
+    const at = manaColours.findIndex(colour => colour.id === cell.dataset.colour);
+    const amount = game.pools[index][at];
+    cell.querySelector('b').textContent = amount;
+    cell.toggleAttribute('data-zero', amount === 0);
+    cell.setAttribute('aria-label', `Player ${index + 1} ${manaColours[at].name} mana, ${amount}. Add one`);
+  }
+}
+
+// Spending from the strip saves at once and has no undo: add it back in mana mode.
+function spendMana(index, colour) {
+  if (game.pools[index][colour] === 0) return;
+  game.pools[index][colour] -= 1;
+  saveGame();
+  haptic();
+  renderBadges(index);
+  syncPill();
+  announcePool(index);
+}
+
+// The eraser empties the pool and leaves "Undo clear" in the strip's place for 5 seconds.
+function clearPool(index) {
+  if (!hasMana(index)) return;
+  endUndoClear(index);
+  const pool = game.pools[index];
+  game.pools[index] = fitCounts([], manaColours.length);
+  clearedPools.set(index, { pool, timer: setTimeout(() => endUndoClear(index), undoClearTime) });
+  saveGame();
+  haptic();
+  renderBadges(index);
+  syncPill();
+  announce(index, 'mana', () => `Player ${index + 1}, mana pool cleared`);
+}
+
+function undoClear(index) {
+  const cleared = clearedPools.get(index);
+  if (!cleared) return;
+  clearTimeout(cleared.timer);
+  clearedPools.delete(index);
+  cleared.pool.forEach((amount, colour) => {
+    game.pools[index][colour] = Math.min(maxCount, game.pools[index][colour] + amount);
+  });
+  saveGame();
+  haptic();
+  renderBadges(index);
+  syncPill();
+  announcePool(index);
+}
+
+function endUndoClear(index) {
+  const cleared = clearedPools.get(index);
+  if (!cleared) return;
+  clearTimeout(cleared.timer);
+  clearedPools.delete(index);
+  renderBadges(index);
+}
+
+function endUndoClears() {
+  for (const index of [...clearedPools.keys()]) endUndoClear(index);
+}
+
+// A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then the eraser. Or
+// "Undo clear" for 5 seconds after the eraser.
+function stripItems(index) {
+  if (clearedPools.has(index)) {
+    const undo = element('button', 'strip-undo', icon('undo'), 'Undo clear');
+    undo.type = 'button';
+    undo.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
+    bindTap(undo, () => undoClear(index));
+    return [undo];
+  }
+  const items = manaColours.flatMap((colour, at) => {
+    const amount = game.pools[index][at];
+    if (!amount) return [];
+    const pip = element('span', 'pip');
+    pip.dataset.pip = colour.id;
+    pip.setAttribute('aria-hidden', 'true');
+    const spend = element('button', 'strip-spend', pip, String(amount));
+    spend.type = 'button';
+    spend.dataset.colour = colour.id;
+    spend.setAttribute('aria-label', `Player ${index + 1}, ${amount} ${colour.name} mana. Spend one`);
+    bindTap(spend, () => spendMana(index, at));
+    return [spend];
+  });
+  const eraser = element('button', 'strip-clear', icon('eraser'));
+  eraser.type = 'button';
+  eraser.setAttribute('aria-label', `Clear Player ${index + 1}'s mana pool`);
+  bindTap(eraser, () => clearPool(index));
+  return [...items, eraser];
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
@@ -1100,7 +1571,26 @@ function renderBadges(index) {
   }));
   far.hidden = damage.length === 0;
   const near = player.querySelector('.badges.near');
-  const chips = [];
+  const turns = turnChips(index);
+  player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
+  // While a pool has mana, or for 5 seconds after the eraser, its strip takes the near row's place. The turn chips
+  // come along, since they're controls and never give way.
+  const strip = player.querySelector('.mana-strip');
+  const hadFocus = strip.contains(document.activeElement) ? document.activeElement.dataset.colour ?? '' : null;
+  if (game.manaPool && (hasMana(index) || clearedPools.has(index))) {
+    strip.replaceChildren(...turns, ...stripItems(index));
+    strip.hidden = false;
+    near.replaceChildren();
+    near.hidden = true;
+    // Keep keyboard focus in the strip as items come and go.
+    if (hadFocus !== null) (strip.querySelector(`[data-colour="${hadFocus}"]`) ?? strip.querySelector('.strip-spend, .strip-clear, .strip-undo'))?.focus();
+    requestFit();
+    return;
+  }
+  strip.replaceChildren();
+  strip.hidden = true;
+  if (hadFocus !== null) setupButton.focus();
+  const chips = [...turns];
   const identity = identityChip(game.identities[index], game.identity.show);
   if (identity) chips.push(identity);
   for (const { kind } of shownCounters()) {
@@ -1113,7 +1603,7 @@ function renderBadges(index) {
     if (level) chip.dataset.level = level;
     chips.push(chip);
   }
-  for (const chip of chips) chip.setAttribute('role', 'listitem');
+  for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
   near.replaceChildren(...chips);
   near.hidden = chips.length === 0;
   requestFit();
@@ -1123,18 +1613,38 @@ function renderBadges(index) {
 // at rest; Undo, save and ✕ while editing.
 function syncPill() {
   const editing = editingModes.includes(boardMode);
+  const first = boardMode === 'first';
+  roundButton.hidden = boardMode !== null || game.turns === 'off';
+  roundBackButton.hidden = roundButton.hidden;
   damageButton.hidden = boardMode !== null || !game.counters.commander;
   countersButton.hidden = boardMode !== null || shownCounters().length === 0;
+  manaButton.hidden = boardMode !== null || !game.manaPool;
   diceButton.hidden = boardMode !== null;
-  setupButton.hidden = editing;
-  for (const button of [undoButton, saveButton, cancelButton]) button.hidden = !editing;
+  setupButton.hidden = editing || first;
+  shuffleButton.hidden = !first;
+  for (const button of [undoButton, saveButton]) button.hidden = !editing;
+  cancelButton.hidden = !editing && !first;
+  cancelButton.setAttribute('aria-label', first ? 'Skip' : 'Cancel');
   undoButton.disabled = !edits?.length;
+  // The round, printed twice like a card index so both sides of the table can read it.
+  const { round, active } = game.turn;
+  for (const number of roundButton.querySelectorAll('.round > span')) number.textContent = round;
+  roundButton.setAttribute('aria-label', game.turns === 'rounds' ? `Round ${round}. Next round`
+    : active === null ? `Round ${round}. Choose who goes first` : `Round ${round}, Player ${active + 1}'s turn. Pass the turn`);
+  roundBackButton.setAttribute('aria-label', game.turns === 'rounds' ? 'Back one round' : 'Back one turn');
+  // The tap symbol gets a dot while any pool has mana.
+  manaButton.toggleAttribute('data-floating', game.pools.some((_, index) => hasMana(index)));
 }
 
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
 // Counters mode ends with save or ✕, and keeps a list of its edits until then.
 function setBoardMode(mode) {
   cancelPresses();
+  clearTimeout(shuffleTimer);
+  for (const flag of ['data-picked', 'data-shuffling']) board.removeAttribute(flag);
+  for (const player of board.children) player.removeAttribute('data-lit');
+  // Opening mana mode settles any "Undo clear": the cleared pool stays empty.
+  if (mode === 'mana') endUndoClears();
   boardMode = mode;
   edits = editingModes.includes(mode) ? [] : null;
   editStartScores = [...game.scores];
@@ -1211,8 +1721,11 @@ function renderBoard() {
     function changeLife(delta) {
       const next = game.scores[index] + delta;
       if (!Number.isSafeInteger(next)) return;
+      const wasOut = isOut(index);
       game.scores[index] = next;
       renderScore(index);
+      // A player who is out has no chip to start a turn.
+      if (isOut(index) !== wasOut) renderBadges(index);
       if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
       haptic();
       announceLife(index);
@@ -1246,6 +1759,12 @@ function startGame(playerCount, startingLife) {
   for (const kind of countKinds) game[kind] = fitCounts([], playerCount);
   game.identities = fitIdentities(game.identities, playerCount);
   game.commanderDamage = fitDamage([], playerCount);
+  // Pools empty, and the game starts at round 1 with nobody first, until "Who goes first?" picks someone.
+  game.pools = fitPools([], playerCount);
+  game.turn = fitTurn(null, playerCount);
+  turnSteps = [];
+  for (const { timer } of clearedPools.values()) clearTimeout(timer);
+  clearedPools.clear();
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
   // A new game takes the screen's current landscape as upright.
@@ -1255,16 +1774,38 @@ function startGame(playerCount, startingLife) {
   saveGame();
   syncBoardTurn();
   renderBoard();
+  syncPill();
+  askFirst = game.turns !== 'off';
+  maybeAskFirst();
 }
 
 function setupChangesGame() {
   return selectedPlayerCount !== game.scores.length || selectedLife !== game.startingLife;
 }
 
-// Track's summary: the icon of each tracker that's on.
+// Track's summary: the icon of each tracker that's on, then the mana pool and turns.
 function renderTrackSummary() {
   trackSummary.replaceChildren(...trackers.filter(tracker => game.counters[tracker])
-    .map(tracker => (tracker === 'commander' ? icon('sword') : counterIcon(tracker))));
+    .map(tracker => (tracker === 'commander' ? icon('sword') : counterIcon(tracker))),
+  ...(game.manaPool ? [manaIcon('tap')] : []),
+  ...(game.turns === 'rounds' ? [icon('flag')] : game.turns === 'turns' ? [manaIcon('untap')] : []));
+}
+
+// Track's own state: the switches, the Turns choice, and the auto-empty switch, which only shows while it applies.
+function renderTrackSheet() {
+  for (const tracker of trackers) document.querySelector(`#${tracker}-switch`).checked = game.counters[tracker];
+  manaSwitch.checked = game.manaPool;
+  autoEmptySwitch.checked = game.autoEmpty;
+  autoEmptyRow.hidden = !game.manaPool || game.turns === 'off';
+  for (const choice of turnChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.turns === game.turns));
+}
+
+function renderAllBadges() {
+  game.scores.forEach((_, index) => {
+    renderScore(index);
+    renderBadges(index);
+  });
+  syncPill();
 }
 
 function renderSetup() {
@@ -1369,8 +1910,36 @@ for (const [dialog, opener] of [[trackDialog, trackButton], [identityDialog, ide
   });
 }
 trackButton.addEventListener('click', () => {
-  for (const tracker of trackers) document.querySelector(`#${tracker}-switch`).checked = game.counters[tracker];
+  renderTrackSheet();
   openSubSheet(trackDialog);
+});
+// Turns saves the moment it changes. Off hides everything about turns but keeps the state. Going from Off to on in a
+// game with no first player asks "Who goes first?" once setup closes; Rounds and Turn by turn switch without asking.
+// Rounds doesn't follow whose turn it is, so switching between them leaves nobody's turn until a player starts theirs.
+for (const choice of turnChoices.children) {
+  choice.addEventListener('click', () => {
+    const mode = choice.dataset.turns;
+    const was = game.turns;
+    if (mode === was) return;
+    game.turns = mode;
+    turnSteps = [];
+    if (was !== 'off' && mode !== 'off') game.turn.active = null;
+    askFirst = was === 'off' && mode !== 'off' ? game.turn.first === null : askFirst && mode !== 'off';
+    saveGame();
+    renderTrackSheet();
+    renderAllBadges();
+  });
+}
+manaSwitch.addEventListener('change', () => {
+  game.manaPool = manaSwitch.checked;
+  if (!game.manaPool) endUndoClears();
+  saveGame();
+  renderTrackSheet();
+  renderAllBadges();
+});
+autoEmptySwitch.addEventListener('change', () => {
+  game.autoEmpty = autoEmptySwitch.checked;
+  saveGame();
 });
 
 // The Identity sheet: what tiles show of each identity, saved the moment it changes. Choose identities keeps its
@@ -1435,7 +2004,7 @@ setup.addEventListener('close', syncBackHandling);
 restart.addEventListener('close', () => {
   syncBackHandling();
   if (restart.returnValue === 'restart') startGame(game.scores.length, game.startingLife);
-  setupButton.focus();
+  if (!boardMode) setupButton.focus();
 });
 
 // Shows the chosen die without a result. A roll in progress stops.
@@ -1491,12 +2060,19 @@ diceDialog.addEventListener('close', () => {
 
 damageButton.addEventListener('click', () => setBoardMode('damage'));
 countersButton.addEventListener('click', () => setBoardMode('counters'));
+manaButton.addEventListener('click', () => setBoardMode('mana'));
+bindStep(roundButton, stepTurn, stepBack);
+roundBackButton.addEventListener('click', stepBack);
+bindTap(shuffleButton, shuffleFirst);
 undoButton.addEventListener('click', undoEdit);
 saveButton.addEventListener('click', () => {
   saveGame();
   setBoardMode(null);
 });
-cancelButton.addEventListener('click', cancelEditing);
+cancelButton.addEventListener('click', () => {
+  if (boardMode === 'first') setBoardMode(null);
+  else cancelEditing();
+});
 discardDialog.addEventListener('close', () => {
   syncBackHandling();
   if (discardDialog.returnValue === 'discard') discardEdits();
@@ -1536,6 +2112,9 @@ for (const tracker of trackers) {
     syncPill();
   });
 }
+// "Who goes first?" waits for setup, its sheets and the new game dialog to close. These listeners run after each
+// dialog's own, so a sheet going back to setup still counts as open.
+for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', maybeAskFirst);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();
   else if (!android && !ios) syncWakeLock();

@@ -5,7 +5,7 @@ import { app, button } from './helpers.mjs';
 
 // Auto-drop (design/polish/SPEC.md §3.2): when a badge row runs out of room, parts give way in a fixed order on
 // every tile at once, and no count is ever hidden. Today's rows hold the colour identity chip, poison, tax, energy,
-// experience and rad (near) and commander damage led by a sword (far); the turn chip comes later.
+// experience and rad (near), led by the turn chip when Turns is on, and commander damage led by a sword (far).
 
 const seats = [0, 1, 2, 3, 4, 5];
 // Long names, a four-colour pie and a shard symbol, so the identity chips are as wide as they get.
@@ -14,9 +14,12 @@ const allParts = { indicator: true, symbol: true, name: true };
 
 // Every counter on with two-digit counts, an identity on every tile and commander damage from every opponent.
 // The chip shows the indicator, symbol and name unless told otherwise. everyCounter: false leaves energy, experience
-// and rad off, for the checks that walk one row's steps with only poison and tax.
-function worstGame(count, { damage = () => 19, show = allParts, poison = () => 19, identities = longIdentities, everyCounter = true } = {}) {
+// and rad off, for the checks that walk one row's steps with only poison and tax. turns puts the board in Turn by turn
+// at round 12 with Player 1 active, so their near row leads with the turn chip; first says who went first and keeps
+// the small flag.
+function worstGame(count, { damage = () => 19, show = allParts, poison = () => 19, identities = longIdentities, everyCounter = true, turns = false, first = 1 } = {}) {
   return {
+    ...(turns ? { turns: 'turns', turn: { first, active: 0, round: 12 } } : {}),
     startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90,
     colors: [], counters: { commander: true, poison: true, energy: everyCounter, experience: everyCounter, rad: everyCounter },
     poison: seats.slice(0, count).map(poison), casts: Array(count).fill(49), identities: identities.slice(0, count),
@@ -102,15 +105,27 @@ function nearStep({ drop, near }) {
 // clipped whatever the platform's font. With only poison and tax on, both rows stay at full size on phones.
 async function checkWorstCase(t, engine) {
   for (const count of [4, 6]) {
-    const page = await openBoard(t, engine, worstGame(count), { width: 952, height: 427 });
+    const page = await openBoard(t, engine, worstGame(count, { turns: true }), { width: 952, height: 427 });
     for (const [width, height, far, nearLimit] of [[952, 427, true, 1], [640, 360, true, 6], [568, 320, false, 6]]) {
       await resize(page, width, height);
       const view = `${count} players, ${width} × ${height}`;
       const drops = await readDrops(page);
       assert.deepEqual(drops.problems, [], `${view}: every count shows inside its tile`);
+      // "Turn" goes with the names at step 1, leaving the untap symbol and the round. The chip itself never goes.
+      const turn = await page.locator('.turn-chip').evaluate(chip => ({
+        shown: chip.checkVisibility() && chip.offsetWidth > 0, word: chip.querySelector('.turn-word').checkVisibility(), text: chip.textContent,
+      }));
+      assert.deepEqual(turn, { shown: true, word: !drops.drop.split(' ').includes('name'), text: 'Turn12' }, `${view}: the turn chip`);
       if (far) assert.deepEqual([drops.drop.includes('sword'), drops.far], [false, ''], `${view}: the far row is at full size`);
       assert.ok(nearStep(drops) <= nearLimit, `${view}: near row at step ${nearStep(drops)}, at most ${nearLimit} (${drops.drop} ${drops.near})`);
     }
+    // With the flag on the active tile too, that row is one chip longer: at 6 players the target also drops the symbol
+    // (step 2), and nothing is hidden or clipped.
+    const together = await openBoard(t, engine, worstGame(count, { turns: true, first: 0 }), { width: 952, height: 427 });
+    await resize(together, 952, 427);
+    const busiest = await readDrops(together);
+    assert.deepEqual(busiest.problems, [], `${count} players, flag and turn chip together: every count shows inside its tile`);
+    assert.ok(nearStep(busiest) <= 2, `${count} players, flag and turn chip together: near row at step ${nearStep(busiest)}, at most 2`);
     const twoCounters = await openBoard(t, engine, worstGame(count, { everyCounter: false }), { width: 952, height: 427 });
     for (const [width, height] of [[952, 427], [640, 360]]) {
       await resize(twoCounters, width, height);
@@ -289,7 +304,24 @@ async function checkNameHysteresis(t, engine) {
   assert.equal((await readDrops(page)).drop, '', 'room to spare brings the names back');
 }
 
+// "Turn" goes at step 1 even when no identity name shows, before any type shrinks.
+async function checkTurnWord(t, engine) {
+  const indicator = { indicator: true, symbol: false, name: false };
+  const page = await openBoard(t, engine, worstGame(6, { show: indicator, turns: true }), { width: 952, height: 427 });
+  let width = 952;
+  let drops = await readDrops(page);
+  while (!drops.drop && !drops.near && width > 300) {
+    width -= 8;
+    await resize(page, width);
+    drops = await readDrops(page);
+  }
+  assert.deepEqual([drops.drop, drops.near, drops.problems], ['name', '', []], `${width}px: the word "Turn" is the first thing to go`);
+  assert.equal(await page.locator('.turn-word').evaluate(word => word.checkVisibility()), false);
+  assert.equal(await page.locator('.turn-chip').textContent(), 'Turn12', 'the chip keeps the untap symbol and the round');
+}
+
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: the word "Turn" goes first, with or without identity names`, { timeout: 60000 }, t => checkTurnWord(t, engine));
   test(`${name}: the busiest board today stays within the drop table on phones`, { timeout: 60000 }, t => checkWorstCase(t, engine));
   test(`${name}: badge rows give way in order, board-wide, without blinking`, { timeout: 120000 }, t => checkSteps(t, engine));
   test(`${name}: the near row drops names, then the symbol, before its type shrinks`, { timeout: 240000 }, t => checkNearSteps(t, engine));

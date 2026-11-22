@@ -1,0 +1,375 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
+import { chromium, webkit } from 'playwright-core';
+import { app, button } from './helpers.mjs';
+
+// Turns (design/polish/SPEC.md §8): Off, Rounds or Turn by turn in Setup → Track, "Who goes first?", the play order,
+// the turn chip and the pill's round button.
+
+const playOrders = { 2: [1, 2], 3: [1, 3, 2], 4: [1, 2, 4, 3], 5: [1, 2, 5, 4, 3], 6: [1, 2, 5, 6, 4, 3] };
+
+function savedGame(count, extra = {}) {
+  return {
+    startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, ...extra,
+  };
+}
+
+async function openPage(t, engine, { game, android = false, random, viewport = { width: 952, height: 427 } } = {}) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
+  if (android) {
+    await page.addInitScript(() => {
+      window.backHandling = [];
+      window.LifePodAndroid = {
+        readGame: () => sessionStorage.getItem('game'),
+        writeGame: (game) => sessionStorage.setItem('game', game),
+        keepAwake() {},
+        haptic() {},
+        setBackHandling: (enabled) => window.backHandling.push(enabled),
+      };
+    });
+  }
+  if (game) {
+    await page.addInitScript(([saved, key]) => {
+      if (!sessionStorage.getItem('test-seeded')) {
+        if (key === 'game') sessionStorage.setItem('game', saved);
+        else localStorage.setItem('lifepod-game', saved);
+        sessionStorage.setItem('test-seeded', '1');
+      }
+    }, [JSON.stringify(game), android ? 'game' : 'local']);
+  }
+  if (random !== undefined) {
+    // Every random draw returns this value, and each draw is counted, so the pick is known.
+    await page.addInitScript((value) => {
+      window.randomDraws = 0;
+      crypto.getRandomValues = (array) => {
+        window.randomDraws += 1;
+        array.fill(value);
+        return array;
+      };
+    }, random);
+  }
+  await page.goto(app);
+  return page;
+}
+
+async function eventually(read, expected, message, timeout = 5000) {
+  const deadline = Date.now() + timeout;
+  let value = await read();
+  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 20));
+    value = await read();
+  }
+  assert.deepEqual(value, expected, message);
+}
+
+const saved = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
+const mode = page => page.locator('#board').getAttribute('data-mode');
+const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
+// The active tile's player number, or null.
+const active = page => page.evaluate(() => {
+  const index = [...document.querySelectorAll('.player')].findIndex(player => player.hasAttribute('data-active'));
+  return index === -1 ? null : index + 1;
+});
+const pillRound = page => page.locator('#round-button .round').evaluate(round => [...round.children].map(number => number.textContent));
+// What each tile's turn chips say, in order: 'flag 3' (Rounds), 'turn 3' (the active player), 'start 1' (nobody's turn
+// yet) and 'went first'.
+const chips = page => page.locator('.player').evaluateAll(players => players.map(player => [...player.querySelectorAll('.turn-chip, .flag-chip')]
+  .map(chip => (chip.matches('.flag-chip') ? 'went first'
+    : `${chip.matches('.round-chip') ? 'flag' : chip.matches('.active-chip') ? 'turn' : 'start'} ${chip.textContent.replace('Turn', '')}`))));
+
+// Holds a control long enough for the hold to register, then lets go.
+async function hold(page, locator, ms = 900) {
+  const box = await locator.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(ms);
+  await page.mouse.up();
+}
+
+async function setTurns(page, label) {
+  await button(page, 'Game setup').tap();
+  await button(page, 'Track').tap();
+  await page.locator('#turn-choices').getByRole('button', { name: label, exact: true }).tap();
+  await button(page, 'Close setup').tap();
+}
+
+// Turn by turn passes clockwise on screen, which is passing to the left, in the spec's order for every player count.
+// The round goes up only when play comes back round to the first player.
+async function checkPlayOrder(t, engine) {
+  for (const count of [2, 3, 4, 5, 6]) {
+    const page = await openPage(t, engine, { game: savedGame(count, { turns: 'turns', turn: { first: 0, active: 0, round: 1 } }) });
+    const seen = [await active(page)];
+    const rounds = [(await saved(page)).turn.round];
+    for (let pass = 0; pass < count + 1; pass++) {
+      await button(page, `Round ${rounds.at(-1)}, Player ${seen.at(-1)}'s turn. Pass the turn`).tap();
+      seen.push(await active(page));
+      rounds.push((await saved(page)).turn.round);
+    }
+    assert.deepEqual(seen, [...playOrders[count], ...playOrders[count].slice(0, 2)], `${count} players: the play order`);
+    assert.deepEqual(rounds, [...Array(count).fill(1), 2, 2], `${count} players: the round goes up on reaching the first player again`);
+    await page.close();
+  }
+}
+
+// The active tile's chip passes the turn too, and a hold steps back one turn, also across a round. Players who are
+// out are skipped, and the round still goes up when play passes a first player who is out.
+async function checkTurnByTurn(t, engine) {
+  const page = await openPage(t, engine, { game: savedGame(4, { turns: 'turns', turn: { first: 1, active: 1, round: 1 } }) });
+  assert.deepEqual(await chips(page), [[], ['turn 1', 'went first'], [], []]);
+  assert.equal(await active(page), 2);
+  assert.deepEqual(await pillRound(page), ['1', '1'], 'the pill shows the round twice');
+  const chip = page.locator('.turn-chip.active-chip');
+  assert.deepEqual(await chip.evaluate((node) => {
+    const hit = getComputedStyle(node, '::after');
+    return [parseFloat(hit.width) >= 64, parseFloat(hit.height) >= 44];
+  }), [true, true], 'the turn chip has a 64 × 44 hit area');
+
+  // P2 → P4 → P3 → P1 → P2: round 2 starts when play is back with P2.
+  for (const expected of [4, 3, 1, 2]) {
+    await chip.tap();
+    assert.equal(await active(page), expected);
+  }
+  assert.deepEqual(await chips(page), [[], ['turn 2', 'went first'], [], []]);
+  assert.deepEqual(await pillRound(page), ['2', '2']);
+
+  // A hold steps back one turn, and back across the first player the round goes down again. A hold never repeats.
+  await hold(page, page.locator('.turn-chip.active-chip'));
+  assert.deepEqual([await active(page), (await saved(page)).turn.round], [1, 1], 'a hold on the chip steps back one turn, into round 1');
+  await hold(page, page.locator('#round-button'), 1500);
+  assert.deepEqual([await active(page), (await saved(page)).turn.round], [3, 1], 'a long hold on the pill steps back just one turn');
+  await page.locator('#round-button').tap();
+  await page.locator('#round-button').tap();
+  assert.deepEqual([await active(page), (await saved(page)).turn.round], [2, 2]);
+
+  // P4 is out at 0 life, so P2 passes straight to P3.
+  const p4 = tile(page, 4).locator('.subtract');
+  for (let tap = 0; tap < 40; tap++) await p4.tap();
+  assert.deepEqual((await saved(page)).scores, [40, 40, 40, 0], 'only P4’s life changed: no tap or hold on a turn control reached a life half');
+  await chip.tap();
+  assert.equal(await active(page), 3, 'a player who is out is skipped');
+  // With the first player out too, the round still goes up when play passes their seat.
+  await page.evaluate(() => {
+    const game = JSON.parse(localStorage.getItem('lifepod-game'));
+    game.scores[1] = -2;
+    localStorage.setItem('lifepod-game', JSON.stringify(game));
+  });
+  await page.reload();
+  await page.locator('#round-button').tap();
+  assert.equal(await active(page), 1);
+  await page.locator('#round-button').tap();
+  assert.deepEqual([await active(page), (await saved(page)).turn.round], [3, 3], 'past the first player’s empty seat, round 3');
+  // After a relaunch there's no history, and a hold steps back by the play order, skipping who's out.
+  await page.waitForTimeout(500);
+  await page.reload();
+  await hold(page, page.locator('#round-button'));
+  assert.deepEqual([await active(page), (await saved(page)).turn.round], [1, 2], 'back across the first player’s seat');
+
+  // Turn steps save at once.
+  await page.waitForTimeout(500);
+  await page.reload();
+  assert.equal(await active(page), 1);
+}
+
+// Rounds: the first player's flag carries the round. Tap for the next round, hold to go back, never below 1.
+async function checkRounds(t, engine) {
+  const page = await openPage(t, engine, { game: savedGame(4, { turns: 'rounds', turn: { first: 1, active: null, round: 1 } }) });
+  assert.deepEqual(await chips(page), [[], ['flag 1'], [], []], 'the first player’s flag shows the round');
+  assert.equal(await active(page), null, 'no active tile in Rounds');
+  const flag = page.locator('.turn-chip.round-chip');
+  assert.equal(await flag.getAttribute('aria-label'), 'Round 1. Next round');
+  await flag.tap();
+  await flag.tap();
+  await page.locator('#round-button').tap();
+  assert.deepEqual(await chips(page), [[], ['flag 4'], [], []]);
+  assert.deepEqual(await pillRound(page), ['4', '4']);
+  await hold(page, flag);
+  assert.equal((await saved(page)).turn.round, 3, 'a hold goes back one round');
+  // With no history after a relaunch, holds still go back, and stop at round 1.
+  await page.waitForTimeout(500);
+  await page.reload();
+  for (let step = 0; step < 3; step++) await hold(page, page.locator('#round-button'), 700);
+  assert.equal((await saved(page)).turn.round, 1, 'never below round 1');
+  // The hidden button beside the pill steps back for keyboards and screen readers.
+  await flag.tap();
+  await button(page, 'Back one round').evaluate(back => back.click());
+  assert.equal((await saved(page)).turn.round, 1);
+
+  // Off hides everything about turns but keeps the state, and on again resumes without asking.
+  await flag.tap();
+  await setTurns(page, 'Off');
+  assert.deepEqual(await chips(page), [[], [], [], []]);
+  assert.ok(await page.locator('#round-button').isHidden(), 'no round button with Turns off');
+  await setTurns(page, 'Rounds');
+  assert.equal(await mode(page), null, 'a game with a first player doesn’t ask again');
+  assert.deepEqual(await chips(page), [[], ['flag 2'], [], []], 'switching back on resumes');
+}
+
+// "Who goes first?" opens on a new game while Turns is on and on Off → on, but not on Rounds ↔ Turn by turn. Each
+// tile offers Me first; the shuffle picks with crypto.getRandomValues; ✕ skips.
+async function checkWhoGoesFirst(t, engine) {
+  // Every draw is 2, so the shuffle picks the third player in play order: P4.
+  const page = await openPage(t, engine, { random: 2 });
+  assert.ok(await page.locator('#round-button').isHidden(), 'Turns is off by default');
+
+  // Off → on asks, once setup has closed.
+  await button(page, 'Game setup').tap();
+  await button(page, 'Track').tap();
+  await page.locator('#turn-choices').getByRole('button', { name: 'Turn by turn', exact: true }).tap();
+  assert.equal(await mode(page), null, 'not while the Track sheet is open');
+  await button(page, 'Back to setup').tap();
+  await eventually(() => page.evaluate(() => document.querySelector('#setup').open), true);
+  assert.equal(await mode(page), null, 'not while setup is open');
+  await page.locator('#save-setup').tap();
+  await eventually(() => mode(page), 'first', 'Off → Turn by turn asks who goes first');
+  assert.equal(await page.locator('.first-go').count(), 4, 'Me first on every tile');
+  assert.ok(await button(page, 'Pick at random').isVisible());
+  assert.ok(await button(page, 'Skip').isVisible());
+  assert.ok(await page.locator('#setup-button').isHidden());
+
+  // Me first: P3 goes first and, turn by turn, takes the first turn.
+  await button(page, 'Player 3 goes first').tap();
+  assert.equal(await tile(page, 3).locator('.first-go').textContent(), 'Goes first');
+  await eventually(() => mode(page), null, 'the board returns after a beat');
+  assert.deepEqual(await chips(page), [[], [], ['turn 1', 'went first'], []]);
+  assert.equal(await active(page), 3);
+
+  // Rounds ↔ Turn by turn doesn't ask. Nobody's turn is known after the switch, so every player can start theirs.
+  await setTurns(page, 'Rounds');
+  assert.equal(await mode(page), null, 'Turn by turn → Rounds doesn’t ask');
+  assert.deepEqual(await chips(page), [[], [], ['flag 1'], []]);
+  await setTurns(page, 'Turn by turn');
+  assert.equal(await mode(page), null, 'Rounds → Turn by turn doesn’t ask');
+  assert.deepEqual(await chips(page), [['start 1'], ['start 1'], ['start 1', 'went first'], ['start 1']]);
+  await tile(page, 2).locator('.start-chip').tap();
+  assert.equal(await active(page), 2, 'a tile’s chip starts that player’s turn');
+
+  // A new game asks again. The shuffle picks at random from the crypto RNG.
+  await button(page, 'Game setup').tap();
+  await button(page, 'New game').tap();
+  await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  await eventually(() => mode(page), 'first', 'a new game asks who goes first');
+  assert.deepEqual((await saved(page)).turn, { first: null, active: null, round: 1 }, 'a new game resets the turn');
+  const draws = await page.evaluate(() => window.randomDraws);
+  await button(page, 'Pick at random').tap();
+  await eventually(() => mode(page), null, 'the shuffle lands and the board returns');
+  assert.ok((await page.evaluate(() => window.randomDraws)) > draws, 'the pick uses crypto.getRandomValues');
+  assert.deepEqual((await saved(page)).turn, { first: 3, active: 3, round: 1 }, 'the shuffle picked P4');
+  assert.equal(await active(page), 4);
+
+  // ✕ skips: no flag, round 1, and no active tile until someone starts their turn.
+  await button(page, 'Game setup').tap();
+  await button(page, 'New game').tap();
+  await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  await eventually(() => mode(page), 'first');
+  await button(page, 'Skip').tap();
+  assert.equal(await mode(page), null);
+  assert.equal(await active(page), null);
+  assert.deepEqual(await chips(page), [['start 1'], ['start 1'], ['start 1'], ['start 1']]);
+  assert.deepEqual(await pillRound(page), ['1', '1']);
+  // The pill can't pass a turn nobody has, so it asks who goes first again.
+  await page.locator('#round-button').tap();
+  await eventually(() => mode(page), 'first');
+  await button(page, 'Skip').tap();
+  await tile(page, 1).locator('.start-chip').tap();
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: 0, round: 1 }, 'the first player to start goes first');
+
+  // Turning Turns off and on again in a game with a first player doesn't ask; a new game with Turns off doesn't either.
+  await setTurns(page, 'Off');
+  await setTurns(page, 'Rounds');
+  assert.equal(await mode(page), null);
+  await setTurns(page, 'Off');
+  await button(page, 'Game setup').tap();
+  await button(page, 'New game').tap();
+  await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  await page.waitForTimeout(300);
+  assert.equal(await mode(page), null, 'no question with Turns off');
+  // Off → on now asks, since the new game has no first player. A player-count change from setup asks too.
+  await setTurns(page, 'Rounds');
+  await eventually(() => mode(page), 'first');
+  await button(page, 'Skip').tap();
+  await button(page, 'Game setup').tap();
+  await button(page, '3 players').tap();
+  await page.locator('#save-setup').tap();
+  await eventually(() => mode(page), 'first', 'a new game from setup asks');
+  assert.equal(await page.locator('.first-go').count(), 3);
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: turn by turn follows the play order for 2 to 6 players`, { timeout: 90000 }, t => checkPlayOrder(t, engine));
+  test(`${name}: turn by turn passes, steps back and skips players who are out`, { timeout: 60000 }, t => checkTurnByTurn(t, engine));
+  test(`${name}: rounds step forward and back with the flag and the pill`, { timeout: 60000 }, t => checkRounds(t, engine));
+  test(`${name}: who goes first opens on a new game and on Off to on`, { timeout: 90000 }, t => checkWhoGoesFirst(t, engine));
+}
+
+test('chromium: the Track sheet holds Turns and fits the smallest phone', async (t) => {
+  const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
+  await button(page, 'Game setup').tap();
+  await button(page, 'Track').tap();
+  const pressed = () => page.locator('#turn-choices').evaluate(group => [...group.children].filter(choice => choice.getAttribute('aria-pressed') === 'true')
+    .map(choice => choice.textContent));
+  assert.deepEqual(await pressed(), ['Off']);
+  await page.locator('#turn-choices').getByRole('button', { name: 'Turn by turn', exact: true }).tap();
+  assert.deepEqual(await pressed(), ['Turn by turn']);
+  assert.equal((await saved(page)).turns, 'turns', 'Turns saves at once');
+  const box = await page.locator('#track').boundingBox();
+  assert.ok(box.y >= 0 && box.y + box.height <= 320, `Track fits 568 × 320: ${JSON.stringify(box)}`);
+  assert.ok(await page.locator('#track').evaluate(dialog => dialog.scrollHeight <= dialog.clientHeight + 1), 'without scrolling');
+  // Back in setup, Track sums up Turns with its icon.
+  await button(page, 'Back to setup').tap();
+  await eventually(() => page.locator('#track-summary').evaluate(node => [...node.children].map(icon => icon.dataset.glyph ?? icon.dataset.icon)), ['untap']);
+});
+
+test('chromium: Android back skips who goes first', async (t) => {
+  const page = await openPage(t, chromium, { android: true, game: savedGame(4, { turns: 'rounds' }) });
+  const back = () => page.evaluate(() => window.closeOpenDialog());
+  await button(page, 'Game setup').tap();
+  await button(page, 'New game').tap();
+  await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  await eventually(() => mode(page), 'first');
+  assert.equal(await page.evaluate(() => window.backHandling.at(-1)), true, 'the page handles back');
+  assert.equal(await back(), true);
+  assert.equal(await mode(page), null, 'back skips');
+  assert.deepEqual((await saved(page)).turn, { first: null, active: null, round: 1 }, 'with no first player');
+  assert.equal(await page.evaluate(() => window.backHandling.at(-1)), false, 'then back goes to the system');
+  // Back while the shuffle runs skips too, so nobody is picked.
+  await page.locator('#round-button').tap();
+  await page.waitForTimeout(100);
+  assert.equal((await saved(page)).turn.round, 2, 'Rounds steps without a first player');
+  await button(page, 'Game setup').tap();
+  await button(page, 'New game').tap();
+  await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  await eventually(() => mode(page), 'first');
+  await button(page, 'Pick at random').tap();
+  assert.equal(await back(), true);
+  assert.equal(await mode(page), null);
+  await page.waitForTimeout(1600);
+  assert.deepEqual((await saved(page)).turn, { first: null, active: null, round: 1 }, 'a shuffle stopped by back picks nobody');
+});
+
+test('chromium: saved turns are checked when a game loads', async (t) => {
+  const page = await openPage(t, chromium);
+  const load = async (game) => {
+    await page.evaluate(next => localStorage.setItem('lifepod-game', JSON.stringify(next)), game);
+    await page.reload();
+    return { chips: await chips(page), pill: await page.locator('#round-button').isVisible(), round: (await pillRound(page))[0] };
+  };
+  const base = savedGame(4);
+  assert.deepEqual(await load(base), { chips: [[], [], [], []], pill: false, round: '1' }, 'an old save loads with Turns off');
+  assert.deepEqual(await load({ ...base, turns: 'sometimes', turn: { first: 2, active: 2, round: 3 } }),
+    { chips: [[], [], [], []], pill: false, round: '3' }, 'a mode that isn’t one of the three is Off');
+  assert.deepEqual(await load({ ...base, turns: 'turns', turn: { first: 2, active: 1.5, round: 4 } }),
+    { chips: [['start 4'], ['start 4'], ['start 4', 'went first'], ['start 4']], pill: true, round: '4' }, 'a bad active seat is nobody');
+  assert.deepEqual(await load({ ...base, turns: 'rounds', turn: { first: 4, active: 1, round: 'x' } }),
+    { chips: [[], [], [], []], pill: true, round: '1' }, 'a seat off the board is nobody, and a bad round is 1');
+  assert.deepEqual(await load({ ...base, turns: 'rounds', turn: { first: 0, round: 1000 } }),
+    { chips: [['flag 1'], [], [], []], pill: true, round: '1' }, 'a round past 999 is 1');
+  // The first change saves the checked turn.
+  await page.locator('#round-button').tap();
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: null, round: 2 });
+});

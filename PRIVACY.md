@@ -12,7 +12,9 @@ LifePod saves the current game on your device so it is still there the next time
 - each seat's rotation and tile colour
 - each player's commander damage, poison, commander tax, energy, experience, rad and colour identity
 - what tiles show of each colour identity
-- whether **Keep awake** and the **Commander**, **Poison**, **Energy**, **Experience** and **Rad** counters are on
+- the mana floating in each player's pool
+- the turn: who went first, whose turn it is, and the round
+- whether **Keep awake**, the **Commander**, **Poison**, **Energy**, **Experience** and **Rad** counters, **Mana pool** and emptying mana pools when the turn passes are on, and the **Turns** setting
 
 This stays on your device: in the app's private storage on Android and iOS, or in your browser's local storage on the web. Deleting the app or clearing its data removes it.
 

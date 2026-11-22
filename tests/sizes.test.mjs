@@ -23,7 +23,8 @@ const screens = {
 const smallestRealPhone = 360;
 const tablets = ['iPad', 'Android tablet', 'iPad Pro 13"'];
 
-// A busy game: every counter on, colour identities set and commander damage from most opponents.
+// A busy game: every counter on, colour identities set, commander damage from most opponents, Turn by turn with Player 2
+// active and Player 1 first, and mana floating in Player 1's pool, so the pill holds every button at rest.
 function busyGame(count) {
   return {
     startingLife: 40, scores: Array.from({ length: count }, (_, i) => [40, 33, 112, 5, -3, 19][i]),
@@ -37,6 +38,8 @@ function busyGame(count) {
     identities: ['WUBRG', 'UB', 'R', 'BG', 'WUR', 'RG'].slice(0, count),
     commanderDamage: Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) =>
       (defender === attacker ? 0 : [21, 16, 12, 8, 3][(defender + attacker) % 5]))),
+    turns: 'turns', turn: { first: 0, active: 1, round: 3 },
+    manaPool: true, pools: Array.from({ length: count }, (_, i) => (i === 0 ? [0, 0, 0, 3, 0, 1] : [0, 0, 0, 0, 0, 0])),
   };
 }
 
@@ -130,7 +133,7 @@ async function checkSizes(t, engine) {
       for (const count of portrait ? [2, 4, 6] : [2, 3, 4, 5, 6]) {
         const view = `${count} players, ${name}, ${portrait ? 'portrait' : 'landscape'}`;
         const { page, errors } = await openBoard(browser, size, count, portrait);
-        const tiles = await readTiles(page, '.controls button', `${life}, .badges .chip`);
+        const tiles = await readTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`);
         checkTiles(tiles, view);
         // One size per board: every tile draws its total, glyphs and badges at the same size.
         checkUniform(await readUniform(page), view);
@@ -166,6 +169,10 @@ async function checkSizes(t, engine) {
           await button(page, 'Counters').tap();
           checkTiles(await readTiles(page, '.counter-cell', '.counter-cell'), `${view}, counters`);
           if (!portrait) scale[name].counterCell = await readModeScale(page, '.counter-cell');
+          await button(page, 'Cancel').tap();
+
+          await button(page, 'Mana pool').tap();
+          checkTiles(await readTiles(page, '.mana-cell', '.mana-cell'), `${view}, mana`);
           await button(page, 'Cancel').tap();
 
           await button(page, 'Game setup').tap();
@@ -211,6 +218,11 @@ async function checkSetup(t, engine) {
   page.on('pageerror', error => errors.push(error.message));
   await fakeScreenOrientation(page);
   await page.goto(app);
+  // With Mana pool on and Turns not Off, Track shows every row, auto-empty's included.
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
+    startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', turn: { first: 0, active: 0, round: 1 },
+  })));
+  await page.reload();
   const check = dialog => page.locator(dialog).evaluate((sheet) => {
     const found = [];
     if (sheet.scrollHeight > sheet.clientHeight + 0.5) found.push(`scrolls ${sheet.scrollHeight} > ${sheet.clientHeight}`);
@@ -251,8 +263,9 @@ async function checkSetup(t, engine) {
     await button(page, 'Track').tap();
     const track = await check('#track');
     assert.deepEqual(track.found, [], `${view}: Track`);
-    // ‹ and ✕, then the Commander, Poison, Energy, Experience and Rad switches.
-    assert.equal(track.count, 7, `${view}: every Track control shows`);
+    // ‹ and ✕, the Commander, Poison, Energy, Experience, Rad and Mana pool switches, three Turns choices and the
+    // auto-empty switch.
+    assert.equal(track.count, 12, `${view}: every Track control shows`);
     await button(page, 'Back to setup').tap();
     await button(page, 'Identity').tap();
     const identity = await check('#identity-sheet');

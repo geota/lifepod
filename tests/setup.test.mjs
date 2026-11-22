@@ -141,9 +141,11 @@ async function checkTrack(t, engine) {
   assert.ok(!(await page.locator('#counters-button').evaluate(node => node.hidden)), 'the counters button shows');
   await page.locator('#track label', { has: page.getByRole('switch', { name: 'Commander', exact: true }) }).tap();
   assert.equal((await saved()).counters.commander, true);
-  // The switches come in the order Commander, Poison, Energy, Experience, Rad, and each saves at once too.
+  // The switches come in the order Commander, Poison, Energy, Experience, Rad, Mana pool, and each saves at once too.
+  // Auto-empty follows them, shown only while Mana pool is on and Turns isn't Off.
   assert.deepEqual(await page.locator('#track [role="switch"]').evaluateAll(inputs => inputs.map(input => input.closest('label').textContent.trim())),
-    ['Commander', 'Poison', 'Energy', 'Experience', 'Rad']);
+    ['Commander', 'Poison', 'Energy', 'Experience', 'Rad', 'Mana pool', 'Empty mana pools when the turn passes']);
+  assert.ok(await page.locator('#auto-empty-row').isHidden(), 'auto-empty is hidden with Mana pool off');
   for (const name of ['Rad', 'Energy']) await page.locator('#track label', { has: page.getByRole('switch', { name, exact: true }) }).tap();
   assert.deepEqual((await saved()).counters, { commander: true, poison: true, energy: true, experience: false, rad: true });
   // Escape goes back to setup too, where Track sums up what's on, in the same order.
