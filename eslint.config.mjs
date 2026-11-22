@@ -6,7 +6,7 @@ export default [
   {
     files: ['web/**/*.js'],
     languageOptions: {
-      ecmaVersion: 2023,
+      ecmaVersion: 2024,
       sourceType: 'script',
       globals: globals.browser,
     },

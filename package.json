@@ -29,6 +29,6 @@
   "browserslist": [
     "iOS >= 18",
     "Android >= 11",
-    "Chrome >= 111"
+    "Chrome >= 129"
   ]
 }

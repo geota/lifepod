@@ -5,11 +5,11 @@
     "allowJs": true,
     "checkJs": true,
     "noEmit": true,
-    // ES2023 is what both floors run (iOS 18's WebKit and Chrome 111), as in the ESLint configs, so a newer built-in
-    // such as Object.groupBy (ES2024, Chrome 117) is a type error. The DOM lib is always the latest;
+    // ES2024 is what both floors run (iOS 18's WebKit and Chrome 129), as in the ESLint configs, so a newer built-in
+    // such as Promise.try (ES2025, Safari 18.2) is a type error. The DOM lib is always the latest;
     // `npm run lint:compat` checks DOM APIs against the floor.
-    "target": "es2023",
-    "lib": ["es2023", "dom"],
+    "target": "es2024",
+    "lib": ["es2024", "dom"],
     "types": [],
     "strict": false,
     "noImplicitAny": false,
