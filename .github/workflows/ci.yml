@@ -35,28 +35,22 @@ jobs:
       - run: npm run lint:compat
       # Type-checks web/'s JavaScript through its JSDoc (tsconfig.json); nothing is emitted.
       - run: npm run typecheck
-      # The board's type is system-ui, which is Roboto on Android. Ubuntu falls back to the much wider DejaVu
-      # Sans, which would make badge-fit and auto-drop tests measure text no phone shows.
-      - name: Use Roboto as the system font, like Android
-        run: |
-          sudo apt-get update -q
-          sudo apt-get install -y -q --no-install-recommends fonts-roboto
-          mkdir -p ~/.config/fontconfig
-          cat > ~/.config/fontconfig/fonts.conf <<'XML'
-          <?xml version="1.0"?>
-          <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-          <fontconfig>
-            <alias binding="strong"><family>system-ui</family><prefer><family>Roboto</family></prefer></alias>
-            <alias binding="strong"><family>sans-serif</family><prefer><family>Roboto</family></prefer></alias>
-          </fontconfig>
-          XML
-          fc-cache -f
-          fc-match system-ui
-          fc-match sans-serif
+      # Playwright's browsers, cached for each playwright-core version.
+      - id: playwright
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-chromium-${{ steps.playwright.outputs.version }}
+      # The Node-only checks and the Chromium tests. LIFEPOD_TESTS picks tests by the prefix of their name
+      # (tests/helpers.mjs), and a test without a known prefix fails, so no test can be left out of both jobs. Chromium
+      # pages measure their text in the Roboto pinned in tests/fonts/, so the runner needs no system fonts set up.
       - name: Check seat layouts in Chromium
+        env:
+          LIFEPOD_TESTS: node,chromium
         run: |
           npx playwright-core install --only-shell chromium
-          npm test -- --test-name-pattern=chromium
+          npm test
       # All of web/, as the Android and iOS apps bundle it.
       - name: Bundle offline web app
         working-directory: web
@@ -194,10 +188,18 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts
+      - id: playwright
+        run: echo "version=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: playwright-${{ runner.os }}-webkit-${{ steps.playwright.outputs.version }}
       - name: Check seat layouts in WebKit
+        env:
+          LIFEPOD_TESTS: webkit
         run: |
           npx playwright-core install webkit
-          npm test -- --test-name-pattern=webkit
+          npm test
       - name: Show the Xcode and iOS SDK in use
         run: |
           xcodebuild -version
