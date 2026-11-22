@@ -123,20 +123,23 @@ const modes = {
   counters: page => click(page, '#counters-button'),
   mana: page => click(page, '#mana-button'),
   colours: async (page) => { await openSetup(page); await click(page, '#tile-colours'); },
-  identity: async (page) => { await openSetup(page); await click(page, '#identity-nav'); await click(page, '#choose-identities'); },
+  identity: async (page) => { await openSetup(page); await click(page, '#choose-identities'); },
   rotate: async (page) => { await openSetup(page); await click(page, '#rotate-seats'); },
-  // "Who goes first?": a game with no first player and Turns off, then Turns to Rounds in the Track sheet and close.
+  // "Who goes first?": a game with no first player and Turns off, then Turns to Rounds in settings and close.
   first: async (page, game) => {
     await load(page, { ...game, turns: 'off', turn: { first: null, active: null, round: 1 } });
-    await openSetup(page); await click(page, '#track-button');
+    await openSetup(page);
     await click(page, '#turn-choices [data-turns="off"]'); await click(page, '#turn-choices [data-turns="rounds"]');
-    await click(page, '#track [data-close]');
+    await click(page, '#settings-close');
   },
   dice: page => click(page, '#dice-button'),
-  setup: openSetup,
-  track: async (page) => { await openSetup(page); await click(page, '#track-button'); },
-  'identity-sheet': async (page) => { await openSetup(page); await click(page, '#identity-nav'); },
-  about: async (page) => { await openSetup(page); await click(page, '#privacy-button'); },
+  // Settings (design/polish/SETTINGS-SPEC.md): at the top, scrolled to the end, with a new game pending, with the life
+  // field open, and turned to face the other side.
+  settings: openSetup,
+  'settings-end': async (page) => { await openSetup(page); await page.locator('#settings-body').evaluate((body) => { body.scrollTop = body.scrollHeight; }); },
+  'settings-pending': async (page) => { await openSetup(page); await click(page, '#player-choices [value="6"]'); await click(page, '#life-presets [data-life="30"]'); },
+  'settings-edit': async (page) => { await openSetup(page); await click(page, '#life-edit'); },
+  'settings-flipped': async (page) => { await openSetup(page); await click(page, '#settings-flip'); },
   'new-game': async (page) => { await openSetup(page); await click(page, '#restart-button'); },
   // Discard: one edit in counters mode, then ✕.
   discard: async (page) => {
@@ -255,7 +258,7 @@ function audit() {
       continue;
     }
     if (!visible(parent)) continue;
-    // Hidden on purpose by a clipped 1px box (the folded setup title).
+    // Hidden on purpose by a clipped 1px box.
     if (getComputedStyle(node.parentElement).clipPath.startsWith('inset(50%')) continue;
     texts.push(node);
   }
@@ -266,7 +269,10 @@ function audit() {
     const box = range.getBoundingClientRect();
     if (!box.width) continue;
     const frame = tileOf(el) ?? el.closest('dialog') ?? document.documentElement;
-    const frameBox = frame === document.documentElement ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight } : rect(frame);
+    let frameBox = frame === document.documentElement ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight } : rect(frame);
+    // The settings body scrolls, so text above or below the part in view isn't cut off; only its sideways fit counts.
+    const scroller = el.closest('.fs-body');
+    if (scroller) frameBox = { left: rect(scroller).left, right: rect(scroller).right, top: -Infinity, bottom: Infinity };
     // A sheet that scrolls with a cue at the bottom (About) shows the rest when scrolled; that's covered by the scroll check.
     const cued = frame.matches?.('dialog') && frame.querySelector('.scroll-cue[data-more]') && box.left >= frameBox.left - 1 && box.right <= frameBox.right + 1;
     if (!inside(box, frameBox) && !cued) add('clip', `${who(el)}${name(el)} text "${node.textContent.trim().slice(0, 24)}" runs outside its ${tileOf(el) ? 'tile' : 'sheet'}`);
@@ -315,7 +321,7 @@ function audit() {
     const box = rect(dialog);
     const cue = dialog.querySelector('.scroll-cue');
     if (dialog.scrollHeight > dialog.clientHeight + 1) {
-      // About may scroll, but only with its cue showing (design/polish/FINAL-REVIEW.md #20).
+      // A sheet may scroll only with its cue showing (design/polish/FINAL-REVIEW.md #20).
       if (!cue) add('scroll', `#${dialog.id} scrolls: ${dialog.scrollHeight}px of content in ${dialog.clientHeight}px`);
       else if (!cue.hasAttribute('data-more') || getComputedStyle(cue, '::before').opacity === '0') add('scroll', `#${dialog.id} scrolls with no cue that there's more`);
       else facts.scrollCue = `${dialog.scrollHeight}px in ${dialog.clientHeight}px, cue shown`;
@@ -494,22 +500,22 @@ async function shots() {
     { size: 'small', count: 6, seed: 'commander', mode: 'rest' },
     { size: 'small', count: 6, seed: 'everything', mode: 'identity' },
     { size: 'small', count: 6, seed: 'everything', mode: 'colours' },
-    { size: 'small', count: 6, seed: 'everything', mode: 'setup' },
+    { size: 'small', count: 6, seed: 'everything', mode: 'settings' },
     { size: 'stress', count: 6, seed: 'counters', mode: 'rest' },
     { size: 'stress', count: 6, seed: 'startTurns', mode: 'rest' },
     { size: 'se', count: 4, seed: 'everything', mode: 'rest' },
     { size: 'se', count: 6, seed: 'commander', mode: 'rest' },
-    { size: 'se', count: 4, seed: 'everything', mode: 'setup' },
+    { size: 'se', count: 4, seed: 'everything', mode: 'settings' },
     { size: 'tiny', count: 6, seed: 'everything', mode: 'rest' },
     { size: 'tiny', count: 6, seed: 'everything', mode: 'counters' },
-    { size: 'tiny', count: 4, seed: 'everything', mode: 'track' },
+    { size: 'tiny', count: 4, seed: 'everything', mode: 'settings-end' },
     { size: 'fold', count: 5, seed: 'everything', mode: 'rest' },
     { size: 'fold', count: 4, seed: 'commander', mode: 'identity' },
-    { size: 'fold', count: 6, seed: 'everything', mode: 'setup' },
+    { size: 'fold', count: 6, seed: 'everything', mode: 'settings' },
     { size: 'tablet', count: 6, seed: 'everything', mode: 'rest' },
     { size: 'tablet', count: 4, seed: 'commander', mode: 'counters' },
     { size: 'tablet', count: 2, seed: 'rotated', mode: 'rest' },
-    { size: 'tablet', count: 6, seed: 'everything', mode: 'setup' },
+    { size: 'tablet', count: 6, seed: 'everything', mode: 'settings' },
     { size: 'stress', count: 6, seed: 'rotated', mode: 'rest' },
     { size: 'stress', count: 6, seed: 'rotated', mode: 'colours' },
     { size: 'small', count: 4, seed: 'rotated', mode: 'colours' },
@@ -571,7 +577,7 @@ async function shots() {
 // the seed can show, measured but not saved as screenshots.
 async function sweep() {
   const boardModes = ['rest', 'damage', 'counters', 'mana', 'colours', 'identity', 'rotate', 'first'];
-  const dialogModes = ['dice', 'setup', 'track', 'identity-sheet', 'about', 'new-game', 'discard'];
+  const dialogModes = ['dice', 'settings', 'settings-end', 'settings-pending', 'settings-edit', 'settings-flipped', 'new-game', 'discard'];
   let runs = 0;
   await Promise.all(Object.keys(sizes).map(async (size) => {
     const page = await openSize(size);
@@ -600,14 +606,13 @@ async function sweep() {
       record({ size, count: 6, seed: 'everything', mode }, await page.evaluate(audit));
       runs++;
     }
-    // Setup with Custom life: the stepper.
-    await load(page, { ...seeds.everything(6), startingLife: 25 });
-    await enter(page, 'setup');
-    record({ size, count: 6, seed: 'everything, life 25', mode: 'setup (stepper)' }, await page.evaluate(audit));
-    // Track with Turns off (no auto-empty row).
+    // Settings with a life off the track (the handle pinned), and with Turns off (no auto-empty row).
+    await load(page, { ...seeds.everything(6), startingLife: 100 });
+    await enter(page, 'settings');
+    record({ size, count: 6, seed: 'everything, life 100', mode: 'settings (pinned)' }, await page.evaluate(audit));
     await load(page, { ...seeds.minimal(6) });
-    await enter(page, 'track');
-    record({ size, count: 6, seed: 'minimal', mode: 'track' }, await page.evaluate(audit));
+    await enter(page, 'settings');
+    record({ size, count: 6, seed: 'minimal', mode: 'settings' }, await page.evaluate(audit));
     await page.context().close();
   }));
   return runs;
@@ -630,24 +635,21 @@ async function accessibility() {
   await enter(page, 'counters');
   const countersTree = await page.locator('#board').ariaSnapshot();
   await leave(page);
-  await enter(page, 'setup');
-  const setupTree = await page.locator('#setup').ariaSnapshot();
-  await leave(page);
-  await enter(page, 'identity-sheet');
-  const identityTree = await page.locator('#identity-sheet').ariaSnapshot();
+  await enter(page, 'settings');
+  const settingsTree = await page.locator('#settings').ariaSnapshot();
   await writeFile(`${outDir}accessibility.txt`, [
     '# Tab order at rest (952 × 427, 4 players, everything on)', ...order, '',
-    '# ARIA tree at rest', tree, '', '# Counters mode', countersTree, '', '# Setup', setupTree, '', '# Identity sheet', identityTree, '',
+    '# ARIA tree at rest', tree, '', '# Counters mode', countersTree, '', '# Settings', settingsTree, '',
   ].join('\n'));
   await page.context().close();
 }
 
-// iOS draws the app in WebKit: the target and stress boards, setup and Track, for font and layout differences.
+// iOS draws the app in WebKit: the target and stress boards and settings, for font and layout differences.
 async function webkitShots() {
   const engine = await webkit.launch();
   for (const size of ['target', 'stress']) {
     const page = await openSize(size, { scale: Math.min(2, Math.floor((1799 / sizes[size].width) * 100) / 100), engine });
-    for (const mode of ['rest', 'setup', 'track', 'counters']) {
+    for (const mode of ['rest', 'settings', 'settings-end', 'counters']) {
       const game = seeds.everything(6);
       await load(page, game);
       await enter(page, mode, game);
