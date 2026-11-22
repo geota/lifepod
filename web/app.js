@@ -845,7 +845,7 @@ function isOut(index) {
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
-// damage: a sword, like the pill's, then one chip per opponent with a dot in their colour, largest first. The near edge holds colour
+// damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first. The near edge holds colour
 // identity, poison and tax, each only when it's set and its switch is on.
 function renderBadges(index) {
   const player = board.children[index];
@@ -858,8 +858,8 @@ function renderBadges(index) {
   const sword = element('span', 'chip sword', icon('sword'));
   sword.setAttribute('aria-hidden', 'true');
   far.replaceChildren(...(damage.length ? [sword] : []), ...damage.map(({ amount, attacker }) => {
-    const chip = element('span', 'chip', inColourOf(element('span', 'dot'), attacker), String(amount),
-      visuallyHidden(` commander damage from Player ${attacker + 1}`));
+    const chip = inColourOf(element('span', 'chip damage', String(amount),
+      visuallyHidden(` commander damage from Player ${attacker + 1}`)), attacker);
     chip.setAttribute('role', 'listitem');
     const level = dangerLevel(amount, commanderWarning, commanderLethal);
     if (level) chip.dataset.level = level;

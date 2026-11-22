@@ -438,10 +438,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   .colour-picker :is(.swatches, .identity) { gap: 3px; }
 }
 
-/* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat in their colour
-   showing the damage their commander has dealt this player. A seat at 0 is that player's panel inside a ring
-   in their seat colour; once it has damage it fills solid with the seat colour. Nothing is transparent. Cells are at least 44px; the hint goes on narrow
-   tiles. app.js sets the grid's rows and columns and places each seat. */
+/* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat showing the damage
+   their commander has dealt this player. Every seat is filled with that player's own tile colour (their panel),
+   exactly as their tile looks across the table, with the number in their seat colour. A seat at 0 has a thin
+   ring in their rim colour; once it has damage the ring turns into a thicker one in their seat colour and the
+   number gets heavier. Nothing is transparent. Cells are at least 44px; the hint goes on narrow tiles. app.js
+   sets the grid's rows and columns and places each seat. */
 .seat-map {
   --hint-space: 24px;
   display: grid;
@@ -453,28 +455,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .map-cell {
   /* The seat's own ring, kept under the changed and pressed rings below. */
-  --seat-ring: 0 0 0 0 transparent;
-  --pressed-ring: inset 0 0 0 3px var(--button);
+  --seat-ring: inset 0 0 0 2px var(--seat);
+  --pressed-ring: inset 0 0 0 4px var(--seat);
   display: grid;
   place-items: center;
   min-width: 0;
   padding: 0;
   border: 0;
   border-radius: var(--radius-sm);
-  background: var(--seat);
-  color: var(--button);
+  background: var(--panel);
+  color: var(--seat);
   font-size: clamp(1.0625rem, 6cqi, max(1.625rem, 26 * var(--grow)));
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.03em;
   box-shadow: var(--seat-ring);
 }
-/* The 0 is the seat colour on the panel, at least 7.4:1, and the ring at least 6.9:1 on any tile. */
+/* The number is the seat colour on the panel, at least 7.4:1. */
 .map-cell[data-zero] {
-  --seat-ring: inset 0 0 0 2px var(--seat);
+  --seat-ring: inset 0 0 0 1px var(--rim);
   --pressed-ring: inset 0 0 0 3px var(--seat);
-  background: var(--panel);
-  color: var(--seat);
   font-weight: var(--weight-semibold);
 }
 /* Seats changed since the mode opened get a ring outside, and a held seat looks pressed. */
@@ -489,6 +489,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: var(--text);
   font-size: clamp(1rem, 5.4cqi, max(1.5rem, 24 * var(--grow)));
   line-height: 1.05;
+  box-shadow: none;
 }
 .map-cell.self strong[data-out] { color: var(--life-out); }
 .life-change { font-size: max(.75rem, .5em); font-weight: var(--weight-semibold); color: var(--text-soft); letter-spacing: normal; }
@@ -574,7 +575,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chip .icon { width: .95em; height: .95em; }
 .chip.sword { width: 1.7em; padding: 0; justify-content: center; color: var(--muted); }
 .chip.sword .icon { width: 1em; height: 1em; }
-.chip .dot { flex: none; width: .66em; height: .66em; border-radius: 50%; background: var(--seat); box-shadow: 0 0 0 1.5px var(--dot-rim); }
+/* A commander damage chip is a tiny piece of the attacker's tile: their panel, their rim and the number in their
+   seat colour, like their seat on the map. */
+.chip.damage { padding: 0 .42em; background: var(--panel); color: var(--seat); box-shadow: inset 0 0 0 1.5px var(--rim); }
 /* Close to losing: amber tinted text from 15 commander damage or 7 poison; at 21 or 10, red tinted text and a
    thin red ring, and the life total turns red. Both pass 4.89:1 on every tile colour (palette.mjs). */
 .chip[data-level] { font-weight: var(--weight-heavy); }
@@ -584,6 +587,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: linear-gradient(var(--life-out-tint), var(--life-out-tint)), var(--chip-background);
   box-shadow: inset 0 0 0 1.5px var(--life-out);
 }
+/* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
+.chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
+.chip.damage[data-level="out"] { background: var(--panel); }
 .chip.pips { gap: 2px; }
 /* Colour identity: plain discs in our own colours, never mana symbols. */
 .pip {

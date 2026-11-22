@@ -23,9 +23,12 @@ const seatLooks = (page, defender) => tile(page, defender).locator('.map-cell[da
     const style = getComputedStyle(cell);
     const seat = getComputedStyle(cell).getPropertyValue('--seat').trim();
     const panel = getComputedStyle(cell).getPropertyValue('--panel').trim();
+    const rim = getComputedStyle(cell).getPropertyValue('--rim').trim();
+    const attacker = document.querySelectorAll('.player')[Number(cell.dataset.attacker)];
     const [text, fill] = [luminance(rgba(style.color)), luminance(rgba(style.backgroundColor))];
     return {
-      attacker: Number(cell.dataset.attacker) + 1, zero: cell.hasAttribute('data-zero'), seat, panel,
+      attacker: Number(cell.dataset.attacker) + 1, zero: cell.hasAttribute('data-zero'), seat, panel, rim,
+      tile: getComputedStyle(attacker).backgroundColor,
       color: style.color, background: style.backgroundColor, shadow: style.boxShadow, opacity: style.opacity,
       opaque: rgba(style.color)[3] ?? 1, solid: rgba(style.backgroundColor)[3] ?? 1,
       contrast: (Math.max(text, fill) + 0.05) / (Math.min(text, fill) + 0.05),
@@ -84,13 +87,14 @@ async function checkDamage(t, engine) {
   assert.ok(await button(page, 'Undo').isDisabled());
   assert.deepEqual(await ownSeat(page, 3), ['40', 'you']);
 
-  // A seat at 0 is the attacker's own panel inside a 2px ring in their seat colour, with the 0 in that colour.
+  // Every seat is filled with the attacker's tile colour, exactly what their tile looks like across the table,
+  // with the number in their seat colour. At 0 it has a thin ring in their rim colour.
   // Nothing is transparent, and every number keeps at least 4.5:1.
   for (const looks of await seatLooks(page, 3)) {
     assert.ok(looks.zero, `P${looks.attacker} starts at 0`);
-    assert.equal(looks.background, hex(looks.panel), `P${looks.attacker}'s seat at 0 is their panel`);
+    assert.equal(looks.background, looks.tile, `P${looks.attacker}'s seat is the colour of their tile`);
     assert.equal(looks.color, hex(looks.seat), `P${looks.attacker}'s 0 is in their seat colour`);
-    assert.match(looks.shadow, new RegExp(`^${hex(looks.seat).replace(/[()]/g, '\\$&')} 0px 0px 0px 2px inset$`), `P${looks.attacker}'s ring`);
+    assert.equal(looks.shadow, `${hex(looks.rim)} 0px 0px 0px 1px inset`, `P${looks.attacker}'s ring at 0`);
     assert.deepEqual([looks.opacity, looks.opaque, looks.solid], ['1', 1, 1], 'no transparency');
     assert.ok(looks.contrast >= 4.5, `P${looks.attacker}'s 0 at ${looks.contrast.toFixed(2)}:1`);
   }
@@ -99,10 +103,11 @@ async function checkDamage(t, engine) {
   // Each tap on an opponent's seat adds 1 commander damage from them and takes 1 life, together.
   for (let tap = 0; tap < 6; tap++) await seat(page, 3, 2).tap();
   assert.equal(await seat(page, 3, 2).textContent(), '6');
-  // With damage the seat fills solid with the seat colour. Changed seats add a ring outside, over the tile.
+  // With damage the seat keeps the attacker's tile colour, and its ring turns into a thicker one in their seat
+  // colour. Changed seats add a ring outside, over the tile.
   const hit = (await seatLooks(page, 3)).find(looks => looks.attacker === 2);
-  assert.equal(hit.background, hex(hit.seat), 'a seat with damage fills with the seat colour');
-  assert.ok(!hit.shadow.includes('inset'), `no zero ring once hit: ${hit.shadow}`);
+  assert.equal(hit.background, hit.tile, 'a seat with damage is still the colour of the attacker’s tile');
+  assert.ok(hit.shadow.startsWith(`${hex(hit.seat)} 0px 0px 0px 2px inset, `), `the damage ring: ${hit.shadow}`);
   assert.match(hit.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px/, 'the changed ring');
   assert.deepEqual([hit.opacity, hit.opaque, hit.solid], ['1', 1, 1], 'no transparency');
   assert.ok(hit.contrast >= 4.5, `the 6 at ${hit.contrast.toFixed(2)}:1`);
@@ -146,8 +151,8 @@ async function checkDamage(t, engine) {
   assert.equal(await seat(page, 3, 4).textContent(), '0');
   // Back at 0 after a change, the seat keeps its zero ring inside the changed ring.
   const back = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
-  assert.equal(back.background, hex(back.panel));
-  assert.ok(back.shadow.startsWith(`${hex(back.seat)} 0px 0px 0px 2px inset, `), `zero ring kept: ${back.shadow}`);
+  assert.equal(back.background, back.tile);
+  assert.ok(back.shadow.startsWith(`${hex(back.rim)} 0px 0px 0px 1px inset, `), `zero ring kept: ${back.shadow}`);
   assert.match(back.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px$/, 'changed ring kept');
   // A held seat at 0 thickens its ring, and keeps the changed ring.
   await seat(page, 3, 4).evaluate(cell => { cell.dataset.pressed = ''; });
@@ -181,20 +186,26 @@ async function checkDamage(t, engine) {
   assert.deepEqual(lead, { sword: true, hidden: 'true', path: true });
   assert.equal(await page.locator('.badges.far .chip.sword').count(), 2, 'a sword only on rows that show');
   assert.ok(!(await tile(page, 2).locator('.badges.far .chip.sword').count()));
-  const dot = await tile(page, 3).locator('.badges.far .dot').first().evaluate(node => getComputedStyle(node).backgroundColor);
-  assert.equal(dot, 'rgb(182, 224, 247)', 'the dot is in the attacker’s tile colour');
+  // Each chip is a tiny piece of the attacker's tile: their tile colour, with the number in their seat colour.
+  const chipLooks = number => tile(page, 3).locator('.badges.far .chip.damage').first().evaluate(chip => {
+    const style = getComputedStyle(chip);
+    return { background: style.backgroundColor, color: style.color };
+  });
+  const tileColour = number => tile(page, number).evaluate(node => getComputedStyle(node).backgroundColor);
+  assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: 'rgb(182, 224, 247)' },
+    'the chip is the colour of the attacker’s tile');
   assert.equal(await farBadges(page, 2), '');
   await reload(page);
   assert.equal(await farBadges(page, 3), '3 commander damage from Player 2 | 1 commander damage from Player 4', 'saved damage survives a reload');
   assert.deepEqual(await scores(page), [39, 40, 36, 40]);
 
-  // A new attacker colour shows on the dots straight away.
+  // A new attacker colour shows on the chips straight away.
   await button(page, 'Game setup').tap();
   await button(page, 'Colours').tap();
   await tile(page, 2).getByRole('button', { name: 'Rose', exact: true }).tap();
   await button(page, 'Done choosing colours').tap();
-  assert.equal(await tile(page, 3).locator('.badges.far .dot').first().evaluate(node => getComputedStyle(node).backgroundColor),
-    'rgb(255, 205, 232)');
+  assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: 'rgb(255, 205, 232)' });
+  assert.equal(await tileColour(2), 'rgb(87, 49, 71)', 'Rose');
 
   // A new game resets commander damage.
   await button(page, 'Game setup').tap();
@@ -274,7 +285,8 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
       out: player.querySelector('.score').hasAttribute('data-out'),
       chips: [...player.querySelectorAll('.badges:not([hidden]) .chip[role="listitem"]')].map(chip => {
         const style = getComputedStyle(chip);
-        return `${chip.textContent} ${chip.dataset.level ?? 'plain'} ${style.color} ${style.boxShadow === 'none' ? 'no ring' : 'ring'}`;
+        const ring = style.boxShadow === 'none' ? 'no ring' : `${style.boxShadow.match(/rgb\([^)]*\)/)[0]} ring`;
+        return `${chip.textContent} ${chip.dataset.level ?? 'plain'} ${style.color} ${ring}`;
       }),
     })));
   };
@@ -286,11 +298,13 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
     counters: { commander: true, poison: true }, poison: [0, 6, 7, 10],
     commanderDamage: [[0, 14, 0, 0], [0, 0, 0, 21], [15, 0, 0, 0], [0, 20, 0, 0]],
   };
+  // Damage chips are in the attacker's tile colour with a ring: their rim colour, or the warning colour.
+  const sky = { seat: 'rgb(182, 224, 247)', rim: 'rgb(81, 113, 135)' };
   assert.deepEqual(await load(game), [
-    { out: false, chips: [`14 commander damage from Player 2 plain ${text} no ring`] },
-    { out: true, chips: [`21 commander damage from Player 4 out ${red} ring`, `6 poison plain ${text} no ring`] },
-    { out: false, chips: [`15 commander damage from Player 1 warn ${amber} no ring`, `7 poison warn ${amber} no ring`] },
-    { out: true, chips: [`20 commander damage from Player 2 warn ${amber} no ring`, `10 poison out ${red} ring`] },
+    { out: false, chips: [`14 commander damage from Player 2 plain ${sky.seat} ${sky.rim} ring`] },
+    { out: true, chips: [`21 commander damage from Player 4 out ${red} ${red} ring`, `6 poison plain ${text} no ring`] },
+    { out: false, chips: [`15 commander damage from Player 1 warn ${amber} ${amber} ring`, `7 poison warn ${amber} no ring`] },
+    { out: true, chips: [`20 commander damage from Player 2 warn ${amber} ${amber} ring`, `10 poison out ${red} ${red} ring`] },
   ]);
   // With their switches off, the counts don't show and don't knock anyone out.
   const off = await load({ ...game, counters: { commander: false, poison: false } });

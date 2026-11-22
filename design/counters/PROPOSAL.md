@@ -54,6 +54,14 @@ These follow feedback on v0.1.0-alpha.9. The mock-ups are in OPTIONS.md, Round 4
 - **Colour identity is any combination of W U B R G.** Colourless (C) is removed, so a colourless commander has no identity set. The white pip must read as white, not grey.
 - **Game setup** must fit without scrolling on a landscape phone about 427px tall, such as a Pixel 10 Pro.
 
+## Decisions after alpha.11 (21 November 2026)
+
+These replace the round 4 map seat decision (C) and the coloured dots in the far row.
+
+- **Every commander colour is the attacker's actual tile colour.** The seat colour is a light accent, so seats and dots filled with it read as lighter versions of the tiles.
+- **Map seats:** always filled with the attacker's tile colour (their panel), with the number in their seat colour. At 0 the seat has a thin ring in their rim colour; with damage it has a thicker ring in their seat colour and a heavier number.
+- **Far row chips:** each commander damage chip is a tiny piece of the attacker's tile, with their panel as the fill, a rim-coloured ring, and the number in their seat colour. There's no separate dot. Warnings keep the panel fill and turn the number and ring amber at 15, or red at 21.
+
 ## Goals
 
 - Nothing new shows on the board until a game uses it. A plain 20-life game looks exactly as it does today, and players who keep counters on dice never see these features.
