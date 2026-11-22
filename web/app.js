@@ -43,7 +43,7 @@ const turnChoices = document.querySelector('#turn-choices');
 const identityNav = document.querySelector('#identity-nav');
 const identityNote = document.querySelector('#identity-note');
 const identityDialog = document.querySelector('#identity-sheet');
-const identityShowChoices = document.querySelector('#identity-show');
+const identityShowSwitches = document.querySelectorAll('#identity-show input');
 const identityBackgroundChoices = document.querySelector('#identity-background');
 const chooseIdentitiesButton = document.querySelector('#choose-identities');
 const restart = document.querySelector('#restart');
@@ -114,9 +114,14 @@ const identityNames = {
   UBRG: 'Glint-Eye', WBRG: 'Dune-Brood', WURG: 'Ink-Treader', WUBG: 'Witch-Maw', WUBR: 'Yore-Tiller',
   WUBRG: 'WUBRG',
 };
-// What a tile's identity chip can show, in the chip's order, and what can sit behind its life total.
+// What a tile's identity chip can show, in the chip's order, and what can sit behind its life total: the symbol on
+// tiles with an identity, the rings on every tile (Default), or nothing (Off).
 const identityParts = ['indicator', 'symbol', 'name'];
-const identityBackgrounds = ['symbol', 'indicator', 'off'];
+const identityBackgrounds = ['symbol', 'default', 'off'];
+// The identity settings' save format. Saves without it are from when Background was Symbol · Indicator · Off and
+// Off meant the rings: their Off loads as Default and their Indicator as Symbol, so only a save of this version
+// can mean the new Off.
+const identitySettingsVersion = 2;
 const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
   { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
@@ -666,7 +671,14 @@ function fitIdentitySettings(saved) {
   const defaults = { indicator: true, symbol: false, name: true };
   const show = Object.fromEntries(identityParts.map(part =>
     [part, typeof saved?.show?.[part] === 'boolean' ? saved.show[part] : defaults[part]]));
-  return { show, background: identityBackgrounds.includes(saved?.background) ? saved.background : 'symbol' };
+  return { show, background: fitIdentityBackground(saved), version: identitySettingsVersion };
+}
+
+function fitIdentityBackground(saved) {
+  if (saved?.version === identitySettingsVersion) {
+    return identityBackgrounds.includes(saved.background) ? saved.background : 'symbol';
+  }
+  return saved?.background === 'off' ? 'default' : 'symbol';
 }
 
 // Each player's pool: one count per colour, W U B R G C. Anything that isn't a whole number from 0 to the maximum is 0.
@@ -1323,20 +1335,17 @@ function syncIdentity() {
   }
 }
 
-// The background behind a tile's total: its identity's symbol, faintly, like a card's watermark, or its colour
-// indicator, or the rings. A tile with no identity always has the rings.
+// The background behind a tile's total (design/polish/SPEC.md §2.3). Symbol puts a set identity's symbol there,
+// faintly, like a card's watermark, and other tiles keep the rings. Default is the rings on every tile, and Off is
+// a plain tile. data-background is set whenever the rings are gone.
 function renderWatermark(index) {
   const player = board.children[index];
   const identity = game.identities[index];
-  const background = identity ? game.identity.background : 'off';
-  const mark = player.querySelector('.watermark');
-  if (background === 'off') {
-    delete player.dataset.background;
-    mark.replaceChildren();
-    return;
-  }
-  player.dataset.background = background;
-  mark.replaceChildren(background === 'symbol' ? identitySymbol(identity) : colourIndicator(identity));
+  const { background } = game.identity;
+  const shown = background === 'off' || (background === 'symbol' && identity) ? background : null;
+  if (shown) player.dataset.background = shown;
+  else delete player.dataset.background;
+  player.querySelector('.watermark').replaceChildren(...(shown === 'symbol' ? [identitySymbol(identity)] : []));
 }
 
 // Applies an edit forwards (1) or takes it back (-1).
@@ -2304,9 +2313,7 @@ autoEmptySwitch.addEventListener('change', () => {
 // The Identity sheet: what tiles show of each identity, saved the moment it changes. Choose identities keeps its
 // place but can't be used while setup would start a new game, like Colours and Rotate seats.
 function renderIdentitySheet() {
-  for (const choice of identityShowChoices.children) {
-    choice.setAttribute('aria-pressed', String(game.identity.show[choice.dataset.show]));
-  }
+  for (const toggle of identityShowSwitches) toggle.checked = game.identity.show[toggle.dataset.show];
   for (const choice of identityBackgroundChoices.children) {
     choice.setAttribute('aria-pressed', String(game.identity.background === choice.dataset.background));
   }
@@ -2333,9 +2340,9 @@ identityNav.addEventListener('click', () => {
   renderIdentitySheet();
   openSubSheet(identityDialog);
 });
-for (const choice of identityShowChoices.children) {
-  choice.addEventListener('click', () => changeIdentitySettings((settings) => {
-    settings.show[choice.dataset.show] = !settings.show[choice.dataset.show];
+for (const toggle of identityShowSwitches) {
+  toggle.addEventListener('change', () => changeIdentitySettings((settings) => {
+    settings.show[toggle.dataset.show] = toggle.checked;
   }));
 }
 for (const choice of identityBackgroundChoices.children) {

@@ -78,13 +78,16 @@
 
 My reading: this is the faint mark behind the life total. It's a setting of its own, independent of the chip.
 
-- **Symbol (default):** the identity's symbol as the watermark, as shipped in fcf2a89. It now covers the shards and four-colour identities too.
-- **Indicator:** the colour indicator disc, faint (10% opacity), in place of the symbol.
-- **Off:** the rings, as for a tile with no identity.
-- An unset identity always shows the rings.
+Segmented **Symbol · Default · Off** (the owner's change; it replaced Symbol · Indicator · Off):
+
+- **Symbol (default):** a tile whose identity is set shows the identity's symbol as the watermark, as shipped in fcf2a89. It now covers the shards and four-colour identities too. A tile with no identity shows the rings.
+- **Default:** the rings on every tile, and no identity symbol.
+- **Off:** no background effect on any tile: no rings and no symbol.
+- There is no Indicator background any more.
+- **Saved values** are `'symbol' | 'default' | 'off'`, with `identity.version: 2` (§10). A save without the version is from before this change, when Off meant the rings: `loadGame()` reads its `'off'` as `'default'` and its `'indicator'` as `'symbol'`, and anything else as `'symbol'`. Only a version 2 save can mean the new Off.
 - **Combining with the chip:**
   - Symbol background plus a Symbol chip repeats the symbol. That's allowed, and the defaults avoid it.
-  - Background off plus chip off is "identity off" without clearing anyone's picks.
+  - Default or Off plus chip off is "identity off" without clearing anyone's picks.
 
 This reading is confirmed (§12).
 
@@ -243,7 +246,7 @@ For reference, `ui` is 316px on the target, 283px at 852 × 393, 213px at 640 ×
 - The indicator says the colours to everyone.
 - The symbol only says them to someone who knows the guild or family.
 - The default background already draws that same symbol behind the tile, so dropping it from the chip loses nothing.
-- If the background is Indicator or Off and the chip shows only the symbol, step 2 doesn't apply, and the symbol stays until step 4.
+- If the background is Default or Off and the chip shows only the symbol, step 2 doesn't apply, and the symbol stays until step 4.
 
 **Fixed thresholds** (by board unit, so they also apply board-wide):
 
@@ -265,10 +268,10 @@ Every control in setup, the Track sheet and the Identity sheet is one of these.
 
 | Type | Use | Spec |
 |---|---|---|
-| **Segmented choice** | Players, starting life, Turns, Background; the *multi* variant for Show on tiles | Equal segments in a 48px group (2px padding, 12px radius, `--background` fill, `--border` ring). Each segment is 44px tall. The selected one is filled `--accent` with `--ink` text. Optional 16px icon. |
+| **Segmented choice** | Players, starting life, Turns, Background | Equal segments in a 48px group (2px padding, 12px radius, `--background` fill, `--border` ring). Each segment is 44px tall. The selected one is filled `--accent` with `--ink` text. Optional 16px icon. |
 | **Stepper** | Custom starting life | − value + inside the selected segment's accent fill, 44px buttons. Range 1–999. Hold repeats at 10 per second, then in steps of 5 after 1s. **No keyboard.** |
 | **Navigation row** | Track, Identity, Colours, Rotate seats | 44px row: accent icon, label, optional summary icons, caret. Opens a sheet or a board mode. |
-| **Switch row** | Keep awake, each tracker, auto-empty | 44px row: icon, label, switch on the right. The whole row is the target. |
+| **Switch row** | Keep awake, each tracker, auto-empty; the *compact* variant for Show on tiles | 44px row: icon, label, switch on the right. The whole row is the target. Compact rows sit three to a line with tighter padding (8px, 6px gaps). |
 | **Button** | New game (secondary), Done / Start new game / Choose identities (primary) | 48px, 12px radius. |
 | **Header button** | ✕ (close), ‹ (back), About (text) | 44px. |
 
@@ -296,11 +299,11 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 4.4 Identity sheet
 
-285px tall.
+264px tall on the target (952 × 427), 286px at 568 × 320, where Show on tiles goes under its label.
 
 - **Header:** ‹ · "Identity" · ✕.
-- **Show on tiles:** multi-segment Indicator · Symbol · Name.
-- **Background:** segmented Symbol · Indicator · Off.
+- **Show on tiles:** three compact switch rows, Indicator · Symbol · Name, each with the mark it adds to the chip (the colour disc, the symbol, "Aa"). Any combination; indicator and name are on by default, and each saves the moment it changes. They sit on one line beside the label; below 620px wide they go under it, and on portrait phones each row puts its label over its mark and switch so no label is cut short.
+- **Background:** segmented Symbol · Default · Off (§2.3).
 - A one-line note.
 - **Choose identities:** primary button. It closes the sheets and starts the identity mode.
 
@@ -421,7 +424,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | `autoEmpty` | boolean | true | `!== false` |
 | `turns` | `'off' \| 'rounds' \| 'turns'` | `'off'` | enum |
 | `turn` | `{ first: int\|null, active: int\|null, round: int ≥1 }` | `{ null, null, 1 }` | indices must be valid seats |
-| `identity` | `{ show: { indicator, symbol, name }, background: 'symbol'\|'indicator'\|'off' }` | `{ show: {true, false, true}, 'symbol' }` | |
+| `identity` | `{ show: { indicator, symbol, name }, background: 'symbol'\|'default'\|'off', version: 2 }` | `{ show: {true, false, true}, 'symbol', 2 }` | without `version`, `'off'` → `'default'` and `'indicator'` → `'symbol'` (§2.3) |
 | `colors` | as today, swatch index 0–11 | seats 1–6 defaults | `fitColors` with 12 swatches |
 
 - Unchanged: `scores`, `startingLife`, `rotations`, `keepAwake`, `landscapeAngle`, `poison`, `casts`, `identities`, `commanderDamage`.
@@ -527,5 +530,5 @@ None are open.
 
 1. **Four-colour names:** full (Glint-Eye, Dune-Brood, Ink-Treader, Witch-Maw, Yore-Tiller). There is no short-form setting.
 2. **Five-colour name:** WUBRG.
-3. **"Indicator backgrounds":** the background setting behind the total (§2.3: Symbol / Indicator / Off). Confirmed.
+3. **"Indicator backgrounds":** the background setting behind the total. Confirmed, and later changed by the owner to Symbol / Default / Off (§2.3).
 4. **New hue names:** Copper, Olive and Orchid, unless the owner renames them once `palette.mjs` produces the palettes.

@@ -272,7 +272,7 @@ async function checkSetup(t, engine) {
     await button(page, 'Identity').tap();
     const identity = await check('#identity-sheet');
     assert.deepEqual(identity.found, [], `${view}: Identity`);
-    // ‹ and ✕, three choices of what to show, three backgrounds and Choose identities.
+    // ‹ and ✕, the three Show on tiles switches, three backgrounds and Choose identities.
     assert.equal(identity.count, 9, `${view}: every Identity control shows`);
     await button(page, 'Close setup').tap();
   }
@@ -374,7 +374,7 @@ async function checkRotatedClearance(t, engine) {
   await turnScreen(page, 952, 427, 90);
   const game = {
     ...busyGame(2), rotations: [1, 2], counters: { commander: true }, turns: 'rounds', turn: { first: 0, active: 0, round: 9 },
-    manaPool: false, identities: ['WR', 'UBRG'], identity: { show: { name: true }, background: 'off' },
+    manaPool: false, identities: ['WR', 'UBRG'], identity: { show: { name: true }, background: 'default', version: 2 },
   };
   await page.evaluate(saved => localStorage.setItem('lifepod-game', saved), JSON.stringify(game));
   await page.reload();

@@ -52,7 +52,6 @@
   --seam-width: 2px;
   --ring-opacity: .08;
   --watermark-opacity: .07;
-  --indicator-watermark-opacity: .1;
 
   /* Tile colours: twelve swatches, each a full tile palette. Players 1, 2 and 5 use the lighter top-row version
      and players 3, 4 and 6 the darker bottom-row one, so neighbours stay apart for colour-blind players even
@@ -405,8 +404,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .watermark:empty { display: none; }
 .player[data-background="symbol"] .watermark { font-size: min(var(--ub, 400px) * .86, var(--ui, 400px) * .62); opacity: var(--watermark-opacity); }
-.player[data-background="indicator"] .watermark { opacity: var(--indicator-watermark-opacity); }
-.watermark .ci { font-size: min(var(--ub, 400px) * .72, var(--ui, 400px) * .52); box-shadow: none; }
 
 /* An identity's symbol, from the Mana font: a colour's mana symbol, a guild, a clan, a Streets of New Capenna
    family or the colour pie. Four colours are the colour pie drawn from the five mana symbols on a pentagon (W at
@@ -1118,13 +1115,6 @@ dialog::backdrop { background: var(--scrim); }
 .segmented > button[hidden] { display: none; }
 .segmented > button:active { background: var(--surface-pressed); }
 .segmented > button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
-/* A multi-select segmented choice (Show on tiles): each segment that's on shows a check, so it reads as several
-   switches rather than one choice. The colour disc keeps a dark rim on the accent. */
-.segmented > button > .ci { flex: none; width: 16px; height: 16px; font-size: 16px; }
-.segmented > button[aria-pressed="true"] > .ci { --ci-rim: var(--ink); }
-.segment-check { display: none; flex: none; width: 13px; height: 13px; }
-.multi > button[aria-pressed="true"] > .segment-check { display: block; }
-.multi > button { gap: 5px; padding-inline: 4px; }
 /* Starting life: the stepper needs a little more room than a number. */
 .life-choices { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(7.5rem, 1.3fr); }
 /* Stepper: − value + inside the selected segment's accent fill, with 44px buttons. */
@@ -1193,6 +1183,28 @@ dialog::backdrop { background: var(--scrim); }
 .nav-summary + .caret { margin-inline-start: 0; }
 .switch-row .switch { margin-inline-start: auto; }
 .switch-row[hidden] { display: none; }
+/* Compact switch rows (Identity's Show on tiles): three to a line beside the label, each a whole 44px target with
+   the mark it adds to the chip, its label and a switch. */
+.compact-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.compact-switch { gap: 6px; padding-inline: 8px 6px; }
+.compact-switch > .ci { font-size: 16px; }
+/* Below 620px wide the three go under their label, and on portrait phones each puts its label over its mark and
+   switch, so no label is cut short. */
+@media (max-width: 620px) {
+  .setting-row:has(> .compact-switches) { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+}
+@media (max-width: 480px) {
+  .compact-switch {
+    display: grid;
+    grid-template-columns: auto auto;
+    place-content: center;
+    place-items: center;
+    gap: 4px 10px;
+    padding: 6px 4px;
+  }
+  .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+  .compact-switch .switch { margin-inline-start: 0; }
+}
 /* A long switch label, such as auto-empty's, wraps rather than being cut short. */
 .wide-switch .nav-label { white-space: normal; line-height: 1.2; }
 /* Segment icons, such as Turns' flag and untap symbol. */

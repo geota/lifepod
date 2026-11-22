@@ -5,8 +5,8 @@ import { chromium, webkit } from 'playwright-core';
 import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
 
 // Colour identity (design/polish/SPEC.md §2): its own sheet in setup, a chip on each tile showing any of the colour
-// indicator, the symbol and the name, a background behind the total, and identity mode, where every player sets
-// their own. None of it depends on the Commander switch.
+// indicator, the symbol and the name, a background behind the total (the symbol, the rings or nothing), and identity
+// mode, where every player sets their own. None of it depends on the Commander switch.
 
 const colours = ['W', 'U', 'B', 'R', 'G'];
 // All 31 identities, in W U B R G order.
@@ -40,6 +40,11 @@ const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const mode = page => page.locator('#board').getAttribute('data-mode');
 const openDialogs = page => page.evaluate(() => [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id));
 const pressed = (page, group) => page.locator(group).evaluate(node => [...node.querySelectorAll('[aria-pressed="true"]')].map(choice => choice.textContent));
+// The Show on tiles switches that are on, by label.
+const switchedOn = page => page.locator('#identity-show [role="switch"]').evaluateAll(inputs => inputs.filter(input => input.checked).map(input => input.closest('label').textContent.trim()));
+const showSwitch = (page, name) => page.locator('#identity-show label', { has: page.getByRole('switch', { name, exact: true }) });
+// The save format of the identity settings: without it, a saved background is from before Default (see the load test).
+const settingsVersion = 2;
 const saved = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
 
 // A dialog's close event runs after the click that closes it, so results that follow it are polled.
@@ -76,7 +81,8 @@ async function openPage(t, engine, { android = false, viewport = { width: 952, h
   return page;
 }
 
-// What each tile shows of its identity: the chip's parts in order, what a screen reader hears, and the background.
+// What each tile shows of its identity: the chip's parts in order, what a screen reader hears, and the background:
+// the symbol at its opacity, the rings, or "plain" for neither.
 function readTiles(page) {
   return page.locator('.player').evaluateAll(players => players.map((player) => {
     const glyph = node => getComputedStyle(node, '::before').content.codePointAt(1).toString(16);
@@ -90,7 +96,7 @@ function readTiles(page) {
     let background = 'rings';
     if (getComputedStyle(face, '::before').content === 'none') {
       const shown = mark.firstElementChild;
-      background = `${shown.matches('.ci') ? `indicator ${shown.dataset.ci}` : `symbol ${symbol(shown)}`} @${getComputedStyle(mark).opacity}`;
+      background = shown && mark.checkVisibility() ? `symbol ${symbol(shown)} @${getComputedStyle(mark).opacity}` : 'plain';
     }
     return {
       chip: chip && [...chip.children].filter(node => !node.matches('.visually-hidden')).map(part),
@@ -101,25 +107,26 @@ function readTiles(page) {
 }
 
 // Every identity, in every chip combination and with every background. Six tiles at a time, so each identity is
-// seen with each background: the backgrounds take turns across the combinations.
+// seen with each background: the backgrounds take turns across the combinations. Symbol is the identity's symbol
+// behind a set identity and the rings elsewhere, Default is the rings everywhere, and Off is a plain tile.
 test('chromium: every identity shows its indicator, symbol and name in every combination and background', { timeout: 120000 }, async (t) => {
   const page = await openPage(t, chromium);
   await page.goto(app);
   await page.evaluate(() => document.fonts.load('16px Mana', ''));
-  const backgrounds = ['symbol', 'indicator', 'off'];
+  const backgrounds = ['symbol', 'default', 'off'];
   for (const [index, show] of combinations.entries()) {
     const background = backgrounds[index % 3];
     for (let start = 0; start < identities.length; start += 6) {
       const batch = Array.from({ length: 6 }, (_, seat) => identities[start + seat] ?? '');
       await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), {
         startingLife: 40, scores: Array(6).fill(40), rotations: Array(6).fill(0), keepAwake: true, landscapeAngle: 90,
-        identities: batch, identity: { show, background },
+        identities: batch, identity: { show, background, version: settingsVersion },
       });
       await page.reload();
       await page.evaluate(() => document.fonts.ready);
       const view = `${JSON.stringify(show)}, ${background}`;
       const expected = batch.map((identity) => {
-        if (!identity) return { chip: null, spoken: null, background: 'rings' };
+        if (!identity) return { chip: null, spoken: null, background: background === 'off' ? 'plain' : 'rings' };
         const parts = [];
         if (show.indicator) parts.push(`indicator ${identity}`);
         if (show.symbol) parts.push(`symbol ${symbol(identity)}`);
@@ -127,7 +134,7 @@ test('chromium: every identity shows its indicator, symbol and name in every com
         return {
           chip: parts.length ? parts : null,
           spoken: parts.length ? spoken(identity) : null,
-          background: background === 'symbol' ? `symbol ${symbol(identity)} @0.07` : background === 'indicator' ? `indicator ${identity} @0.1` : 'rings',
+          background: { symbol: `symbol ${symbol(identity)} @0.07`, default: 'rings', off: 'plain' }[background],
         };
       });
       assert.deepEqual(await readTiles(page), expected, `${view}: ${batch.join(' ')}`);
@@ -178,32 +185,36 @@ async function checkSheet(t, engine) {
   await button(page, 'Game setup').tap();
   await button(page, 'Identity').tap();
   await eventually(() => openDialogs(page), ['identity-sheet']);
-  assert.deepEqual(await pressed(page, '#identity-show'), ['Indicator', 'Name']);
+  assert.deepEqual(await switchedOn(page), ['Indicator', 'Name']);
   assert.deepEqual(await pressed(page, '#identity-background'), ['Symbol']);
 
-  // Show on tiles is any combination, saved at once, and the tiles behind the sheet follow.
-  const show = page.locator('#identity-show');
-  await show.getByRole('button', { name: 'Symbol' }).tap();
+  // Show on tiles is three switches, any combination, each saved at once, and the tiles behind the sheet follow.
+  await showSwitch(page, 'Symbol').tap();
   assert.deepEqual((await saved(page)).identity.show, { indicator: true, symbol: true, name: true }, 'saved before the sheet closes');
   assert.deepEqual((await readTiles(page))[0].chip, ['indicator WUB', `symbol ${symbol('WUB')}`, 'name Esper']);
-  await show.getByRole('button', { name: 'Indicator' }).tap();
-  await show.getByRole('button', { name: 'Name' }).tap();
-  assert.deepEqual(await pressed(page, '#identity-show'), ['Symbol']);
+  await showSwitch(page, 'Indicator').tap();
+  await showSwitch(page, 'Name').tap();
+  assert.deepEqual(await switchedOn(page), ['Symbol']);
   assert.deepEqual((await readTiles(page))[3].chip, [`symbol ${symbol('UBRG')}`]);
-  await show.getByRole('button', { name: 'Symbol' }).tap();
-  assert.deepEqual(await pressed(page, '#identity-show'), [], 'everything can be off');
+  await showSwitch(page, 'Symbol').tap();
+  assert.deepEqual(await switchedOn(page), [], 'everything can be off');
   assert.deepEqual((await readTiles(page)).map(read => read.chip), [null, null, null, null], 'with nothing to show, no chip');
   assert.equal((await readTiles(page))[2].background, `symbol ${glyphs.UG} @0.07`, 'the background is a setting of its own');
+  // Symbol: a tile with no identity keeps the rings.
+  assert.equal((await readTiles(page))[1].background, 'rings');
 
-  // The background: the colour indicator, faintly, or the rings.
+  // Default is the rings on every tile, with no symbol.
   const background = page.locator('#identity-background');
-  await background.getByRole('button', { name: 'Indicator' }).tap();
-  assert.equal((await saved(page)).identity.background, 'indicator');
-  assert.deepEqual((await readTiles(page)).map(read => read.background), ['indicator WUB @0.1', 'rings', 'indicator UG @0.1', 'indicator UBRG @0.1']);
-  await background.getByRole('button', { name: 'Off' }).tap();
-  assert.deepEqual(await pressed(page, '#identity-background'), ['Off']);
+  await background.getByRole('button', { name: 'Default' }).tap();
+  assert.equal((await saved(page)).identity.background, 'default');
+  assert.deepEqual(await pressed(page, '#identity-background'), ['Default']);
   assert.deepEqual((await readTiles(page)).map(read => read.background), ['rings', 'rings', 'rings', 'rings']);
-  // Both off is identity off, and every player keeps their pick.
+  // Off is no background at all: no rings and no symbol.
+  await background.getByRole('button', { name: 'Off' }).tap();
+  assert.deepEqual((await saved(page)).identity, { show: { indicator: false, symbol: false, name: false }, background: 'off', version: settingsVersion });
+  assert.deepEqual(await pressed(page, '#identity-background'), ['Off']);
+  assert.deepEqual((await readTiles(page)).map(read => read.background), ['plain', 'plain', 'plain', 'plain']);
+  // Chip and background off is identity off, and every player keeps their pick.
   assert.deepEqual((await saved(page)).identities, ['WUB', '', 'UG', 'UBRG']);
 
   // ‹ returns to setup, with focus on Identity.
@@ -247,7 +258,8 @@ async function checkSheet(t, engine) {
     await page.reload();
     await button(page, 'Game setup').tap();
     await button(page, 'Identity').tap();
-    assert.deepEqual([await pressed(page, '#identity-show'), await pressed(page, '#identity-background')], [[], ['Off']]);
+    assert.deepEqual([await switchedOn(page), await pressed(page, '#identity-background')], [[], ['Off']]);
+    assert.deepEqual((await readTiles(page)).map(read => read.background), ['plain', 'plain', 'plain', 'plain'], 'Off survives a reload');
   }
 }
 
@@ -398,7 +410,9 @@ test('chromium: identity mode fits every player count', { timeout: 120000 }, asy
   }
 });
 
-// Saves from before identity settings load with the defaults, and anything invalid falls back to its default.
+// Saves from before identity settings load with the defaults, and anything invalid falls back to its default. Saves
+// from before Default had Symbol · Indicator · Off, where Off was the rings: their Off loads as Default and their
+// Indicator as Symbol. Only a save that carries the settings version can be the new Off.
 test('chromium: saved identity settings are checked when a game loads', async (t) => {
   const page = await openPage(t, chromium);
   await page.goto(app);
@@ -409,7 +423,7 @@ test('chromium: saved identity settings are checked when a game loads', async (t
     await page.reload();
     await button(page, 'Game setup').tap();
     await button(page, 'Identity').tap();
-    const settings = [await pressed(page, '#identity-show'), await pressed(page, '#identity-background')];
+    const settings = [await switchedOn(page), await pressed(page, '#identity-background')];
     await button(page, 'Close setup').tap();
     return { settings, tiles: (await readTiles(page)).map(read => [read.chip, read.background.split(' ')[0]]) };
   };
@@ -417,19 +431,36 @@ test('chromium: saved identity settings are checked when a game loads', async (t
     settings: [['Indicator', 'Name'], ['Symbol']],
     tiles: [[['indicator WU', 'name Azorius'], 'symbol'], [['indicator BRG', 'name Jund'], 'symbol'], [null, 'rings'], [['indicator R', 'name Mono-red'], 'symbol']],
   }, 'a save from before identity settings gets the defaults');
-  assert.deepEqual((await load({ show: { indicator: 'yes', symbol: true, name: 0 }, background: 'rings' })).settings,
+  assert.deepEqual((await load({ show: { indicator: 'yes', symbol: true, name: 0 }, background: 'rings', version: settingsVersion })).settings,
     [['Indicator', 'Symbol', 'Name'], ['Symbol']], 'each invalid value falls back to its own default');
   assert.deepEqual((await load('symbol')).settings, [['Indicator', 'Name'], ['Symbol']]);
-  assert.deepEqual(await load({ show: { indicator: false, symbol: false, name: false }, background: 'off' }), {
-    settings: [[], ['Off']], tiles: [[null, 'rings'], [null, 'rings'], [null, 'rings'], [null, 'rings']],
-  }, 'identity off loads as saved');
-  assert.deepEqual((await load({ show: { symbol: true }, background: 'indicator' })).settings, [['Indicator', 'Symbol', 'Name'], ['Indicator']],
+  assert.deepEqual(await load({ show: { indicator: false, symbol: false, name: false }, background: 'off', version: settingsVersion }), {
+    settings: [[], ['Off']], tiles: [[null, 'plain'], [null, 'plain'], [null, 'plain'], [null, 'plain']],
+  }, 'identity off loads as saved, with no background');
+  assert.deepEqual(await load({ show: { indicator: false, symbol: false, name: false }, background: 'default', version: settingsVersion }), {
+    settings: [[], ['Default']], tiles: [[null, 'rings'], [null, 'rings'], [null, 'rings'], [null, 'rings']],
+  }, 'Default loads as saved');
+  assert.deepEqual((await load({ show: { symbol: true }, background: 'symbol', version: settingsVersion })).settings, [['Indicator', 'Symbol', 'Name'], ['Symbol']],
     'missing parts get their defaults');
+
+  // Saves from before Default.
+  assert.deepEqual(await load({ show: { indicator: false, symbol: false, name: false }, background: 'off' }), {
+    settings: [[], ['Default']], tiles: [[null, 'rings'], [null, 'rings'], [null, 'rings'], [null, 'rings']],
+  }, 'the old Off was the rings, so it loads as Default');
+  assert.deepEqual(await load({ show: { symbol: true }, background: 'indicator' }), {
+    settings: [['Indicator', 'Symbol', 'Name'], ['Symbol']],
+    tiles: [
+      [['indicator WU', `symbol ${glyphs.WU}`, 'name Azorius'], 'symbol'], [['indicator BRG', `symbol ${glyphs.BRG}`, 'name Jund'], 'symbol'],
+      [null, 'rings'], [['indicator R', `symbol ${glyphs.R}`, 'name Mono-red'], 'symbol'],
+    ],
+  }, 'the old Indicator background loads as Symbol');
+  assert.deepEqual((await load({ background: 'symbol' })).settings, [['Indicator', 'Name'], ['Symbol']], 'the old Symbol stays Symbol');
+  assert.deepEqual((await load({ background: 'rings' })).settings, [['Indicator', 'Name'], ['Symbol']], 'anything else is Symbol');
 });
 
 // Identity mode and the Identity sheet explain themselves (design/polish/FINAL-REVIEW.md #9 and #10). An off toggle's
-// symbol is muted and an on one has a check, under the hint "Tap your colours". Each "Show on tiles" segment has the
-// mark it adds (the colour disc, the symbol, "Aa"), shows a check while it's on, and the note says what tiles show.
+// symbol is muted and an on one has a check, under the hint "Tap your colours". Each "Show on tiles" switch row has the
+// mark it adds (the colour disc, the symbol, "Aa") and a switch that's on or off, and the note says what tiles show.
 async function checkExplains(t, engine) {
   const page = await openPage(t, engine);
   await page.goto(app);
@@ -440,24 +471,24 @@ async function checkExplains(t, engine) {
   await button(page, 'Game setup').tap();
   await button(page, 'Identity').tap();
   const sheet = () => page.locator('#identity-show').evaluate(group => ({
-    segments: [...group.children].map(segment => ({
-      label: segment.textContent.trim(),
-      mark: Boolean(segment.querySelector(':scope > :first-child:is(.ci, .mana-icon, svg:not(.segment-check))')),
-      check: segment.querySelector('.segment-check').checkVisibility(),
+    toggles: [...group.children].map(row => ({
+      label: row.textContent.trim(),
+      mark: Boolean(row.querySelector(':scope > :first-child:is(.ci, .mana-icon, svg)')),
+      on: row.querySelector('[role="switch"]').checked,
     })),
     note: document.querySelector('#identity-note').textContent,
   }));
   assert.deepEqual(await sheet(), {
-    segments: [{ label: 'Indicator', mark: true, check: true }, { label: 'Symbol', mark: true, check: false }, { label: 'Name', mark: true, check: true }],
+    toggles: [{ label: 'Indicator', mark: true, on: true }, { label: 'Symbol', mark: true, on: false }, { label: 'Name', mark: true, on: true }],
     note: "Tiles show the colour disc and name of each player's identity.",
-  }, 'the default: the colour disc and the name, each with a check');
-  await page.locator('#identity-show').getByRole('button', { name: 'Symbol' }).tap();
+  }, 'the default: the colour disc and the name are on');
+  await showSwitch(page, 'Symbol').tap();
   assert.equal((await sheet()).note, "Tiles show the colour disc, symbol and name of each player's identity.");
-  for (const part of ['Indicator', 'Symbol', 'Name']) await page.locator('#identity-show').getByRole('button', { name: part }).tap();
+  for (const part of ['Indicator', 'Symbol', 'Name']) await showSwitch(page, part).tap();
   const none = await sheet();
-  assert.deepEqual(none.segments.map(segment => segment.check), [false, false, false], 'no checks with nothing on');
+  assert.deepEqual(none.toggles.map(toggle => toggle.on), [false, false, false], 'every switch off');
   assert.equal(none.note, 'Identity is hidden on tiles. Players keep their picks.');
-  await page.locator('#identity-show').getByRole('button', { name: 'Name' }).tap();
+  await showSwitch(page, 'Name').tap();
   assert.equal((await sheet()).note, "Tiles show the name of each player's identity.");
 
   // Identity mode: Player 1 has W, U, B and G, so red is off.
