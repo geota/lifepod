@@ -1,6 +1,4 @@
-Mana font: Copyright (c) Andrew Gioia (https://github.com/andrewgioia/mana).
-The mana and colour indicator symbol designs are property of Wizards of the Coast LLC. LifePod is unofficial
-Fan Content permitted under the Fan Content Policy, not approved or endorsed by Wizards.
+Copyright (c) Andrew Gioia (https://github.com/andrewgioia/mana).
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
