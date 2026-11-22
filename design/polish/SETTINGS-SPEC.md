@@ -170,3 +170,31 @@ Each is a row with its icon, its label and an out-to-the-board arrow. The row's 
   - switches save instantly and survive a reload.
 - `sizes.test.mjs`: replace the setup-fits-without-scrolling checks with "the header stays visible and the body scrolls".
 - Remove the Track and Identity sub-sheet tests. Their switch behaviour checks move into `settings.test.mjs`.
+
+---
+
+## 7. As built (22 November 2026)
+
+Built with [STYLE.md](STYLE.md)'s picks: direction A (tonal) on every control type, Graphite + lime for the chrome, the notched players and life sliders with the inline life field, and a solid pill whose fill is one token (`--pill-background`) so a glass pill can replace it. The tiles, the life halves and the twelve tile palettes are unchanged. Tests: `tests/settings.test.mjs` replaces `setup.test.mjs`; `sizes.test.mjs` checks the page on every screen it lists.
+
+Where the build differs from the spec above, and why:
+
+| Spec | As built | Why |
+|---|---|---|
+| The pill's button opens settings (its name was "Game setup") | It's named **Settings**, and ✕ is "Close settings" | The name matches the page it opens. |
+| Board actions keep their visible labels | Colours, Rotate seats and Choose identities show those labels; their accessible names are the spec's longer ones | The names contain the visible labels (WCAG 2.5.3). |
+| One column: labels beside controls in cards at least 480px wide | True for Turns and Background. The sliders and Show on tiles keep their label above at every width. | A slider needs the full width for 44px stops; beside a 7.5rem label the life stops crowd. |
+| Compact switches put the label over the switch in portrait | They do so whenever their card is narrow: under 460px for Show on tiles, under 340px for Track's switches | At 640 × 360 and 667 × 375 the two columns are narrower than a portrait phone, and "Indicator" or "Experience" would be cut short. A container query decides. |
+| Two columns in landscape from 620px wide | Two columns whenever the window is at least 620px wide, portrait tablets included | The width is what matters; a portrait tablet has room. |
+| Section order by layout | app.js moves the sections between the columns (and keeps focus) rather than reordering them with CSS | The reading and focus order always match what shows. The move waits while the life field is open, so a keyboard resize can't close it. |
+| `scroll-padding-top` equal to the header | The header is its own grid row above the scrolling body, so it can't cover anything; the body has 8px scroll padding | Covering is impossible by construction; a test tabs through every control at 568 × 320 to check it. |
+| Arrow keys step, Page Up and Page Down step life by 5 | As specified. Home and End go to the ends of the track (2 and 6; 10 and 60). Life's ARIA range is 1 to 999, and keys can step past the track, where the handle pins and is marked with an arrow. | Keyboard users can reach every life the field allows. |
+| Each stop is a target | Stops are buttons with `tabindex="-1"`: the slider is one tab stop, and screen readers can still reach each stop | Five extra tab stops per slider would be noise next to the arrow keys. |
+| A press on the slider | A value is picked when a press lifts without moving (a tap) or moves sideways (a drag); a vertical swipe scrolls the page (`touch-action: pan-y`) | No scroll trap: a swipe that starts on a slider never changes it. |
+| Inline life field | Enter, ✓, Done in the iOS keyboard bar or leaving the field commits; Escape cancels and leaves settings open. Letters are dropped as they're typed. | Escape would otherwise close settings and lose the typing. |
+| The field scrolls clear of the keyboard | It also gets extra bottom room (`--keyboard`) from the visual viewport where the page doesn't shrink for the keyboard (iOS), and it works when the page is flipped | The field could otherwise sit under an iOS keyboard with nothing left to scroll. |
+| New game's confirmation over settings | Android back and Escape close the top dialog first (the confirmation), then settings | `closeOpenDialog` now closes the last open dialog. |
+| Header at 320 × 568 | Under 400px wide the header tightens, and "Start new game" may wrap onto two lines | So the title stays whole beside it. |
+| Mode cells' pressed state | Counter and mana cells press with the 10% state layer (direction A); the turn chip and Me first keep their seat wash | Cells are controls in the chrome's style; the chip and Me first belong to the tile, like the life halves. |
+| Identity toggles | Off is a raised disc with the symbol muted; on keeps the symbol in full colour inside a 2px accent ring, with the check | Direction A's selected style without filling the symbol, which is the information. |
+| The pill | No border; the solid `--raised` fill and a soft two-layer shadow | Direction A. The fill is `--pill-background`, the shadow `--pill-shadow`. |

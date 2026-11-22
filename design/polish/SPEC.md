@@ -255,10 +255,15 @@ For reference, `ui` is 316px on the target, 283px at 852 × 393, 213px at 640 ×
 | Mode hints ("Tap +1 · hold −1", "Your tile colour") | `ub ≥ 200` and `ui ≥ 240`, as today. Shown on the target; hidden at 640 × 360 and below with 6 players. |
 | Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2. |
 | Mana strip | One line when it fits; otherwise it wraps to two. It's never dropped. |
-| Setup header | Its own row when the viewport is at least 360px tall. Below that, the title goes and About · ✕ move to the end of the Players row (282px sheet at 568 × 320). |
+| Settings header | Fixed at the top of the full-screen settings page; it tightens to 4px padding under 360px tall (SETTINGS-SPEC.md §3). |
 | Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. |
 
 ## 4. Setup with a fixed set of controls (Q4: S2, plus the owner's restyle)
+
+> **Superseded (22 November 2026).** Setup and its Track, Identity and About sheets are now one full-screen settings page,
+> built from [SETTINGS-SPEC.md](SETTINGS-SPEC.md) (layout and behaviour) and styled by [STYLE.md](STYLE.md) direction A
+> (tonal) with the Graphite + lime palette. Players and starting life are notched sliders with an inline life field,
+> which replaces the stepper below. The rest of this section is kept as the record of the earlier build.
 
 ![Setup](renders/spec-setup.png)
 
@@ -439,7 +444,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.3 Android back, in order
 
-1. A sub-sheet (Track, Identity) goes back to setup. Setup, the dice and other dialogs close.
+1. The topmost dialog closes: New game's confirmation over settings first, then settings (dropping a pending new game), the dice and other dialogs. (Updated for the settings page; there are no sub-sheets any more.)
 2. Rotate, colours and identity modes end, keeping their changes.
 3. Counters, damage and mana modes behave like ✕: they ask when there are edits.
 4. "Who goes first?" is skipped.
