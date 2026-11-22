@@ -33,6 +33,8 @@ jobs:
       # Checks web/ against the iOS 16 and Android WebView floor in package.json's browserslist. Every finding is an
       # error; a feature-detected line or a partial-support note that doesn't apply says why in a disable comment.
       - run: npm run lint:compat
+      # Type-checks web/'s JavaScript through its JSDoc (tsconfig.json); nothing is emitted.
+      - run: npm run typecheck
       # The board's type is system-ui, which is Roboto on Android. Ubuntu falls back to the much wider DejaVu
       # Sans, which would make badge-fit and auto-drop tests measure text no phone shows.
       - name: Use Roboto as the system font, like Android

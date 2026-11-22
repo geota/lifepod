@@ -1,0 +1,19 @@
+// `npm run typecheck`: TypeScript checks web/'s JavaScript through its JSDoc comments. Nothing is emitted, so the
+// shipped files stay exactly what's written. types/globals.d.ts declares the native bridges and the dice API.
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    // ES2022 is what iOS 16's WebKit runs, as in the ESLint configs, so a newer built-in such as Object.groupBy (ES2024)
+    // is a type error. The DOM lib is always the latest; `npm run lint:compat` checks DOM APIs against the floor.
+    "target": "es2022",
+    "lib": ["es2022", "dom"],
+    "types": [],
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "skipLibCheck": true
+  },
+  "include": ["web/*.js", "types/*.d.ts"]
+}

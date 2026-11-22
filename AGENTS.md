@@ -2,7 +2,7 @@
 
 LifePod is one offline web page in `web/`, wrapped by a Kotlin WebView app (`android/`) and a SwiftUI WKWebView app (`ios/`). There's no build step for the web code. `design/polish/SPEC.md` describes how the board behaves, and `README.md` has the rules players see.
 
-Run `npm run check` before every commit. It runs ESLint, the compatibility lint, ktlint, swift-format and every test. There's no commit hook, so nothing else runs them before CI. For Android changes, also run `npm run lint:android` and `./android/build.sh`.
+Run `npm run check` before every commit. It runs ESLint, the compatibility lint, the type check, ktlint, swift-format and every test. There's no commit hook, so nothing else runs them before CI. For Android changes, also run `npm run lint:android` and `./android/build.sh`.
 
 ## Invariants
 
@@ -19,6 +19,10 @@ The page loading a new file isn't enough. List it in all three places, or it wil
 1. `MIME_TYPES` in `android/src/dev/maceiras/lifepod/MainActivity.kt`, the Android asset allowlist;
 2. the `zip` line of the "Bundle offline web app" step in `.github/workflows/ci.yml`;
 3. the expected file list in `tests/native.test.mjs`, whose contract test checks the other two.
+
+## Types
+
+`npm run typecheck` runs TypeScript over `web/*.js` through JSDoc comments, with no build step and nothing emitted (`tsconfig.json`). The saved game is `@typedef Game` above `loadGame` in `app.js`, and the board modes are `BoardMode`. `types/globals.d.ts` declares the Android and iOS bridges and the dice API; change it with the native code. It's outside `web/` because the native builds package every file there. A new `game` field goes in the typedef as well as `loadGame`. Prefer a JSDoc cast, such as `/** @type {HTMLInputElement} */ (…)`, over changing code to satisfy the checker.
 
 ## The Mana font
 

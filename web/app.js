@@ -3,55 +3,55 @@
 const storageKey = 'lifepod-game';
 const android = window.LifePodAndroid;
 const ios = window.webkit?.messageHandlers;
-const board = document.querySelector('#board');
-const playerTemplate = document.querySelector('#player-template');
-const wakeInput = document.querySelector('#keep-awake');
-const boardControls = document.querySelector('#board-controls');
-const setupButton = document.querySelector('#setup-button');
-const diceButton = document.querySelector('#dice-button');
-const diceDialog = document.querySelector('#dice');
-const diceStage = document.querySelector('#dice-stage');
-const dicePicker = document.querySelector('#dice-picker');
-const diceRoll = document.querySelector('#dice-roll');
-const diceResult = document.querySelector('#dice-result');
-const rotateSeatsButton = document.querySelector('#rotate-seats');
-const tileColoursButton = document.querySelector('#tile-colours');
-const damageButton = document.querySelector('#damage-button');
-const countersButton = document.querySelector('#counters-button');
-const roundButton = document.querySelector('#round-button');
-const roundBackButton = document.querySelector('#round-back');
-const manaButton = document.querySelector('#mana-button');
-const shuffleButton = document.querySelector('#shuffle-button');
-const undoButton = document.querySelector('#undo-button');
-const saveButton = document.querySelector('#save-button');
-const cancelButton = document.querySelector('#cancel-button');
-const discardDialog = document.querySelector('#discard');
-const settings = document.querySelector('#settings');
-const settingsForm = document.querySelector('#settings-form');
-const settingsBody = document.querySelector('#settings-body');
-const settingsContent = document.querySelector('#settings-content');
-const settingsHead = settings.querySelector('.fs-head');
-const settingsCue = settings.querySelector('.scroll-cue');
-const settingsFlip = document.querySelector('#settings-flip');
-const settingsDone = document.querySelector('#save-setup');
-const settingsPending = document.querySelector('#settings-pending');
-const restartButton = document.querySelector('#restart-button');
-const playerChoices = document.querySelector('#player-choices');
-const lifePresets = document.querySelector('#life-presets');
-const lifeEdit = document.querySelector('#life-edit');
-const lifeValue = document.querySelector('#life-value');
-const lifeEditor = document.querySelector('#life-editor');
-const lifeInput = document.querySelector('#life-input');
-const manaSwitch = document.querySelector('#mana-switch');
-const autoEmptySwitch = document.querySelector('#auto-empty-switch');
-const autoEmptyRow = document.querySelector('#auto-empty-row');
-const turnChoices = document.querySelector('#turn-choices');
-const identityNote = document.querySelector('#identity-note');
-const identityShowSwitches = document.querySelectorAll('#identity-show input');
-const identityBackgroundChoices = document.querySelector('#identity-background');
-const chooseIdentitiesButton = document.querySelector('#choose-identities');
-const restart = document.querySelector('#restart');
-const announcer = document.querySelector('#announcer');
+const board = /** @type {HTMLParent} */ (document.querySelector('#board'));
+const playerTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector('#player-template'));
+const wakeInput = /** @type {HTMLInputElement} */ (document.querySelector('#keep-awake'));
+const boardControls = /** @type {HTMLDivElement} */ (document.querySelector('#board-controls'));
+const setupButton = /** @type {HTMLButtonElement} */ (document.querySelector('#setup-button'));
+const diceButton = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-button'));
+const diceDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#dice'));
+const diceStage = /** @type {HTMLDivElement} */ (document.querySelector('#dice-stage'));
+const dicePicker = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#dice-picker'));
+const diceRoll = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-roll'));
+const diceResult = /** @type {HTMLParagraphElement} */ (document.querySelector('#dice-result'));
+const rotateSeatsButton = /** @type {HTMLButtonElement} */ (document.querySelector('#rotate-seats'));
+const tileColoursButton = /** @type {HTMLButtonElement} */ (document.querySelector('#tile-colours'));
+const damageButton = /** @type {HTMLButtonElement} */ (document.querySelector('#damage-button'));
+const countersButton = /** @type {HTMLButtonElement} */ (document.querySelector('#counters-button'));
+const roundButton = /** @type {HTMLButtonElement} */ (document.querySelector('#round-button'));
+const roundBackButton = /** @type {HTMLButtonElement} */ (document.querySelector('#round-back'));
+const manaButton = /** @type {HTMLButtonElement} */ (document.querySelector('#mana-button'));
+const shuffleButton = /** @type {HTMLButtonElement} */ (document.querySelector('#shuffle-button'));
+const undoButton = /** @type {HTMLButtonElement} */ (document.querySelector('#undo-button'));
+const saveButton = /** @type {HTMLButtonElement} */ (document.querySelector('#save-button'));
+const cancelButton = /** @type {HTMLButtonElement} */ (document.querySelector('#cancel-button'));
+const discardDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#discard'));
+const settings = /** @type {HTMLDialogElement} */ (document.querySelector('#settings'));
+const settingsForm = /** @type {HTMLFormElement} */ (document.querySelector('#settings-form'));
+const settingsBody = /** @type {HTMLDivElement} */ (document.querySelector('#settings-body'));
+const settingsContent = /** @type {HTMLDivElement} */ (document.querySelector('#settings-content'));
+const settingsHead = /** @type {HTMLElement} */ (settings.querySelector('.fs-head'));
+const settingsCue = /** @type {HTMLDivElement} */ (settings.querySelector('.scroll-cue'));
+const settingsFlip = /** @type {HTMLButtonElement} */ (document.querySelector('#settings-flip'));
+const settingsDone = /** @type {HTMLButtonElement} */ (document.querySelector('#save-setup'));
+const settingsPending = /** @type {HTMLParagraphElement} */ (document.querySelector('#settings-pending'));
+const restartButton = /** @type {HTMLButtonElement} */ (document.querySelector('#restart-button'));
+const playerChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#player-choices'));
+const lifePresets = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#life-presets'));
+const lifeEdit = /** @type {HTMLButtonElement} */ (document.querySelector('#life-edit'));
+const lifeValue = /** @type {HTMLSpanElement} */ (document.querySelector('#life-value'));
+const lifeEditor = /** @type {HTMLSpanElement} */ (document.querySelector('#life-editor'));
+const lifeInput = /** @type {HTMLInputElement} */ (document.querySelector('#life-input'));
+const manaSwitch = /** @type {HTMLInputElement} */ (document.querySelector('#mana-switch'));
+const autoEmptySwitch = /** @type {HTMLInputElement} */ (document.querySelector('#auto-empty-switch'));
+const autoEmptyRow = /** @type {HTMLLabelElement} */ (document.querySelector('#auto-empty-row'));
+const turnChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#turn-choices'));
+const identityNote = /** @type {HTMLParagraphElement} */ (document.querySelector('#identity-note'));
+const identityShowSwitches = /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#identity-show input'));
+const identityBackgroundChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#identity-background'));
+const chooseIdentitiesButton = /** @type {HTMLButtonElement} */ (document.querySelector('#choose-identities'));
+const restart = /** @type {HTMLDialogElement} */ (document.querySelector('#restart'));
+const announcer = /** @type {HTMLParagraphElement} */ (document.querySelector('#announcer'));
 const portraitQuery = window.matchMedia('(orientation: portrait)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
@@ -90,6 +90,7 @@ const defaultStyle = ios?.game ? 'glass' : 'material';
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
 // Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
+/** @type {BoardMode[]} */
 const editingModes = ['damage', 'counters', 'mana'];
 const discardMessages = {
   damage: 'Commander damage and life go back to how they were when you opened commander damage.',
@@ -99,6 +100,7 @@ const discardMessages = {
 // Player counters (design/polish/SPEC.md §6), in the order they appear everywhere: counters mode, the near badge row,
 // the Track sheet and its summary. Each is one count per player in game[kind], shown while its Track switch is on.
 // Commander tax counts casts and comes with the Commander switch. phrase names one counter for screen readers.
+/** @type {{ kind: CountKind, tracker: Tracker, phrase: string }[]} */
 const counterKinds = [
   { kind: 'poison', tracker: 'poison', phrase: 'poison counter' },
   { kind: 'casts', tracker: 'commander', phrase: 'commander cast' },
@@ -106,10 +108,14 @@ const counterKinds = [
   { kind: 'experience', tracker: 'experience', phrase: 'experience counter' },
   { kind: 'rad', tracker: 'rad', phrase: 'rad counter' },
 ];
+// Typed as strings, so includes() can test any kind.
+/** @type {string[]} */
 const countKinds = counterKinds.map(counter => counter.kind);
 // The monarch (CR 726) and the initiative (CR 727): one player at most holds each, saved in game[kind] as a seat index
 // or null. Nobody holds either until an effect gives it, so a new game clears both. Counters mode shows a cell for each
 // after the counters, and the holder's near row a chip. The words are for screen readers.
+/** @typedef {{ kind: DesignationKind, label: string, name: string, role: string, still: string }} Designation */
+/** @type {Designation[]} */
 const designations = [
   { kind: 'monarch', label: 'Monarch', name: 'the monarch', role: 'is the monarch', still: 'is still the monarch' },
   { kind: 'initiative', label: 'Initiative', name: 'the initiative', role: 'has the initiative', still: 'still has the initiative' },
@@ -224,11 +230,13 @@ let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
 // The open board mode: 'rotate', 'colours', 'identity', 'damage', 'counters', 'mana' or 'first' ("Who goes first?"),
-// or null at rest.
+// or null at rest. Only setBoardMode changes it.
+/** @typedef {null | 'rotate' | 'colours' | 'identity' | 'damage' | 'counters' | 'mana' | 'first'} BoardMode */
+/** @type {BoardMode} */
 let boardMode = null;
 // While an editing mode is open: every change made in it, newest last, so it can be undone or discarded,
 // and the life totals when it opened.
-let edits = null;
+let edits = /** @type {Edit[] | null} */ (null);
 let editStartScores = [];
 let announceTimer;
 const pendingAnnouncements = new Map();
@@ -282,9 +290,10 @@ function readScreen() {
 }
 
 // The screen angle that shows the board upright in landscape, so the seats can stay fixed to the device.
+/** @returns {QuarterTurn} */
 function currentLandscapeAngle() {
   const { angle, landscape } = readScreen();
-  return landscape ? angle : (angle + 90) % 360;
+  return /** @type {QuarterTurn} */ (landscape ? angle : (angle + 90) % 360);
 }
 
 function boardTurn() {
@@ -322,7 +331,7 @@ function measureBoard() {
   // The far row already keeps this clear of the board's middle.
   const farClear = size / 2 + 2;
   const usable = faces.map((face) => {
-    const player = face.parentElement;
+    const player = /** @type {HTMLElement} */ (face.parentElement);
     const clear = centreClearance(player, face, pill, farClear);
     for (const edge of faceEdges) {
       if (clear[edge]) player.style.setProperty(`--clear-${edge}`, `${clear[edge]}px`);
@@ -403,7 +412,7 @@ function centreClearance(player, face, pill, farClear) {
     left <= tile.left + 0.5 ? right - tile.left : null,
   ];
   const turn = faceAngles[player.dataset.edge] / 90;
-  let best = null;
+  let best = /** @type {{ edge: string, need: number, cost: number } | null} */ (null);
   depths.forEach((depth, side) => {
     if (depth === null) return;
     const edge = faceEdges[(side - turn + 4) % 4];
@@ -545,7 +554,7 @@ function fitBadgeSide(side) {
   const measure = (level) => {
     syncDropTokens({ ...dropLevels, [side]: level });
     const taken = steps.slice(0, level);
-    const floors = taken.filter(step => step.floor).map(step => step.floor);
+    const floors = taken.filter(step => step.floor).map(step => /** @type {number} */ (step.floor));
     return {
       // A pixel to spare absorbs the rounding of each chip's width.
       ratio: Math.min(...rows.map(row => (row.clientWidth - 1) / Math.max(1, chipsWidth(row)))),
@@ -591,7 +600,7 @@ function overlaps(a, b) {
 // The type steps (shrink, then wrap) are board-wide like the badge rows: the fewest that fold the fewest strips, with
 // the same 15% to spare before a step is undone. Returns whether a chip took room on a near row's line.
 function fitStrips() {
-  const strips = [...board.querySelectorAll('.mana-strip')].filter(strip => !strip.hidden && strip.parentElement.offsetParent !== null);
+  const strips = [...board.querySelectorAll('.mana-strip')].filter(strip => !strip.hidden && /** @type {HTMLElement} */ (strip.parentElement).offsetParent !== null);
   board.style.removeProperty('--strip-size');
   if (!strips.length) {
     syncDropTokens(dropLevels);
@@ -619,7 +628,7 @@ function fitStrips() {
   // costs one, and one on the near row's line two.
   const place = (strip, slack, wrap) => {
     const player = tileOf(strip);
-    const room = strip.parentElement.clientWidth;
+    const room = /** @type {HTMLElement} */ (strip.parentElement).clientWidth;
     const near = player.querySelector('.badges.near');
     const nearWidth = near.hidden ? 0 : chipsWidth(near);
     const besideNear = width => nearWidth + (nearWidth ? 4 : 0) + width <= room + 1;
@@ -638,7 +647,7 @@ function fitStrips() {
     syncDropTokens({ ...dropLevels, strip: level });
     board.style.removeProperty('--strip-size');
     const taken = steps.slice(0, level);
-    const floors = taken.filter(step => step.floor).map(step => step.floor);
+    const floors = taken.filter(step => step.floor).map(step => /** @type {number} */ (step.floor));
     const wrap = taken.some(step => step.wrap);
     if (floors.length) {
       // Each strip shrinks toward the line it can have: its own line where that's clear of the total, otherwise what the
@@ -647,7 +656,7 @@ function fitStrips() {
         const player = tileOf(strip);
         const near = player.querySelector('.badges.near');
         player.dataset.strip = 'above';
-        const room = strip.parentElement.clientWidth - (clear(strip) || near.hidden ? 0 : chipsWidth(near) + 4);
+        const room = /** @type {HTMLElement} */ (strip.parentElement).clientWidth - (clear(strip) || near.hidden ? 0 : chipsWidth(near) + 4);
         return room / (lineWidth(strip) * slack);
       }));
       if (ratio < 1) board.style.setProperty('--strip-size', `${Math.max(Math.min(...floors), Math.floor(base * ratio * 10) / 10)}px`);
@@ -672,12 +681,21 @@ function fitStrips() {
   return strips.some(strip => tileOf(strip).dataset.strip === 'fold-inline');
 }
 
+/**
+ * @param {number} index
+ * @returns {'top' | 'bottom'}
+ */
 function seatRow(index) {
   return topRowPlayers.includes(index) ? 'top' : 'bottom';
 }
 
 // One distinct swatch per player. Valid saved choices are kept in seat order. A seat with no choice, or with
 // one already taken, gets its default if that's free and otherwise the first free swatch.
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {number[]}
+ */
 function fitColors(saved, count) {
   const colors = [];
   for (let index = 0; index < count; index++) {
@@ -693,6 +711,11 @@ function fitColors(saved, count) {
 }
 
 // One count per player. Anything that isn't a whole number from 0 to the maximum starts at 0.
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {number[]}
+ */
 function fitCounts(saved, count) {
   return Array.from({ length: count }, (_, index) => {
     const value = Array.isArray(saved) ? saved[index] : undefined;
@@ -702,12 +725,21 @@ function fitCounts(saved, count) {
 
 // Colour identity as letters in W U B R G order. Anything else, including colourless ('C') from saves made
 // before it was removed, means no identity.
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
 function normalizeIdentity(value) {
   if (typeof value !== 'string' || !/^[WUBRG]*$/.test(value)) return '';
   return identityColours.map(colour => colour.id).filter(id => value.includes(id)).join('');
 }
 
 // Commander damage taken, by defender then attacker. A player never damages themselves.
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {number[][]}
+ */
 function fitDamage(saved, count) {
   return Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) => {
     const value = Array.isArray(saved?.[defender]) ? saved[defender][attacker] : undefined;
@@ -715,19 +747,32 @@ function fitDamage(saved, count) {
   }));
 }
 
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {string[]}
+ */
 function fitIdentities(saved, count) {
   return Array.from({ length: count }, (_, index) => normalizeIdentity(Array.isArray(saved) ? saved[index] : undefined));
 }
 
 // What tiles show of each identity: the chip's parts (default: indicator and name) and the background behind the
 // total (default: the symbol). Anything that isn't a valid choice falls back to its default.
+/**
+ * @param {any} [saved]
+ * @returns {IdentitySettings}
+ */
 function fitIdentitySettings(saved) {
   const defaults = { indicator: true, symbol: false, name: true };
-  const show = Object.fromEntries(identityParts.map(part =>
-    [part, typeof saved?.show?.[part] === 'boolean' ? saved.show[part] : defaults[part]]));
+  const show = /** @type {IdentitySettings['show']} */ (Object.fromEntries(identityParts.map(part =>
+    [part, typeof saved?.show?.[part] === 'boolean' ? saved.show[part] : defaults[part]])));
   return { show, background: fitIdentityBackground(saved), version: identitySettingsVersion };
 }
 
+/**
+ * @param {any} saved
+ * @returns {IdentitySettings['background']}
+ */
 function fitIdentityBackground(saved) {
   if (saved?.version === identitySettingsVersion) {
     return identityBackgrounds.includes(saved.background) ? saved.background : 'symbol';
@@ -736,16 +781,31 @@ function fitIdentityBackground(saved) {
 }
 
 // Each player's pool: one count per colour, W U B R G C. Anything that isn't a whole number from 0 to the maximum is 0.
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {number[][]}
+ */
 function fitPools(saved, count) {
   return Array.from({ length: count }, (_, index) => fitCounts(Array.isArray(saved) ? saved[index] : undefined, manaColours.length));
 }
 
 // A seat index on a board of count players, or null for nobody, which is also what anything else means.
+/**
+ * @param {any} value
+ * @param {number} count
+ * @returns {number | null}
+ */
 function fitSeat(value, count) {
   return Number.isInteger(value) && value >= 0 && value < count ? value : null;
 }
 
 // Who went first, whose turn it is and the round. A seat that isn't on the board means nobody.
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {Turn}
+ */
 function fitTurn(saved, count) {
   const round = saved?.round;
   return {
@@ -755,27 +815,93 @@ function fitTurn(saved, count) {
 }
 
 // Which trackers are on. Each is off unless it was saved as exactly true.
+/**
+ * @param {unknown} [saved]
+ * @returns {Trackers}
+ */
 function fitTrackers(saved) {
-  return Object.fromEntries(trackers.map(tracker => [tracker, saved?.[tracker] === true]));
+  return /** @type {Trackers} */ (Object.fromEntries(trackers.map(tracker => [tracker, saved?.[tracker] === true])));
 }
 
 // Which reminders are on. Each is on unless it was saved as exactly false.
+/**
+ * @param {unknown} [saved]
+ * @returns {Reminders}
+ */
 function fitReminders(saved) {
-  return Object.fromEntries(reminderKinds.map(kind => [kind, saved?.[kind] !== false]));
+  return /** @type {Reminders} */ (Object.fromEntries(reminderKinds.map(kind => [kind, saved?.[kind] !== false])));
 }
 
+/**
+ * The saved game: what loadGame returns, saveGame writes as JSON and every render reads. loadGame checks each field of
+ * a save and falls back to its default, so a field added here needs a fit* check there too (AGENTS.md).
+ * Arrays indexed by player have one entry per seat, in seat order, and scores.length is the player count.
+ *
+ * @typedef {object} Game
+ * @property {number} startingLife A whole number of at least 1.
+ * @property {number[]} scores Each player's life total.
+ * @property {number[]} rotations Each seat's quarter turns, 0 to 3, an index into clockwiseEdges.
+ * @property {boolean} keepAwake
+ * @property {QuarterTurn} landscapeAngle How the board is turned in landscape.
+ * @property {number[]} colors Each player's tile colour, an index into swatches, all distinct.
+ * @property {Trackers} counters Which Track switches are on.
+ * @property {number[]} poison Each player's poison counters, 0 to maxCount; likewise casts, energy, experience and rad.
+ * @property {number[]} casts Commander casts, for commander tax.
+ * @property {number[]} energy
+ * @property {number[]} experience
+ * @property {number[]} rad
+ * @property {string[]} identities Each player's colour identity, as letters in W U B R G order; '' for none.
+ * @property {IdentitySettings} identity
+ * @property {number[][]} commanderDamage Damage taken, by defender then attacker; 0 where they're the same player.
+ * @property {boolean} manaPool Whether the Mana pool switch is on.
+ * @property {boolean} autoEmpty Whether pools empty as the turn passes.
+ * @property {number[][]} pools Each player's floating mana, one count per colour in W U B R G C order.
+ * @property {TurnMode} turns
+ * @property {Turn} turn
+ * @property {TileSet} tileColours
+ * @property {Style | null} style null until the player picks one, so the platform's default applies.
+ * @property {number | null} monarch The monarch's seat, or null for nobody.
+ * @property {number | null} initiative The initiative holder's seat, or null for nobody.
+ * @property {Reminders} reminders
+ */
+/** @typedef {0 | 90 | 180 | 270} QuarterTurn */
+/** @typedef {'commander' | 'poison' | 'energy' | 'experience' | 'rad' | DesignationKind} Tracker */
+/** @typedef {Record<Tracker, boolean>} Trackers */
+/** @typedef {'poison' | 'casts' | 'energy' | 'experience' | 'rad'} CountKind */
+/** @typedef {'monarch' | 'initiative'} DesignationKind */
+/**
+ * @typedef {object} IdentitySettings
+ * @property {Record<IdentityPart, boolean>} show What the identity chip shows.
+ * @property {'symbol' | 'default' | 'off'} background What sits behind the life total.
+ * @property {number} version identitySettingsVersion when saved; older saves mean something else by background.
+ */
+/** @typedef {'indicator' | 'symbol' | 'name'} IdentityPart */
+/** @typedef {'off' | 'rounds' | 'turns'} TurnMode */
+/**
+ * @typedef {object} Turn
+ * @property {number | null} first Who went first, as a seat, or null.
+ * @property {number | null} active Whose turn it is, as a seat, or null.
+ * @property {number} round From 1 to maxRound.
+ */
+/** @typedef {'classic' | 'soft' | 'jewel' | 'clear'} TileSet */
+/** @typedef {'material' | 'glass'} Style */
+/** @typedef {Record<'turns' | 'passOn' | 'gestures', boolean>} Reminders */
+
+/** @returns {Game} */
 function loadGame() {
+  /** @type {Game} */
   const defaults = {
     startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
-    counters: fitTrackers(), ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)])),
+    counters: fitTrackers(), .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)]))),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
     manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet,
     style: null, monarch: null, initiative: null, reminders: fitReminders(),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
-    const saved = JSON.parse(snapshot);
+    // With no save, this parses null as null or throws on undefined, and both mean the defaults.
+    const saved = JSON.parse(/** @type {string} */ (snapshot));
     if (!saved || !Array.isArray(saved.scores) || !playerCounts.includes(saved.scores.length) ||
         !saved.scores.every(Number.isSafeInteger) || !Number.isSafeInteger(saved.startingLife) || saved.startingLife < 1) {
       return defaults;
@@ -789,7 +915,7 @@ function loadGame() {
       startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false, landscapeAngle,
       colors: fitColors(saved.colors, saved.scores.length),
       counters: fitTrackers(saved.counters),
-      ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts(saved[kind], saved.scores.length)])),
+      .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts(saved[kind], saved.scores.length)]))),
       identities: fitIdentities(saved.identities, saved.scores.length),
       identity: fitIdentitySettings(saved.identity),
       commanderDamage: fitDamage(saved.commanderDamage, saved.scores.length),
@@ -868,6 +994,11 @@ let ignoreClicksUntil = 0;
 // or to Android cancelling touches when several fingers land at once. Holding repeats after a pause.
 // Clicks still handle keyboards and assistive technology.
 // adjust gets how long the press has been held, in milliseconds (0 for a tap or a click).
+/**
+ * @param {HTMLElement} button
+ * @param {(held: number) => void} adjust
+ * @param {string} label
+ */
 function bindCounter(button, adjust, label) {
   button.setAttribute('aria-label', label);
   const tile = button.closest('.player') ?? button;
@@ -917,7 +1048,7 @@ function bindCounter(button, adjust, label) {
       press.end();
     }
   });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
     button.addEventListener(type, (event) => {
       if (event.pointerId === pressPointer) ignoreClicksUntil = performance.now() + 800;
       if (event.pointerId !== press?.pointerId) return;
@@ -940,6 +1071,11 @@ function haptic() {
 
 // Announce totals once a burst of changes settles, instead of on every step of a hold. Each player's news is
 // read in seat order, and describe() runs when it's read, so it gives the settled value.
+/**
+ * @param {number} index The player, or -1 for the whole table.
+ * @param {string} kind
+ * @param {() => string} describe
+ */
 function announce(index, kind, describe) {
   pendingAnnouncements.set(`${index} ${kind}`, { index, describe });
   clearTimeout(announceTimer);
@@ -957,7 +1093,7 @@ function announceLife(index) {
 // How a screen reader hears an identity, such as "Selesnya, colour identity white, green", whatever the chip shows.
 function identityText(identity) {
   if (!identity) return 'no colour identity';
-  return `${identityNames[identity]}, colour identity ${[...identity].map(id => identityColours.find(colour => colour.id === id).name).join(', ')}`;
+  return `${identityNames[identity]}, colour identity ${[...identity].map(id => /** @type {{ id: string, name: string }} */ (identityColours.find(colour => colour.id === id)).name).join(', ')}`;
 }
 
 // Android's back gesture only needs the page while a dialog or board mode is open.
@@ -965,6 +1101,10 @@ function syncBackHandling() {
   android?.setBackHandling?.(boardMode !== null || document.querySelector('dialog[open]') !== null);
 }
 
+/**
+ * @param {keyof typeof iconPaths} name
+ * @returns {SVGSVGElement}
+ */
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('class', 'icon');
@@ -978,7 +1118,12 @@ function icon(name) {
   return svg;
 }
 
-// A symbol from the bundled Mana font, sized and coloured like the Phosphor icons.
+// A symbol from the bundled Mana font, sized and coloured like the Phosphor icons. styles.css maps each name to its
+// code point.
+/** @typedef {'d20' | 'infect' | 'energy' | 'rad' | 'pie' | 'tap' | 'untap' | 'commander'} ManaGlyph */
+/**
+ * @param {ManaGlyph} name
+ */
 function manaIcon(name) {
   const glyph = element('span', 'icon mana-icon');
   glyph.dataset.glyph = name;
@@ -986,6 +1131,13 @@ function manaIcon(name) {
   return glyph;
 }
 
+/**
+ * @template {keyof HTMLElementTagNameMap} K
+ * @param {K} tag
+ * @param {string} [className]
+ * @param {...(Node | string)} children
+ * @returns {HTMLElementTagNameMap[K]}
+ */
 function element(tag, className, ...children) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -998,6 +1150,10 @@ function visuallyHidden(text) {
 }
 
 // For buttons that act once per press: a press counts the moment a finger lands, as on the life buttons.
+/**
+ * @param {HTMLElement & { disabled?: boolean }} button
+ * @param {() => void} action
+ */
 function bindTap(button, action) {
   let pointerId;
   button.addEventListener('pointerdown', (event) => {
@@ -1007,7 +1163,7 @@ function bindTap(button, action) {
     action();
   });
   // However long the press, the click that follows it is skipped.
-  for (const type of ['pointerup', 'pointercancel']) {
+  for (const type of /** @type {const} */ (['pointerup', 'pointercancel'])) {
     button.addEventListener(type, (event) => {
       if (event.pointerId !== pointerId) return;
       pointerId = undefined;
@@ -1131,7 +1287,7 @@ function bindSeat(button, add, remove) {
       press.finish();
     }
   });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
     button.addEventListener(type, (event) => {
       if (event.pointerId === pressPointer) ignoreClicksUntil = performance.now() + 800;
       if (event.pointerId !== press?.pointerId) return;
@@ -1188,7 +1344,7 @@ function bindStep(button, forward, back) {
       // The pointer is already gone. The next touch ends this press.
     }
   });
-  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
     button.addEventListener(type, (event) => {
       if (event.pointerId !== press?.pointerId) return;
       ignoreClicksUntil = performance.now() + 800;
@@ -1242,7 +1398,7 @@ function syncSeatMap(index) {
   for (const cell of map.querySelectorAll('.map-cell[data-attacker]')) {
     const attacker = Number(cell.dataset.attacker);
     const damage = game.commanderDamage[index][attacker];
-    cell.textContent = damage;
+    cell.textContent = String(damage);
     cell.toggleAttribute('data-zero', damage === 0);
     cell.toggleAttribute('data-changed', Boolean(edits?.some(edit => edit.kind === 'damage' && edit.index === index && edit.attacker === attacker)));
     cell.setAttribute('aria-label', `Player ${attacker + 1}'s commander, ${damage} damage. Add one`);
@@ -1269,7 +1425,7 @@ function buildSwatches(index, choose) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'swatch';
-    button.value = colour;
+    button.value = String(colour);
     button.dataset.colour = swatch.id;
     button.dataset.row = seatRow(index);
     bindTap(button, () => choose(colour));
@@ -1374,6 +1530,11 @@ function identitySymbol(identity) {
 
 // An identity chip: any of the indicator, the symbol and the name, in that order. With only the indicator or only
 // the symbol it's round; with the name it's a capsule. No identity, or nothing to show, is no chip.
+/**
+ * @param {string} identity
+ * @param {IdentitySettings['show']} show
+ * @returns {HTMLElement | null}
+ */
 function identityChip(identity, show) {
   if (!identity) return null;
   const parts = [];
@@ -1399,7 +1560,7 @@ function buildIdentityPreview(index) {
 function syncIdentity() {
   for (const group of board.querySelectorAll('.identity[data-player]')) {
     const identity = game.identities[Number(group.dataset.player)];
-    for (const toggle of group.querySelectorAll('.identity-toggle')) {
+    for (const toggle of /** @type {NodeListOf<HTMLButtonElement>} */ (group.querySelectorAll('.identity-toggle'))) {
       toggle.setAttribute('aria-pressed', String(identity.includes(toggle.value)));
     }
   }
@@ -1422,16 +1583,40 @@ function renderWatermark(index) {
   player.querySelector('.watermark').replaceChildren(...(shown === 'symbol' ? [identitySymbol(identity)] : []));
 }
 
+/**
+ * One change made in an editing mode (damage, counters or mana), kept until the mode closes so it can be undone.
+ *
+ * @typedef {object} Edit
+ * @property {CountKind | 'mana' | 'damage' | 'designation'} kind
+ * @property {number} index The player it changes: the defender, for commander damage.
+ * @property {number} [delta] How much it adds, or takes away when negative.
+ * @property {number} [attacker] For commander damage, whose commander dealt it.
+ * @property {number} [colour] For mana, an index into manaColours.
+ * @property {Transfer[]} [transfers] Designations it moved, in order.
+ */
+/**
+ * @typedef {object} Transfer
+ * @property {DesignationKind} kind
+ * @property {number | null} from
+ * @property {number | null} to
+ */
+
 // Applies an edit forwards (1) or takes it back (-1). An edit can carry transfers: the monarch or the initiative moving
 // from one player to another (or to nobody) as part of the same change, such as commander damage to the monarch, which
 // is combat damage and makes the attacker the monarch. They're undone with it, last first.
+/**
+ * @param {Edit} edit
+ * @param {1 | -1} direction
+ */
 function applyEdit(edit, direction) {
-  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += edit.delta * direction;
-  else if (edit.kind === 'mana') game.pools[edit.index][edit.colour] += edit.delta * direction;
+  // Every edit but a designation's has a delta, mana's a colour and commander damage's an attacker.
+  const delta = /** @type {number} */ (edit.delta);
+  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += delta * direction;
+  else if (edit.kind === 'mana') game.pools[edit.index][/** @type {number} */ (edit.colour)] += delta * direction;
   else if (edit.kind === 'damage') {
     // Commander damage is damage, so the defender loses the same life in the same save.
-    game.commanderDamage[edit.index][edit.attacker] += edit.delta * direction;
-    game.scores[edit.index] -= edit.delta * direction;
+    game.commanderDamage[edit.index][/** @type {number} */ (edit.attacker)] += delta * direction;
+    game.scores[edit.index] -= delta * direction;
   }
   const transfers = edit.transfers ?? [];
   for (const transfer of direction > 0 ? transfers : [...transfers].reverse()) {
@@ -1440,12 +1625,19 @@ function applyEdit(edit, direction) {
 }
 
 // Every player an edit shows on: its own, and anyone a designation moved to or from.
+/**
+ * @param {Edit} edit
+ * @returns {number[]}
+ */
 function editPlayers(edit) {
   return [...new Set([edit.index, ...(edit.transfers ?? []).flatMap(({ from, to }) => [from, to])])]
     .filter(index => index !== null && index !== undefined);
 }
 
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
+/**
+ * @param {Edit} edit
+ */
 function showEdit(edit) {
   const { index } = edit;
   // Whoever holds the monarch and the initiative now, after a tap, commander damage or a player going out.
@@ -1455,7 +1647,7 @@ function showEdit(edit) {
   } else if (countKinds.includes(edit.kind)) {
     announce(index, edit.kind, () => `Player ${index + 1}, ${game[edit.kind][index]} ${edit.kind}`);
   } else if (edit.kind === 'damage') {
-    const { attacker } = edit;
+    const attacker = /** @type {number} */ (edit.attacker);
     announce(index, `damage ${attacker}`, () =>
       `Player ${attacker + 1}'s commander, ${game.commanderDamage[index][attacker]} damage to Player ${index + 1}`);
     announceLife(index);
@@ -1475,6 +1667,9 @@ function showEdit(edit) {
 }
 
 // An edit made in a mode. Anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4), in the same edit.
+/**
+ * @param {Edit} edit
+ */
 function commitEdit(edit) {
   const out = outPlayers();
   applyEdit(edit, 1);
@@ -1483,7 +1678,7 @@ function commitEdit(edit) {
     edit.transfers = [...(edit.transfers ?? []), ...handoffs];
     for (const transfer of handoffs) game[transfer.kind] = transfer.to;
   }
-  edits.push(edit);
+  /** @type {Edit[]} */ (edits).push(edit);
   showEdit(edit);
 }
 
@@ -1517,12 +1712,18 @@ function stepCount(kind, index, delta) {
 }
 
 // Each counter's icon: Mana's infect, commander, energy and rad symbols, and Phosphor's graduation cap for experience.
+/**
+ * @param {CountKind} kind
+ */
 function counterIcon(kind) {
   if (kind === 'experience') return icon('graduation-cap');
-  return manaIcon({ poison: 'infect', casts: 'commander' }[kind] ?? kind);
+  return manaIcon(/** @type {ManaGlyph} */ ({ poison: 'infect', casts: 'commander' }[kind] ?? kind));
 }
 
 // The monarch's crown and the initiative's castle turret, both Phosphor.
+/**
+ * @param {DesignationKind} kind
+ */
 function designationIcon(kind) {
   return icon(kind === 'monarch' ? 'crown' : 'castle-turret');
 }
@@ -1600,7 +1801,7 @@ function renderPassHints() {
 
 // Says who holds a designation now, once a burst of changes settles.
 function announceDesignation(kind) {
-  const { name, role } = designations.find(designation => designation.kind === kind);
+  const { name, role } = /** @type {Designation} */ (designations.find(designation => designation.kind === kind));
   announce(-1, kind, () => (game[kind] === null ? `Nobody has ${name}` : `Player ${game[kind] + 1} ${role}`));
 }
 
@@ -1640,7 +1841,7 @@ function syncCounterCells(index) {
   const layer = board.children[index]?.querySelector('.counter-cells');
   if (!layer) return;
   for (const cell of layer.querySelectorAll('.designation-cell')) {
-    const kind = cell.dataset.designation;
+    const kind = /** @type {DesignationKind} */ (cell.dataset.designation);
     const held = game[kind] === index;
     // A toggle: its name stays put and aria-pressed says whether this player holds it.
     cell.setAttribute('aria-pressed', String(held));
@@ -1649,9 +1850,9 @@ function syncCounterCells(index) {
   }
   for (const cell of layer.querySelectorAll('.counter-cell[data-kind]')) {
     const name = `Player ${index + 1}`;
-    const { kind } = cell.dataset;
+    const kind = /** @type {CountKind} */ (cell.dataset.kind);
     const value = game[kind][index];
-    cell.querySelector('b').textContent = kind === 'casts' ? `+${value * 2}` : value;
+    cell.querySelector('b').textContent = kind === 'casts' ? `+${value * 2}` : String(value);
     cell.toggleAttribute('data-zero', value === 0);
     cell.setAttribute('aria-label', kind === 'casts'
       ? `${name} commander tax, ${value * 2}, ${value} ${value === 1 ? 'cast' : 'casts'}. Add one cast`
@@ -1711,6 +1912,10 @@ function isOut(index) {
 }
 
 // Why a player is out: 'life' at 0 or below, then 'poison' at 10, then 'commander' at 21 commander damage, or null.
+/**
+ * @param {number} index
+ * @returns {keyof typeof outLabels | null}
+ */
 function outReason(index) {
   if (game.scores[index] <= 0) return 'life';
   if (game.counters.poison && game.poison[index] >= poisonLethal) return 'poison';
@@ -1821,6 +2026,10 @@ function startTurn(index) {
 // A turn reminder (Settings → Reminders → Turn reminders), only in Turn by turn: "Monarch: draw a card" or "Initiative:
 // venture into Undercity" on that player's tile, facing them, for 3 seconds or until it's tapped. Screen readers hear it
 // too.
+/**
+ * @param {number | null} index
+ * @param {DesignationKind} kind
+ */
 function remind(index, kind) {
   if (index === null || game.turns !== 'turns' || !game.reminders.turns || !game.counters[kind]) return;
   const shown = reminders.get(index) ?? new Map();
@@ -1951,7 +2160,7 @@ function chooseFirst(index) {
   [...board.children].forEach((player, seat) => player.toggleAttribute('data-lit', seat === index));
   const go = board.children[index].querySelector('.first-go');
   go.replaceChildren(icon('flag'), 'Goes first');
-  go.nextElementSibling.textContent = game.turns === 'rounds' ? 'Tap the flag to start each round' : 'Tap Turn when your turn ends';
+  /** @type {Element} */ (go.nextElementSibling).textContent = game.turns === 'rounds' ? 'Tap the flag to start each round' : 'Tap Turn when your turn ends';
   announcer.textContent = `Player ${index + 1} goes first`;
   // Their turn starts once the board is back, where its reminder can show.
   shuffleTimer = setTimeout(() => {
@@ -2072,7 +2281,7 @@ function syncManaCells(index) {
   for (const cell of layer.querySelectorAll('.mana-cell')) {
     const at = manaColours.findIndex(colour => colour.id === cell.dataset.colour);
     const amount = game.pools[index][at];
-    cell.querySelector('b').textContent = amount;
+    cell.querySelector('b').textContent = String(amount);
     cell.toggleAttribute('data-zero', amount === 0);
     cell.setAttribute('aria-label', `Player ${index + 1} ${manaColours[at].name} mana, ${amount}. Add one`);
   }
@@ -2232,7 +2441,7 @@ function renderBadges(index) {
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
   // While a pool has mana, or for 5 seconds after the eraser, its strip shows over the near row, which stays.
   const strip = player.querySelector('.mana-strip');
-  const hadFocus = strip.contains(document.activeElement) ? document.activeElement.dataset.colour ?? '' : null;
+  const hadFocus = strip.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement).dataset.colour ?? '' : null;
   const floating = game.manaPool && (hasMana(index) || clearedPools.has(index));
   strip.replaceChildren(...(floating ? stripItems(index) : []));
   strip.hidden = !floating;
@@ -2260,13 +2469,13 @@ function renderBadges(index) {
   for (const designation of trackedDesignations()) {
     if (game[designation.kind] === index) chips.push(designationChip(designation, index));
   }
-  syncReminderChips(index, near.parentElement.querySelector('.reminders'));
+  syncReminderChips(index, /** @type {HTMLElement} */ (near.parentElement).querySelector('.reminders'));
   placeReminders(player);
   // The strip folded onto the near row, shown only when it can go nowhere else.
   if (foldedChip) chips.push(foldedChip);
   for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
   // Keep keyboard focus on a turn chip as the row is rebuilt. When the turn moves to another tile, showTurn follows it.
-  const turnFocus = near.contains(document.activeElement) && document.activeElement.matches('.turn-chip');
+  const turnFocus = near.contains(document.activeElement) && /** @type {Element} */ (document.activeElement).matches('.turn-chip');
   near.replaceChildren(...chips);
   if (turnFocus) near.querySelector('.turn-chip')?.focus();
   near.hidden = chips.length === 0;
@@ -2292,7 +2501,7 @@ function syncPill() {
   undoButton.disabled = !edits?.length;
   // The round, printed twice like a card index so both sides of the table can read it.
   const { round, active } = game.turn;
-  for (const number of roundButton.querySelectorAll('.round > span')) number.textContent = round;
+  for (const number of roundButton.querySelectorAll('.round > span')) number.textContent = String(round);
   roundButton.setAttribute('aria-label', game.turns === 'rounds' ? `Round ${round}. Next round`
     : active === null ? `Round ${round}. Choose who goes first` : `Round ${round}, Player ${active + 1}'s turn. Pass the turn`);
   roundBackButton.setAttribute('aria-label', game.turns === 'rounds' ? 'Back one round' : 'Back one turn');
@@ -2308,6 +2517,7 @@ function syncPill() {
 
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
 // Counters mode ends with save or ✕, and keeps a list of its edits until then.
+/** @param {BoardMode} mode */
 function setBoardMode(mode) {
   cancelPresses();
   clearTimeout(shuffleTimer);
@@ -2348,11 +2558,12 @@ function setBoardMode(mode) {
 
 // ✕ in an editing mode: with no changes it just closes; otherwise it asks first, and Keep editing is the default.
 function cancelEditing() {
-  if (!edits.length) {
+  const changes = /** @type {Edit[]} */ (edits).length;
+  if (!changes) {
     setBoardMode(null);
     return;
   }
-  document.querySelector('#discard-title').textContent = `Discard ${edits.length} ${edits.length === 1 ? 'change' : 'changes'}?`;
+  document.querySelector('#discard-title').textContent = `Discard ${changes} ${changes === 1 ? 'change' : 'changes'}?`;
   // Commander damage can pass the monarch and the initiative, and counters mode sets them.
   const moved = designations.filter(({ kind }) => game[kind] !== editStartHolders[kind]).map(({ name }) => name);
   document.querySelector('#discard-message').textContent = discardMessages[boardMode]
@@ -2363,7 +2574,8 @@ function cancelEditing() {
 }
 
 function discardEdits() {
-  while (edits.length) applyEdit(edits.pop(), -1);
+  const changes = /** @type {Edit[]} */ (edits);
+  while (changes.length) applyEdit(/** @type {Edit} */ (changes.pop()), -1);
   game.scores.forEach((_, index) => renderScore(index));
   saveGame();
   setBoardMode(null);
@@ -2377,7 +2589,7 @@ function leaveBoardMode() {
 }
 
 function renderScore(index) {
-  const score = board.children[index].querySelector('.score');
+  const score = /** @type {HTMLOutputElement} */ (board.children[index].querySelector('.score'));
   const value = String(game.scores[index]).replace('-', '−');
   score.value = value;
   // A player who is out says so under the total, and their other badges dim.
@@ -2393,7 +2605,7 @@ function renderBoard() {
   clearTimeout(announceTimer);
   pendingAnnouncements.clear();
   const players = game.scores.map((_, index) => {
-    const player = playerTemplate.content.firstElementChild.cloneNode(true);
+    const player = /** @type {HTMLElement} */ (/** @type {Element} */ (playerTemplate.content.firstElementChild).cloneNode(true));
     const name = `Player ${index + 1}`;
     player.setAttribute('aria-label', name);
     const score = player.querySelector('.score');
@@ -2436,6 +2648,10 @@ function renderBoard() {
   });
 }
 
+/**
+ * @param {number} playerCount
+ * @param {number} startingLife
+ */
 function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
   game.colors = fitColors(game.colors, playerCount);
@@ -2475,7 +2691,7 @@ function settingsChangeGame() {
 
 // Track's own state: the switches, the Turns choice, and the auto-empty switch, which only shows while it applies.
 function renderTrackSheet() {
-  for (const tracker of trackers) document.querySelector(`#${tracker}-switch`).checked = game.counters[tracker];
+  for (const tracker of trackers) /** @type {HTMLInputElement} */ (document.querySelector(`#${tracker}-switch`)).checked = game.counters[tracker];
   manaSwitch.checked = game.manaPool;
   autoEmptySwitch.checked = game.autoEmpty;
   autoEmptyRow.hidden = !game.manaPool || game.turns === 'off';
@@ -2585,7 +2801,7 @@ function notchedSlider({ root, min, max, snap, step, page, lowest, highest, get,
 for (const count of playerCounts) {
   const choice = element('button', 'k-stop', String(count));
   choice.type = 'button';
-  choice.value = count;
+  choice.value = String(count);
   choice.tabIndex = -1;
   choice.setAttribute('aria-label', `${count} players`);
   choice.addEventListener('click', () => {
@@ -2621,7 +2837,7 @@ const lifeSlider = notchedSlider({
 });
 
 // Tile colours: saved the moment it changes, like the switches. Swatch ids stay, so every player keeps their colour.
-const tileSetChoices = document.querySelector('#tile-set-choices');
+const tileSetChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#tile-set-choices'));
 function applyTileColours() {
   document.documentElement.dataset.tiles = game.tileColours;
 }
@@ -2645,7 +2861,7 @@ function renderTileSetting() {
 }
 
 // Style: saved the moment it's picked, after which it wins over the platform's default.
-const styleChoices = document.querySelector('#style-choices');
+const styleChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#style-choices'));
 const currentStyle = () => game.style ?? defaultStyle;
 function applyStyle() {
   document.documentElement.dataset.style = currentStyle();
@@ -2656,7 +2872,7 @@ function renderStyleSetting() {
 for (const choice of styleChoices.children) {
   choice.addEventListener('click', () => {
     if (choice.dataset.choice === game.style) return;
-    game.style = choice.dataset.choice;
+    game.style = /** @type {Style} */ (choice.dataset.choice);
     saveGame();
     applyStyle();
     renderStyleSetting();
@@ -2666,6 +2882,9 @@ for (const choice of styleChoices.children) {
 // Reduce Transparency on iOS, whose WebKit has no prefers-reduced-transparency: LifePodApp.swift injects
 // window.initialReduceTransparency before the page loads and calls window.setReduceTransparency when it changes. Glass
 // treats data-reduce-transparency like the media query, with solid surfaces.
+/**
+ * @param {boolean | undefined} reduce
+ */
 function setReduceTransparency(reduce) {
   document.documentElement.toggleAttribute('data-reduce-transparency', reduce === true);
 }
@@ -2677,7 +2896,7 @@ function renderSettings() {
   for (const preset of lifePresets.children) preset.setAttribute('aria-pressed', String(Number(preset.dataset.life) === selectedLife));
   playersSlider.render();
   lifeSlider.render();
-  lifeValue.textContent = selectedLife;
+  lifeValue.textContent = String(selectedLife);
   lifeEdit.setAttribute('aria-label', `Starting life ${selectedLife}. Type a number`);
   const pending = settingsChangeGame();
   settingsDone.textContent = pending ? 'Start new game' : 'Done';
@@ -2731,7 +2950,7 @@ lifeInput.addEventListener('keydown', (event) => {
 });
 document.querySelector('#life-commit').addEventListener('click', () => closeLifeEditor(true, true));
 lifeEditor.addEventListener('focusout', (event) => {
-  if (!lifeEditor.contains(event.relatedTarget)) closeLifeEditor(true, false);
+  if (!lifeEditor.contains(/** @type {Node | null} */ (event.relatedTarget))) closeLifeEditor(true, false);
 });
 
 // Keeps the field clear of the keyboard and the header. Android's WebView shrinks the page for the keyboard; iOS shrinks
@@ -2766,7 +2985,7 @@ function placeSettingsSections() {
   const wanted = columns ? [[game, table, reminderSection], [track, identity]] : [[game, track, identity, table, reminderSection], []];
   settingsContent.toggleAttribute('data-columns', columns);
   if (wanted[0].every((section, index) => start.children[index] === section) && end.children.length === wanted[1].length) return;
-  const focused = settings.contains(document.activeElement) ? document.activeElement : null;
+  const focused = settings.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement) : null;
   start.replaceChildren(...wanted[0]);
   end.replaceChildren(...wanted[1]);
   focused?.focus({ preventScroll: true });
@@ -2823,7 +3042,7 @@ settings.addEventListener('close', () => {
 // Rounds doesn't follow whose turn it is, so switching between them leaves nobody's turn until a player starts theirs.
 for (const choice of turnChoices.children) {
   choice.addEventListener('click', () => {
-    const mode = choice.dataset.turns;
+    const mode = /** @type {TurnMode} */ (choice.dataset.turns);
     const was = game.turns;
     if (mode === was) return;
     game.turns = mode;
@@ -2852,11 +3071,11 @@ autoEmptySwitch.addEventListener('change', () => {
 
 // Reminders: each switch saves the moment it changes. Turn reminders shows only while the monarch or the initiative is on
 // and Turns is Turn by turn, and Pass-it-on hints while either is on; Gesture hints always shows.
-const reminderSwitches = document.querySelectorAll('#settings-reminders input[data-reminder]');
+const reminderSwitches = /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#settings-reminders input[data-reminder]'));
 function renderRemindersSection() {
   const designated = trackedDesignations().length > 0;
   for (const input of reminderSwitches) {
-    input.checked = game.reminders[input.dataset.reminder];
+    input.checked = game.reminders[/** @type {keyof Reminders} */ (input.dataset.reminder)];
     const row = input.closest('.switch-row');
     row.hidden = input.dataset.reminder === 'turns' ? !designated || game.turns !== 'turns'
       : input.dataset.reminder === 'passOn' ? !designated : false;
@@ -2865,7 +3084,7 @@ function renderRemindersSection() {
 }
 for (const input of reminderSwitches) {
   input.addEventListener('change', () => {
-    game.reminders[input.dataset.reminder] = input.checked;
+    game.reminders[/** @type {keyof Reminders} */ (input.dataset.reminder)] = input.checked;
     saveGame();
     if (input.dataset.reminder === 'turns' && !input.checked) {
       clearReminders();
@@ -2879,7 +3098,7 @@ for (const input of reminderSwitches) {
 
 // Identity: what tiles show of each identity, saved the moment it changes.
 function renderIdentitySheet() {
-  for (const toggle of identityShowSwitches) toggle.checked = game.identity.show[toggle.dataset.show];
+  for (const toggle of identityShowSwitches) toggle.checked = game.identity.show[/** @type {IdentityPart} */ (toggle.dataset.show)];
   for (const choice of identityBackgroundChoices.children) {
     choice.setAttribute('aria-pressed', String(game.identity.background === choice.dataset.background));
   }
@@ -2903,7 +3122,7 @@ function changeIdentitySettings(change) {
 
 for (const toggle of identityShowSwitches) {
   toggle.addEventListener('change', () => changeIdentitySettings((identity) => {
-    identity.show[toggle.dataset.show] = toggle.checked;
+    identity.show[/** @type {IdentityPart} */ (toggle.dataset.show)] = toggle.checked;
   }));
 }
 for (const choice of identityBackgroundChoices.children) {
@@ -2914,6 +3133,7 @@ for (const choice of identityBackgroundChoices.children) {
 
 // Choose identities, Colours and Rotate seats close settings and start their board mode, starting a pending new game
 // first. The mode's check mark returns to the board.
+/** @param {'identity' | 'rotate' | 'colours'} mode */
 function leaveSettingsFor(mode) {
   closeLifeEditor(true, false);
   if (settingsChangeGame()) startGame(selectedPlayerCount, selectedLife);
@@ -2977,7 +3197,7 @@ function rollDie() {
 for (const sides of window.lifePodDice.sides) {
   const choice = document.createElement('button');
   choice.type = 'button';
-  choice.value = sides;
+  choice.value = String(sides);
   choice.append(window.lifePodDice.icon(sides), `d${sides}`);
   choice.addEventListener('click', () => {
     if (!stopRoll) showDie(sides);
@@ -3023,7 +3243,7 @@ discardDialog.addEventListener('close', () => {
 
 // Android's back gesture closes the open dialog, then leaves the open board mode the way ✕ does.
 window.closeOpenDialog = () => {
-  const openDialog = [...document.querySelectorAll('dialog[open]')].at(-1);
+  const openDialog = [.../** @type {NodeListOf<HTMLDialogElement>} */ (document.querySelectorAll('dialog[open]'))].at(-1);
   if (openDialog) {
     openDialog.close('cancel');
     return true;
@@ -3043,7 +3263,7 @@ wakeInput.addEventListener('change', () => {
 });
 // The counter switches are saved at once and stay on across launches and new games.
 for (const tracker of trackers) {
-  const input = document.querySelector(`#${tracker}-switch`);
+  const input = /** @type {HTMLInputElement} */ (document.querySelector(`#${tracker}-switch`));
   input.addEventListener('change', () => {
     // Poison and Commander decide who is out, so switching one on can put a holder out of the game.
     const out = outPlayers();
