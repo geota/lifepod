@@ -26,8 +26,8 @@ async function openPage(t, engine) {
 }
 
 async function openColours(page) {
-  await button(page, 'Game setup').tap();
-  await button(page, 'Colours').tap();
+  await button(page, 'Settings').tap();
+  await button(page, 'Choose tile colours on the board').tap();
 }
 
 // Chromium writes page storage in the background, so give a write a moment to land before a reload.
@@ -132,7 +132,7 @@ async function checkColours(t, engine) {
   assert.deepEqual(await colours(page), ['rose', 'sky', 'sage', 'violet', 'amber', 'teal'], 'colours survive a reload');
 
   // A new game keeps the colours.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   // The restart dialog's close event, which starts the game, runs after the tap.

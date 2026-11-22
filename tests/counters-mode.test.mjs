@@ -60,7 +60,7 @@ async function checkCountersMode(t, engine) {
   assert.equal(await cell(page, 1, 'poison').evaluate(node => getComputedStyle(node).borderRadius), '50%', 'cells are circles');
   assert.equal(await count(page, 1, 'poison'), '0');
   assert.ok(await button(page, 'Undo').isDisabled(), 'Undo is dimmed until something changes');
-  assert.ok(!(await button(page, 'Roll dice').isVisible()) && !(await button(page, 'Game setup').isVisible()));
+  assert.ok(!(await button(page, 'Roll dice').isVisible()) && !(await button(page, 'Settings').isVisible()));
   await button(page, 'Cancel').tap();
   assert.equal(await mode(page), null, '✕ with no changes closes straight away');
   assert.ok(!(await isOpen(page, 'discard')));
@@ -284,7 +284,7 @@ async function checkNewCounters(t, engine) {
   assert.equal(await nearBadges(page, 3), '12 energy');
 
   // A new game resets every count and keeps the switches.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => Promise.all([1, 2, 3, 4].map(number => nearBadges(page, number))), ['', '', '', ''], 'a new game clears the badges');
@@ -327,12 +327,12 @@ test('chromium: counters mode fits six players with every counter on the smalles
   assert.deepEqual(problems, []);
   assert.equal(await page.locator('.mode-layer .counter-cell').count(), 30, 'five cells per tile');
 
-  // Setup still fits the smallest landscape phone.
+  // Settings still fills the smallest landscape phone.
   await button(page, 'Cancel').tap();
   await turnScreen(page, 568, 320, 90);
-  await button(page, 'Game setup').tap();
-  const setupBox = await page.locator('#setup').boundingBox();
-  assert.ok(setupBox.y >= 0 && setupBox.y + setupBox.height <= 320, `setup fits: ${JSON.stringify(setupBox)}`);
+  await button(page, 'Settings').tap();
+  const settingsBox = await page.locator('#settings').boundingBox();
+  assert.deepEqual(settingsBox, { x: 0, y: 0, width: 568, height: 320 }, `settings fills the screen: ${JSON.stringify(settingsBox)}`);
 });
 
 test('chromium: Android back cancels counters mode the way ✕ does', async (t) => {

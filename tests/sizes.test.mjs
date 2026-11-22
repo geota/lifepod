@@ -177,15 +177,14 @@ async function checkSizes(t, engine) {
           checkTiles(await readTiles(page, '.mana-cell', '.mana-cell'), `${view}, mana`);
           await button(page, 'Cancel').tap();
 
-          await button(page, 'Game setup').tap();
-          await button(page, 'Colours').tap();
+          await button(page, 'Settings').tap();
+          await button(page, 'Choose tile colours on the board').tap();
           checkTiles(await readTiles(page, '.swatch', '.layer-hint'), `${view}, colours`);
           if (!portrait) scale[name].swatch = await readModeScale(page, '.swatch');
           await button(page, 'Done choosing colours').tap();
 
-          await button(page, 'Game setup').tap();
-          await button(page, 'Identity').tap();
-          await button(page, 'Choose identities').tap();
+          await button(page, 'Settings').tap();
+          await button(page, 'Choose identities on the board').tap();
           checkTiles(await readTiles(page, '.identity-toggle', '.identity-preview .chip'), `${view}, identity`);
           if (!portrait) scale[name].identityToggle = await readModeScale(page, '.identity-toggle');
         }
@@ -209,78 +208,56 @@ async function checkSizes(t, engine) {
 test('chromium: the board fits and scales on small phones, foldables and tablets', t => checkSizes(t, chromium));
 test('webkit: the board fits and scales on small phones, foldables and tablets', t => checkSizes(t, webkit));
 
-// Game setup fits without scrolling from a 952 × 427 phone down to the 568 × 320 stress test, where the header folds
-// into the Players row. Every control is on the sheet and at least 44px, with Custom life's stepper too, and so
-// do the Track and Identity sheets.
-async function checkSetup(t, engine) {
+// Settings is a full-screen page (design/polish/SETTINGS-SPEC.md §3) on every screen above, landscape and portrait: the
+// header stays in view while the body scrolls, nothing is wider than the window, and every control is at least 44px
+// and whole. Two columns from 620px wide, one below.
+async function checkSettings(t, engine) {
   const browser = await engine.launch();
   t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  // With Mana pool on and Turns not Off, Track shows every row, auto-empty's included.
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-    startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', turn: { first: 0, active: 0, round: 1 },
-  })));
-  await page.reload();
-  const check = dialog => page.locator(dialog).evaluate((sheet) => {
-    const found = [];
-    if (sheet.scrollHeight > sheet.clientHeight + 0.5) found.push(`scrolls ${sheet.scrollHeight} > ${sheet.clientHeight}`);
-    const box = sheet.getBoundingClientRect();
-    if (box.top < 0 || box.bottom > window.innerHeight || box.left < 0 || box.right > window.innerWidth) found.push(`sheet ${JSON.stringify(box)}`);
-    const shown = [...sheet.querySelectorAll('button, label')].filter(node => node.checkVisibility({ visibilityProperty: true }) && node.offsetWidth);
-    for (const node of shown) {
-      const target = node.getBoundingClientRect();
-      const name = node.getAttribute('aria-label') ?? node.textContent.trim();
-      if (target.width < 43.5 || target.height < 43.5) found.push(`${name} ${Math.round(target.width)}×${Math.round(target.height)}`);
-      if (target.top < box.top || target.bottom > box.bottom || target.left < box.left || target.right > box.right) found.push(`${name} off the sheet`);
+  for (const [name, size] of Object.entries(screens)) {
+    for (const portrait of [false, true]) {
+      const view = `${name}, ${portrait ? 'portrait' : 'landscape'}`;
+      const { page, errors } = await openBoard(browser, size, 4, portrait);
+      await button(page, 'Settings').tap();
+      // A pending new game adds its line, the widest the page gets.
+      await button(page, '6 players').tap();
+      const read = () => page.evaluate(() => {
+        const found = [];
+        const dialog = document.querySelector('#settings');
+        const body = document.querySelector('#settings-body');
+        const head = dialog.querySelector('.fs-head').getBoundingClientRect();
+        if (head.top < 0 || head.bottom > innerHeight / 2) found.push(`header ${head.top}–${head.bottom}`);
+        if (body.scrollWidth > body.clientWidth + 0.5) found.push(`scrolls sideways ${body.scrollWidth} > ${body.clientWidth}`);
+        const shown = node => node.checkVisibility({ visibilityProperty: true }) && node.offsetWidth > 0;
+        for (const node of [...dialog.querySelectorAll('*')].filter(shown)) {
+          const box = node.getBoundingClientRect();
+          if (box.left < -0.5 || box.right > innerWidth + 0.5) found.push(`${node.id || node.className} runs off the side`);
+        }
+        for (const node of [...dialog.querySelectorAll('button, label, .k-slider')].filter(shown)) {
+          if (node.offsetWidth < 43.5 || node.offsetHeight < 43.5) found.push(`${node.getAttribute('aria-label') ?? node.id ?? node.textContent.trim()} ${node.offsetWidth}×${node.offsetHeight}`);
+        }
+        for (const label of [...dialog.querySelectorAll('.nav-label, .setting-label, .k-stop')].filter(shown)) {
+          if (label.scrollWidth > label.clientWidth + 0.5) found.push(`${label.textContent.trim()} is cut short`);
+        }
+        return { found, columns: document.querySelector('#settings-content').hasAttribute('data-columns'), scrolls: body.scrollHeight > body.clientHeight + 1 };
+      });
+      const top = await read();
+      assert.deepEqual(top.found, [], `${view}: settings fits`);
+      assert.equal(top.columns, page.viewportSize().width >= 620, `${view}: ${top.columns ? 'two columns' : 'one column'}`);
+      if (top.scrolls) {
+        const head = await page.locator('.fs-head').boundingBox();
+        await page.locator('#settings-body').evaluate((body) => { body.scrollTop = body.scrollHeight; });
+        assert.deepEqual(await page.locator('.fs-head').boundingBox(), head, `${view}: the header stays visible as the body scrolls`);
+        assert.deepEqual((await read()).found, [], `${view}: settings fits, scrolled to the end`);
+      }
+      await page.close();
+      assert.deepEqual(errors, [], `${view}: no script errors`);
     }
-    // A label cut short with an ellipsis.
-    for (const label of sheet.querySelectorAll('.nav-label')) {
-      if (label.checkVisibility() && label.scrollWidth > label.clientWidth) found.push(`${label.textContent} is cut short`);
-    }
-    return { found, height: Math.round(box.height), count: shown.length };
-  });
-  for (const [width, height, angle] of [[952, 427, 90], [852, 393, 90], [640, 360, 90], [568, 320, 90], [320, 568, 0]]) {
-    const view = `${width} × ${height}`;
-    await turnScreen(page, width, height, angle);
-    await button(page, 'Game setup').tap();
-    const setup = await check('#setup');
-    assert.deepEqual(setup.found, [], `${view}: setup`);
-    // Header (About, ✕), five players, four life choices, Track, Identity, Colours, Rotate seats, Keep awake, New game
-    // and Done.
-    assert.equal(setup.count, 18, `${view}: every setup control shows`);
-    const folded = await page.evaluate(() => {
-      const title = document.querySelector('#setup-title').getBoundingClientRect();
-      const close = document.querySelector('#setup [data-close]').getBoundingClientRect();
-      const players = document.querySelector('#player-choices').getBoundingClientRect();
-      return { title: title.width > 1, sameRow: Math.abs((close.top + close.bottom) / 2 - (players.top + players.bottom) / 2) < 2 };
-    });
-    if (height < 360) assert.deepEqual(folded, { title: false, sameRow: true }, `${view}: the header folds into the Players row`);
-    else assert.equal(folded.title, true, `${view}: the title shows`);
-    await page.locator('#custom-life').tap();
-    assert.deepEqual((await check('#setup')).found, [], `${view}: setup with the custom life stepper`);
-    await button(page, 'Track').tap();
-    const track = await check('#track');
-    assert.deepEqual(track.found, [], `${view}: Track`);
-    // ‹ and ✕, the Commander, Poison, Energy, Experience, Rad and Mana pool switches, three Turns choices and the
-    // auto-empty switch.
-    assert.equal(track.count, 12, `${view}: every Track control shows`);
-    await button(page, 'Back to setup').tap();
-    await button(page, 'Identity').tap();
-    const identity = await check('#identity-sheet');
-    assert.deepEqual(identity.found, [], `${view}: Identity`);
-    // ‹ and ✕, the three Show on tiles switches, three backgrounds and Choose identities.
-    assert.equal(identity.count, 9, `${view}: every Identity control shows`);
-    await button(page, 'Close setup').tap();
   }
-  assert.deepEqual(errors, [], 'no script errors');
 }
 
-test('chromium: setup fits phones from 427 to 320 tall without scrolling', t => checkSetup(t, chromium));
-test('webkit: setup fits phones from 427 to 320 tall without scrolling', t => checkSetup(t, webkit));
+test('chromium: settings fills every screen with no sideways overflow and the header in view', { timeout: 120000 }, t => checkSettings(t, chromium));
+test('webkit: settings fills every screen with no sideways overflow and the header in view', { timeout: 120000 }, t => checkSettings(t, webkit));
 
 // The centre pill never covers a life total, a − or + glyph, a badge, a strip or the "Out" tag
 // (design/polish/FINAL-REVIEW.md #1 and #2), at its widest (round, commander damage, counters, mana, dice and setup), at
@@ -345,8 +322,8 @@ async function checkPill(t, engine) {
             assert.deepEqual(await underPill(page), [], `${view}, ${open}: every target is clear of the pill and inside its tile`);
             await button(page, close).tap();
           }
-          for (const [row, done] of [[['Colours'], 'Done choosing colours'], [['Identity', 'Choose identities'], 'Done choosing identities'], [['Rotate seats'], 'Done rotating seats']]) {
-            await button(page, 'Game setup').tap();
+          for (const [row, done] of [[['Choose tile colours on the board'], 'Done choosing colours'], [['Choose identities on the board'], 'Done choosing identities'], [['Rotate seats on the board'], 'Done rotating seats']]) {
+            await button(page, 'Settings').tap();
             for (const name of row) await button(page, name).tap();
             assert.deepEqual(await underPill(page), [], `${view}, ${row.at(-1)}: every target is clear of the pill and inside its tile`);
             await button(page, done).tap();

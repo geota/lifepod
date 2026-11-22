@@ -108,9 +108,9 @@ async function eventually(read, expected, message) {
 const calls = (page, name) => page.evaluate(wanted => window.bridgeCalls.filter(([call]) => call === wanted).map(([, ...args]) => args), name);
 
 async function toggleKeepAwake(page) {
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await page.locator('label', { has: page.locator('#keep-awake') }).tap();
-  await button(page, 'Close setup').tap();
+  await button(page, 'Close settings').tap();
 }
 
 test('chromium: the Android bridge saves and loads, keeps the screen awake, ticks and takes back', async (t) => {
@@ -133,13 +133,13 @@ test('chromium: the Android bridge saves and loads, keeps the screen awake, tick
 
   // Back runs MainActivity.kt's own script, whose JSON result onBackPressed compares with "true".
   assert.equal(await page.evaluate(`JSON.stringify(${closeDialog})`), 'false', 'at rest, back is the system’s');
-  await button(page, 'Game setup').tap();
-  assert.equal(await page.evaluate(`JSON.stringify(${closeDialog})`), 'true', 'back closes setup');
+  await button(page, 'Settings').tap();
+  assert.equal(await page.evaluate(`JSON.stringify(${closeDialog})`), 'true', 'back closes settings');
   await eventually(() => page.evaluate(() => document.querySelectorAll('dialog[open]').length), 0);
-  await eventually(() => calls(page, 'setBackHandling'), [[false], [true], [false]], 'back handling turns on with setup and off after it');
+  await eventually(() => calls(page, 'setBackHandling'), [[false], [true], [false]], 'back handling turns on with settings and off after it');
   // A board mode with no dialog open: back leaves the mode.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Rotate seats').tap();
+  await button(page, 'Settings').tap();
+  await button(page, 'Rotate seats on the board').tap();
   await eventually(() => page.locator('#board').getAttribute('data-mode'), 'rotate');
   assert.equal(await page.evaluate(`JSON.stringify(${closeDialog})`), 'true', 'back leaves Rotate seats');
   assert.equal(await page.locator('#board').getAttribute('data-mode'), null);

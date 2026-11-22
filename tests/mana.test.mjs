@@ -230,8 +230,7 @@ async function checkAutoEmpty(t, engine) {
   assert.equal((await saved(page)).turn.active, 2, 'P3’s turn');
 
   // Auto-empty shows only while Mana pool is on and Turns isn't Off. Off, pools survive a pass.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Track').tap();
+  await button(page, 'Settings').tap();
   const autoEmpty = page.getByRole('switch', { name: 'Empty mana pools when the turn passes', exact: true });
   assert.equal(await autoEmpty.isChecked(), true, 'on by default');
   await page.locator('#auto-empty-row').tap();
@@ -240,10 +239,10 @@ async function checkAutoEmpty(t, engine) {
   assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Turns off');
   await page.locator('#turn-choices').getByRole('button', { name: 'Rounds', exact: true }).tap();
   assert.ok(await page.locator('#auto-empty-row').isVisible());
-  await page.locator('#track label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
+  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
   assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Mana pool off');
-  await page.locator('#track label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
-  await button(page, 'Close setup').tap();
+  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
+  await button(page, 'Close settings').tap();
   await button(page, 'Mana pool').tap();
   await cell(page, 4, 'B').tap();
   await button(page, 'Save').tap();
@@ -251,10 +250,9 @@ async function checkAutoEmpty(t, engine) {
   assert.deepEqual(await strips(page), ['', '', '', 'B1 clear'], 'with auto-empty off, pools survive a round step');
 
   // Rounds steps empty pools too, with auto-empty on again.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Track').tap();
+  await button(page, 'Settings').tap();
   await page.locator('#auto-empty-row').tap();
-  await button(page, 'Close setup').tap();
+  await button(page, 'Close settings').tap();
   await tile(page, 1).locator('.round-chip').tap();
   assert.deepEqual(await strips(page), ['', '', '', ''], 'a round step empties every pool');
   await page.waitForTimeout(400);
@@ -268,7 +266,7 @@ async function checkAutoEmpty(t, engine) {
   assert.deepEqual(await strips(page), ['', '', '', 'B1 clear'], 'holding back the round restores the pool');
 
   // A new game empties every pool and keeps the settings.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => mode(page), 'first');
@@ -421,7 +419,6 @@ test('chromium: saved pools are checked when a game loads', async (t) => {
   // Auto-empty is on unless saved as false.
   await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40], manaPool: true, turns: 'rounds', autoEmpty: 0 })));
   await page.reload();
-  await button(page, 'Game setup').tap();
-  await button(page, 'Track').tap();
+  await button(page, 'Settings').tap();
   assert.equal(await page.getByRole('switch', { name: 'Empty mana pools when the turn passes', exact: true }).isChecked(), true);
 });

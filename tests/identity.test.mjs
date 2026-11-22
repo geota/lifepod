@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
 import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
 
-// Colour identity (design/polish/SPEC.md §2): its own sheet in setup, a chip on each tile showing any of the colour
+// Colour identity (design/polish/SPEC.md §2): its own section in settings, a chip on each tile showing any of the colour
 // indicator, the symbol and the name, a background behind the total (the symbol, the rings or nothing), and identity
 // mode, where every player sets their own. None of it depends on the Commander switch.
 
@@ -165,8 +165,8 @@ test('chromium: a lone indicator or symbol is a round chip, and a name makes a c
   for (const ratio of shapes.both) assert.ok(ratio > 1.4, `indicator and symbol together make a capsule: ${shapes.both}`);
 });
 
-// Setup → Identity: what tiles show and the background, each saved the moment it changes. ‹, Escape and Android
-// back go to setup; ✕ closes everything.
+// Settings → Identity: what tiles show and the background, each saved the moment it changes. ✕, Escape and Android
+// back close settings and keep what was saved.
 async function checkSheet(t, engine) {
   const android = engine === chromium;
   const page = await openPage(t, engine, { android });
@@ -182,15 +182,14 @@ async function checkSheet(t, engine) {
   assert.deepEqual((await readTiles(page)).map(read => read.chip), [['indicator WUB', 'name Esper'], null, ['indicator UG', 'name Simic'], ['indicator UBRG', 'name Glint-Eye']]);
   assert.equal((await readTiles(page))[0].background, `symbol ${symbol('WUB')} @0.07`);
 
-  await button(page, 'Game setup').tap();
-  await button(page, 'Identity').tap();
-  await eventually(() => openDialogs(page), ['identity-sheet']);
+  await button(page, 'Settings').tap();
+  await eventually(() => openDialogs(page), ['settings']);
   assert.deepEqual(await switchedOn(page), ['Indicator', 'Name']);
   assert.deepEqual(await pressed(page, '#identity-background'), ['Symbol']);
 
-  // Show on tiles is three switches, any combination, each saved at once, and the tiles behind the sheet follow.
+  // Show on tiles is three switches, any combination, each saved at once, and the tiles behind settings follow.
   await showSwitch(page, 'Symbol').tap();
-  assert.deepEqual((await saved(page)).identity.show, { indicator: true, symbol: true, name: true }, 'saved before the sheet closes');
+  assert.deepEqual((await saved(page)).identity.show, { indicator: true, symbol: true, name: true }, 'saved before settings closes');
   assert.deepEqual((await readTiles(page))[0].chip, ['indicator WUB', `symbol ${symbol('WUB')}`, 'name Esper']);
   await showSwitch(page, 'Indicator').tap();
   await showSwitch(page, 'Name').tap();
@@ -217,38 +216,21 @@ async function checkSheet(t, engine) {
   // Chip and background off is identity off, and every player keeps their pick.
   assert.deepEqual((await saved(page)).identities, ['WUB', '', 'UG', 'UBRG']);
 
-  // ‹ returns to setup, with focus on Identity.
-  await button(page, 'Back to setup').tap();
-  await eventually(() => openDialogs(page), ['setup'], '‹ returns to setup');
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'identity-nav');
-  // Escape returns to setup too.
-  await button(page, 'Identity').tap();
-  await page.keyboard.press('Escape');
-  await eventually(() => openDialogs(page), ['setup'], 'Escape returns to setup');
-
-  // While setup would start a new game, Choose identities keeps its place but can't be used.
+  // Choose identities stays usable while a new game is pending (it starts that game first).
   await button(page, '6 players').tap();
-  await button(page, 'Identity').tap();
-  assert.ok(!(await button(page, 'Choose identities').isVisible()), 'no Choose identities while setup would start a new game');
-  await button(page, 'Back to setup').tap();
-  await eventually(() => openDialogs(page), ['setup']);
-  assert.equal(await page.locator('#save-setup').textContent(), 'Start new game', 'setup keeps its unsaved choices');
+  assert.ok(await button(page, 'Choose identities on the board').isVisible(), 'Choose identities shows while a new game is pending');
   await button(page, '4 players').tap();
 
-  // ✕ closes everything.
-  await button(page, 'Identity').tap();
-  assert.ok(await button(page, 'Choose identities').isVisible());
-  await button(page, 'Close setup').tap();
-  await eventually(() => openDialogs(page), [], '✕ closes setup and Identity');
+  // ✕ closes settings and keeps what was saved.
+  await button(page, 'Close settings').tap();
+  await eventually(() => openDialogs(page), [], '✕ closes settings');
+  assert.equal((await saved(page)).identity.background, 'off');
 
   if (android) {
-    // Android back goes from Identity to setup, then closes setup.
+    // Android back closes settings.
     const back = () => page.evaluate(() => window.closeOpenDialog());
-    await button(page, 'Game setup').tap();
-    await button(page, 'Identity').tap();
-    await eventually(() => openDialogs(page), ['identity-sheet']);
-    assert.equal(await back(), true);
-    await eventually(() => openDialogs(page), ['setup'], 'back returns from Identity to setup');
+    await button(page, 'Settings').tap();
+    await eventually(() => openDialogs(page), ['settings']);
     assert.equal(await back(), true);
     await eventually(() => openDialogs(page), []);
     await eventually(() => page.evaluate(() => window.backHandling.at(-1)), false, 'back goes to the system at rest');
@@ -256,15 +238,14 @@ async function checkSheet(t, engine) {
     // The settings survive a reload.
     await page.waitForTimeout(500);
     await page.reload();
-    await button(page, 'Game setup').tap();
-    await button(page, 'Identity').tap();
+    await button(page, 'Settings').tap();
     assert.deepEqual([await switchedOn(page), await pressed(page, '#identity-background')], [[], ['Off']]);
     assert.deepEqual((await readTiles(page)).map(read => read.background), ['plain', 'plain', 'plain', 'plain'], 'Off survives a reload');
   }
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: the Identity sheet sets what tiles show and saves at once`, { timeout: 60000 }, t => checkSheet(t, engine));
+  test(`${name}: Identity in settings sets what tiles show and saves at once`, { timeout: 60000 }, t => checkSheet(t, engine));
 }
 
 // Identity mode: every tile previews everything its identity can show over five mana-symbol toggles, facing its
@@ -287,10 +268,9 @@ async function checkMode(t, engine) {
   });
 
   // A fresh install has no tracker on: identity works without Commander.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Identity').tap();
-  await button(page, 'Choose identities').tap();
-  await eventually(() => openDialogs(page), [], 'Choose identities closes the sheets');
+  await button(page, 'Settings').tap();
+  await button(page, 'Choose identities on the board').tap();
+  await eventually(() => openDialogs(page), [], 'Choose identities closes settings');
   assert.equal(await mode(page), 'identity');
   assert.ok(await button(page, 'Done choosing identities').isVisible());
   assert.ok(!(await button(page, 'Roll dice').isVisible()), 'only the check mark stays in the centre');
@@ -330,9 +310,8 @@ async function checkMode(t, engine) {
 
   // Escape ends it too, keeping changes.
   const reopen = async () => {
-    await button(page, 'Game setup').tap();
-    await button(page, 'Identity').tap();
-    await button(page, 'Choose identities').tap();
+    await button(page, 'Settings').tap();
+    await button(page, 'Choose identities on the board').tap();
     await eventually(() => mode(page), 'identity');
   };
   await reopen();
@@ -351,7 +330,7 @@ async function checkMode(t, engine) {
   }
 
   // A new game keeps every identity.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await page.waitForFunction(() => !document.querySelector('#restart').open);
@@ -377,9 +356,8 @@ test('chromium: identity mode fits every player count', { timeout: 120000 }, asy
     await turnScreen(page, width, height, angle);
     for (const players of [2, 3, 4, 5, 6]) {
       await startGame(page, players);
-      await button(page, 'Game setup').tap();
-      await button(page, 'Identity').tap();
-      await button(page, 'Choose identities').tap();
+      await button(page, 'Settings').tap();
+      await button(page, 'Choose identities on the board').tap();
       await eventually(() => mode(page), 'identity');
       const problems = await page.evaluate(() => {
         const controls = document.querySelector('#board-controls').getBoundingClientRect();
@@ -421,10 +399,9 @@ test('chromium: saved identity settings are checked when a game loads', async (t
       startingLife: 40, scores: [40, 40, 40, 40], identities: ['WU', 'BRG', '', 'R'], ...(identity === undefined ? {} : { identity }),
     });
     await page.reload();
-    await button(page, 'Game setup').tap();
-    await button(page, 'Identity').tap();
+    await button(page, 'Settings').tap();
     const settings = [await switchedOn(page), await pressed(page, '#identity-background')];
-    await button(page, 'Close setup').tap();
+    await button(page, 'Close settings').tap();
     return { settings, tiles: (await readTiles(page)).map(read => [read.chip, read.background.split(' ')[0]]) };
   };
   assert.deepEqual(await load(undefined), {
@@ -458,7 +435,7 @@ test('chromium: saved identity settings are checked when a game loads', async (t
   assert.deepEqual((await load({ background: 'rings' })).settings, [['Indicator', 'Name'], ['Symbol']], 'anything else is Symbol');
 });
 
-// Identity mode and the Identity sheet explain themselves (design/polish/FINAL-REVIEW.md #9 and #10). An off toggle's
+// Identity mode and the Identity section explain themselves (design/polish/FINAL-REVIEW.md #9 and #10). An off toggle's
 // symbol is muted and an on one has a check, under the hint "Tap your colours". Each "Show on tiles" switch row has the
 // mark it adds (the colour disc, the symbol, "Aa") and a switch that's on or off, and the note says what tiles show.
 async function checkExplains(t, engine) {
@@ -468,8 +445,7 @@ async function checkExplains(t, engine) {
     startingLife: 40, scores: [40, 40, 40, 40, 40, 40], identities: ['WUBG', 'UB', '', 'G', 'WUBRG', 'R'], landscapeAngle: 90,
   })));
   await page.reload();
-  await button(page, 'Game setup').tap();
-  await button(page, 'Identity').tap();
+  await button(page, 'Settings').tap();
   const sheet = () => page.locator('#identity-show').evaluate(group => ({
     toggles: [...group.children].map(row => ({
       label: row.textContent.trim(),
@@ -492,7 +468,7 @@ async function checkExplains(t, engine) {
   assert.equal((await sheet()).note, "Tiles show the name of each player's identity.");
 
   // Identity mode: Player 1 has W, U, B and G, so red is off.
-  await button(page, 'Choose identities').tap();
+  await button(page, 'Choose identities on the board').tap();
   const toggles = await tile(page, 1).locator('.identity-toggle').evaluateAll(buttons => buttons.map((toggle) => {
     const pip = getComputedStyle(toggle.querySelector('.pip'));
     return { colour: toggle.value, on: toggle.getAttribute('aria-pressed') === 'true', muted: pip.filter !== 'none' && Number(pip.opacity) < 1, check: toggle.querySelector('.toggle-check').checkVisibility() };
@@ -517,9 +493,8 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
 async function checkLongPressToggle(t, engine) {
   const page = await openPage(t, engine);
   await page.goto(app);
-  await button(page, 'Game setup').tap();
-  await button(page, 'Identity').tap();
-  await button(page, 'Choose identities').tap();
+  await button(page, 'Settings').tap();
+  await button(page, 'Choose identities on the board').tap();
   await eventually(() => mode(page), 'identity');
   const toggle = colour => page.getByRole('group', { name: 'Colour identity for Player 3' }).getByRole('button', { name: colour, exact: true });
   const identities = async () => (await saved(page)).identities;

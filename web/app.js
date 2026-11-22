@@ -26,29 +26,31 @@ const undoButton = document.querySelector('#undo-button');
 const saveButton = document.querySelector('#save-button');
 const cancelButton = document.querySelector('#cancel-button');
 const discardDialog = document.querySelector('#discard');
-const setup = document.querySelector('#setup');
-const setupForm = document.querySelector('#setup-form');
+const settings = document.querySelector('#settings');
+const settingsForm = document.querySelector('#settings-form');
+const settingsBody = document.querySelector('#settings-body');
+const settingsContent = document.querySelector('#settings-content');
+const settingsHead = settings.querySelector('.fs-head');
+const settingsCue = settings.querySelector('.scroll-cue');
+const settingsFlip = document.querySelector('#settings-flip');
+const settingsDone = document.querySelector('#save-setup');
+const settingsPending = document.querySelector('#settings-pending');
+const restartButton = document.querySelector('#restart-button');
 const playerChoices = document.querySelector('#player-choices');
 const lifePresets = document.querySelector('#life-presets');
-const customLifeButton = document.querySelector('#custom-life');
-const lifeStepper = document.querySelector('#life-stepper');
+const lifeEdit = document.querySelector('#life-edit');
 const lifeValue = document.querySelector('#life-value');
-const trackButton = document.querySelector('#track-button');
-const trackSummary = document.querySelector('#track-summary');
-const trackDialog = document.querySelector('#track');
+const lifeEditor = document.querySelector('#life-editor');
+const lifeInput = document.querySelector('#life-input');
 const manaSwitch = document.querySelector('#mana-switch');
 const autoEmptySwitch = document.querySelector('#auto-empty-switch');
 const autoEmptyRow = document.querySelector('#auto-empty-row');
 const turnChoices = document.querySelector('#turn-choices');
-const identityNav = document.querySelector('#identity-nav');
 const identityNote = document.querySelector('#identity-note');
-const identityDialog = document.querySelector('#identity-sheet');
 const identityShowSwitches = document.querySelectorAll('#identity-show input');
 const identityBackgroundChoices = document.querySelector('#identity-background');
 const chooseIdentitiesButton = document.querySelector('#choose-identities');
 const restart = document.querySelector('#restart');
-const privacy = document.querySelector('#privacy');
-const privacyCue = privacy.querySelector('.scroll-cue');
 const announcer = document.querySelector('#announcer');
 const portraitQuery = window.matchMedia('(orientation: portrait)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -185,6 +187,7 @@ const iconPaths = {
   undo: 'M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z',
   check: 'M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z',
   'caret-right': 'M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z',
+  play: 'M234.49,111.07,90.41,22.94A20,20,0,0,0,60,39.87V216.13a20,20,0,0,0,30.41,16.93l144.08-88.13a19.82,19.82,0,0,0,0-33.86ZM84,208.85V47.15L216.16,128Z',
 };
 
 let game = loadGame();
@@ -205,9 +208,8 @@ let dropLevels = { near: 0, far: 0, strip: 0 };
 let fitQueued = false;
 // The pill's buttons now and at rest, as last measured.
 let pillShape = '';
-// Setup's starting life, before Done applies it, and whether Custom is chosen.
+// Settings' starting life, before Done applies it. selectedPlayerCount above is the same for players.
 let selectedLife = game.startingLife;
-let customLife = false;
 let diceSides = 20;
 let die;
 let stopRoll;
@@ -216,7 +218,7 @@ const activePresses = new Set();
 // Turn steps, newest last, so holding the turn chip or the pill steps back exactly, restoring any pools the step
 // emptied. Not saved: after a relaunch, a hold steps back by the play order instead.
 let turnSteps = [];
-// "Who goes first?" waits until setup and its sheets have closed, then opens.
+// "Who goes first?" waits until settings has closed, then opens.
 let askFirst = false;
 let shuffleTimer;
 // Pools cleared with the eraser in the last 5 seconds, by player, so "Undo clear" can put them back. Not saved.
@@ -261,8 +263,11 @@ function boardTurn() {
 function syncBoardTurn() {
   document.querySelector('.app').dataset.boardTurn = String(boardTurn());
   measureBoard();
-  if (setup.open) renderTrackSummary();
-  if (privacy.open) syncPrivacyCue();
+  if (settings.open) {
+    placeSettingsSections();
+    syncSettingsCue();
+    keepLifeEditorInView();
+  }
 }
 
 // One size per board (design/polish/SPEC.md §3.1): every tile draws its content at the size that fits the smallest
@@ -2005,7 +2010,7 @@ function setBoardMode(mode) {
   }
   // The badges were hidden while the mode was open, so they're measured now that they show again.
   requestFit();
-  setupButton.setAttribute('aria-label', mode ? doneLabels[mode] ?? 'Game setup' : 'Game setup');
+  setupButton.setAttribute('aria-label', mode ? doneLabels[mode] ?? 'Settings' : 'Settings');
   setupButton.setAttribute('aria-haspopup', mode ? 'false' : 'dialog');
   setupButton.querySelector('.setup-icon').hidden = mode !== null;
   setupButton.querySelector('.rotation-done').hidden = mode === null;
@@ -2015,7 +2020,7 @@ function setBoardMode(mode) {
     : mode ? board.querySelector('.mode-layer button') : setupButton;
   focusTarget?.focus();
   syncBackHandling();
-  // A mode opened from setup, such as Rotate seats, was still open when setup's close event looked, so the question
+  // A mode opened from settings, such as Rotate seats, was still open when settings' close event looked, so the question
   // waits for the mode to end.
   if (mode === null) maybeAskFirst();
 }
@@ -2130,23 +2135,10 @@ function startGame(playerCount, startingLife) {
   maybeAskFirst();
 }
 
-function setupChangesGame() {
+// Settings (design/polish/SETTINGS-SPEC.md). Players and starting life wait for Done: a change to either is a pending
+// new game (P1), which Done, renamed "Start new game", or a board action starts. ✕, Escape and Android back drop it.
+function settingsChangeGame() {
   return selectedPlayerCount !== game.scores.length || selectedLife !== game.startingLife;
-}
-
-// Track's summary: the icon of each tracker that's on, then the mana pool and turns. It shows at most three icons, and
-// as many as fit beside the word "Track", then "+N" for the rest, so the label and the caret always keep their room.
-function renderTrackSummary() {
-  const icons = () => [...trackers.filter(tracker => game.counters[tracker])
-    .map(tracker => (tracker === 'commander' ? icon('sword') : counterIcon(tracker))),
-  ...(game.manaPool ? [manaIcon('tap')] : []),
-  ...(game.turns === 'rounds' ? [icon('flag')] : game.turns === 'turns' ? [manaIcon('untap')] : [])];
-  const total = icons().length;
-  const show = count => trackSummary.replaceChildren(...icons().slice(0, count), ...(total > count ? [element('span', 'more', `+${total - count}`)] : []));
-  let count = Math.min(3, total);
-  show(count);
-  // Measured only while setup is open; it's fitted again each time setup opens.
-  while (count > 0 && setup.open && trackSummary.scrollWidth > trackSummary.clientWidth + 0.5) show(--count);
 }
 
 // Track's own state: the switches, the Turns choice, and the auto-empty switch, which only shows while it applies.
@@ -2156,6 +2148,7 @@ function renderTrackSheet() {
   autoEmptySwitch.checked = game.autoEmpty;
   autoEmptyRow.hidden = !game.manaPool || game.turns === 'off';
   for (const choice of turnChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.turns === game.turns));
+  syncSettingsCue();
 }
 
 function renderAllBadges() {
@@ -2166,123 +2159,268 @@ function renderAllBadges() {
   syncPill();
 }
 
-function renderSetup() {
-  for (const choice of playerChoices.children) {
-    choice.setAttribute('aria-pressed', String(Number(choice.value) === selectedPlayerCount));
+// A notched slider (design/polish/STYLE.md §4): a track from min to max whose labelled stops are buttons, so a tap works
+// as well as a drag (WCAG 2.5.7). A tap on the track or a drag snaps to multiples of snap. The arrow keys step by step
+// and Page Up and Page Down by page, within lowest and highest, which may reach past the track: a value off the track,
+// such as a starting life of 100, pins the thumb to that end and marks it (data-pinned).
+function notchedSlider({ root, min, max, snap, step, page, lowest, highest, get, set, describe }) {
+  const track = root.querySelector('.k-track');
+  const clamp = value => Math.min(highest, Math.max(lowest, value));
+  const at = value => `${((Math.min(max, Math.max(min, value)) - min) / (max - min)) * 100}%`;
+  const change = (value) => {
+    if (value !== get()) set(value);
+  };
+  // The value under a point on the track. Turned to face the other side, the page runs right to left on screen.
+  const valueAt = (x) => {
+    const box = track.getBoundingClientRect();
+    let along = Math.min(1, Math.max(0, (x - box.left) / box.width));
+    if (settings.hasAttribute('data-flipped')) along = 1 - along;
+    return Math.min(max, Math.max(min, Math.round((min + along * (max - min)) / snap) * snap));
+  };
+  for (const stop of root.querySelectorAll('.k-stop')) stop.style.left = at(Number(stop.value || stop.dataset.life));
+  const ticks = root.querySelector('.k-ticks');
+  for (let value = min; value <= max; value += snap) {
+    const tick = element('span', 'k-tick');
+    tick.style.left = at(value);
+    tick.dataset.value = value;
+    if (root.querySelector(`.k-stop[value="${value}"], .k-stop[data-life="${value}"]`)) tick.dataset.stop = '';
+    ticks.append(tick);
   }
-  // Custom is chosen when the player picks it, or when the life isn't one of the presets, such as an old save at 25.
-  const presets = [...lifePresets.querySelectorAll('[data-life]')];
-  const custom = customLife || !presets.some(preset => Number(preset.dataset.life) === selectedLife);
-  for (const preset of presets) preset.setAttribute('aria-pressed', String(!custom && Number(preset.dataset.life) === selectedLife));
-  customLifeButton.hidden = custom;
-  lifeStepper.hidden = !custom;
-  lifeValue.textContent = selectedLife;
-  const changesGame = setupChangesGame();
-  document.querySelector('#save-setup').textContent = changesGame ? 'Start new game' : 'Done';
-  document.querySelector('#restart-button').hidden = changesGame;
-  rotateSeatsButton.hidden = changesGame;
-  tileColoursButton.hidden = changesGame;
-  renderTrackSummary();
+  // A press only picks a value once it lifts without moving (a tap) or moves sideways (a drag). A vertical swipe is
+  // left to the page, which scrolls (touch-action: pan-y), so the slider never traps a scroll. A tap on a stop is
+  // left to the stop's own click.
+  let pointer;
+  let startX = 0;
+  let dragging = false;
+  let onStop = false;
+  root.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || pointer !== undefined) return;
+    pointer = event.pointerId;
+    startX = event.clientX;
+    dragging = false;
+    onStop = event.target.closest('.k-stop') !== null;
+  });
+  root.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== pointer) return;
+    if (!dragging && Math.abs(event.clientX - startX) < 6) return;
+    if (!dragging) {
+      dragging = true;
+      root.setPointerCapture?.(event.pointerId);
+    }
+    change(valueAt(event.clientX));
+  });
+  const end = (event, lifted) => {
+    if (event.pointerId !== pointer) return;
+    if (lifted && !dragging && !onStop) change(valueAt(event.clientX));
+    pointer = undefined;
+  };
+  root.addEventListener('pointerup', event => end(event, true));
+  root.addEventListener('pointercancel', event => end(event, false));
+  track.addEventListener('keydown', (event) => {
+    const value = get();
+    const next = {
+      ArrowRight: value + step, ArrowUp: value + step, ArrowLeft: value - step, ArrowDown: value - step,
+      PageUp: value + page, PageDown: value - page, Home: min, End: max,
+    }[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    change(clamp(next));
+  });
+  return {
+    render() {
+      const value = get();
+      track.style.setProperty('--p', at(value));
+      track.setAttribute('aria-valuenow', String(value));
+      track.setAttribute('aria-valuetext', describe(value));
+      for (const tick of ticks.children) tick.toggleAttribute('data-filled', Number(tick.dataset.value) <= value);
+      if (value < min || value > max) track.dataset.pinned = value < min ? 'low' : 'high';
+      else delete track.dataset.pinned;
+    },
+  };
 }
 
 for (const count of playerCounts) {
-  const choice = document.createElement('button');
+  const choice = element('button', 'k-stop', String(count));
   choice.type = 'button';
   choice.value = count;
-  choice.textContent = count;
+  choice.tabIndex = -1;
   choice.setAttribute('aria-label', `${count} players`);
   choice.addEventListener('click', () => {
     selectedPlayerCount = count;
-    renderSetup();
+    renderSettings();
   });
   playerChoices.append(choice);
 }
-
-for (const preset of lifePresets.querySelectorAll('[data-life]')) {
+for (const preset of lifePresets.children) {
   preset.addEventListener('click', () => {
     selectedLife = Number(preset.dataset.life);
-    customLife = false;
-    renderSetup();
+    renderSettings();
   });
 }
-// Custom becomes the stepper, starting at the current value.
-customLifeButton.addEventListener('click', () => {
-  customLife = true;
-  renderSetup();
-  document.querySelector('#life-up').focus();
+const playersSlider = notchedSlider({
+  root: document.querySelector('#players-slider'), min: 2, max: 6, snap: 1, step: 1, page: 1, lowest: 2, highest: 6,
+  get: () => selectedPlayerCount,
+  set(count) {
+    selectedPlayerCount = count;
+    renderSettings();
+  },
+  describe: count => `${count} players`,
 });
-// The stepper counts 1 to 999. Holding repeats ten times a second, in steps of 5 once held for a second.
-function stepStartingLife(direction, held) {
-  const next = Math.min(maxStartingLife, Math.max(1, selectedLife + direction * (held >= 1000 ? 5 : 1)));
-  if (next === selectedLife) return;
-  selectedLife = next;
-  renderSetup();
-}
-bindCounter(document.querySelector('#life-down'), held => stepStartingLife(-1, held), 'Less starting life');
-bindCounter(document.querySelector('#life-up'), held => stepStartingLife(1, held), 'More starting life');
+// Starting life: 10 to 60 on the track, in fives, and any whole number from 1 to 999 by keys or the field.
+const lifeSlider = notchedSlider({
+  root: document.querySelector('#life-slider'), min: 10, max: 60, snap: 5, step: 1, page: 5, lowest: 1, highest: maxStartingLife,
+  get: () => selectedLife,
+  set(life) {
+    selectedLife = life;
+    renderSettings();
+  },
+  describe: life => `Starting life ${life}`,
+});
 
+function renderSettings() {
+  for (const choice of playerChoices.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === selectedPlayerCount));
+  for (const preset of lifePresets.children) preset.setAttribute('aria-pressed', String(Number(preset.dataset.life) === selectedLife));
+  playersSlider.render();
+  lifeSlider.render();
+  lifeValue.textContent = selectedLife;
+  lifeEdit.setAttribute('aria-label', `Starting life ${selectedLife}. Type a number`);
+  const pending = settingsChangeGame();
+  settingsDone.textContent = pending ? 'Start new game' : 'Done';
+  restartButton.hidden = pending;
+  // The pending line is a live region, so it's kept in the page (visually hidden while empty) and only rewritten when
+  // its words change.
+  const words = pending ? `Starts a new game with ${selectedPlayerCount} players at ${selectedLife} life when you leave settings.` : '';
+  if (settingsPending.textContent !== words) settingsPending.replaceChildren(...(pending ? [icon('play'), element('span', '', words)] : []));
+  settingsPending.toggleAttribute('data-empty', !pending);
+  syncSettingsCue();
+}
+
+// The inline life editor: the number turns into a field with the numeric keyboard and a ✓. Enter (Android), ✓, Done in
+// the iOS keyboard bar or leaving the field commits a whole number from 1 to 999; anything else keeps the last value.
+// Escape cancels.
+function openLifeEditor() {
+  lifeInput.value = String(selectedLife);
+  lifeEdit.hidden = true;
+  lifeEditor.hidden = false;
+  lifeInput.focus();
+  lifeInput.select();
+  keepLifeEditorInView();
+}
+function closeLifeEditor(commit, refocus) {
+  if (lifeEditor.hidden) return;
+  const typed = lifeInput.value.trim();
+  // Hidden first: hiding the field blurs it, and its focusout calls back in.
+  lifeEditor.hidden = true;
+  lifeEdit.hidden = false;
+  if (commit && /^\d{1,3}$/.test(typed) && Number(typed) >= 1) selectedLife = Number(typed);
+  settings.style.removeProperty('--keyboard');
+  renderSettings();
+  placeSettingsSections();
+  if (refocus) lifeEdit.focus();
+}
+lifeEdit.addEventListener('click', openLifeEditor);
+lifeInput.addEventListener('input', () => {
+  const digits = lifeInput.value.replace(/\D/g, '').slice(0, 3);
+  if (digits !== lifeInput.value) lifeInput.value = digits;
+});
+lifeInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') {
+    // Not the form's implicit submit, which would close settings.
+    event.preventDefault();
+    closeLifeEditor(true, true);
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    event.stopPropagation();
+    closeLifeEditor(false, true);
+  }
+});
+document.querySelector('#life-commit').addEventListener('click', () => closeLifeEditor(true, true));
+lifeEditor.addEventListener('focusout', (event) => {
+  if (!lifeEditor.contains(event.relatedTarget)) closeLifeEditor(true, false);
+});
+
+// Keeps the field clear of the keyboard and the header. Android's WebView shrinks the page for the keyboard; iOS shrinks
+// only the visual viewport, so the body gets that much extra room (--keyboard) to scroll the field up into. Turned to
+// face the other side, the header is at the bottom of the screen and scrolling moves the field the other way.
+function keepLifeEditorInView() {
+  if (lifeEditor.hidden || !settings.open) return;
+  const view = window.visualViewport;
+  const viewTop = view ? view.offsetTop : 0;
+  const viewBottom = view ? view.offsetTop + view.height : window.innerHeight;
+  const flipped = settings.hasAttribute('data-flipped');
+  settings.style.setProperty('--keyboard', `${Math.max(0, Math.round(window.innerHeight - viewBottom))}px`);
+  const head = settingsHead.getBoundingClientRect();
+  const top = (flipped ? viewTop : Math.max(viewTop, head.bottom)) + 8;
+  const bottom = (flipped ? Math.min(viewBottom, head.top) : viewBottom) - 8;
+  const box = lifeEditor.getBoundingClientRect();
+  const move = box.bottom > bottom ? bottom - box.bottom : box.top < top ? top - box.top : 0;
+  if (move) settingsBody.scrollTop += flipped ? move : -move;
+}
+window.visualViewport?.addEventListener('resize', keepLifeEditorInView);
+
+// Layout B: two columns from 620px wide, Game and Table then Track and Identity; one column below, in the order Game,
+// Track, Identity, Table. The sections move rather than being reordered by CSS, so the reading and focus order always
+// match what shows. They stay put while the life field is open, so a resize from the keyboard can't close it.
+const settingsSections = ['game', 'table', 'track', 'identity'].map(name => document.querySelector(`#settings-${name}`));
+function placeSettingsSections() {
+  if (!lifeEditor.hidden) return;
+  const columns = window.innerWidth >= 620;
+  const [game, table, track, identity] = settingsSections;
+  const [start, end] = settingsContent.querySelectorAll('.fs-col');
+  const wanted = columns ? [[game, table], [track, identity]] : [[game, track, identity, table], []];
+  settingsContent.toggleAttribute('data-columns', columns);
+  if (wanted[0].every((section, index) => start.children[index] === section) && end.children.length === wanted[1].length) return;
+  const focused = settings.contains(document.activeElement) ? document.activeElement : null;
+  start.replaceChildren(...wanted[0]);
+  end.replaceChildren(...wanted[1]);
+  focused?.focus({ preventScroll: true });
+}
+
+// A fade along the bottom of the body while there's more below.
+function syncSettingsCue() {
+  settingsCue.toggleAttribute('data-more', settingsBody.scrollTop + settingsBody.clientHeight < settingsBody.scrollHeight - 1);
+}
+settingsBody.addEventListener('scroll', syncSettingsCue, { passive: true });
+
+function openSettings() {
+  selectedPlayerCount = game.scores.length;
+  selectedLife = game.startingLife;
+  wakeInput.checked = game.keepAwake;
+  settings.removeAttribute('data-flipped');
+  settingsFlip.setAttribute('aria-pressed', 'false');
+  renderSettings();
+  renderTrackSheet();
+  renderIdentitySheet();
+  placeSettingsSections();
+  settings.showModal();
+  // Settings always open at the top.
+  settingsBody.scrollTop = 0;
+  syncSettingsCue();
+  syncBackHandling();
+}
 setupButton.addEventListener('click', () => {
   if (boardMode) {
     setBoardMode(null);
     return;
   }
-  selectedPlayerCount = game.scores.length;
-  selectedLife = game.startingLife;
-  customLife = false;
-  wakeInput.checked = game.keepAwake;
-  renderSetup();
-  setup.showModal();
-  renderTrackSummary();
+  openSettings();
+});
+document.querySelector('#settings-close').addEventListener('click', () => settings.close());
+// The flip (O1): the page faces the phone, and this turns it to face a player across the table. Opening settings
+// resets it.
+settingsFlip.addEventListener('click', () => {
+  const flipped = !settings.hasAttribute('data-flipped');
+  settings.toggleAttribute('data-flipped', flipped);
+  settingsFlip.setAttribute('aria-pressed', String(flipped));
+});
+settings.addEventListener('close', () => {
+  closeLifeEditor(false, false);
+  settings.removeAttribute('data-flipped');
   syncBackHandling();
 });
-setup.querySelector('[data-close]').addEventListener('click', () => setup.close());
-// About (the privacy summary and credits) opens from setup and returns to it. The apps can't open web pages, so it's shown here.
-document.querySelector('#privacy-button').addEventListener('click', () => {
-  setup.close();
-  privacy.showModal();
-  privacy.scrollTop = 0;
-  syncPrivacyCue();
-  syncBackHandling();
-});
-privacy.addEventListener('close', () => {
-  setup.showModal();
-  renderTrackSummary();
-  syncBackHandling();
-});
-// About scrolls on short screens, with a fade along the bottom while there's more below.
-function syncPrivacyCue() {
-  privacyCue.toggleAttribute('data-more', privacy.scrollTop + privacy.clientHeight < privacy.scrollHeight - 1);
-}
-privacy.addEventListener('scroll', syncPrivacyCue, { passive: true });
-// Track and Identity replace setup, keeping setup's unsaved choices. ‹, Escape and Android back return to setup;
-// ✕ closes both. Choose identities closes both and starts identity mode.
-function openSubSheet(dialog) {
-  dialog.returnValue = '';
-  setup.close();
-  dialog.showModal();
-  syncBackHandling();
-}
-for (const [dialog, opener] of [[trackDialog, trackButton], [identityDialog, identityNav]]) {
-  dialog.querySelector('[data-back]').addEventListener('click', () => dialog.close('back'));
-  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close('close'));
-  dialog.addEventListener('close', () => {
-    if (dialog.returnValue === 'close') {
-      setupButton.focus();
-    } else if (dialog.returnValue !== 'choose') {
-      renderSetup();
-      setup.showModal();
-      renderTrackSummary();
-      opener.focus();
-    }
-    syncBackHandling();
-  });
-}
-trackButton.addEventListener('click', () => {
-  renderTrackSheet();
-  openSubSheet(trackDialog);
-});
+
 // Turns saves the moment it changes. Off hides everything about turns but keeps the state. Going from Off to on in a
-// game with no first player asks "Who goes first?" once setup closes; Rounds and Turn by turn switch without asking.
+// game with no first player asks "Who goes first?" once settings closes; Rounds and Turn by turn switch without asking.
 // Rounds doesn't follow whose turn it is, so switching between them leaves nobody's turn until a player starts theirs.
 for (const choice of turnChoices.children) {
   choice.addEventListener('click', () => {
@@ -2310,18 +2448,16 @@ autoEmptySwitch.addEventListener('change', () => {
   saveGame();
 });
 
-// The Identity sheet: what tiles show of each identity, saved the moment it changes. Choose identities keeps its
-// place but can't be used while setup would start a new game, like Colours and Rotate seats.
+// Identity: what tiles show of each identity, saved the moment it changes.
 function renderIdentitySheet() {
   for (const toggle of identityShowSwitches) toggle.checked = game.identity.show[toggle.dataset.show];
   for (const choice of identityBackgroundChoices.children) {
     choice.setAttribute('aria-pressed', String(game.identity.background === choice.dataset.background));
   }
   identityNote.textContent = identityNoteText(game.identity.show);
-  chooseIdentitiesButton.hidden = setupChangesGame();
 }
 
-// The Identity sheet's note says what the tiles show: "Tiles show the colour disc and name", or that the chip is off.
+// Identity's note says what the tiles show: "Tiles show the colour disc and name", or that the chip is off.
 function identityNoteText(show) {
   const parts = [['indicator', 'colour disc'], ['symbol', 'symbol'], ['name', 'name']].filter(([part]) => show[part]).map(([, words]) => words);
   if (!parts.length) return 'Identity is hidden on tiles. Players keep their picks.';
@@ -2336,50 +2472,49 @@ function changeIdentitySettings(change) {
   game.scores.forEach((_, index) => renderBadges(index));
 }
 
-identityNav.addEventListener('click', () => {
-  renderIdentitySheet();
-  openSubSheet(identityDialog);
-});
 for (const toggle of identityShowSwitches) {
-  toggle.addEventListener('change', () => changeIdentitySettings((settings) => {
-    settings.show[toggle.dataset.show] = toggle.checked;
+  toggle.addEventListener('change', () => changeIdentitySettings((identity) => {
+    identity.show[toggle.dataset.show] = toggle.checked;
   }));
 }
 for (const choice of identityBackgroundChoices.children) {
-  choice.addEventListener('click', () => changeIdentitySettings((settings) => {
-    settings.background = choice.dataset.background;
+  choice.addEventListener('click', () => changeIdentitySettings((identity) => {
+    identity.background = choice.dataset.background;
   }));
 }
-chooseIdentitiesButton.addEventListener('click', () => {
-  identityDialog.close('choose');
-  setBoardMode('identity');
-});
-rotateSeatsButton.addEventListener('click', () => {
-  setup.close();
-  setBoardMode('rotate');
-});
-tileColoursButton.addEventListener('click', () => {
-  setup.close();
-  setBoardMode('colours');
-});
-setupForm.addEventListener('submit', (event) => {
+
+// Choose identities, Colours and Rotate seats close settings and start their board mode, starting a pending new game
+// first. The mode's check mark returns to the board.
+function leaveSettingsFor(mode) {
+  closeLifeEditor(true, false);
+  if (settingsChangeGame()) startGame(selectedPlayerCount, selectedLife);
+  settings.close();
+  setBoardMode(mode);
+}
+chooseIdentitiesButton.addEventListener('click', () => leaveSettingsFor('identity'));
+rotateSeatsButton.addEventListener('click', () => leaveSettingsFor('rotate'));
+tileColoursButton.addEventListener('click', () => leaveSettingsFor('colours'));
+settingsForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  if (setupChangesGame()) startGame(selectedPlayerCount, selectedLife);
-  setup.close();
+  closeLifeEditor(true, false);
+  if (settingsChangeGame()) startGame(selectedPlayerCount, selectedLife);
+  settings.close();
 });
 
-document.querySelector('#restart-button').addEventListener('click', () => {
+// New game opens its confirmation over settings. Confirming starts a new game with the same players and life and
+// closes both; cancelling returns to settings. It's hidden while a new game is pending.
+restartButton.addEventListener('click', () => {
   document.querySelector('#restart-message').textContent = `All players will go back to ${game.startingLife} life.`;
   restart.returnValue = 'cancel';
-  setup.close();
   restart.showModal();
   syncBackHandling();
 });
-setup.addEventListener('close', syncBackHandling);
 restart.addEventListener('close', () => {
+  if (restart.returnValue === 'restart') {
+    startGame(game.scores.length, game.startingLife);
+    settings.close();
+  }
   syncBackHandling();
-  if (restart.returnValue === 'restart') startGame(game.scores.length, game.startingLife);
-  if (!boardMode) setupButton.focus();
 });
 
 // Shows the chosen die without a result. A roll in progress stops.
@@ -2456,7 +2591,7 @@ discardDialog.addEventListener('close', () => {
 
 // Android's back gesture closes the open dialog, then leaves the open board mode the way ✕ does.
 window.closeOpenDialog = () => {
-  const openDialog = document.querySelector('dialog[open]');
+  const openDialog = [...document.querySelectorAll('dialog[open]')].at(-1);
   if (openDialog) {
     openDialog.close('cancel');
     return true;
@@ -2487,8 +2622,7 @@ for (const tracker of trackers) {
     syncPill();
   });
 }
-// "Who goes first?" waits for setup, its sheets and the new game dialog to close. These listeners run after each
-// dialog's own, so a sheet going back to setup still counts as open.
+// "Who goes first?" waits for settings and the new game dialog to close. These listeners run after each dialog's own.
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', maybeAskFirst);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();

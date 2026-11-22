@@ -98,8 +98,8 @@ async function checkLayouts(t, engine) {
 
   // The last game is six players with a landscape screen at 90°. Rotate one seat, then turn the phone around.
   await turnScreen(page, 852, 393, 90);
-  await button(page, 'Game setup').tap();
-  await button(page, 'Rotate seats').tap();
+  await button(page, 'Settings').tap();
+  await button(page, 'Rotate seats on the board').tap();
   await button(page, 'Rotate Player 6 clockwise').tap();
   await button(page, 'Done rotating seats').tap();
   const rotated = ['1↑ 2↑ 5↑', '3↓ 4↓ 6←'];
@@ -127,18 +127,14 @@ async function checkLayouts(t, engine) {
   await turnScreen(page, 393, 852, 90);
   await checkBoard(page, rotated, 90, 'portrait window on a landscape screen');
 
-  // Setup fits the smallest landscape phone, and its privacy summary opens and returns to setup.
+  // Settings fills the smallest landscape phone, with About inline.
   await turnScreen(page, 568, 320, 90);
-  await button(page, 'Game setup').tap();
-  const setupBox = await page.locator('#setup').boundingBox();
-  assert.ok(setupBox.y >= 0 && setupBox.y + setupBox.height <= 320, `setup fits: ${JSON.stringify(setupBox)}`);
-  await button(page, 'About').tap();
-  assert.match(await page.locator('#privacy').textContent(), /collects no data/);
-  assert.match(await page.locator('#privacy').textContent(), /unofficial Fan Content permitted under the Fan Content Policy/);
-  await button(page, 'Close about').tap();
-  // The dialog close event runs after the click, so wait for setup to reopen.
-  await page.waitForFunction(() => document.querySelector('#setup').open, null, { timeout: 2000 });
-  await button(page, 'Close setup').tap();
+  await button(page, 'Settings').tap();
+  const settingsBox = await page.locator('#settings').boundingBox();
+  assert.deepEqual(settingsBox, { x: 0, y: 0, width: 568, height: 320 }, 'settings fills the screen');
+  assert.match(await page.locator('#settings-about').textContent(), /collects no data/);
+  assert.match(await page.locator('#settings-about').textContent(), /unofficial Fan Content permitted under the Fan Content Policy/);
+  await button(page, 'Close settings').tap();
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {

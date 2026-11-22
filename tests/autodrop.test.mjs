@@ -225,7 +225,7 @@ async function checkSteps(t, engine) {
   assert.equal(reached, 2, 'the far row wraps on the narrowest windows');
 
   // A new game resets the counts and starts at full size.
-  await button(busy, 'Game setup').tap();
+  await button(busy, 'Settings').tap();
   await button(busy, 'New game').tap();
   await busy.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await busy.waitForFunction(() => [...document.querySelectorAll('.badges.far')].every(row => row.hidden), null, { timeout: 2000 });

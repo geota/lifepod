@@ -93,10 +93,9 @@ async function hold(page, locator, ms = 900) {
 }
 
 async function setTurns(page, label) {
-  await button(page, 'Game setup').tap();
-  await button(page, 'Track').tap();
+  await button(page, 'Settings').tap();
   await page.locator('#turn-choices').getByRole('button', { name: label, exact: true }).tap();
-  await button(page, 'Close setup').tap();
+  await button(page, 'Close settings').tap();
 }
 
 // Turn by turn passes clockwise on screen, which is passing to the left, in the spec's order for every player count.
@@ -217,14 +216,11 @@ async function checkWhoGoesFirst(t, engine) {
   const page = await openPage(t, engine, { random: 2 });
   assert.ok(await page.locator('#round-button').isHidden(), 'Turns is off by default');
 
-  // Off → on asks, once setup has closed.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Track').tap();
+  // Off → on asks, once settings has closed.
+  await button(page, 'Settings').tap();
   await page.locator('#turn-choices').getByRole('button', { name: 'Turn by turn', exact: true }).tap();
-  assert.equal(await mode(page), null, 'not while the Track sheet is open');
-  await button(page, 'Back to setup').tap();
-  await eventually(() => page.evaluate(() => document.querySelector('#setup').open), true);
-  assert.equal(await mode(page), null, 'not while setup is open');
+  await new Promise(resolve => setTimeout(resolve, 100));
+  assert.equal(await mode(page), null, 'not while settings is open');
   await page.locator('#save-setup').tap();
   await eventually(() => mode(page), 'first', 'Off → Turn by turn asks who goes first');
   assert.equal(await page.locator('.first-go').count(), 4, 'Me first on every tile');
@@ -250,7 +246,7 @@ async function checkWhoGoesFirst(t, engine) {
   assert.equal(await active(page), 2, 'a tile’s chip starts that player’s turn');
 
   // A new game asks again. The shuffle picks at random from the crypto RNG.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => mode(page), 'first', 'a new game asks who goes first');
@@ -263,7 +259,7 @@ async function checkWhoGoesFirst(t, engine) {
   assert.equal(await active(page), 4);
 
   // ✕ skips: no flag, round 1, and no active tile until someone starts their turn.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => mode(page), 'first');
@@ -284,7 +280,7 @@ async function checkWhoGoesFirst(t, engine) {
   await setTurns(page, 'Rounds');
   assert.equal(await mode(page), null);
   await setTurns(page, 'Off');
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await page.waitForTimeout(300);
@@ -293,7 +289,7 @@ async function checkWhoGoesFirst(t, engine) {
   await setTurns(page, 'Rounds');
   await eventually(() => mode(page), 'first');
   await button(page, 'Skip').tap();
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, '3 players').tap();
   await page.locator('#save-setup').tap();
   await eventually(() => mode(page), 'first', 'a new game from setup asks');
@@ -307,28 +303,27 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: who goes first opens on a new game and on Off to on`, { timeout: 90000 }, t => checkWhoGoesFirst(t, engine));
 }
 
-test('chromium: the Track sheet holds Turns and fits the smallest phone', async (t) => {
+test('chromium: Track in settings holds Turns and fits the smallest phone', async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
-  await button(page, 'Game setup').tap();
-  await button(page, 'Track').tap();
+  await button(page, 'Settings').tap();
   const pressed = () => page.locator('#turn-choices').evaluate(group => [...group.children].filter(choice => choice.getAttribute('aria-pressed') === 'true')
     .map(choice => choice.textContent));
   assert.deepEqual(await pressed(), ['Off']);
   await page.locator('#turn-choices').getByRole('button', { name: 'Turn by turn', exact: true }).tap();
   assert.deepEqual(await pressed(), ['Turn by turn']);
   assert.equal((await saved(page)).turns, 'turns', 'Turns saves at once');
-  const box = await page.locator('#track').boundingBox();
-  assert.ok(box.y >= 0 && box.y + box.height <= 320, `Track fits 568 × 320: ${JSON.stringify(box)}`);
-  assert.ok(await page.locator('#track').evaluate(dialog => dialog.scrollHeight <= dialog.clientHeight + 1), 'without scrolling');
-  // Back in setup, Track sums up Turns with its icon.
-  await button(page, 'Back to setup').tap();
-  await eventually(() => page.locator('#track-summary').evaluate(node => [...node.children].map(icon => icon.dataset.glyph ?? icon.dataset.icon)), ['untap']);
+  // Track is as wide as the page allows: every Turns choice is a 44px target inside the window.
+  const choices = await page.locator('#turn-choices button').evaluateAll(buttons => buttons.map((choice) => {
+    const box = choice.getBoundingClientRect();
+    return box.left >= 0 && box.right <= innerWidth && box.height >= 43.5;
+  }));
+  assert.deepEqual(choices, [true, true, true], 'every Turns choice fits 568 × 320');
 });
 
 test('chromium: Android back skips who goes first', async (t) => {
   const page = await openPage(t, chromium, { android: true, game: savedGame(4, { turns: 'rounds' }) });
   const back = () => page.evaluate(() => window.closeOpenDialog());
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => mode(page), 'first');
@@ -341,7 +336,7 @@ test('chromium: Android back skips who goes first', async (t) => {
   await page.locator('#round-button').tap();
   await page.waitForTimeout(100);
   assert.equal((await saved(page)).turn.round, 2, 'Rounds steps without a first player');
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => mode(page), 'first');
@@ -430,18 +425,15 @@ async function checkOrphanedChipPress(t, engine) {
   assert.equal(await active(page), 2, 'a hold still steps back one turn');
 }
 
-// Rotate seats, Colours and Choose identities close setup and open a board mode at once, so "Who goes first?" waits
+// Rotate seats, Colours and Choose identities close settings and open a board mode at once, so "Who goes first?" waits
 // for that mode to end, then opens (docs/review/ARCHITECTURE.md B3).
 async function checkAskFirstAfterMode(t, engine) {
   const page = await openPage(t, engine);
-  for (const [entry, done] of [['Rotate seats', 'Done rotating seats'], ['Colours', 'Done choosing colours']]) {
-    await button(page, 'Game setup').tap();
-    await button(page, 'Track').tap();
+  for (const [entry, done] of [['Rotate seats on the board', 'Done rotating seats'], ['Choose tile colours on the board', 'Done choosing colours']]) {
+    await button(page, 'Settings').tap();
     await page.locator('#turn-choices').getByRole('button', { name: 'Rounds', exact: true }).tap();
-    await button(page, 'Back to setup').tap();
-    await eventually(() => page.evaluate(() => document.querySelector('#setup').open), true);
     await button(page, entry).tap();
-    await eventually(() => page.evaluate(() => document.querySelectorAll('dialog[open]').length), 0, `${entry} closes setup`);
+    await eventually(() => page.evaluate(() => document.querySelectorAll('dialog[open]').length), 0, `${entry} closes settings`);
     assert.notEqual(await mode(page), 'first', `not while ${entry} is open`);
     await button(page, done).tap();
     await eventually(() => mode(page), 'first', `"Who goes first?" opens once ${entry} is done`);

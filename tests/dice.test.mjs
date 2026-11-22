@@ -70,8 +70,8 @@ async function checkDice(t, engine) {
   }
 
   // Seat rotation leaves only its Done button on the board.
-  await button(page, 'Game setup').click();
-  await button(page, 'Rotate seats').click();
+  await button(page, 'Settings').click();
+  await button(page, 'Rotate seats on the board').click();
   assert.equal(await button(page, 'Roll dice').isVisible(), false, 'no dice while rotating seats');
   await button(page, 'Done rotating seats').click();
   assert.ok(await button(page, 'Roll dice').isVisible());

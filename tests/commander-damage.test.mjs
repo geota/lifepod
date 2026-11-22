@@ -204,15 +204,15 @@ async function checkDamage(t, engine) {
   assert.deepEqual(await scores(page), [39, 40, 36, 40]);
 
   // A new attacker colour shows on the chips straight away.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Colours').tap();
+  await button(page, 'Settings').tap();
+  await button(page, 'Choose tile colours on the board').tap();
   await tile(page, 2).getByRole('button', { name: 'Rose', exact: true }).tap();
   await button(page, 'Done choosing colours').tap();
   assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: 'rgb(255, 205, 232)' });
   assert.equal(await tileColour(2), 'rgb(87, 49, 71)', 'Rose');
 
   // A new game resets commander damage.
-  await button(page, 'Game setup').tap();
+  await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   await eventually(() => farBadges(page, 3), '', 'a new game clears commander damage');
@@ -265,8 +265,8 @@ async function checkMaps(t, engine) {
     }
   }
   // A rotated seat turns its map with it.
-  await button(page, 'Game setup').tap();
-  await button(page, 'Rotate seats').tap();
+  await button(page, 'Settings').tap();
+  await button(page, 'Rotate seats on the board').tap();
   await button(page, 'Rotate Player 6 clockwise').tap();
   await button(page, 'Rotate Player 1 clockwise').tap();
   await button(page, 'Rotate Player 1 clockwise').tap();

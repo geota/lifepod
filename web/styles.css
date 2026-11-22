@@ -10,19 +10,26 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces and text */
-  --background: #141916;
-  --surface: #202720;
-  --surface-pressed: #354137;
-  --border: #3b473d;
-  --control-border: #819084;
-  --switch-off: #38423a;
-  --text: #f3f1e5;
-  --text-soft: #d6e1d5;
-  --muted: #bcc7b8;
-  --accent: #def09a;
-  --accent-pressed: #c5d882;
-  --ink: #202914;
+  /* Surfaces and text: Graphite + lime (design/polish/STYLE.md §5). Neutral graphite surfaces, so the tiles carry all
+     the colour, and the brand lime as the one accent. --raised is a control one tonal step above its card. */
+  --background: #111213;
+  --surface: #1b1c1e;
+  --raised: #242528;
+  --surface-pressed: #303236;
+  --border: #393b40;
+  --control-border: #8b8f97;
+  --switch-off: #35373b;
+  --text: #f2f2ef;
+  --text-soft: #d8d9dc;
+  --muted: #b3b6bc;
+  --accent: #d9f08a;
+  --accent-pressed: #c4dc76;
+  --ink: #1d2608;
+  /* Text on the tiles keeps the colours the twelve tile palettes were generated and checked against
+     (design/counters/palette.mjs: the life total 9:1, small text 7.6:1); .board uses them in place of the chrome's. */
+  --tile-text: #f3f1e5;
+  --tile-text-soft: #d6e1d5;
+  --tile-muted: #bcc7b8;
   --danger-text: #ffc7b2;
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
@@ -41,12 +48,26 @@
   --ci-rim: #f3f1e5a6;
 
   /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
-  --die-shadow: #070a08;
-  --dice-stage-pressed: #1a201c;
-  --press-overlay: #f3f1e51a;
-  --scrim: #0c110dd9;
-  --shadow-dialog: 0 24px 80px #0e130fd9;
-  --shadow-float: 0 2px 7px #10161291;
+  --die-shadow: #070808;
+  --dice-stage-pressed: #191a1c;
+  --press-overlay: #f2f2ef1a;
+  --scrim: #111213d9;
+  --shadow-dialog: 0 24px 80px #0b0c0dd9;
+
+  /* Controls: direction A, tonal (design/polish/STYLE.md §3A). Controls are filled one tone above their card, with no
+     outlines; pressed lays a 10% --text state layer over the fill; selected is the accent with --ink. */
+  --state-pressed: #f2f2ef1a;
+  --state-hover: #f2f2ef14;
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --motion: .2s;
+  /* The centre pill: solid, with the only shadow on the board. Its fill is one token so a glass pill can replace it. */
+  --pill-background: var(--raised);
+  --pill-shadow: 0 1px 3px #0009, 0 6px 18px #0007;
+  /* The safe-area insets, as variables so a test can stand in for a notch. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
 
   /* Board */
   --seam-width: 2px;
@@ -93,10 +114,14 @@
   --type-label: .875rem;
   --type-small: .8125rem;
 
-  /* Shape and spacing */
+  /* Shape: one corner scale (Material's 8, 16, 22, 24 and 28px, then full capsules). Buttons, switches and the chosen
+     segment are capsules; segments are a connected group with 8px inner corners; rows, map seats and swatches 16px;
+     cards 24px; dialogs 28px; cells circles. */
   --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 18px;
+  --radius-md: 16px;
+  --radius-group: 22px;
+  --radius-card: 24px;
+  --radius-lg: 28px;
   --radius-full: 999px;
   --space-1: 4px;
   --space-2: 8px;
@@ -125,7 +150,7 @@ body { overflow: hidden; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 button, .player { -webkit-user-select: none; user-select: none; }
-button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
 /* Game symbols from the Mana font: the d20 for dice, infect for poison, energy, rad, the colour pie for identity, the
@@ -197,10 +222,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   position: absolute;
   inset: calc(var(--setup-button) / 8);
   content: '';
-  border: 1px solid var(--control-border);
   border-radius: var(--radius-full);
-  background: var(--background);
-  box-shadow: var(--shadow-float);
+  background: var(--pill-background);
+  box-shadow: var(--pill-shadow);
 }
 .pill-button {
   position: relative;
@@ -233,11 +257,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   content: '';
   background: var(--border);
 }
-.pill-button:active::before { background: var(--surface-pressed); }
+.pill-button:active::before { background: var(--state-pressed); }
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
 /* While rotating seats or choosing colours or identities, only the Done disc stays. */
-.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--accent); border-color: var(--accent); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--accent); }
 .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--ink); }
 .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button::before { content: none; }
 /* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
@@ -286,7 +310,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .round-button .round > span:first-child { transform: rotate(180deg); }
 .round-button .round::after { position: absolute; top: 50%; left: 22%; right: 22%; height: 1px; content: ''; background: var(--border); }
-.round-button[data-pressed]::before { background: var(--surface-pressed); }
+.round-button[data-pressed]::before { background: var(--state-pressed); }
 /* The mana pool's tap symbol, with a dot while any pool has mana. */
 .pill-button > .mana-icon, .mana-dot { position: relative; }
 #mana-button[data-floating] { color: var(--accent); }
@@ -355,6 +379,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
    total. The board flags are board-wide thresholds: data-narrow (ui < 240), data-short (ub < 200) and data-wide
    (ui ≥ 264). */
 .board {
+  --text: var(--tile-text);
+  --text-soft: var(--tile-text-soft);
+  --muted: var(--tile-muted);
   --u: calc(var(--ui, 400px) / 100);
   --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
 }
@@ -635,14 +662,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   width: var(--toggle);
   height: var(--toggle);
   padding: 0;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-full);
-  background: var(--background);
+  background: var(--raised);
+  transition: box-shadow var(--motion) var(--ease);
 }
+.identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
-/* Off, the symbol is muted like an empty mana cell. On, it's in full colour inside a light ring, with a check. */
+/* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px accent
+   ring, with a check, so the state never rests on colour alone. */
 .identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
-.identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); box-shadow: 0 0 0 1px var(--text); }
+.identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--accent); }
 .toggle-check {
   position: absolute;
   top: -3px;
@@ -681,7 +711,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   min-width: 0;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   background: var(--panel);
   color: var(--seat);
   font-size: clamp(1.0625rem, calc(6 * var(--u)), max(1.625rem, 26 * var(--grow)));
@@ -746,7 +776,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .counter-cell :is(.icon, .mana-icon) { color: var(--seat); font-size: 1.4em; }
 .counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
-.counter-cell:is(:active, [data-pressed]) { background: var(--cell-pressed); }
+.counter-cell:is(:active, [data-pressed]) { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .counter-cell:has(+ .counter-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
@@ -1026,7 +1056,7 @@ dialog {
   width: min(420px, calc(100% - 32px));
   max-height: calc(100% - 12px);
   padding: 0;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface);
   color: var(--text);
@@ -1037,65 +1067,70 @@ dialog::backdrop { background: var(--scrim); }
 .sheet { display: grid; gap: var(--space-5); padding: var(--space-5); }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .sheet-header h2 { font-size: var(--type-title); letter-spacing: -.022em; }
-.sheet-header-actions { display: flex; align-items: center; gap: var(--space-1); }
-.text-button {
-  min-height: var(--tap-min);
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--muted);
-  font-size: var(--type-label);
-  font-weight: var(--weight-semibold);
-}
-.text-button:active { background: var(--surface-pressed); }
-.privacy-text { display: grid; gap: var(--space-3); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
-.privacy-text h3 { margin: var(--space-2) 0 0; font-size: 1rem; color: var(--text); }
-.privacy-text h3:first-child { margin-top: 0; }
-/* About scrolls on short screens: a fade along the bottom says there's more below, until the end is reached. */
-.scroll-cue { position: sticky; bottom: 0; height: 0; pointer-events: none; }
-.scroll-cue::before {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 40px;
-  content: '';
-  background: linear-gradient(#20272000, var(--surface) 85%);
-  opacity: 0;
-  transition: opacity .15s;
-}
-.scroll-cue[data-more]::before { opacity: 1; }
+.sheet-note { color: var(--muted); font-size: var(--type-small); }
+.privacy-text { display: grid; gap: var(--space-2); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
+.privacy-text h4 { margin: var(--space-2) 0 0; font-size: .875rem; color: var(--text); }
+.privacy-text h4:first-child { margin-top: 0; }
+.sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
+#restart-message { color: var(--muted); }
+
+/* Buttons (direction A): capsules filled one tone above their card, with no outline. The primary button is the one
+   accent fill in its view. Pressed lays the 10% state layer over the fill; disabled is 38%. */
 .close, .primary, .secondary {
   min-height: var(--tap-min);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--raised);
+  color: var(--text);
   font-weight: var(--weight-semibold);
 }
-.close:active, .secondary:active { background: var(--surface-pressed); }
 .close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: 1.125rem; }
+.primary, .secondary { padding: 0 var(--space-5); }
+.primary { background: var(--accent); color: var(--ink); }
+.primary:active { background: var(--accent-pressed); }
+:is(.close, .secondary, .nav-row, .switch-row, .segmented > button, .dice-picker button:not([aria-pressed="true"]), .k-value):active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
+}
+:is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: .38; }
 
-/* Setup and Track (design/polish/SPEC.md §4): six control types. Header buttons and rows are 44px; the action
-   buttons 48px. The sheet is 600px wide at most and fits a 952 × 427 phone down to a 640 × 360 one without
-   scrolling. Below 360px tall its header folds into the Players row. */
-#setup, #track, #identity-sheet { width: min(600px, calc(100% - 32px)); }
-.sheet.setup-sheet { gap: var(--space-2); padding: var(--space-3) var(--space-4) 14px; }
-.setup-header { gap: 6px; min-height: var(--tap-min); }
-.setup-header h2 { flex: 1; font-size: 1.25rem; letter-spacing: -.02em; }
-.setup-header .close { border-radius: 12px; }
-.setting-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+/* Rows: a board action or a switch, filled one tone above the card, 16px corners. In a switch row the whole row toggles
+   the switch. */
+.nav-row, .switch-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--raised);
+  color: var(--text);
+  font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  text-align: start;
+  cursor: pointer;
+}
+.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--accent); }
+.nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch-row .switch { margin-inline-start: auto; }
+.switch-row[hidden] { display: none; }
+/* The input covers its row, so scrolling it into view on focus shows the whole row. */
+.switch-row input { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.switch-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A long switch label, such as auto-empty's, wraps rather than being cut short. */
+.wide-switch .nav-label { white-space: normal; line-height: 1.2; }
+.setting-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: var(--space-1); }
 .setting-label { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
-/* Segmented choice: equal 44px segments in one 48px group. The selected one is filled with the accent. */
+
+/* Segmented choice: a connected group of equal 44px segments, 8px inner corners and 22px outer ones. The chosen
+   segment is the accent and rounds into a full capsule. */
 .segmented {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--background);
 }
 .segmented > button {
   display: flex;
@@ -1106,95 +1141,54 @@ dialog::backdrop { background: var(--scrim); }
   min-height: var(--tap-min);
   padding: 0 6px;
   border: 0;
-  border-radius: var(--radius-md);
-  background: none;
+  border-radius: var(--radius-sm);
+  background: var(--raised);
   color: var(--text-soft);
   font-size: .9375rem;
   font-weight: var(--weight-semibold);
-}
-.segmented > button[hidden] { display: none; }
-.segmented > button:active { background: var(--surface-pressed); }
-.segmented > button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
-/* Starting life: the stepper needs a little more room than a number. */
-.life-choices { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(7.5rem, 1.3fr); }
-/* Stepper: − value + inside the selected segment's accent fill, with 44px buttons. */
-.stepper {
-  display: grid;
-  grid-template-columns: var(--tap-min) minmax(0, 1fr) var(--tap-min);
-  align-items: center;
-  border-radius: var(--radius-md);
-  background: var(--accent);
-  color: var(--ink);
-  font-weight: var(--weight-heavy);
-  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
   text-align: center;
+  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease);
 }
-.stepper[hidden] { display: none; }
-.stepper button {
-  display: grid;
-  place-items: center;
-  min-height: var(--tap-min);
-  padding: 0;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--ink);
-  font-size: 1rem;
-}
-.stepper button:is(:active, [data-pressed]) { background: var(--accent-pressed); }
-/* Navigation and switch rows share a grid. A navigation row opens a sheet or a board mode; in a switch row the
-   whole row toggles the switch. */
-.control-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
-/* Track's switch rows, three to a line in landscape. */
-.tracker-grid { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
-/* On the narrowest landscape sheets (568 × 320) the rows tighten so "Commander" and "Experience" aren't cut short. */
-@media (max-width: 620px) {
-  .tracker-grid .switch-row { gap: 6px; padding-inline: 8px 6px; font-size: var(--type-small); }
-}
-.nav-row, .switch-row {
+.segmented > button:first-child { border-radius: var(--radius-group) var(--radius-sm) var(--radius-sm) var(--radius-group); }
+.segmented > button:last-child { border-radius: var(--radius-sm) var(--radius-group) var(--radius-group) var(--radius-sm); }
+.segmented > button[aria-pressed="true"] { border-radius: var(--radius-group); background: var(--accent); color: var(--ink); }
+.segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
+
+/* Switch: 36 × 20. Off is an outlined track with a small thumb; on is the accent with a larger ink thumb, so the shape
+   changes as well as the colour. */
+.switch {
   position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  min-height: var(--tap-min);
-  padding: 0 10px 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--background);
-  color: var(--text);
-  font-size: var(--type-label);
-  font-weight: var(--weight-semibold);
-  text-align: start;
-  cursor: pointer;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border: 2px solid var(--control-border);
+  border-radius: var(--radius-full);
+  background: transparent;
+  transition: background-color var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
-/* A navigation row that can't be used yet, such as Colours while setup would start a new game, keeps its place. */
-.nav-row[hidden] { display: flex; visibility: hidden; }
-.nav-row:active, .switch-row:active { background: var(--surface-pressed); }
-.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--accent); }
-.nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Track keeps its label whole: the summary takes what's left (app.js shows as many icons as fit, at most three, then
-   "+N"). */
-#track-button .nav-label { flex: none; }
-.nav-summary { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; margin-inline-start: auto; color: var(--muted); font-size: 14px; }
-.nav-summary :is(.icon, .mana-icon) { flex: none; width: 14px; height: 14px; }
-.nav-summary .more { flex: none; font-size: var(--type-small); font-variant-numeric: tabular-nums; }
-.nav-row .caret { flex: none; width: 14px; height: 14px; margin-inline-start: auto; color: var(--muted); }
-.nav-summary + .caret { margin-inline-start: 0; }
-.switch-row .switch { margin-inline-start: auto; }
-.switch-row[hidden] { display: none; }
-/* Compact switch rows (Identity's Show on tiles): three to a line beside the label, each a whole 44px target with
-   the mark it adds to the chip, its label and a switch. */
+.switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--control-border);
+  content: '';
+  transition: transform var(--motion) var(--ease), width var(--motion) var(--ease), height var(--motion) var(--ease), top var(--motion) var(--ease);
+}
+input:checked + .switch { border-color: var(--accent); background: var(--accent); }
+input:checked + .switch::after { top: 1px; width: 14px; height: 14px; transform: translateX(15px); background: var(--ink); }
+
+/* Compact switch rows (Track's six and Identity's Show on tiles): each a whole 44px target with its mark, its label and
+   a switch. Where a row has too little room, such as on portrait phones or in a narrow column, the label goes over the
+   mark and the switch, so no label is cut short. */
 .compact-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
 .compact-switch { gap: 6px; padding-inline: 8px 6px; }
 .compact-switch > .ci { font-size: 16px; }
-/* Below 620px wide the three go under their label, and on portrait phones each puts its label over its mark and
-   switch, so no label is cut short. */
-@media (max-width: 620px) {
-  .setting-row:has(> .compact-switches) { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
-}
-@media (max-width: 480px) {
-  .compact-switch {
+@container settings-section (max-width: 459.98px) {
+  .compact-switches .compact-switch {
     display: grid;
     grid-template-columns: auto auto;
     place-content: center;
@@ -1202,79 +1196,180 @@ dialog::backdrop { background: var(--scrim); }
     gap: 4px 10px;
     padding: 6px 4px;
   }
-  .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
-  .compact-switch .switch { margin-inline-start: 0; }
+  .compact-switches .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+  .compact-switches .compact-switch .switch { margin-inline-start: 0; }
 }
-/* A long switch label, such as auto-empty's, wraps rather than being cut short. */
-.wide-switch .nav-label { white-space: normal; line-height: 1.2; }
-/* Segment icons, such as Turns' flag and untap symbol. */
-.segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
-.segmented > button { line-height: 1.15; text-align: center; }
-.switch-row input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
-.switch-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-#setup .sheet-actions :is(.primary, .secondary), #choose-identities { min-height: 48px; border-radius: 12px; font-size: 1rem; }
-.sheet-note { color: var(--muted); font-size: var(--type-small); }
-/* Choose identities keeps its place while setup would start a new game, like Colours and Rotate seats. */
-#choose-identities[hidden] { display: block; visibility: hidden; }
-/* Portrait phones stack each label over its control, so five segments keep 44px, and give each row the full
-   width so its label isn't cut short. */
-@media (max-width: 480px) {
-  .setting-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
-  .control-grid { grid-auto-flow: row; }
-  /* The stepper needs more room than a segment here, so it takes its own line under the presets. */
-  .life-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .life-choices .stepper { grid-column: 1 / -1; }
-}
-/* Short portrait phones (the 320 × 568 stress test): Track and Identity share a line, with Colours under them and
-   Track's summary left out, so setup fits with the custom life stepper open. */
-@media (max-width: 480px) and (max-height: 600px) {
-  .control-grid:has(#identity-nav) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .control-grid:has(#identity-nav) .nav-row { gap: 8px; padding-inline: 10px 8px; }
-  .control-grid:has(#identity-nav) .nav-summary { display: none; }
-  .control-grid:has(#identity-nav) .caret { margin-inline-start: auto; }
-  #tile-colours { grid-column: 1 / -1; }
-}
-/* Below 360px tall, the title goes and About · ✕ move to the end of the Players row. */
-@media (max-height: 359.98px) and (min-width: 481px) {
-  .sheet.setup-sheet:has(#players-row) { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding-block: 10px; }
-  .setup-sheet:has(#players-row) > * { grid-column: 1 / -1; }
-  .setup-sheet .setup-header:has(#setup-title) { display: contents; }
-  #setup-title {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+@container settings-section (max-width: 339.98px) {
+  .tracker-grid .compact-switch {
+    display: grid;
+    grid-template-columns: auto auto;
+    place-content: center;
+    place-items: center;
+    gap: 4px 10px;
+    padding: 6px 4px;
   }
-  .setup-sheet > #players-row { grid-row: 1; grid-column: 1; }
-  .setup-header > .sheet-header-actions { grid-row: 1; grid-column: 2; }
+  .tracker-grid .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+  .tracker-grid .compact-switch .switch { margin-inline-start: 0; }
 }
-.switch {
+
+/* Settings (design/polish/SETTINGS-SPEC.md §3): a full-screen page inside the safe area, with a fixed header and a body
+   that scrolls. It faces the phone, not the board, and the flip turns it 180° for a player across the table. */
+dialog.fs {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--background);
+  box-shadow: none;
+}
+dialog.fs::backdrop { background: var(--background); }
+dialog.fs[data-flipped] { transform: rotate(180deg); }
+.fs-frame { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); height: 100%; }
+.fs-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--surface); }
+.fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: 1.25rem; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+.fs-head .close .icon { width: 18px; height: 18px; }
+.fs-done { flex: none; font-size: 1rem; font-weight: var(--weight-heavy); white-space: nowrap; }
+.fs-body {
   position: relative;
-  flex: none;
-  width: 30px;
-  height: 17px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-full);
-  background: var(--switch-off);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-2);
+  /* Room to scroll the life field above an iOS keyboard (app.js: keepLifeEditorInView). */
+  padding-bottom: var(--keyboard, 0px);
 }
-.switch::after {
+dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bottom: 0; }
+.fs-content { display: grid; align-content: start; gap: var(--space-3); width: min(1180px, 100%); margin: 0 auto; padding: var(--space-3) var(--space-4) var(--space-6, 24px); }
+.fs-content[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.fs-content[data-columns] > .fs-about { grid-column: 1 / -1; }
+.fs-col { display: grid; gap: var(--space-3); min-width: 0; }
+.fs-col:empty { display: none; }
+/* Sections are cards (direction A): the surface on the page background, no border, 24px corners. */
+.fs-sec { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border-radius: var(--radius-card); background: var(--surface); container: settings-section / inline-size; }
+.fs-sec > h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 2px; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
+.fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--accent); }
+/* One column: a label sits beside its control when the card has room (480px), otherwise above it. In two columns each
+   label stays above its control. */
+@container settings-section (min-width: 480px) {
+  .fs-content:not([data-columns]) .setting-row:not(.k-row, :has(> .compact-switches)) { grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-2); }
+}
+.fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 6px; }
+.fs-action { min-height: 48px; }
+.fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
+.fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.fs-newgame { min-height: 48px; padding: 0 var(--space-5); font-size: 1rem; }
+.fs-newgame[hidden] { display: none; }
+.fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; margin-inline-start: auto; }
+/* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
+.fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--radius-md); background: color-mix(in oklab, var(--accent) 14%, var(--surface)); color: var(--text); font-size: var(--type-label); }
+.fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
+.fs-pending[data-empty] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.fs .privacy-text { max-width: none; font-size: var(--type-small); }
+/* A fade along the bottom of the body while there's more below. */
+.scroll-cue { position: sticky; bottom: 0; height: 0; pointer-events: none; }
+.scroll-cue::before {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--text-soft);
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
   content: '';
+  background: linear-gradient(#11121300, var(--background) 85%);
+  opacity: 0;
+  transition: opacity .15s;
 }
-input:checked + .switch { background: var(--accent); border-color: var(--accent); }
-input:checked + .switch::after { transform: translateX(13px); background: var(--ink); }
-.sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
-.primary { background: var(--accent); border-color: var(--accent); color: var(--ink); }
-.primary:active { background: var(--accent-pressed); }
-#restart-message { color: var(--muted); }
+.scroll-cue[data-more]::before { opacity: 1; }
+/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole. */
+@media (max-width: 400px) {
+  .fs-head { gap: 6px; padding-inline: var(--space-3); }
+  .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: .9375rem; line-height: 1.1; white-space: normal; }
+}
+/* Under 360px tall (568 × 320), the header and the cards tighten. */
+@media (max-height: 359.98px) {
+  .fs-head { padding: var(--space-1) var(--space-3); }
+  .fs-content { gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-4); }
+  .fs-col { gap: var(--space-2); }
+  .fs-sec { gap: 6px; padding: 10px; }
+}
+
+/* Players and starting life: notched sliders (design/polish/STYLE.md §4, direction A). The stops are 44px buttons over
+   a 16px track with an accent fill, notches as dots and a 4px bar handle. The whole slider takes a tap or a sideways
+   drag; a vertical swipe scrolls the page. */
+.k-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'slider slider'; }
+#players-row { grid-template-areas: 'label label' 'slider slider'; }
+.k-row > .setting-label { grid-area: label; }
+.k-row > .k-slider { grid-area: slider; }
+.k-row > .k-val { grid-area: value; justify-self: end; }
+.k-slider { --track-top: 44px; --thumb: 36px; position: relative; height: 80px; margin: 0 22px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.k-stops { position: absolute; inset: 0 0 auto; height: 44px; }
+.k-stop {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-soft);
+  font-size: .9375rem;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.k-stop[aria-pressed="true"] { color: var(--accent); font-weight: 800; }
+.k-stop:active { background: var(--state-pressed); }
+.k-track { position: absolute; inset: var(--track-top) 0 0; border-radius: var(--radius-sm); }
+.k-track:focus-visible { outline-offset: 4px; }
+.k-track::before, .k-fill { position: absolute; top: 50%; height: 16px; transform: translateY(-50%); border-radius: var(--radius-full); content: ''; }
+.k-track::before { left: -8px; right: -8px; background: var(--raised); }
+.k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--accent); }
+.k-ticks { position: absolute; inset: 0; }
+.k-tick { position: absolute; top: 50%; width: 2px; height: 2px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--muted); }
+.k-tick[data-stop] { width: 4px; height: 4px; }
+.k-tick[data-filled] { background: var(--ink); opacity: .55; }
+.k-thumb { position: absolute; top: 50%; left: var(--p, 0%); width: 4px; height: var(--thumb); transform: translate(-50%, -50%); border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 4px var(--surface); }
+/* A value off the track (a starting life under 10 or over 60) pins the handle to that end, with an arrow beyond it. */
+.k-track[data-pinned] .k-thumb::after { position: absolute; top: 50%; width: 0; height: 0; border-block: 6px solid transparent; transform: translateY(-50%); content: ''; }
+.k-track[data-pinned="high"] .k-thumb::after { left: 8px; border-inline-start: 7px solid var(--accent); }
+.k-track[data-pinned="low"] .k-thumb::after { right: 8px; border-inline-end: 7px solid var(--accent); }
+/* The value, and the field it turns into. */
+.k-val { display: flex; }
+.k-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 76px;
+  min-height: var(--tap-min);
+  padding: 0 12px 0 16px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.k-value[hidden] { display: none; }
+.k-edit { display: grid; color: var(--muted); }
+.k-edit .icon { width: 14px; height: 14px; }
+.k-editor { padding: 0; box-shadow: inset 0 0 0 2px var(--accent); }
+.k-editor input { width: 3.4em; min-height: var(--tap-min); padding: 0 4px 0 14px; border: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent); }
+.k-editor input:focus-visible { outline: 0; }
+.k-commit { display: grid; place-items: center; flex: none; width: var(--tap-min); height: var(--tap-min); padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: var(--ink); }
+.k-commit:active { background: var(--accent-pressed); }
+.k-commit .icon { width: 18px; height: 18px; }
+@media (max-height: 359.98px) {
+  .k-slider { --thumb: 28px; height: 72px; }
+}
 
 /* Dice sheet: the die on a stage, the sides picker and Roll. Landscape puts the stage on the left.
    #dice keeps these gaps over the compact sheet spacing for small screens below. */
@@ -1290,8 +1385,7 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
   display: grid;
   place-items: center;
   block-size: clamp(176px, calc(100dvh - 340px), 340px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-card);
   background: var(--background);
   container-type: size;
   overflow: hidden;
@@ -1310,16 +1404,15 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
   gap: 6px;
   min-height: 48px;
   padding: 0 var(--space-1);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--background);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--raised);
   color: var(--text-soft);
   font-size: var(--type-label);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-.dice-picker button:active { background: var(--surface-pressed); }
-.dice-picker button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink); }
+.dice-picker button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
 .dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
 .dice-roll { grid-area: roll; min-height: 48px; font-size: 1.0625rem; }
 @media (orientation: landscape) {
@@ -1395,16 +1488,20 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 .die-icon .tone-2 { fill: currentColor; fill-opacity: .3; }
 .die-icon .tone-3 { fill: currentColor; fill-opacity: .46; }
 
-/* Mouse pointers get a hover state on the board and sheet controls. */
+/* Mouse pointers get a hover state: an 8% layer over the fill. */
 @media (hover: hover) {
-  .pill-button:not(:disabled, .save-button):hover::before, .dice-picker button:not([aria-pressed="true"]):hover,
-  .close:hover, .segmented > button:not([aria-pressed="true"]):hover, .nav-row:hover, .switch-row:hover, .secondary:hover,
-  .text-button:hover { background: var(--surface-pressed); }
-  .stepper button:hover { background: var(--accent-pressed); }
+  .pill-button:not(:disabled, .save-button):hover::before { background: var(--state-hover); }
+  :is(.close, .secondary, .nav-row, .switch-row, .segmented > button:not([aria-pressed="true"]), .dice-picker button:not([aria-pressed="true"]), .k-value, .k-stop):hover {
+    background-image: linear-gradient(var(--state-hover), var(--state-hover));
+  }
   .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button:hover::before { content: none; }
   .save-button:hover::before { background: var(--accent-pressed); }
-  .primary:hover { background: var(--accent-pressed); }
+  :is(.primary, .k-commit):hover { background: var(--accent-pressed); }
   .dice-stage:hover { background: var(--dice-stage-pressed); }
+}
+/* Motion is 200ms emphasised easing (direction A), and none at all under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; }
 }
 @media (max-height: 420px), (max-width: 420px) {
   .sheet { gap: var(--space-1); padding-block: var(--space-2); }
