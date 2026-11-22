@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { button, engines, openPage, seedGame, stripProblems, test, tileProblems } from './helpers.mjs';
 
-// The size checks, run once per style (the Style setting, design/polish/STYLE.md): sizes.test.mjs runs them in Material
-// and sizes-glass.test.mjs in Glass, as two files so the two run side by side. Each check seeds its games with the style.
+// The size checks, run once per style (the Style setting, design/polish/STYLE.md) and split by concern, so each file is
+// short and the files run side by side: sizes-fit, sizes-settings and sizes-pill run them in Material, and the -glass
+// files in Glass. Each check seeds its games with the style.
 
 // Screens the board is checked on, by CSS size in landscape. The design target is a Pixel 11 Pro class phone at
 // 952 × 427. 320 × 568 is a stress test: no phone people still use is that small, but if it fits there it fits
@@ -23,6 +24,11 @@ const screens = {
 };
 const smallestRealPhone = 360;
 const tablets = ['iPad', 'Android tablet', 'iPad Pro 13"'];
+// The board fit runs in two files: phones, and the larger screens with the largest phone that tablets are compared with.
+const fitScreens = {
+  phones: ['target (Pixel 11 Pro)', 'stress test (iPhone SE, 1st gen)', 'smallest real phone (small Android)', 'iPhone SE'],
+  large: ['foldable, cover screen', 'foldable, inner screen', 'largest phone', ...tablets],
+};
 
 // A busy game: every counter on, colour identities set, commander damage from most opponents, Turn by turn with Player 2
 // active and Player 1 first, and mana floating in Player 1's pool, so the pill holds every button at rest. Every chip is
@@ -99,11 +105,12 @@ function readModeScale(page, selector) {
   }, selector);
 }
 
-async function checkSizes(t, engine, style) {
+async function checkSizes(t, engine, style, names) {
   const life = '.controls button, .controls .score';
   const scale = {};
 
-  for (const [name, size] of Object.entries(screens)) {
+  for (const name of names) {
+    const size = screens[name];
     for (const portrait of [false, true]) {
       // The board turns to landscape either way, so the odd player counts are only checked in landscape.
       for (const count of portrait ? [2, 4, 6] : [2, 3, 4, 5, 6]) {
@@ -164,7 +171,7 @@ async function checkSizes(t, engine, style) {
   // On a tablet, 4-player tiles keep about the proportions they have on a current phone instead of leaving
   // phone-sized controls in a much bigger tile. Each size is relative to the tile's reading width.
   const phone = scale['largest phone'];
-  for (const name of tablets) {
+  for (const name of tablets.filter(tablet => names.includes(tablet))) {
     for (const [part, value] of Object.entries(scale[name])) {
       assert.ok(value >= phone[part] * 0.8,
         `${name}: ${part} keeps its proportion of the tile (${value.toFixed(3)} against ${phone[part].toFixed(3)} on the largest phone)`);
@@ -223,7 +230,13 @@ async function checkSettings(t, engine, style) {
 // (design/polish/FINAL-REVIEW.md #1 and #2), at its widest (round, commander damage, counters, mana, dice and setup), at
 // every player count, on phones from 952 × 427 down to 568 × 320 and 320 × 568, on the foldable and the tablet, with
 // the seats as dealt and rotated every way. Board modes keep their targets clear of it too, inside their tiles.
-const pillScreens = [[952, 427], [852, 393], [640, 360], [568, 320], [320, 568], [375, 667], [841, 701], [1366, 1024]];
+// The screens come in three groups, each in its own file so none is slow: the larger landscape phones, the smaller ones
+// and the rest.
+const pillScreens = {
+  phones: [[952, 427], [852, 393]],
+  small: [[640, 360], [568, 320]],
+  other: [[320, 568], [375, 667], [841, 701], [1366, 1024]],
+};
 const pillRotations = [null, [1, 2, 3, 0, 1, 3], [2, 2, 2, 2, 2, 2], [3, 1, 2, 3, 3, 1], [1, 1, 1, 1, 1, 1]];
 
 // What a tile shows that sits under the pill, or outside its tile (tileProblems): display parts against the pill's whole
@@ -239,8 +252,8 @@ function pillGame(count, rotations, style) {
   return { ...busyGame(count, style), rotations: rotations ? rotations.slice(0, count) : Array(count).fill(0) };
 }
 
-async function checkPill(t, engine, style) {
-  for (const [width, height] of pillScreens) {
+async function checkPill(t, engine, style, screens) {
+  for (const [width, height] of screens) {
     const page = await openPage(t, engine, { viewport: { width, height }, orientation: height > width ? 0 : 90 });
     for (const count of [2, 3, 4, 5, 6]) {
       for (const rotations of pillRotations) {
@@ -300,13 +313,23 @@ async function checkRotatedClearance(t, engine, style) {
   assert.ok(state.chip >= 2, `Player 2's identity chip is beside the pill, not under it (${state.chip}px)`);
 }
 
-// Registers every size check for one style, in Chromium and WebKit, named for the style.
-export function sizeTests(style) {
+// Registers one part of the size checks ('fit-phones', 'fit-large', 'settings', 'pill-phones', 'pill-small' or
+// 'pill-other') for one style, in Chromium and WebKit, named for
+// the style.
+export function sizeTests(style, part) {
   const name = { material: 'Material', glass: 'Glass' }[style];
   for (const [engineName, engine] of Object.entries(engines)) {
-    test(`${engineName}: the board fits and scales on small phones, foldables and tablets (${name})`, { timeout: 120000 }, t => checkSizes(t, engine, style));
-    test(`${engineName}: settings fills every screen with no sideways overflow and the header in view (${name})`, { timeout: 120000 }, t => checkSettings(t, engine, style));
-    test(`${engineName}: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation (${name})`, { timeout: 300000 }, t => checkPill(t, engine, style));
-    test(`${engineName}: a rotated seat keeps the edge it turns toward the pill clear (${name})`, t => checkRotatedClearance(t, engine, style));
+    if (part === 'fit-phones') {
+      test(`${engineName}: the board fits on small phones (${name})`, { timeout: 300000 }, t => checkSizes(t, engine, style, fitScreens.phones));
+    } else if (part === 'fit-large') {
+      test(`${engineName}: the board fits and scales on foldables, the largest phone and tablets (${name})`, { timeout: 300000 }, t => checkSizes(t, engine, style, fitScreens.large));
+    } else if (part === 'settings') {
+      test(`${engineName}: settings fills every screen with no sideways overflow and the header in view (${name})`, { timeout: 300000 }, t => checkSettings(t, engine, style));
+    } else if (['pill-phones', 'pill-small', 'pill-other'].includes(part)) {
+      const screens = pillScreens[part.slice('pill-'.length)];
+      const sizes = screens.map(([width, height]) => `${width} × ${height}`).join(', ');
+      test(`${engineName}: the centre pill never covers a total, a glyph or a badge, at any count or rotation, at ${sizes} (${name})`, { timeout: 300000 }, t => checkPill(t, engine, style, screens));
+      if (part === 'pill-phones') test(`${engineName}: a rotated seat keeps the edge it turns toward the pill clear (${name})`, t => checkRotatedClearance(t, engine, style));
+    } else throw new Error(`No size checks called ${part}`);
   }
 }
