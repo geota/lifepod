@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
 import { app, button, fakeScreenOrientation, seedGame, stripProblems, turnScreen } from './helpers.mjs';
 
+// The size checks, run once per style (the Style setting, design/polish/STYLE.md): sizes.test.mjs runs them in Material
+// and sizes-glass.test.mjs in Glass, as two files so the two run side by side. Each check seeds its games with the style.
+
 // Screens the board is checked on, by CSS size in landscape. The design target is a Pixel 11 Pro class phone at
 // 952 × 427. 320 × 568 is a stress test: no phone people still use is that small, but if it fits there it fits
 // everywhere. 360 × 640 is the smallest real phone, so design trade-offs such as chip spacing are judged there.
@@ -27,8 +30,9 @@ const tablets = ['iPad', 'Android tablet', 'iPad Pro 13"'];
 // active and Player 1 first, and mana floating in Player 1's pool, so the pill holds every button at rest. Every chip is
 // on: Player 2, the active player, is the monarch, and the initiative is held by a player who is out and hasn't passed
 // it on (Player 5, at −3 life, or Player 4, out on poison, with four), so their row shows the "Pass it on" hint.
-function busyGame(count) {
+function busyGame(count, style) {
   return {
+    style,
     startingLife: 40, scores: Array.from({ length: count }, (_, i) => [40, 33, 112, 5, -3, 19][i]),
     rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, colors: Array(count).fill(null),
     counters: { commander: true, poison: true, energy: true, experience: true, rad: true, monarch: true, initiative: true },
@@ -46,13 +50,13 @@ function busyGame(count) {
   };
 }
 
-async function openBoard(browser, [width, height], count, portrait) {
+async function openBoard(browser, [width, height], count, portrait, style) {
   const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: portrait ? { width: height, height: width } : { width, height } });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await fakeScreenOrientation(page);
   await page.goto(app);
-  await seedGame(page, busyGame(count));
+  await seedGame(page, busyGame(count, style));
   await turnScreen(page, page.viewportSize().width, page.viewportSize().height, portrait ? 0 : 90);
   return { page, errors };
 }
@@ -119,7 +123,7 @@ function readModeScale(page, selector) {
   }, selector);
 }
 
-async function checkSizes(t, engine) {
+async function checkSizes(t, engine, style) {
   const browser = await engine.launch();
   t.after(() => browser.close());
   const life = '.controls button, .controls .score';
@@ -130,7 +134,7 @@ async function checkSizes(t, engine) {
       // The board turns to landscape either way, so the odd player counts are only checked in landscape.
       for (const count of portrait ? [2, 4, 6] : [2, 3, 4, 5, 6]) {
         const view = `${count} players, ${name}, ${portrait ? 'portrait' : 'landscape'}`;
-        const { page, errors } = await openBoard(browser, size, count, portrait);
+        const { page, errors } = await openBoard(browser, size, count, portrait, style);
         const tiles = await readTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`);
         checkTiles(tiles, view);
         // The mana strip never covers a life total or its glyphs.
@@ -203,19 +207,17 @@ async function checkSizes(t, engine) {
   }
 }
 
-test('chromium: the board fits and scales on small phones, foldables and tablets', t => checkSizes(t, chromium));
-test('webkit: the board fits and scales on small phones, foldables and tablets', t => checkSizes(t, webkit));
 
 // Settings is a full-screen page (design/polish/SETTINGS-SPEC.md §3) on every screen above, landscape and portrait: the
 // header stays in view while the body scrolls, nothing is wider than the window, and every control is at least 44px
 // and whole. Two columns from 620px wide, one below.
-async function checkSettings(t, engine) {
+async function checkSettings(t, engine, style) {
   const browser = await engine.launch();
   t.after(() => browser.close());
   for (const [name, size] of Object.entries(screens)) {
     for (const portrait of [false, true]) {
       const view = `${name}, ${portrait ? 'portrait' : 'landscape'}`;
-      const { page, errors } = await openBoard(browser, size, 4, portrait);
+      const { page, errors } = await openBoard(browser, size, 4, portrait, style);
       await button(page, 'Settings').tap();
       // A pending new game adds its line, the widest the page gets.
       await button(page, '6 players').tap();
@@ -254,8 +256,6 @@ async function checkSettings(t, engine) {
   }
 }
 
-test('chromium: settings fills every screen with no sideways overflow and the header in view', { timeout: 120000 }, t => checkSettings(t, chromium));
-test('webkit: settings fills every screen with no sideways overflow and the header in view', { timeout: 120000 }, t => checkSettings(t, webkit));
 
 // The centre pill never covers a life total, a − or + glyph, a badge, a strip or the "Out" tag
 // (design/polish/FINAL-REVIEW.md #1 and #2), at its widest (round, commander damage, counters, mana, dice and setup), at
@@ -291,11 +291,11 @@ function underPill(page) {
   });
 }
 
-function pillGame(count, rotations) {
-  return { ...busyGame(count), rotations: rotations ? rotations.slice(0, count) : Array(count).fill(0) };
+function pillGame(count, rotations, style) {
+  return { ...busyGame(count, style), rotations: rotations ? rotations.slice(0, count) : Array(count).fill(0) };
 }
 
-async function checkPill(t, engine) {
+async function checkPill(t, engine, style) {
   const browser = await engine.launch();
   t.after(() => browser.close());
   for (const [width, height] of pillScreens) {
@@ -308,7 +308,7 @@ async function checkPill(t, engine) {
     for (const count of [2, 3, 4, 5, 6]) {
       for (const rotations of pillRotations) {
         const view = `${width} × ${height}, ${count} players, seats ${rotations ? rotations.slice(0, count).join('') : 'as dealt'}`;
-        await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify(pillGame(count, rotations)));
+        await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify(pillGame(count, rotations, style)));
         await page.reload();
         await page.evaluate(() => document.fonts.ready);
         assert.equal(await page.locator('#board-controls .pill-button:not([hidden])').count(), 6, `${view}: the pill is at its widest`);
@@ -334,13 +334,11 @@ async function checkPill(t, engine) {
   }
 }
 
-test('chromium: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation', { timeout: 300000 }, t => checkPill(t, chromium));
-test('webkit: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation', { timeout: 300000 }, t => checkPill(t, webkit));
 
 // A rotated seat's edge that faces the pill gets the far row's clearance (design/polish/FINAL-REVIEW.md #2). With 2 players
 // the pill stands along the middle seam. Player 1 turned upside down faces it with the start of its face (its − glyph),
 // and Player 2 turned twice with its near row (its identity chip); both stay in full view beside the pill.
-async function checkRotatedClearance(t, engine) {
+async function checkRotatedClearance(t, engine, style) {
   const browser = await engine.launch();
   t.after(() => browser.close());
   const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
@@ -348,7 +346,7 @@ async function checkRotatedClearance(t, engine) {
   await page.goto(app);
   await turnScreen(page, 952, 427, 90);
   const game = {
-    ...busyGame(2), rotations: [1, 2], counters: { commander: true }, turns: 'rounds', turn: { first: 0, active: 0, round: 9 },
+    ...busyGame(2, style), rotations: [1, 2], counters: { commander: true }, turns: 'rounds', turn: { first: 0, active: 0, round: 9 },
     manaPool: false, identities: ['WR', 'UBRG'], identity: { show: { name: true }, background: 'default', version: 2 },
   };
   await page.evaluate(saved => localStorage.setItem('lifepod-game', saved), JSON.stringify(game));
@@ -376,5 +374,13 @@ async function checkRotatedClearance(t, engine) {
   assert.ok(state.chip >= 2, `Player 2's identity chip is beside the pill, not under it (${state.chip}px)`);
 }
 
-test('chromium: a rotated seat keeps the edge it turns toward the pill clear', t => checkRotatedClearance(t, chromium));
-test('webkit: a rotated seat keeps the edge it turns toward the pill clear', t => checkRotatedClearance(t, webkit));
+// Registers every size check for one style, in Chromium and WebKit, named for the style.
+export function sizeTests(style) {
+  const name = { material: 'Material', glass: 'Glass' }[style];
+  for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]]) {
+    test(`${engineName}: the board fits and scales on small phones, foldables and tablets (${name})`, t => checkSizes(t, engine, style));
+    test(`${engineName}: settings fills every screen with no sideways overflow and the header in view (${name})`, { timeout: 120000 }, t => checkSettings(t, engine, style));
+    test(`${engineName}: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation (${name})`, { timeout: 300000 }, t => checkPill(t, engine, style));
+    test(`${engineName}: a rotated seat keeps the edge it turns toward the pill clear (${name})`, t => checkRotatedClearance(t, engine, style));
+  }
+}

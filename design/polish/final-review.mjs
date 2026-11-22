@@ -8,7 +8,9 @@
 //   node design/polish/final-review.mjs --shots    screenshots only
 //   node design/polish/final-review.mjs --sweep    sweep only
 // Screenshots go to design/polish/renders/final/ at 2× (or the largest scale under 1800px wide). The sweep writes
-// renders/final/findings.json (every problem, with its size, seed and mode) and prints a summary.
+// renders/final/findings.json (every problem, with its style, size, seed and mode) and prints a summary. The sweep runs in
+// both styles (the Style setting: Material and Glass, design/polish/STYLE.md); the screenshots are Material, plus a set in
+// Glass named glass-….
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright-core';
@@ -21,6 +23,7 @@ const doSweep = !args.has('--shots');
 await mkdir(outDir, { recursive: true });
 
 // Sizes in CSS px, as the window is. Portrait windows report a portrait screen (angle 0), the rest landscape (90).
+const styles = ['material', 'glass'];
 const sizes = {
   target: { width: 952, height: 427, label: 'Pixel 11 Pro, 952 × 427 (target)' },
   phone: { width: 852, height: 393, label: 'Phone, 852 × 393' },
@@ -459,8 +462,8 @@ async function openSize(key, { scale = 1, reducedMotion = 'reduce', engine = bro
   return page;
 }
 
-async function load(page, game) {
-  await page.evaluate(g => { localStorage.setItem('lifepod-game', g); }, JSON.stringify(game));
+async function load(page, game, style = 'material') {
+  await page.evaluate(g => { localStorage.setItem('lifepod-game', g); }, JSON.stringify({ ...game, style }));
   await page.reload();
   await page.waitForSelector('#board .player');
   await page.evaluate(() => document.fonts.ready);
@@ -543,6 +546,10 @@ async function shots() {
     { size: 'target', count: 5, seed: 'everything', mode: 'damage' },
     { size: 'stress', count: 5, seed: 'everything', mode: 'damage' },
   );
+  // Glass: the board, a mode, settings and the dialogs, at the target and the stress size.
+  for (const size of ['target', 'stress']) {
+    for (const mode of ['rest', 'counters', 'identity', 'settings', 'settings-end', 'dice', 'new-game']) list.push({ size, count: 4, seed: 'everything', mode, style: 'glass' });
+  }
   const bySize = Object.groupBy(list, s => s.size);
   const report = [];
   await Promise.all(Object.entries(bySize).map(async ([size, items]) => {
@@ -551,12 +558,13 @@ async function shots() {
     for (const item of items) {
       const game = seeds[item.seed](item.count);
       if (!available(item.mode, game)) continue;
-      await load(page, game);
+      const style = item.style ?? 'material';
+      await load(page, game, style);
       await enter(page, item.mode, game);
-      const file = `${size}-${item.count}p-${item.seed}-${item.mode}.png`;
+      const file = `${style === 'glass' ? 'glass-' : ''}${size}-${item.count}p-${item.seed}-${item.mode}.png`;
       await page.screenshot({ path: `${outDir}${file}` });
       const result = await page.evaluate(audit);
-      record({ size, count: item.count, seed: item.seed, mode: item.mode, shot: file }, result);
+      record({ style, size, count: item.count, seed: item.seed, mode: item.mode, shot: file }, result);
       report.push({ file, ...result.facts, problems: result.problems.length });
       await leave(page);
     }
@@ -586,58 +594,58 @@ async function shots() {
 }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The sweep: every size × 2–6 players × every seed (with the eight chip combinations spread over them) × every mode
+// The sweep, in each style: every size × 2–6 players × every seed (with the eight chip combinations spread over them) × every mode
 // the seed can show, measured but not saved as screenshots.
 async function sweep() {
   const boardModes = ['rest', 'damage', 'counters', 'mana', 'colours', 'identity', 'rotate', 'first', 'reminders'];
   const dialogModes = ['dice', 'settings', 'settings-end', 'settings-pending', 'settings-edit', 'settings-flipped', 'new-game', 'discard'];
   let runs = 0;
-  await Promise.all(Object.keys(sizes).map(async (size) => {
+  await Promise.all(Object.keys(sizes).flatMap(size => styles.map(async (style) => {
     const page = await openSize(size);
     let combo = 0;
     for (const count of [2, 3, 4, 5, 6]) {
       for (const seedName of Object.keys(seeds)) {
         const parts = showCombos[combo++ % showCombos.length];
         const game = seedName === 'everything' ? seeds[seedName](count) : withShow(seeds[seedName](count), parts);
-        await load(page, game);
+        await load(page, game, style);
         for (const mode of boardModes) {
           if (!available(mode, game)) continue;
           await enter(page, mode, game);
-          record({ size, count, seed: seedName === 'everything' ? seedName : `${seedName} (show ${parts.join('+') || 'none'})`, mode }, await page.evaluate(audit));
+          record({ style, size, count, seed: seedName === 'everything' ? seedName : `${seedName} (show ${parts.join('+') || 'none'})`, mode }, await page.evaluate(audit));
           runs++;
           await leave(page);
           // "Who goes first?" changes the game; start the next mode from the seed again.
-          if (mode === 'first' || mode === 'rotate') await load(page, game);
+          if (mode === 'first' || mode === 'rotate') await load(page, game, style);
         }
       }
     }
     // Dialogs depend on the window, not the players.
     for (const mode of dialogModes) {
       const game = seeds.everything(6);
-      await load(page, game);
+      await load(page, game, style);
       await enter(page, mode, game);
-      record({ size, count: 6, seed: 'everything', mode }, await page.evaluate(audit));
+      record({ style, size, count: 6, seed: 'everything', mode }, await page.evaluate(audit));
       runs++;
     }
     // The other tile colour sets (Clear, the default, is everything above): the board at rest, the map and Colours.
     for (const tileColours of ['classic', 'soft', 'jewel']) {
       const game = { ...seeds.everything(6), tileColours };
       for (const mode of ['rest', 'damage', 'colours']) {
-        await load(page, game);
+        await load(page, game, style);
         await enter(page, mode, game);
-        record({ size, count: 6, seed: `everything, ${tileColours} tiles`, mode }, await page.evaluate(audit));
+        record({ style, size, count: 6, seed: `everything, ${tileColours} tiles`, mode }, await page.evaluate(audit));
         runs++;
       }
     }
     // Settings with a life off the track (the handle pinned), and with Turns off (no auto-empty row).
-    await load(page, { ...seeds.everything(6), startingLife: 100 });
+    await load(page, { ...seeds.everything(6), startingLife: 100 }, style);
     await enter(page, 'settings');
-    record({ size, count: 6, seed: 'everything, life 100', mode: 'settings (pinned)' }, await page.evaluate(audit));
-    await load(page, { ...seeds.minimal(6) });
+    record({ style, size, count: 6, seed: 'everything, life 100', mode: 'settings (pinned)' }, await page.evaluate(audit));
+    await load(page, { ...seeds.minimal(6) }, style);
     await enter(page, 'settings');
-    record({ size, count: 6, seed: 'minimal', mode: 'settings' }, await page.evaluate(audit));
+    record({ style, size, count: 6, seed: 'minimal', mode: 'settings' }, await page.evaluate(audit));
     await page.context().close();
-  }));
+  })));
   return runs;
 }
 
@@ -734,6 +742,7 @@ const grouped = {};
 for (const f of allFindings) (grouped[key(f)] ??= []).push(f);
 const summary = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length).map(([k, list]) => ({
   problem: k, count: list.length,
+  styles: [...new Set(list.map(f => f.style ?? 'material'))],
   sizes: [...new Set(list.map(f => f.size))], players: [...new Set(list.map(f => f.count))].sort(), modes: [...new Set(list.map(f => f.mode))],
   example: list[0],
 }));
@@ -741,5 +750,5 @@ const indicators = await indicatorContrast();
 await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
 console.log('Indicator discs on chips (need 3:1 from the fill or the rim):', indicators.map(d => `${d.colour} fill ${d.lowest}, rim ${d.rim}${d.visible ? '' : ' FAILS'}`).join(' · '));
 console.log(`${runs} sweep states, ${allFindings.length} problems in ${summary.length} groups, ${pageErrors.length} page errors, ${Math.round((Date.now() - started) / 1000)}s`);
-for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      sizes ${s.sizes.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.size} ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
+for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      styles ${s.styles.join(' ')} · sizes ${s.sizes.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.style ?? 'material'} ${s.example.size} ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
 if (pageErrors.length) console.log('Page errors:\n' + [...new Set(pageErrors)].join('\n'));
