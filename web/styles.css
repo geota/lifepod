@@ -137,6 +137,39 @@
   --head-fill: var(--surface);
   --dialog-fill: var(--surface);
   --dialog-edge: 0px;
+  --dialog-edge-color: var(--border);
+  /* The neutral thumb Glass picks with; Material picks with the accent. */
+  --thumb: var(--chosen-fill);
+  --thumb-ink: var(--chosen-ink);
+
+  /* Settings rows: each a filled 16px row, 6px apart. */
+  --row-fill: var(--control-fill);
+  --row-gap: 6px;
+  --row-column-gap: 6px;
+  --row-divider: transparent;
+  --row-inset: 12px;
+
+  /* Segmented choice: separate filled segments; the chosen one is the accent. */
+  --segment-track: transparent;
+  --segment-track-radius: 0px;
+  --segment-pad: 0px;
+  --segment-gap: 2px;
+  --segment-fill: var(--control-fill);
+  --segment-chosen-fill: var(--chosen-fill);
+  --segment-chosen-ink: var(--chosen-ink);
+  --segment-chosen-shadow: none;
+  /* The dice picker's chosen die, and an identity toggle's ring when it's on. */
+  --pick-fill: var(--chosen-fill);
+  --pick-ink: var(--chosen-ink);
+  --toggle-ring: var(--chosen-fill);
+
+  /* Floating chrome: the pill, the settings header and dialogs. Solid in Material, so no backdrop filter, no edge, and
+     the header is its own row above the settings body (--head-overlay 0). */
+  --glass-filter: none;
+  --head-radius: 0px;
+  --head-margin: 0px;
+  --head-shadow: none;
+  --head-overlay: 0;
 
   /* State layers, at Material's opacities: pressed and focus 10%, hover 8%, disabled 38%. */
   --state-pressed: #f2f2ef1a;
@@ -144,6 +177,8 @@
   --disabled-opacity: .38;
   --focus-ring: 2px solid var(--accent);
   --focus-offset: 2px;
+  /* Pressed controls keep their size (Glass shrinks them a little). */
+  --press-scale: 1;
 
   /* Motion: 200ms emphasised easing; none under reduced motion. */
   --ease: cubic-bezier(.2, 0, 0, 1);
@@ -173,6 +208,7 @@
   --shadow-dialog: 0 24px 80px #0b0c0dd9;
   --pill-background: var(--raised);
   --pill-edge: 0px;
+  --pill-edge-color: var(--control-border);
   --pill-shadow: 0 1px 3px #0009, 0 6px 18px #0007;
 
   /* Switch: off is an outlined track with a small thumb; on is the accent with a larger ink thumb. */
@@ -185,8 +221,9 @@
   --switch-on-fill: var(--accent);
   --switch-on-thumb: var(--ink);
   --switch-on-size: 14px;
+  --switch-thumb-shadow: none;
 
-  /* Slider: a 16px track with an accent fill, and a 4px bar handle ringed in the card's colour. */
+  /* Slider: a 16px track with an accent fill, notches as dots, and a 4px bar handle ringed in the card's colour. */
   --slider-track: 16px;
   --slider-track-fill: var(--raised);
   --slider-fill: var(--accent);
@@ -195,6 +232,132 @@
   --slider-thumb-radius: 2px;
   --slider-thumb-fill: var(--accent);
   --slider-thumb-ring: 0 0 0 4px var(--surface);
+  --tick-width: 2px;
+  --tick-height: 2px;
+  --tick-stop-width: 4px;
+  --tick-stop-height: 4px;
+  --tick-radius: 50%;
+  --tick-fill: var(--muted);
+  --tick-filled: var(--ink);
+  --tick-filled-opacity: .55;
+}
+
+/* Direction B, Glass chrome over solid content (design/polish/STYLE.md §3, the Style setting). Only tokens: every
+   component rule reads the ones above. The floating chrome (the pill, the settings header and dialogs) is tinted glass,
+   design/polish/GLASS.md's recipe: the surface at 68% over an 18px blur, with a light edge and a top highlight. Content
+   stays solid: grouped lists, rows split by hairlines, iOS switches and segmented controls. The palette and its
+   contrast minimums are Material's. The fallbacks after this block make the glass solid. */
+[data-style="glass"] {
+  /* A neutral thumb picks a segment or a die: 3.2:1 against the raised track, white ink on it 4.75:1. */
+  --thumb: #707379;
+  --thumb-ink: #fff;
+  --scrim: #111213b3;
+
+  --glass-tint: #1b1c1ead;
+  --glass-filter: blur(18px) saturate(1.3);
+  --glass-edge: 1px;
+  --glass-edge-color: #ffffff1f;
+  --glass-highlight: inset 0 1px 0 #ffffff22;
+
+  --pill-background: var(--glass-tint);
+  --pill-edge: var(--glass-edge);
+  --pill-edge-color: var(--glass-edge-color);
+  --pill-shadow: var(--glass-highlight), 0 1px 3px #0009, 0 6px 18px #0007;
+  --dialog-fill: var(--glass-tint);
+  --dialog-edge: var(--glass-edge);
+  --dialog-edge-color: var(--glass-edge-color);
+  --shadow-dialog: var(--glass-highlight), 0 24px 80px #0b0c0dd9;
+  /* The settings header floats over the body, which scrolls under it. */
+  --head-fill: var(--glass-tint);
+  --head-radius: 22px;
+  --head-margin: 8px;
+  --head-shadow: inset 0 0 0 var(--glass-edge) var(--glass-edge-color), var(--glass-highlight), 0 8px 24px #0009;
+  --head-overlay: 1;
+
+  /* Grouped lists: rows share their card, split by hairlines, with switches on the right edge. */
+  --row-fill: transparent;
+  --row-radius: 0px;
+  --row-gap: 0px;
+  --row-column-gap: var(--space-4);
+  --row-divider: var(--border);
+  --row-inset: 2px;
+
+  /* Segmented choice: one track with the chosen segment as a raised thumb; the accent is kept for Done and switches. */
+  --segment-track: var(--raised);
+  --segment-track-radius: 12px;
+  --segment-pad: 2px;
+  --segment-gap: 0px;
+  --segment-fill: transparent;
+  --segment-inner: 10px;
+  --segment-outer: 10px;
+  --segment-chosen: 10px;
+  --segment-chosen-fill: var(--thumb);
+  --segment-chosen-ink: var(--thumb-ink);
+  --segment-chosen-shadow: 0 1px 3px #0008;
+  --pick-fill: var(--thumb);
+  --pick-ink: var(--thumb-ink);
+  --toggle-ring: var(--text);
+
+  /* Pressed shrinks to 96% under the 10% layer. Motion is springy, 250ms with a gentle overshoot. */
+  --press-scale: .96;
+  --ease: cubic-bezier(.3, 1.35, .55, 1);
+  --motion: .25s;
+
+  /* Shape: capsule buttons, 20px cards, 30px dialogs, 12px map seats and swatches. */
+  --seat-radius: 12px;
+  --swatch-radius: 12px;
+  --card-radius: 20px;
+  --dialog-radius: 30px;
+
+  /* Switch: iOS proportions, a 40 × 24 track and a 20px thumb. Off is a grey track, 3.6:1 on the card, with a white
+     thumb; on is the accent with an ink thumb, since white on the lime would vanish. */
+  --switch-width: 40px;
+  --switch-height: 24px;
+  --switch-edge: 0px;
+  --switch-off-fill: var(--thumb);
+  --switch-off-thumb: #fff;
+  --switch-off-size: 20px;
+  --switch-on-thumb: var(--ink);
+  --switch-on-size: 20px;
+  --switch-thumb-shadow: 0 1px 3px #0006;
+
+  /* Slider: a 4px track, tick lines and a round white 28px thumb. */
+  --slider-track: 4px;
+  --slider-track-fill: var(--thumb);
+  --slider-thumb-width: 28px;
+  --slider-thumb-height: 28px;
+  --slider-thumb-radius: 50%;
+  --slider-thumb-fill: #fff;
+  --slider-thumb-ring: 0 1px 4px #000a;
+  --tick-width: 2px;
+  --tick-height: 8px;
+  --tick-stop-width: 2px;
+  --tick-stop-height: 12px;
+  --tick-radius: 1px;
+  --tick-fill: var(--muted);
+  --tick-filled: var(--accent);
+  --tick-filled-opacity: 1;
+}
+/* Glass falls back to solid surfaces where the blur isn't drawn (no backdrop-filter), where the player asked for less
+   transparency (the media query on Android and in browsers; on iOS, whose WebKit lacks the query, LifePodApp.swift passes
+   Reduce Transparency and app.js sets data-reduce-transparency), and with an outline where they asked for more
+   contrast. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-style="glass"] { --glass-filter: none; --pill-background: var(--raised); --dialog-fill: var(--surface); --head-fill: var(--surface); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-style="glass"] { --glass-filter: none; --pill-background: var(--raised); --dialog-fill: var(--surface); --head-fill: var(--surface); }
+}
+[data-style="glass"][data-reduce-transparency] { --glass-filter: none; --pill-background: var(--raised); --dialog-fill: var(--surface); --head-fill: var(--surface); }
+@media (prefers-contrast: more) {
+  [data-style="glass"] {
+    --glass-filter: none;
+    --glass-edge: 2px;
+    --glass-edge-color: var(--control-border);
+    --pill-background: var(--raised);
+    --dialog-fill: var(--surface);
+    --head-fill: var(--surface);
+  }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -276,10 +439,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   position: absolute;
   inset: calc(var(--setup-button) / 8);
   content: '';
-  border: var(--pill-edge) solid var(--control-border);
+  border: var(--pill-edge) solid var(--pill-edge-color);
   border-radius: var(--radius-full);
   background: var(--pill-background);
   box-shadow: var(--pill-shadow);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
 }
 .pill-button {
   position: relative;
@@ -312,7 +477,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   content: '';
   background: var(--border);
 }
-.pill-button:active::before { background: var(--state-pressed); }
+.pill-button::before { transition: transform var(--motion) var(--ease); }
+.pill-button:active::before { background: var(--state-pressed); transform: scale(var(--press-scale)); }
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
 /* While rotating seats or choosing colours or identities, only the Done disc stays. */
@@ -800,14 +966,14 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   border: var(--control-edge) solid var(--control-border);
   border-radius: var(--radius-full);
   background: var(--control-fill);
-  transition: box-shadow var(--motion) var(--ease);
+  transition: box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 .identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
 /* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px accent
    ring, with a check, so the state never rests on colour alone. */
 .identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
-.identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--chosen-fill); }
+.identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--toggle-ring); }
 .toggle-check {
   position: absolute;
   top: -3px;
@@ -1266,11 +1432,13 @@ dialog {
   width: min(420px, calc(100% - 32px));
   max-height: calc(100% - 12px);
   padding: 0;
-  border: var(--dialog-edge) solid var(--border);
+  border: var(--dialog-edge) solid var(--dialog-edge-color);
   border-radius: var(--dialog-radius);
   background: var(--dialog-fill);
   color: var(--text);
   box-shadow: var(--shadow-dialog);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
   overscroll-behavior: contain;
 }
 dialog::backdrop { background: var(--scrim); }
@@ -1302,6 +1470,9 @@ dialog::backdrop { background: var(--scrim); }
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
 }
 :is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: var(--disabled-opacity); }
+/* Pressed buttons and board-mode cells shrink by --press-scale (Glass); Material keeps them full size. */
+:is(.close, .primary, .secondary, .dice-picker button, button.k-value, .k-commit, .counter-cell, .swatch, .map-cell) { transition: transform var(--motion) var(--ease); }
+:is(.close, .primary, .secondary, .segmented > button, .dice-picker button, button.k-value, .k-commit, .counter-cell, .identity-toggle, .swatch:enabled, .map-cell):active { transform: scale(var(--press-scale)); }
 
 /* Rows: a board action or a switch, filled one tone above the card, 16px corners. In a switch row the whole row toggles
    the switch. */
@@ -1312,10 +1483,11 @@ dialog::backdrop { background: var(--scrim); }
   gap: 10px;
   min-width: 0;
   min-height: var(--tap-min);
-  padding: 0 10px 0 12px;
+  padding: 0 10px 0 var(--row-inset);
   border: var(--control-edge) solid var(--control-border);
   border-radius: var(--row-radius);
-  background: var(--control-fill);
+  background: var(--row-fill);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
   color: var(--text);
   font-size: var(--type-label);
   font-weight: var(--weight-semibold);
@@ -1340,7 +1512,10 @@ dialog::backdrop { background: var(--scrim); }
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
-  gap: 2px;
+  gap: var(--segment-gap);
+  padding: var(--segment-pad);
+  border-radius: var(--segment-track-radius);
+  background: var(--segment-track);
 }
 .segmented > button {
   display: flex;
@@ -1352,17 +1527,17 @@ dialog::backdrop { background: var(--scrim); }
   padding: 0 6px;
   border: var(--control-edge) solid var(--control-border);
   border-radius: var(--segment-inner);
-  background: var(--control-fill);
+  background: var(--segment-fill);
   color: var(--text-soft);
   font-size: .9375rem;
   font-weight: var(--weight-semibold);
   line-height: 1.15;
   text-align: center;
-  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease);
+  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease), transform var(--motion) var(--ease);
 }
 .segmented > button:first-child { border-radius: var(--segment-outer) var(--segment-inner) var(--segment-inner) var(--segment-outer); }
 .segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
-.segmented > button[aria-pressed="true"] { border-color: var(--chosen-fill); border-radius: var(--segment-chosen); background: var(--chosen-fill); color: var(--chosen-ink); }
+.segmented > button[aria-pressed="true"] { border-color: var(--segment-chosen-fill); border-radius: var(--segment-chosen); background: var(--segment-chosen-fill); color: var(--segment-chosen-ink); box-shadow: var(--segment-chosen-shadow); }
 .segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
 
 /* Switch: 36 × 20. Off is an outlined track with a small thumb; on is the accent with a larger ink thumb, so the shape
@@ -1387,6 +1562,7 @@ dialog::backdrop { background: var(--scrim); }
   height: var(--switch-off-size);
   border-radius: 50%;
   background: var(--switch-off-thumb);
+  box-shadow: var(--switch-thumb-shadow);
   content: '';
   transition: left var(--motion) var(--ease), width var(--motion) var(--ease), height var(--motion) var(--ease), top var(--motion) var(--ease);
 }
@@ -1402,7 +1578,7 @@ input:checked + .switch::after {
 /* Compact switch rows (Track's six and Identity's Show on tiles): each a whole 44px target with its mark, its label and
    a switch. Where a row has too little room, such as on portrait phones or in a narrow column, the label goes over the
    mark and the switch, so no label is cut short. */
-.compact-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.compact-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 .compact-switch { gap: 6px; padding-inline: 8px 6px; }
 .compact-switch > .ci { font-size: 16px; }
 @container settings-section (max-width: 459.98px) {
@@ -1442,29 +1618,58 @@ dialog.fs {
   margin: 0;
   padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   overflow: hidden;
+  border: 0;
   border-radius: 0;
   background: var(--background);
   box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 dialog.fs::backdrop { background: var(--background); }
 dialog.fs[data-flipped] { transform: rotate(180deg); }
-.fs-frame { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); height: 100%; }
-.fs-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--head-fill); }
+/* The header is its own row over the body (Material), or floats over the top of the body, which scrolls under it (Glass,
+   --head-overlay 1). Either way the content starts below it, and focus scrolls clear of it (--head-clear). */
+.fs-frame {
+  --head-pad: var(--space-2);
+  --head-clear: calc(var(--head-overlay) * (var(--head-margin) + var(--tap-min) + 2 * var(--head-pad)));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+}
+.fs-head {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--head-margin) calc(var(--head-margin) * var(--head-side, 1)) 0;
+  padding: var(--head-pad) var(--space-4);
+  border-radius: var(--head-radius);
+  background: var(--head-fill);
+  box-shadow: var(--head-shadow);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
 .fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: 1.25rem; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .fs-head .close .icon { width: 18px; height: 18px; }
 .fs-done { flex: none; font-size: 1rem; font-weight: var(--weight-heavy); white-space: nowrap; }
 .fs-body {
   position: relative;
+  grid-row: calc(2 - var(--head-overlay)) / 3;
+  grid-column: 1;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: var(--space-2);
+  scroll-padding-block: calc(var(--head-clear) + var(--space-2)) var(--space-2);
   /* Room to scroll the life field above an iOS keyboard (app.js: keepLifeEditorInView). */
   padding-bottom: var(--keyboard, 0px);
 }
 dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bottom: 0; }
-.fs-content { display: grid; align-content: start; gap: var(--space-3); width: min(1180px, 100%); margin: 0 auto; padding: var(--space-3) var(--space-4) var(--space-6, 24px); }
+.fs-content { --content-top: var(--space-3); display: grid; align-content: start; gap: var(--space-3); width: min(1180px, 100%); margin: 0 auto; padding: calc(var(--content-top) + var(--head-clear)) var(--space-4) var(--space-6, 24px); }
 .fs-content[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 .fs-content[data-columns] > .fs-about { grid-column: 1 / -1; }
 .fs-col { display: grid; gap: var(--space-3); min-width: 0; }
@@ -1478,10 +1683,10 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 @container settings-section (min-width: 480px) {
   .fs-content:not([data-columns]) .setting-row:not(.k-row, :has(> .compact-switches)) { grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-2); }
 }
-.fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 /* Reminders: two to a line where each row has room for its whole label, otherwise one. */
 .fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
-.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 6px; }
+.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
@@ -1507,15 +1712,17 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   transition: opacity .15s;
 }
 .scroll-cue[data-more]::before { opacity: 1; }
-/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole. */
+/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole. A floating header
+   (Glass) halves its side margin and takes the other half from its padding. */
 @media (max-width: 400px) {
-  .fs-head { gap: 6px; padding-inline: var(--space-3); }
+  .fs-head { --head-side: .5; gap: 6px; padding-inline: calc(var(--space-3) - var(--head-margin) / 2); }
   .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: .9375rem; line-height: 1.1; white-space: normal; }
 }
 /* Under 360px tall (568 × 320), the header and the cards tighten. */
 @media (max-height: 359.98px) {
-  .fs-head { padding: var(--space-1) var(--space-3); }
-  .fs-content { gap: var(--space-2); padding: var(--space-2) var(--space-3) var(--space-4); }
+  .fs-frame { --head-pad: var(--space-1); }
+  .fs-head { padding-inline: var(--space-3); }
+  .fs-content { --content-top: var(--space-2); gap: var(--space-2); padding-inline: var(--space-3); padding-bottom: var(--space-4); }
   .fs-col { gap: var(--space-2); }
   .fs-sec { gap: 6px; padding: 10px; }
 }
@@ -1556,14 +1763,14 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .k-track::before { left: -8px; right: -8px; background: var(--slider-track-fill); }
 .k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--slider-fill); }
 .k-ticks { position: absolute; inset: 0; }
-.k-tick { position: absolute; top: 50%; width: 2px; height: 2px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--muted); }
-.k-tick[data-stop] { width: 4px; height: 4px; }
-.k-tick[data-filled] { background: var(--ink); opacity: .55; }
+.k-tick { position: absolute; top: 50%; width: var(--tick-width); height: var(--tick-height); transform: translate(-50%, -50%); border-radius: var(--tick-radius); background: var(--tick-fill); }
+.k-tick[data-stop] { width: var(--tick-stop-width); height: var(--tick-stop-height); }
+.k-tick[data-filled] { background: var(--tick-filled); opacity: var(--tick-filled-opacity); }
 .k-thumb { position: absolute; top: 50%; left: var(--p, 0%); width: var(--slider-thumb-width); height: var(--slider-thumb-height); transform: translate(-50%, -50%); border-radius: var(--slider-thumb-radius); background: var(--slider-thumb-fill); box-shadow: var(--slider-thumb-ring); }
 /* A value off the track (a starting life under 10 or over 60) pins the handle to that end, with an arrow beyond it. */
 .k-track[data-pinned] .k-thumb::after { position: absolute; top: 50%; width: 0; height: 0; border-block: 6px solid transparent; transform: translateY(-50%); content: ''; }
-.k-track[data-pinned="high"] .k-thumb::after { left: 8px; border-inline-start: 7px solid var(--accent); }
-.k-track[data-pinned="low"] .k-thumb::after { right: 8px; border-inline-end: 7px solid var(--accent); }
+.k-track[data-pinned="high"] .k-thumb::after { left: calc(100% + 4px); border-inline-start: 7px solid var(--accent); }
+.k-track[data-pinned="low"] .k-thumb::after { right: calc(100% + 4px); border-inline-end: 7px solid var(--accent); }
 /* The value, and the field it turns into. */
 .k-val { display: flex; }
 .k-value {
@@ -1635,7 +1842,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-.dice-picker button[aria-pressed="true"] { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); }
+.dice-picker button[aria-pressed="true"] { border-color: var(--pick-fill); background: var(--pick-fill); color: var(--pick-ink); }
 .dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
 .dice-roll { grid-area: roll; min-height: 48px; font-size: 1.0625rem; }
 @media (orientation: landscape) {
@@ -1722,8 +1929,10 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   :is(.primary, .k-commit):hover { background: var(--accent-pressed); }
   .dice-stage:hover { background: var(--dice-stage-pressed); }
 }
-/* Motion is 200ms emphasised easing (direction A), and none at all under reduced motion. */
+/* Motion is 200ms emphasised easing (Material) or a 250ms spring (Glass), and none at all under reduced motion, where
+   pressed controls keep their size too. */
 @media (prefers-reduced-motion: reduce) {
+  :root { --press-scale: 1; }
   *, *::before, *::after { transition: none !important; }
   .chip.reminder-chip { animation: none; }
 }

@@ -324,38 +324,43 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 }
 
-test('chromium: the life field scrolls clear of the keyboard and the header', async (t) => {
-  const page = await openPage(t, chromium);
-  await page.goto(app);
-  await button(page, 'Settings').tap();
-  // Scrolled so the life row is near the bottom of the screen, then the keyboard takes 46% of the height (Android's
-  // WebView shrinks the page for it).
-  await page.locator('#settings-body').evaluate((body) => {
-    const row = document.querySelector('#life-row').getBoundingClientRect();
-    body.scrollTop = Math.max(0, row.bottom - innerHeight + 20 + body.scrollTop);
+// In both styles: Glass's header floats over the body (design/polish/STYLE.md, direction B).
+for (const style of ['material', 'glass']) {
+  test(`chromium: the life field scrolls clear of the keyboard and the header (${style})`, async (t) => {
+    const page = await openPage(t, chromium);
+    await page.goto(app);
+    await page.evaluate(saved => localStorage.setItem('lifepod-game', JSON.stringify(saved)), { startingLife: 40, scores: [40, 40, 40, 40], style });
+    await page.reload();
+    await button(page, 'Settings').tap();
+    // Scrolled so the life row is near the bottom of the screen, then the keyboard takes 46% of the height (Android's
+    // WebView shrinks the page for it).
+    await page.locator('#settings-body').evaluate((body) => {
+      const row = document.querySelector('#life-row').getBoundingClientRect();
+      body.scrollTop = Math.max(0, row.bottom - innerHeight + 20 + body.scrollTop);
+    });
+    await page.locator('#life-edit').tap();
+    await page.setViewportSize({ width: 952, height: 230 });
+    const clear = () => page.evaluate(() => {
+      const field = document.querySelector('#life-editor').getBoundingClientRect();
+      const head = document.querySelector('.fs-head').getBoundingClientRect();
+      return field.top >= head.bottom && field.bottom <= innerHeight;
+    });
+    await eventually(clear, true, 'the field shows between the header and the keyboard');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'life-input', 'the field keeps focus');
+    // Turned to face the other side too.
+    await page.setViewportSize({ width: 952, height: 427 });
+    await page.locator('#settings-flip').evaluate(flip => flip.click());
+    await page.locator('#life-input').focus();
+    await page.setViewportSize({ width: 952, height: 230 });
+    await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+    const clearFlipped = () => page.evaluate(() => {
+      const field = document.querySelector('#life-editor').getBoundingClientRect();
+      const head = document.querySelector('.fs-head').getBoundingClientRect();
+      return field.top >= 0 && field.bottom <= head.top;
+    });
+    await eventually(clearFlipped, true, 'turned, the field shows between the top of the screen and the header');
   });
-  await page.locator('#life-edit').tap();
-  await page.setViewportSize({ width: 952, height: 230 });
-  const clear = () => page.evaluate(() => {
-    const field = document.querySelector('#life-editor').getBoundingClientRect();
-    const head = document.querySelector('.fs-head').getBoundingClientRect();
-    return field.top >= head.bottom && field.bottom <= innerHeight;
-  });
-  await eventually(clear, true, 'the field shows between the header and the keyboard');
-  assert.equal(await page.evaluate(() => document.activeElement.id), 'life-input', 'the field keeps focus');
-  // Turned to face the other side too.
-  await page.setViewportSize({ width: 952, height: 427 });
-  await page.locator('#settings-flip').evaluate(flip => flip.click());
-  await page.locator('#life-input').focus();
-  await page.setViewportSize({ width: 952, height: 230 });
-  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-  const clearFlipped = () => page.evaluate(() => {
-    const field = document.querySelector('#life-editor').getBoundingClientRect();
-    const head = document.querySelector('.fs-head').getBoundingClientRect();
-    return field.top >= 0 && field.bottom <= head.top;
-  });
-  await eventually(clearFlipped, true, 'turned, the field shows between the top of the screen and the header');
-});
+}
 
 // ---- Pending new game (P1), Done, ✕ and New game ------------------------------------------------------------------
 
@@ -659,34 +664,36 @@ test('chromium: a vertical touch swipe that starts on a slider scrolls the page 
     'the slider leaves vertical pans to a body that scrolls, and nothing above it blocks them');
 });
 
-test('chromium: the fixed header never covers the focused control', async (t) => {
-  const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns' })));
-  await page.reload();
-  await button(page, 'Settings').tap();
-  const seen = new Set();
-  for (let step = 0; step < 60; step++) {
-    await page.keyboard.press('Tab');
-    const focus = await page.evaluate(() => {
-      const node = document.activeElement;
-      // Past the last control, focus leaves the page for a moment before it comes round to ✕.
-      if (!document.querySelector('#settings').contains(node)) return { id: 'outside', covered: false };
-      const target = node.closest('label') ?? node;
-      const box = target.getBoundingClientRect();
-      const head = document.querySelector('.fs-head');
-      const inHead = head.contains(node);
-      const headBottom = head.getBoundingClientRect().bottom;
-      return { id: node.id || node.textContent.trim().slice(0, 20), covered: !inHead && (box.top < headBottom - 0.5 || box.bottom > innerHeight + 0.5) };
-    });
-    assert.equal(focus.covered, false, `${focus.id} is in full view below the header`);
-    if (seen.has(focus.id) && focus.id === 'settings-close') break;
-    seen.add(focus.id);
-  }
-  for (const id of ['players-track', 'life-track', 'life-edit', 'keep-awake', 'tile-colours', 'choose-identities', 'auto-empty-switch']) {
-    assert.ok(seen.has(id), `Tab reaches ${id}`);
-  }
-});
+for (const style of ['material', 'glass']) {
+  test(`chromium: the fixed header never covers the focused control (${style})`, async (t) => {
+    const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
+    await page.goto(app);
+    await page.evaluate(saved => localStorage.setItem('lifepod-game', JSON.stringify(saved)), { startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', style });
+    await page.reload();
+    await button(page, 'Settings').tap();
+    const seen = new Set();
+    for (let step = 0; step < 60; step++) {
+      await page.keyboard.press('Tab');
+      const focus = await page.evaluate(() => {
+        const node = document.activeElement;
+        // Past the last control, focus leaves the page for a moment before it comes round to ✕.
+        if (!document.querySelector('#settings').contains(node)) return { id: 'outside', covered: false };
+        const target = node.closest('label') ?? node;
+        const box = target.getBoundingClientRect();
+        const head = document.querySelector('.fs-head');
+        const inHead = head.contains(node);
+        const headBottom = head.getBoundingClientRect().bottom;
+        return { id: node.id || node.textContent.trim().slice(0, 20), covered: !inHead && (box.top < headBottom - 0.5 || box.bottom > innerHeight + 0.5) };
+      });
+      assert.equal(focus.covered, false, `${focus.id} is in full view below the header`);
+      if (seen.has(focus.id) && focus.id === 'settings-close') break;
+      seen.add(focus.id);
+    }
+    for (const id of ['players-track', 'life-track', 'life-edit', 'keep-awake', 'tile-colours', 'choose-identities', 'auto-empty-switch']) {
+      assert.ok(seen.has(id), `Tab reaches ${id}`);
+    }
+  });
+}
 
 // ---- Tile colours -------------------------------------------------------------------------------------------------
 

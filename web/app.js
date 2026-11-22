@@ -82,6 +82,11 @@ const tileSets = {
 };
 const tileSetOrder = Object.keys(tileSets);
 const defaultTileSet = 'clear';
+// The Style setting (design/polish/STYLE.md): direction A, Material, or direction B, Glass. styles.css holds each as
+// tokens under data-style. Until the player picks one, the iOS app (its game message handler) starts on Glass, and
+// Android and browsers on Material.
+const styleOrder = ['material', 'glass'];
+const defaultStyle = ios?.game ? 'glass' : 'material';
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
 // Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
@@ -765,7 +770,7 @@ function loadGame() {
     counters: fitTrackers(), ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)])),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
     manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet,
-    monarch: null, initiative: null, reminders: fitReminders(),
+    style: null, monarch: null, initiative: null, reminders: fitReminders(),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -794,6 +799,9 @@ function loadGame() {
       turn: fitTurn(saved.turn, saved.scores.length),
       // A save from before the setting, or with an unknown set, gets the default.
       tileColours: tileSetOrder.includes(saved.tileColours) ? saved.tileColours : defaultTileSet,
+      // null until the player picks a style, so the platform's default applies; a save from before the setting, or with an
+      // unknown style, gets it too.
+      style: styleOrder.includes(saved.style) ? saved.style : null,
       // A seat that isn't on the board, or anything that isn't a seat, means nobody holds it.
       monarch: fitSeat(saved.monarch, saved.scores.length),
       initiative: fitSeat(saved.initiative, saved.scores.length),
@@ -2619,6 +2627,34 @@ function renderTileSetting() {
   tilesSlider.render();
 }
 
+// Style: saved the moment it's picked, after which it wins over the platform's default.
+const styleChoices = document.querySelector('#style-choices');
+const currentStyle = () => game.style ?? defaultStyle;
+function applyStyle() {
+  document.documentElement.dataset.style = currentStyle();
+}
+function renderStyleSetting() {
+  for (const choice of styleChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.choice === currentStyle()));
+}
+for (const choice of styleChoices.children) {
+  choice.addEventListener('click', () => {
+    if (choice.dataset.choice === game.style) return;
+    game.style = choice.dataset.choice;
+    saveGame();
+    applyStyle();
+    renderStyleSetting();
+  });
+}
+
+// Reduce Transparency on iOS, whose WebKit has no prefers-reduced-transparency: LifePodApp.swift injects
+// window.initialReduceTransparency before the page loads and calls window.setReduceTransparency when it changes. Glass
+// treats data-reduce-transparency like the media query, with solid surfaces.
+function setReduceTransparency(reduce) {
+  document.documentElement.toggleAttribute('data-reduce-transparency', reduce === true);
+}
+window.setReduceTransparency = setReduceTransparency;
+setReduceTransparency(window.initialReduceTransparency);
+
 function renderSettings() {
   for (const choice of playerChoices.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === selectedPlayerCount));
   for (const preset of lifePresets.children) preset.setAttribute('aria-pressed', String(Number(preset.dataset.life) === selectedLife));
@@ -2736,6 +2772,7 @@ function openSettings() {
   renderRemindersSection();
   renderIdentitySheet();
   renderTileSetting();
+  renderStyleSetting();
   placeSettingsSections();
   settings.showModal();
   // Settings always open at the top.
@@ -3026,6 +3063,7 @@ document.fonts?.addEventListener?.('loadingdone', () => {
   syncBoardTurn();
 });
 applyTileColours();
+applyStyle();
 syncBoardTurn();
 renderBoard();
 syncPill();

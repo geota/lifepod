@@ -135,6 +135,15 @@
             </section>
             <section class="fs-sec" id="settings-table" aria-labelledby="settings-table-title">
               <h3 id="settings-table-title"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M100,36H56A20,20,0,0,0,36,56v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V56A20,20,0,0,0,100,36ZM96,96H60V60H96ZM200,36H156a20,20,0,0,0-20,20v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V56A20,20,0,0,0,200,36Zm-4,60H160V60h36Zm-96,40H56a20,20,0,0,0-20,20v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V156A20,20,0,0,0,100,136Zm-4,60H60V160H96Zm104-60H156a20,20,0,0,0-20,20v44a20,20,0,0,0,20,20h44a20,20,0,0,0,20-20V156A20,20,0,0,0,200,136Zm-4,60H160V160h36Z"/></svg>Table</h3>
+              <!-- Style (design/polish/STYLE.md): the whole app's controls, Material or Glass, saved the moment it changes.
+                   Until it's picked, iOS starts on Glass and Android and browsers on Material. -->
+              <div class="setting-row">
+                <span class="setting-label" id="style-label">Style</span>
+                <div class="segmented" id="style-choices" role="group" aria-labelledby="style-label">
+                  <button type="button" data-choice="material">Material</button>
+                  <button type="button" data-choice="glass">Glass</button>
+                </div>
+              </div>
               <!-- Tile colours (design/polish/TILES.md): four sets of the same twelve swatches, saved the moment it changes. -->
               <div class="setting-row k-row k-words" id="tiles-row">
                 <span class="setting-label" id="tiles-label">Tile colours</span>
