@@ -62,6 +62,14 @@ These replace the round 4 map seat decision (C) and the coloured dots in the far
 - **Map seats:** always filled with the attacker's tile colour (their panel), with the number in their seat colour. At 0 the seat has a thin ring in their rim colour; with damage it has a thicker ring in their seat colour and a heavier number.
 - **Far row chips:** each commander damage chip is a tiny piece of the attacker's tile, with their panel as the fill, a rim-coloured ring, and the number in their seat colour. There's no separate dot. Warnings keep the panel fill and turn the number and ring amber at 15, or red at 21.
 
+## Decision: real mana symbols (21 November 2026)
+
+This replaces "Mana symbols: use our own pips" below and the round 4 pip ring.
+
+- **Colour identity uses the real mana symbols** from Andrew Gioia's Mana font (v1.18.0, SIL OFL 1.1), bundled in `web/fonts/` so the app stays offline. Each pip is the symbol on the colour it's printed with.
+- **The identity button on small tiles shows the card-style colour indicator** (Mana's `ms-ci` glyphs and colours), or an empty ring when no identity is set.
+- **The owner's decision, made knowing the risk:** the Fan Content Policy lists the mana symbols among the trademarks that need Wizards' prior written permission. The app is free and carries the policy's required notice in About and the README.
+
 ## Goals
 
 - Nothing new shows on the board until a game uses it. A plain 20-life game looks exactly as it does today, and players who keep counters on dice never see these features.

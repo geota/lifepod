@@ -146,7 +146,7 @@ class MainActivity : Activity() {
             val mimeType = MIME_TYPES[path]
             if (url.scheme == "https" && url.authority == ASSET_HOST && mimeType != null) {
                 try {
-                    val encoding = if (mimeType.startsWith("image/")) null else "UTF-8"
+                    val encoding = if (mimeType.startsWith("image/") || mimeType.startsWith("font/")) null else "UTF-8"
                     return WebResourceResponse(mimeType, encoding, assets.open(path.removePrefix("/")))
                 } catch (_: IOException) {
                     // Treat a missing asset like an unavailable URL.
@@ -174,6 +174,7 @@ class MainActivity : Activity() {
                 "/styles.css" to "text/css",
                 "/app.js" to "application/javascript",
                 "/dice.js" to "application/javascript",
+                "/fonts/mana.woff2" to "font/woff2",
                 "/icon.png" to "image/png",
                 "/favicon-32.png" to "image/png",
             )

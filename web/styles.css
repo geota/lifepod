@@ -1,3 +1,11 @@
+/* Mana by Andrew Gioia, SIL OFL 1.1 (fonts/OFL.txt): the mana and colour indicator symbols for colour identity.
+   It's only used for those symbols, so it blocks briefly rather than flashing letters in their place. */
+@font-face {
+  font-family: Mana;
+  src: url('fonts/mana.woff2') format('woff2');
+  font-display: block;
+}
+
 /* Design tokens. Values and the reasons for them are documented in design/tokens.css and design/AUDIT.md. */
 :root {
   color-scheme: dark;
@@ -25,10 +33,10 @@
   /* Badges at rest sit on a translucent dark chip. Colour dots get a thin dark rim. */
   --chip-background: #0a0e0b70;
   --dot-rim: #0a0e0b;
-  /* Colour identity discs: white, blue, black, red and green, each with the same thin light ring. White is a
-     clean white, so it never reads as grey on any tile. */
-  --pip-w: #fffefa; --pip-u: #6fb0e8; --pip-b: #2c2729; --pip-r: #ec7160; --pip-g: #5fb06e;
-  --pip-rim: #a89ea4;
+  /* Colour identity: the real mana symbols from the bundled Mana font (fonts/OFL.txt), on the disc colours
+     the symbols are printed with, with the symbol itself in near-black. */
+  --pip-w: #fdfbce; --pip-u: #bcdaf7; --pip-b: #a7999e; --pip-r: #f19b79; --pip-g: #9fcba6;
+  --pip-ink: #111;
 
   /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
   --die-shadow: #070a08;
@@ -375,7 +383,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .colour-picker .identity { display: none; grid-template-columns: repeat(2, var(--swatch-size)); grid-auto-rows: var(--swatch-size); }
 .colour-picker .identity-toggle { width: var(--swatch-size); height: var(--swatch-size); font-size: max(.6875rem, var(--swatch-size) * .18); }
 /* On a tablet the toggles grow past phone size, so the disc inside grows with them. */
-.colour-picker .identity-toggle .pip { width: max(16px, var(--swatch-size) * .26); height: max(16px, var(--swatch-size) * .26); }
+.colour-picker .identity-toggle .pip { --pip-size: max(20px, var(--swatch-size) * .34); }
 @container (min-width: 264px) {
   .colour-picker[data-identity] { --swatch-size: clamp(44px, min((100cqi - 40px) / 5, (100cqb - 70px) / 3), 60 * var(--grow)); }
   .colour-picker .identity { display: grid; }
@@ -401,7 +409,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .swatch:disabled { cursor: default; }
 .swatch:disabled::before { content: none; }
 .swatch .owner { color: var(--seat); font-size: max(14px, var(--swatch-size) * .24); font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
-/* The identity button: the tile's own colours, with the identity as a wheel of pips in W U B R G order. */
+/* The identity button: the tile's own colours, with the identity as the colour indicator printed on cards. */
 .identity-button {
   display: grid;
   place-items: center;
@@ -414,15 +422,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: var(--button);
 }
 .identity-button:active { background: var(--surface-pressed); }
-.pip-wheel { position: relative; width: 30px; height: 30px; }
-.pip-wheel .pip { position: absolute; width: 9px; height: 9px; transform: translate(-50%, -50%); }
-.pip-wheel .pip:nth-child(1) { left: 50%; top: 13%; }
-.pip-wheel .pip:nth-child(2) { left: 85%; top: 39%; }
-.pip-wheel .pip:nth-child(3) { left: 72%; top: 80%; }
-.pip-wheel .pip:nth-child(4) { left: 28%; top: 80%; }
-.pip-wheel .pip:nth-child(5) { left: 15%; top: 39%; }
-/* A colour not in the identity is a small placeholder dot, so it can't be mistaken for black. */
-.pip-wheel .pip[data-off] { width: 5px; height: 5px; background: var(--rim); box-shadow: none; }
+.identity-button .ci { font-size: 28px; }
 @container (max-width: 240px) {
   .mode-layer { padding: 20px 4px 1px; }
   .mode-layer:has(.colour-picker[data-identity]) { padding-inline: 1px; }
@@ -590,21 +590,77 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
 .chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
 .chip.damage[data-level="out"] { background: var(--panel); }
-.chip.pips { gap: 2px; }
-/* Colour identity: plain discs in our own colours, never mana symbols. */
+.chip.pips { gap: .12em; }
+/* Colour identity: each colour's mana symbol on its disc, like a mana cost. --pip-size sets the disc; the symbol
+   is 77% of it, as Mana's own cost style draws it. */
 .pip {
+  --pip-size: 1.05em;
   flex: none;
-  width: .62em;
-  height: .62em;
+  display: grid;
+  place-items: center;
+  width: var(--pip-size);
+  height: var(--pip-size);
   border-radius: 50%;
   background: var(--pip);
-  box-shadow: 0 0 0 1px var(--pip-rim);
+  color: var(--pip-ink);
 }
-.pip[data-pip="W"] { --pip: var(--pip-w); }
-.pip[data-pip="U"] { --pip: var(--pip-u); }
-.pip[data-pip="B"] { --pip: var(--pip-b); }
-.pip[data-pip="R"] { --pip: var(--pip-r); }
-.pip[data-pip="G"] { --pip: var(--pip-g); }
+.pip::before { font: normal normal normal calc(var(--pip-size) * .77)/1 Mana; content: var(--glyph); speak: never; }
+.pip[data-pip="W"] { --pip: var(--pip-w); --glyph: '\e600'; }
+.pip[data-pip="U"] { --pip: var(--pip-u); --glyph: '\e601'; }
+.pip[data-pip="B"] { --pip: var(--pip-b); --glyph: '\e602'; }
+.pip[data-pip="R"] { --pip: var(--pip-r); --glyph: '\e603'; }
+.pip[data-pip="G"] { --pip: var(--pip-g); --glyph: '\e604'; }
+
+/* The colour indicator printed on cards: one disc split into the identity's colours, with Mana's dividing lines
+   on top. With no identity set it's an empty ring. */
+.ci {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  box-shadow: inset 0 0 1px #fff;
+  color: #010101;
+}
+.ci::before { font: normal normal normal 1em/1 Mana; speak: never; }
+.ci[data-count="1"]::before { content: '\e98a'; }
+.ci[data-count="2"]::before { content: '\e98b'; }
+.ci[data-count="3"]::before { content: '\e98c'; }
+.ci[data-count="4"]::before { content: '\e98d'; }
+.ci[data-count="5"]::before { content: '\e98e'; }
+.ci[data-ci=""] { box-shadow: inset 0 0 0 1.5px var(--rim); }
+.ci[data-ci="W"] { background: #fff; }
+.ci[data-ci="U"] { background: #3b6ba0; }
+.ci[data-ci="B"] { background: #383431; }
+.ci[data-ci="R"] { background: #c6553e; }
+.ci[data-ci="G"] { background: #3d684b; }
+.ci[data-ci="WU"] { background: conic-gradient(#fff 45deg, #3b6ba0 45deg 225deg, #fff 225deg); }
+.ci[data-ci="WB"] { background: conic-gradient(#fff 45deg, #383431 45deg 225deg, #fff 225deg); }
+.ci[data-ci="WR"] { background: conic-gradient(#c6553e 45deg, #fff 45deg 225deg, #c6553e 225deg); }
+.ci[data-ci="WG"] { background: conic-gradient(#3d684b 45deg, #fff 45deg 225deg, #3d684b 225deg); }
+.ci[data-ci="UB"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 225deg, #3b6ba0 225deg); }
+.ci[data-ci="UR"] { background: conic-gradient(#3b6ba0 45deg, #c6553e 45deg 225deg, #3b6ba0 225deg); }
+.ci[data-ci="UG"] { background: conic-gradient(#3d684b 45deg, #3b6ba0 45deg 225deg, #3d684b 225deg); }
+.ci[data-ci="BR"] { background: conic-gradient(#383431 45deg, #c6553e 45deg 225deg, #383431 225deg); }
+.ci[data-ci="BG"] { background: conic-gradient(#383431 45deg, #3d684b 45deg 225deg, #383431 225deg); }
+.ci[data-ci="RG"] { background: conic-gradient(#c6553e 45deg, #3d684b 45deg 225deg, #c6553e 225deg); }
+.ci[data-ci="WUB"] { background: conic-gradient(#383431 60deg, #fff 60deg 180deg, #3b6ba0 180deg 300deg, #383431 300deg); }
+.ci[data-ci="WUR"] { background: conic-gradient(#c6553e 60deg, #fff 60deg 180deg, #3b6ba0 180deg 300deg, #c6553e 300deg); }
+.ci[data-ci="WUG"] { background: conic-gradient(#3b6ba0 60deg, #3d684b 60deg 180deg, #fff 180deg 300deg, #3b6ba0 300deg); }
+.ci[data-ci="WBR"] { background: conic-gradient(#fff 60deg, #383431 60deg 180deg, #c6553e 180deg 300deg, #fff 300deg); }
+.ci[data-ci="WBG"] { background: conic-gradient(#383431 60deg, #3d684b 60deg 180deg, #fff 180deg 300deg, #383431 300deg); }
+.ci[data-ci="WRG"] { background: conic-gradient(#fff 60deg, #c6553e 60deg 180deg, #3d684b 180deg 300deg, #fff 300deg); }
+.ci[data-ci="UBR"] { background: conic-gradient(#c6553e 60deg, #3b6ba0 60deg 180deg, #383431 180deg 300deg, #c6553e 300deg); }
+.ci[data-ci="UBG"] { background: conic-gradient(#3d684b 60deg, #3b6ba0 60deg 180deg, #383431 180deg 300deg, #3d684b 300deg); }
+.ci[data-ci="URG"] { background: conic-gradient(#3b6ba0 60deg, #c6553e 60deg 180deg, #3d684b 180deg 300deg, #3b6ba0 300deg); }
+.ci[data-ci="BRG"] { background: conic-gradient(#3d684b 60deg, #383431 60deg 180deg, #c6553e 180deg 300deg, #3d684b 300deg); }
+.ci[data-ci="WUBR"] { background: conic-gradient(#fff 45deg, #3b6ba0 45deg 135deg, #383431 135deg 225deg, #c6553e 225deg 315deg, #fff 315deg); }
+.ci[data-ci="WUBG"] { background: conic-gradient(#3d684b 45deg, #fff 45deg 135deg, #3b6ba0 135deg 225deg, #383431 225deg 315deg, #3d684b 315deg); }
+.ci[data-ci="WURG"] { background: conic-gradient(#c6553e 45deg, #3d684b 45deg 135deg, #fff 135deg 225deg, #3b6ba0 225deg 315deg, #c6553e 315deg); }
+.ci[data-ci="WBRG"] { background: conic-gradient(#383431 45deg, #c6553e 45deg 135deg, #3d684b 135deg 225deg, #fff 225deg 315deg, #383431 315deg); }
+.ci[data-ci="UBRG"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 135deg, #c6553e 135deg 225deg, #3d684b 225deg 315deg, #3b6ba0 315deg); }
+.ci[data-ci="WUBRG"] { background: conic-gradient(#fff 36deg, #3b6ba0 36deg 108deg, #383431 108deg 180deg, #c6553e 180deg 252deg, #3d684b 252deg 324deg, #fff 324deg); }
 
 /* The player sheet faces the player who opened it, so app.js turns it with the board and the tile. */
 #player-sheet {
@@ -645,7 +701,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   font-size: .6875rem;
   font-weight: var(--weight-semibold);
 }
-.identity-toggle .pip { width: 16px; height: 16px; box-shadow: 0 0 0 1.5px var(--pip-rim); }
+.identity-toggle .pip { --pip-size: 20px; }
 .identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); color: var(--text); box-shadow: 0 0 0 1px var(--text); }
 
 #discard { width: min(360px, calc(100% - 32px)); }
@@ -681,6 +737,8 @@ dialog::backdrop { background: var(--scrim); }
 }
 .text-button:active { background: var(--surface-pressed); }
 .privacy-text { display: grid; gap: var(--space-3); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
+.privacy-text h3 { margin: var(--space-2) 0 0; font-size: 1rem; color: var(--text); }
+.privacy-text h3:first-child { margin-top: 0; }
 .close, .choices button, .primary, .secondary {
   min-height: var(--tap-min);
   border: 1px solid var(--border);

@@ -5,7 +5,7 @@
   <!-- Icons: Phosphor Icons, Bold weight, MIT License, Copyright (c) 2020 Phosphor Icons. https://phosphoricons.com -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#141916">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; font-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
   <title>LifePod</title>
   <link rel="icon" href="favicon-32.png" sizes="32x32">
   <link rel="icon" href="icon.png" sizes="192x192">
@@ -68,7 +68,7 @@
       <div class="sheet-header">
         <h2 id="setup-title">Game setup</h2>
         <div class="sheet-header-actions">
-          <button class="text-button" type="button" id="privacy-button" aria-haspopup="dialog">Privacy</button>
+          <button class="text-button" type="button" id="privacy-button" aria-haspopup="dialog">About</button>
           <button class="close" type="button" data-close aria-label="Close setup" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
         </div>
       </div>
@@ -147,13 +147,17 @@
   <dialog id="privacy" aria-labelledby="privacy-title">
     <form class="sheet" method="dialog">
       <div class="sheet-header">
-        <h2 id="privacy-title">Privacy</h2>
-        <button class="close" type="submit" aria-label="Close privacy policy" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+        <h2 id="privacy-title">About LifePod</h2>
+        <button class="close" type="submit" aria-label="Close about" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
       </div>
       <div class="privacy-text">
+        <h3>Privacy</h3>
         <p>LifePod collects no data. There are no accounts, ads, analytics, or tracking, and the apps make no network requests.</p>
         <p>The current game (players, life totals, seat rotations, tile colours, counters, and settings) is saved only on this device. Removing the app or clearing its data deletes it.</p>
         <p>Full policy: github.com/geota/lifepod/blob/main/PRIVACY.md</p>
+        <h3>Credits</h3>
+        <p>LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>
+        <p>Mana symbols from the Mana font by Andrew Gioia, under the SIL Open Font License 1.1.</p>
       </div>
     </form>
   </dialog>

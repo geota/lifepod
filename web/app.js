@@ -681,16 +681,12 @@ function buildIdentity(index) {
   return group;
 }
 
-// On tiles too small for the toggles, a button with the player's identity as a wheel of pips opens the
-// player sheet, facing them. Pips not in the identity show as empty rings.
+// On tiles too small for the toggles, a button with the player's identity as a colour indicator opens the
+// player sheet, facing them. With no identity set, the indicator is an empty ring.
 function buildIdentityButton(index) {
-  const wheel = element('span', 'pip-wheel', ...identityColours.map((colour) => {
-    const pip = element('span', 'pip');
-    pip.dataset.pip = colour.id;
-    return pip;
-  }));
-  wheel.setAttribute('aria-hidden', 'true');
-  const button = element('button', 'identity-button', wheel);
+  const indicator = element('span', 'ci');
+  indicator.setAttribute('aria-hidden', 'true');
+  const button = element('button', 'identity-button', indicator);
   button.type = 'button';
   button.dataset.player = index;
   button.setAttribute('aria-haspopup', 'dialog');
@@ -704,11 +700,12 @@ function syncIdentity() {
     const index = Number(node.dataset.player);
     const identity = game.identities[index];
     for (const pip of node.querySelectorAll('.pip')) {
-      const chosen = identity.includes(pip.dataset.pip);
-      pip.closest('.identity-toggle')?.setAttribute('aria-pressed', String(chosen));
-      pip.toggleAttribute('data-off', !chosen);
+      pip.closest('.identity-toggle')?.setAttribute('aria-pressed', String(identity.includes(pip.dataset.pip)));
     }
     if (node.matches('.identity-button')) {
+      const indicator = node.querySelector('.ci');
+      indicator.dataset.ci = identity;
+      indicator.dataset.count = identity.length;
       node.setAttribute('aria-label', `Colour identity for Player ${index + 1}: ${identity ? identityText(identity).replace('colour identity ', '') : 'none'}`);
     }
   }
@@ -1118,7 +1115,7 @@ setupButton.addEventListener('click', () => {
   syncBackHandling();
 });
 setup.querySelector('[data-close]').addEventListener('click', () => setup.close());
-// The privacy summary opens from setup and returns to it. The apps can't open web pages, so it's shown here.
+// About (the privacy summary and credits) opens from setup and returns to it. The apps can't open web pages, so it's shown here.
 document.querySelector('#privacy-button').addEventListener('click', () => {
   setup.close();
   privacy.showModal();

@@ -47,7 +47,7 @@ Turn on **Commander** or **Poison** under Counters in Setup to track commander t
 
 With **Commander** on, a sword joins the center controls too. Tap it and every tile becomes a map of the table: each opponent's seat sits where that player sits, in their tile colour, and shows the commander damage their commander has dealt you. A seat at 0 is outlined in that player's colour, and it fills with their colour once they have hit you. Tap an opponent's seat to add 1 commander damage and take 1 life in the same step. Hold a seat to take 1 away, repeating while you hold. Your own seat shows your life and the change, such as "28 −6". Undo, the check mark and ✕ work as they do for counters. At rest, a row along each tile's far edge starts with a sword and shows the commander damage taken from each opponent, largest first, with a dot in that opponent's colour. Amber text warns at 15 commander damage from one commander or 7 poison. At 21 or 10 the badge turns red with a thin ring, and the life total turns red.
 
-Choose **Colours** in Setup to change tile colours. Every tile shows nine swatches facing its player, so everyone can pick at once. With Commander on, each player sets their colour identity there too: any mix of white, blue, black, red and green, left empty for a colourless commander. Larger tiles show the five toggles beside the swatches; on small tiles, such as six players on a phone, an identity button beside the swatches opens them in a sheet facing that player. No two players can have the same colour: a swatch another player has shows who has it, such as P2, in place of its dot, and can't be picked. Tap the center check mark or press back when finished. Colours carry over to new games and player-count changes.
+Choose **Colours** in Setup to change tile colours. Every tile shows nine swatches facing its player, so everyone can pick at once. With Commander on, each player sets their colour identity there too: any mix of white, blue, black, red and green, left empty for a colourless commander. Identity shows as the real mana symbols. Larger tiles show the five toggles beside the swatches; on small tiles, such as six players on a phone, an identity button showing the card-style colour indicator opens them in a sheet facing that player. No two players can have the same colour: a swatch another player has shows who has it, such as P2, in place of its dot, and can't be picked. Tap the center check mark or press back when finished. Colours carry over to new games and player-count changes.
 
 ## Install on Android
 
@@ -93,3 +93,9 @@ A version tag such as `v0.1.0-alpha.1` publishes a GitHub prerelease with the si
 ## Privacy
 
 LifePod collects no data. See the [privacy policy](PRIVACY.md).
+
+## Credits
+
+LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
+
+The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, bundled as `web/fonts/mana.woff2` under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)).

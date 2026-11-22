@@ -19,4 +19,4 @@ No ads, no accounts, no tracking, and no internet permission. LifePod works enti
 
 Built for Commander and other Magic: The Gathering formats, LifePod works for any game that tracks life or points.
 
-LifePod is unofficial and is not affiliated with, endorsed, sponsored, or approved by Wizards of the Coast. Magic: The Gathering is a trademark of Wizards of the Coast LLC.
+LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC. Magic: The Gathering is a trademark of Wizards of the Coast LLC. Mana symbols from the Mana font by Andrew Gioia (SIL Open Font License 1.1).

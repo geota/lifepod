@@ -174,9 +174,14 @@ async function checkIdentity(t, engine) {
   assert.equal(await page.locator('.identity-button:visible').count(), 0);
   assert.deepEqual(await group.getByRole('button').evaluateAll(toggles => toggles.map(toggle => toggle.getAttribute('aria-label'))),
     ['White', 'Blue', 'Black', 'Red', 'Green'], 'five colours, no colourless');
-  // Every pip has the same thin light ring, and an unchosen toggle shows its pip at full colour.
-  const pips = await group.locator('.pip').evaluateAll(nodes => nodes.map(pip => `${getComputedStyle(pip).opacity} ${getComputedStyle(pip).boxShadow}`));
-  assert.deepEqual(new Set(pips), new Set(['1 rgb(168, 158, 164) 0px 0px 0px 1.5px']), `pips: ${pips}`);
+  // Every pip is that colour's mana symbol from the bundled Mana font, at full colour even when unchosen.
+  await page.evaluate(() => document.fonts.ready);
+  const pips = await group.locator('.pip').evaluateAll(nodes => nodes.map(pip => {
+    const symbol = getComputedStyle(pip, '::before');
+    return `${getComputedStyle(pip).opacity} ${symbol.fontFamily} ${symbol.content.codePointAt(1).toString(16)}`;
+  }));
+  assert.deepEqual(pips, ['1 Mana e600', '1 Mana e601', '1 Mana e602', '1 Mana e603', '1 Mana e604'], `pips: ${pips}`);
+  assert.ok(await page.evaluate(() => document.fonts.check('16px Mana', '\ue600')), 'the Mana font loads from the app');
   // Each tile's toggles face its player, like the swatches.
   const facing = await page.locator('.player .identity').evaluateAll(groups => groups.map(node => Math.round(new DOMMatrixReadOnly(getComputedStyle(node.closest('.player-face')).transform).a)));
   assert.deepEqual(facing, [-1, -1, 1, 1]);
@@ -189,10 +194,8 @@ async function checkIdentity(t, engine) {
   await reload(page);
   await turnScreen(page, 852, 393, 90);
   assert.equal(await nearBadges(page, 3), 'colour identity white, green', 'saved, and shown in W U B R G order');
-  const nearPips = await tile(page, 3).locator('.badges.near .pip').evaluateAll(nodes => nodes.map(pip => getComputedStyle(pip).boxShadow));
-  assert.deepEqual(nearPips, Array(2).fill('rgb(168, 158, 164) 0px 0px 0px 1px'), 'the same ring on every pip');
-  assert.equal(await tile(page, 3).locator('.badges.near .pip[data-pip="W"]').evaluate(pip => getComputedStyle(pip).backgroundColor),
-    'rgb(255, 254, 250)', 'white reads as white');
+  const nearPips = await tile(page, 3).locator('.badges.near .pip').evaluateAll(nodes => nodes.map(pip => getComputedStyle(pip).backgroundColor));
+  assert.deepEqual(nearPips, ['rgb(253, 251, 206)', 'rgb(159, 203, 166)'], 'the colours mana symbols are printed with');
 
   // Six players on the smallest phone: the tiles are too small for the toggles, so a 44px identity button beside
   // the swatches opens the player sheet, facing that player, with identity only.
@@ -212,6 +215,10 @@ async function checkIdentity(t, engine) {
   await sheet.getByRole('button', { name: 'Done' }).tap();
   assert.ok(!(await isOpen(page, 'player-sheet')));
   assert.ok(await button(page, 'Colour identity for Player 3: white, black, green').isVisible(), 'the button shows the new identity');
+  // The button shows the identity as a colour indicator, split three ways.
+  assert.deepEqual(await page.locator('.identity-button[data-player="2"] .ci').evaluate(node => [node.dataset.ci, node.dataset.count, getComputedStyle(node, '::before').content]),
+    ['WBG', '3', '"\ue98c"']);
+  assert.equal(await page.locator('.identity-button[data-player="5"] .ci').getAttribute('data-ci'), '', 'an empty ring with no identity');
   // Each sheet fits whichever way it faces, and Android back closes it before the mode.
   for (const number of [1, 3, 5]) {
     await page.locator(`.identity-button[data-player="${number - 1}"]`).tap();

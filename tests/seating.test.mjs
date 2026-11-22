@@ -132,9 +132,10 @@ async function checkLayouts(t, engine) {
   await button(page, 'Game setup').tap();
   const setupBox = await page.locator('#setup').boundingBox();
   assert.ok(setupBox.y >= 0 && setupBox.y + setupBox.height <= 320, `setup fits: ${JSON.stringify(setupBox)}`);
-  await button(page, 'Privacy').tap();
+  await button(page, 'About').tap();
   assert.match(await page.locator('#privacy').textContent(), /collects no data/);
-  await button(page, 'Close privacy policy').tap();
+  assert.match(await page.locator('#privacy').textContent(), /unofficial Fan Content permitted under the Fan Content Policy/);
+  await button(page, 'Close about').tap();
   // The dialog close event runs after the click, so wait for setup to reopen.
   await page.waitForFunction(() => document.querySelector('#setup').open, null, { timeout: 2000 });
   await button(page, 'Close setup').tap();
