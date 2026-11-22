@@ -597,15 +597,58 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 }
 
+// A real swipe through CDP: first Chromium's synthetic scroll gesture, then raw touch events with small moves over time.
+// Linux's headless shell on CI turns neither into a scroll (macOS does), so there the test falls back to what makes the
+// scroll possible: the slider leaves vertical pans to the page (touch-action: pan-y) and the body scrolls on its own.
+// Either way, the swipe never changes the slider. On macOS the real scroll is required.
 test('chromium: a vertical touch swipe that starts on a slider scrolls the page and leaves the value', async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
   await page.goto(app);
   await button(page, 'Settings').tap();
   const cdp = await page.context().newCDPSession(page);
+  const scrolled = () => page.locator('#settings-body').evaluate(node => node.scrollTop > 40);
+  const settle = async () => {
+    const deadline = Date.now() + 1500;
+    while (!(await scrolled()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
+    return scrolled();
+  };
   const start = await pointFor(page, 'players', 5, [2, 6]);
-  await cdp.send('Input.synthesizeScrollGesture', { x: Math.round(start.x), y: Math.round(start.y), yDistance: -160, gestureSourceType: 'touch', speed: 800 });
-  await eventually(() => page.locator('#settings-body').evaluate(node => node.scrollTop > 40), true, 'the swipe scrolls the page');
-  assert.equal((await sliderState(page, 'players')).now, 4, 'the slider keeps its value');
+  const x = Math.round(start.x);
+  const y = Math.round(start.y);
+  await cdp.send('Input.synthesizeScrollGesture', { x, y, yDistance: -200, gestureSourceType: 'touch', speed: 600, repeatCount: 1 });
+  let scrolls = await settle();
+  assert.equal((await sliderState(page, 'players')).now, 4, 'the gesture leaves the slider’s value');
+  if (!scrolls) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let step = 1; step <= 20; step++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - step * 10 }] });
+      await new Promise(resolve => setTimeout(resolve, 16));
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    scrolls = await settle();
+  }
+  assert.equal((await sliderState(page, 'players')).now, 4, 'the swipe leaves the slider’s value');
+  if (process.platform === 'darwin' || scrolls) {
+    assert.equal(scrolls, true, 'the swipe scrolls the page');
+    return;
+  }
+  // No synthetic swipe scrolls in this browser build: check the conditions for one instead.
+  const conditions = await page.evaluate(() => {
+    const body = document.querySelector('#settings-body');
+    const blocks = [];
+    for (let node = document.querySelector('#players-slider'); node; node = node.parentElement) {
+      const action = getComputedStyle(node).touchAction;
+      if (action === 'none' || action === 'pan-x') blocks.push(node.id || node.className);
+    }
+    return {
+      slider: getComputedStyle(document.querySelector('#players-slider')).touchAction,
+      body: [getComputedStyle(body).overflowY, getComputedStyle(body).overscrollBehaviorY],
+      room: body.scrollHeight > body.clientHeight + 40,
+      blocks,
+    };
+  });
+  assert.deepEqual(conditions, { slider: 'pan-y', body: ['auto', 'contain'], room: true, blocks: [] },
+    'the slider leaves vertical pans to a body that scrolls, and nothing above it blocks them');
 });
 
 test('chromium: the fixed header never covers the focused control', async (t) => {
