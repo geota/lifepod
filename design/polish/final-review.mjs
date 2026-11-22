@@ -40,7 +40,8 @@ const noPools = count => Array.from({ length: count }, () => zeros(6));
 const base = count => ({
   startingLife: 40, scores: pick([40, 33, 27, 38, 19, 35], count), rotations: zeros(count), keepAwake: true, landscapeAngle: 90,
   colors: Array.from({ length: count }, (_, i) => i),
-  counters: { commander: false, poison: false, energy: false, experience: false, rad: false },
+  counters: { commander: false, poison: false, energy: false, experience: false, rad: false, monarch: false, initiative: false },
+  monarch: null, initiative: null,
   poison: zeros(count), casts: zeros(count), energy: zeros(count), experience: zeros(count), rad: zeros(count),
   identities: zeros(count).map(() => ''), identity: { show: { indicator: true, symbol: false, name: true }, background: 'symbol' },
   commanderDamage: Array.from({ length: count }, () => zeros(count)),
@@ -54,11 +55,13 @@ const damageFrom = (count, lethalOn = null) => Array.from({ length: count }, (_,
 
 const seeds = {
   // Everything on: every counter with two-digit counts, three-digit and negative totals, a player out on poison,
-  // commander damage from every opponent, the full chip, Turn by turn, and mana floating in two pools.
+  // commander damage from every opponent, the full chip, Turn by turn, mana floating in two pools, the monarch on the
+  // busiest row and the initiative with Player 2, who is out and hasn't passed it on ("Pass it on").
   everything: count => ({
     ...base(count),
     scores: pick([112, -3, 27, 5, 40, 19], count),
-    counters: { commander: true, poison: true, energy: true, experience: true, rad: true },
+    counters: { commander: true, poison: true, energy: true, experience: true, rad: true, monarch: true, initiative: true },
+    monarch: 0, initiative: 1,
     poison: pick([0, 10, 7, 2, 1, 9], count), casts: pick([1, 2, 0, 5, 1, 3], count),
     energy: pick([12, 2, 0, 8, 11, 3], count), experience: pick([10, 0, 1, 0, 13, 1], count), rad: pick([14, 0, 0, 2, 0, 16], count),
     identities: pick(identities, count), identity: { show: { indicator: true, symbol: true, name: true }, background: 'symbol' },
@@ -70,7 +73,8 @@ const seeds = {
   minimal: count => ({ ...base(count), scores: pick([40, 40, 40, 40, 40, 40], count), identity: { show: { indicator: false, symbol: false, name: false }, background: 'off' } }),
   // A typical Commander night: commander and poison, the default chip, Rounds, single-digit counts.
   commander: count => ({
-    ...base(count), counters: { commander: true, poison: true, energy: false, experience: false, rad: false },
+    ...base(count), counters: { commander: true, poison: true, energy: false, experience: false, rad: false, monarch: true, initiative: false },
+    monarch: count - 1,
     poison: pick([0, 3, 0, 1, 0, 0], count), casts: pick([1, 0, 2, 0, 1, 0], count),
     identities: pick(['WUB', 'RG', 'WURG', 'B', 'WUBRG', 'UG'], count), commanderDamage: damageFrom(count).map(row => row.map(v => (v > 12 ? 0 : v))),
     turns: 'rounds', turn: { first: 1 % count, active: 1 % count, round: 4 },
@@ -133,6 +137,8 @@ const modes = {
     await click(page, '#settings-close');
   },
   dice: page => click(page, '#dice-button'),
+  // Turn reminders on every tile, the monarch's and the initiative's in turn (app.js's remind(), a page global).
+  reminders: page => page.evaluate(() => game.scores.forEach((_, index) => remind(index, index % 2 ? 'initiative' : 'monarch'))),
   // Settings (design/polish/SETTINGS-SPEC.md): at the top, scrolled to the end, with a new game pending, with the life
   // field open, and turned to face the other side.
   settings: openSetup,
@@ -154,6 +160,7 @@ const available = (mode, game) => ({
   counters: Object.values(game.counters).some(Boolean),
   mana: game.manaPool,
   discard: Object.values(game.counters).some(Boolean),
+  reminders: game.turns === 'turns' && game.counters.monarch && game.counters.initiative,
 }[mode] ?? true);
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -345,11 +352,14 @@ function audit() {
     near: '.badges.near > *',
     far: '.badges.far > *',
     strip: '.mana-strip > *',
+    // A turn reminder sits above the near edge, clear of the total and the glyphs, or takes the near edge for its 3 seconds.
+    reminder: '.reminders > *',
     layer: '.mode-layer button, .mode-layer .layer-hint, .mode-layer .identity-preview > *, .mode-layer .map-cell',
     rotate: '.rotate-badge',
   };
   const pairs = [['score', 'near'], ['score', 'far'], ['score', 'strip'], ['score', 'glyphs'], ['glyphs', 'near'], ['glyphs', 'far'], ['glyphs', 'strip'], ['near', 'far'], ['strip', 'far'],
-    ['out', 'near'], ['out', 'far'], ['out', 'strip'], ['strip', 'near']];
+    ['out', 'near'], ['out', 'far'], ['out', 'strip'], ['strip', 'near'],
+    ['reminder', 'score'], ['reminder', 'glyphs'], ['reminder', 'out'], ['reminder', 'far'], ['reminder', 'strip']];
   const sizesBy = {};
   const note = (key, value) => { (sizesBy[key] ??= []).push(value); };
   for (const player of players) {
@@ -400,9 +410,12 @@ function audit() {
   // While a pool has mana, its strip must leave the near row in place: list the counts and chips that don't show. A
   // strip folded into one chip must say that it opens mana mode (a caret).
   const game = JSON.parse(localStorage.getItem('lifepod-game'));
+  // A turn reminder that takes its tile's near edge (data-reminder="over", on tiles too short to show it above) hides the
+  // near row and the strip on purpose for its 3 seconds, so their checks skip that tile.
+  const covered = el => el.closest('.player[data-reminder="over"]') !== null;
   if (!facts.mode) {
     players.forEach((player, index) => {
-      if (!game.manaPool || !game.pools[index].some(Boolean)) return;
+      if (!game.manaPool || !game.pools[index].some(Boolean) || covered(player)) return;
       const near = player.querySelector('.badges.near');
       const shownKinds = [...near.querySelectorAll('.chip[data-kind]')].filter(visible).map(chip => chip.dataset.kind);
       const hidden = ['poison', 'casts', 'energy', 'experience', 'rad']
@@ -422,7 +435,7 @@ function audit() {
   }
   // Every count chip must be visible (never dropped).
   for (const chip of document.querySelectorAll('.badges.near .chip[data-kind], .badges.far .chip.damage')) {
-    if (!chip.closest('.badges').hidden && !document.querySelector('#board').dataset.mode && !visible(chip)) add('dropped', `${who(chip)}${name(chip)} is hidden`);
+    if (!chip.closest('.badges').hidden && !document.querySelector('#board').dataset.mode && !visible(chip) && !(chip.closest('.near') && covered(chip))) add('dropped', `${who(chip)}${name(chip)} is hidden`);
   }
   return { problems, facts };
 }
@@ -576,7 +589,7 @@ async function shots() {
 // The sweep: every size × 2–6 players × every seed (with the eight chip combinations spread over them) × every mode
 // the seed can show, measured but not saved as screenshots.
 async function sweep() {
-  const boardModes = ['rest', 'damage', 'counters', 'mana', 'colours', 'identity', 'rotate', 'first'];
+  const boardModes = ['rest', 'damage', 'counters', 'mana', 'colours', 'identity', 'rotate', 'first', 'reminders'];
   const dialogModes = ['dice', 'settings', 'settings-end', 'settings-pending', 'settings-edit', 'settings-flipped', 'new-game', 'discard'];
   let runs = 0;
   await Promise.all(Object.keys(sizes).map(async (size) => {
