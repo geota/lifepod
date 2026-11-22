@@ -9,6 +9,7 @@ import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
@@ -20,6 +21,7 @@ import java.io.ByteArrayInputStream
 import java.io.IOException
 
 class MainActivity : Activity() {
+    private lateinit var root: FrameLayout
     private lateinit var webView: WebView
 
     // Registered only while the page has a dialog or seat rotation to close, so the system handles back otherwise.
@@ -27,8 +29,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val background = Color.rgb(20, 25, 22)
-        val root = FrameLayout(this).apply { setBackgroundColor(background) }
+        root = FrameLayout(this).apply { setBackgroundColor(BACKGROUND) }
 
         @Suppress("DEPRECATION")
         window.setDecorFitsSystemWindows(false)
@@ -43,11 +44,17 @@ class MainActivity : Activity() {
             WindowInsets.CONSUMED
         }
 
+        setContentView(root)
+        showTracker()
+    }
+
+    // Adds a new WebView and loads the tracker in it. The page reads the saved game from GameBridge as it starts.
+    private fun showTracker() {
         // JavaScript runs only the bundled files: LocalWebViewClient refuses every other URL.
         @Suppress("SetJavaScriptEnabled")
         webView =
             WebView(this).apply {
-                setBackgroundColor(background)
+                setBackgroundColor(BACKGROUND)
                 settings.apply {
                     javaScriptEnabled = true
                     allowFileAccess = false
@@ -60,8 +67,16 @@ class MainActivity : Activity() {
             }
         val matchParent = FrameLayout.LayoutParams.MATCH_PARENT
         root.addView(webView, FrameLayout.LayoutParams(matchParent, matchParent))
-        setContentView(root)
         webView.loadUrl(START_URL)
+    }
+
+    // A WebView whose renderer has gone can't be used again. Replace it and reload, as iOS does when its web
+    // content process ends. The game is saved on every change, so the new page carries on where the old one was.
+    private fun replaceTracker() {
+        setBackHandling(false)
+        root.removeView(webView)
+        webView.destroy()
+        showTracker()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -132,6 +147,15 @@ class MainActivity : Activity() {
     }
 
     private inner class LocalWebViewClient : WebViewClient() {
+        // Returning true keeps the app running when the system kills the renderer to free memory, or it crashes.
+        override fun onRenderProcessGone(
+            view: WebView,
+            detail: RenderProcessGoneDetail,
+        ): Boolean {
+            if (view == webView) replaceTracker()
+            return true
+        }
+
         override fun shouldOverrideUrlLoading(
             view: WebView,
             request: WebResourceRequest,
@@ -164,6 +188,7 @@ class MainActivity : Activity() {
     }
 
     private companion object {
+        val BACKGROUND = Color.rgb(20, 25, 22)
         const val ASSET_HOST = "appassets.androidplatform.net"
         const val START_URL = "https://$ASSET_HOST/index.html"
         const val GAME_KEY = "currentGame"
