@@ -156,6 +156,11 @@ jobs:
           # Android keys are self-signed, so check that the bundle is signed rather than trusted by a CA.
           jarsigner -verify "$AAB" | grep -q '^jar verified'
           unzip -l "$AAB" | grep -Eq 'META-INF/[^/]+\.(RSA|EC)$'
+      # R8 strips the JavaScript bridge without an error if a keep rule is wrong, and the page then can't save.
+      - name: Check that R8 kept the JavaScript bridge
+        env:
+          APK: ${{ steps.build.outputs.apk }}
+        run: ./android/check-bridge.sh "$APK"
       - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: lifepod-android

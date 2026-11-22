@@ -54,7 +54,16 @@ link() {
 "$kotlin_compiler" -kotlin-home "$kotlin_dir" -jvm-target 11 -no-reflect \
     -classpath "$android_jar:$kotlin_stdlib" -include-runtime \
     -d "$work/classes.jar" "$android_dir/src/dev/maceiras/lifepod/MainActivity.kt"
-"$build_tools/d8" --lib "$android_jar" --min-api 30 --output "$work/dex" "$work/classes.jar"
+
+# R8 drops the parts of the Kotlin runtime the app doesn't use. aapt2 writes the keep rules for the manifest's
+# activity; proguard-rules.pro keeps the JavaScript bridge, which only the page calls. check-bridge.sh fails the
+# build if the bridge methods went missing anyway, since R8 would strip them without an error.
+"$build_tools/aapt2" link -I "$android_jar" --manifest "$android_dir/AndroidManifest.xml" \
+    --proguard "$work/manifest-rules.pro" -o "$work/rules.apk" "$work/resources.zip"
+java -cp "$build_tools/lib/d8.jar" com.android.tools.r8.R8 --release --min-api 30 --lib "$android_jar" \
+    --pg-conf "$android_dir/proguard-rules.pro" --pg-conf "$work/manifest-rules.pro" \
+    --output "$work/dex" "$work/classes.jar"
+"$android_dir/check-bridge.sh" "$work/dex/classes.dex"
 
 # APK
 link -o "$work/unsigned.apk"
