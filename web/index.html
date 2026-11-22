@@ -2,7 +2,7 @@
 <html lang="en" data-style="material">
 <head>
   <meta charset="utf-8">
-  <!-- Icons: Phosphor Icons, Bold weight (the flags and the experience graduation cap are Fill weight), MIT License, Copyright (c) 2020 Phosphor Icons. https://phosphoricons.com -->
+  <!-- Icons: Phosphor Icons, Bold weight (the flags, the experience graduation cap and the initiative castle turret are Fill weight), MIT License, Copyright (c) 2020 Phosphor Icons. https://phosphoricons.com -->
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#111213">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; font-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
@@ -52,8 +52,9 @@
           <span class="out-tag" aria-hidden="true">Out</span>
           <span class="rotate-badge" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg></span>
         </div>
-        <!-- The near edge: the mana strip, while a pool has mana, over the near badge row. -->
+        <!-- The near edge: the mana strip, while a pool has mana, over the near badge row. A turn reminder sits above it. -->
         <div class="near-edge">
+          <div class="reminders"></div>
           <div class="mana-strip" role="group" aria-label="Mana pool" hidden></div>
           <div class="badges near" role="list" aria-label="Counters" hidden></div>
         </div>
@@ -152,6 +153,28 @@
                 <button class="nav-row fs-action" type="button" id="rotate-seats" aria-label="Rotate seats on the board"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,48V96a12,12,0,0,1-12,12H168a12,12,0,0,1,0-24h19l-7.8-7.8a75.55,75.55,0,0,0-53.32-22.26h-.43A75.49,75.49,0,0,0,72.39,75.57,12,12,0,1,1,55.61,58.41a99.38,99.38,0,0,1,69.87-28.47H126A99.42,99.42,0,0,1,196.2,59.23L204,67V48a12,12,0,0,1,24,0ZM183.61,180.43a75.49,75.49,0,0,1-53.09,21.63h-.43A75.55,75.55,0,0,1,76.77,179.8L69,172H88a12,12,0,0,0,0-24H40a12,12,0,0,0-12,12v48a12,12,0,0,0,24,0V189l7.8,7.8A99.42,99.42,0,0,0,130,226.06h.56a99.38,99.38,0,0,0,69.87-28.47,12,12,0,0,0-16.78-17.16Z"/></svg><span class="nav-label">Rotate seats</span><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208,28H48A20,20,0,0,0,28,48V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V48A20,20,0,0,0,208,28Zm-4,176H52V52H204ZM87.51,168.49a12,12,0,0,1,0-17L131,108H112a12,12,0,0,1,0-24h48a12,12,0,0,1,12,12v48a12,12,0,0,1-24,0V125l-43.51,43.52a12,12,0,0,1-17,0Z"/></svg></button>
               </div>
             </section>
+            <!-- Reminders: what the board reminds players of. Turn reminders shows only while the monarch or the initiative
+                 is on and Turns is Turn by turn, and Pass-it-on hints while either is on. Each saves the moment it changes. -->
+            <section class="fs-sec" id="settings-reminders" aria-labelledby="settings-reminders-title">
+              <h3 id="settings-reminders-title"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M225.29,165.93C216.61,151,212,129.57,212,104a84,84,0,0,0-168,0c0,25.58-4.59,47-13.27,61.93A20.08,20.08,0,0,0,30.66,186,19.77,19.77,0,0,0,48,196H84.18a44,44,0,0,0,87.64,0H208a19.77,19.77,0,0,0,17.31-10A20.08,20.08,0,0,0,225.29,165.93ZM128,212a20,20,0,0,1-19.6-16h39.2A20,20,0,0,1,128,212ZM54.66,172C63.51,154,68,131.14,68,104a60,60,0,0,1,120,0c0,27.13,4.48,50,13.33,68Z"/></svg>Reminders</h3>
+              <div class="fs-switches reminder-grid">
+                <label class="switch-row compact-switch" id="turn-reminders-row" hidden>
+                  <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M225.81,74.65A11.86,11.86,0,0,1,220.3,76a12,12,0,0,1-10.67-6.47,90.1,90.1,0,0,0-32-35.38,12,12,0,1,1,12.8-20.29,115.25,115.25,0,0,1,40.54,44.62A12,12,0,0,1,225.81,74.65ZM46.37,69.53a90.1,90.1,0,0,1,32-35.38A12,12,0,1,0,65.6,13.86,115.25,115.25,0,0,0,25.06,58.48a12,12,0,0,0,5.13,16.17A11.86,11.86,0,0,0,35.7,76,12,12,0,0,0,46.37,69.53Zm173.51,98.35A20,20,0,0,1,204,200H171.81a44,44,0,0,1-87.62,0H52a20,20,0,0,1-15.91-32.12c7.17-9.33,15.73-26.62,15.88-55.94A76,76,0,0,1,204,112C204.15,141.26,212.71,158.55,219.88,167.88ZM147.6,200H108.4a20,20,0,0,0,39.2,0Zm48.74-24c-8.16-13-16.19-33.57-16.34-63.94A52,52,0,1,0,76,112c-.15,30.42-8.18,51-16.34,64Z"/></svg><span class="nav-label">Turn reminders</span>
+                  <input type="checkbox" id="turn-reminders-switch" role="switch" data-reminder="turns">
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+                <label class="switch-row compact-switch" id="pass-hints-row" hidden>
+                  <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,112.49l-48,48a12,12,0,0,1-17-17L195,116H128a84.09,84.09,0,0,0-84,84,12,12,0,0,1-24,0A108.12,108.12,0,0,1,128,92h67L167.51,64.48a12,12,0,0,1,17-17l48,48A12,12,0,0,1,232.49,112.49Z"/></svg><span class="nav-label">Pass-it-on hints</span>
+                  <input type="checkbox" id="pass-hints-switch" role="switch" data-reminder="passOn">
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+                <label class="switch-row compact-switch" id="gesture-hints-row">
+                  <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,156v36c0,13.85-1.63,26.52-4.58,35.68a12,12,0,1,1-22.84-7.36c2.14-6.65,3.42-17.24,3.42-28.32V156a8,8,0,0,0-16,0v4a12,12,0,0,1-24,0V140a8,8,0,0,0-16,0v12a12,12,0,0,1-24,0V84a8,8,0,0,0-16,0V192a12,12,0,0,1-22.18,6.34l-18.68-30-.21-.34A8,8,0,0,0,53,175.92L78.27,217.8a12,12,0,0,1-20.56,12.39l-25.31-42-.12-.2A32,32,0,0,1,84,150.83V84a32,32,0,0,1,64,0v25a32,32,0,0,1,36.78,17A32,32,0,0,1,228,156ZM56,96A12,12,0,0,0,68,84a48,48,0,0,1,96,0,12,12,0,0,0,24,0A72,72,0,0,0,44,84,12,12,0,0,0,56,96Z"/></svg><span class="nav-label">Gesture hints</span>
+                  <input type="checkbox" id="gesture-hints-switch" role="switch" data-reminder="gestures">
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+              </div>
+            </section>
           </div>
           <div class="fs-col" id="settings-end">
             <section class="fs-sec" id="settings-track" aria-labelledby="settings-track-title">
@@ -185,6 +208,16 @@
                 <label class="switch-row compact-switch">
                   <span class="icon mana-icon" data-glyph="tap" aria-hidden="true"></span><span class="nav-label">Mana pool</span>
                   <input type="checkbox" id="mana-switch" role="switch">
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+                <label class="switch-row compact-switch">
+                  <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z"/></svg><span class="nav-label">Monarch</span>
+                  <input type="checkbox" id="monarch-switch" role="switch">
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+                <label class="switch-row compact-switch">
+                  <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M216,216H200V115.31L211.31,104A15.86,15.86,0,0,0,216,92.69V48a16,16,0,0,0-16-16H180a8,8,0,0,0-8,8V64H148V40a8,8,0,0,0-8-8H116a8,8,0,0,0-8,8V64H84V40a8,8,0,0,0-8-8H56A16,16,0,0,0,40,48V92.69A15.86,15.86,0,0,0,44.69,104L56,115.31V216H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16ZM112,168a16,16,0,0,1,32,0v48H112Z"/></svg><span class="nav-label">Initiative</span>
+                  <input type="checkbox" id="initiative-switch" role="switch">
                   <span class="switch" aria-hidden="true"></span>
                 </label>
               </div>
@@ -234,7 +267,7 @@
             <div class="privacy-text">
               <h4>Privacy</h4>
               <p>LifePod collects no data. There are no accounts, ads, analytics, or tracking, and the apps make no network requests.</p>
-              <p>The current game (players, life totals, seat rotations, tile colours, counters, floating mana, turns, and settings) is saved only on this device. Removing the app or clearing its data deletes it.</p>
+              <p>The current game (players, life totals, seat rotations, tile colours, counters, the monarch and the initiative, floating mana, turns, and settings) is saved only on this device. Removing the app or clearing its data deletes it.</p>
               <p>Full policy: github.com/geota/lifepod/blob/main/PRIVACY.md</p>
               <h4>Credits</h4>
               <p>LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>

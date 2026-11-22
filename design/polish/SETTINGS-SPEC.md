@@ -34,15 +34,17 @@ dialog#settings.fs
       section#settings-track     Track
       section#settings-identity  Identity
       section#settings-table     Table
+      section#settings-reminders Reminders (added after the build, §8)
       section#settings-about     About
 ```
 
 | Section | Contents, in order |
 |---|---|
 | **Game** | Players **[STYLE Q4]**; Starting life **[STYLE Q5]**; then a footer row with **New game** (secondary button) and **Keep awake** (switch row) side by side |
-| **Track** | Six switch rows (Commander, Poison, Energy, Experience, Rad, Mana pool), two to a line; Turns (Off · Rounds · Turn by turn); "Empty mana pools when the turn passes", shown only while Mana pool is on and Turns isn't Off |
+| **Track** | Eight switch rows (Commander, Poison, Energy, Experience, Rad, Mana pool, Monarch, Initiative), two to a line; Turns (Off · Rounds · Turn by turn); "Empty mana pools when the turn passes", shown only while Mana pool is on and Turns isn't Off |
 | **Identity** | Show on tiles (three compact switches: Indicator, Symbol, Name); Background (Symbol · Default · Off); the note line; **Choose identities** (board action) |
 | **Table** | **Colours** and **Rotate seats** (board actions), side by side |
+| **Reminders** | Turn reminders, Pass-it-on hints and Gesture hints, compact switch rows (§8) |
 | **About** | Privacy and credits, today's text, in small muted type |
 
 - Each section has a small caps title with its icon:
@@ -50,6 +52,7 @@ dialog#settings.fs
   - Track: the flag;
   - Identity: Mana's colour pie;
   - Table: squares-four;
+  - Reminders: Phosphor bell;
   - About: info.
 - **The section card** (border, fill or neither) is **[STYLE Q1]**.
 
@@ -57,8 +60,8 @@ dialog#settings.fs
 
 | Viewport | Layout |
 |---|---|
-| **Landscape, at least 620px wide** (952 × 427 target, 852 × 393, 1366 × 1024) | Two columns, each `minmax(0, 1fr)`, 12px apart, inside a container at most `min(1180px, 100%)` wide: Game and Table in the left column, Track and Identity in the right, About across both. Inside a column, each row stacks its label above its control. |
-| **Under 620px wide** (568 × 320, 640 × 360 portrait-ish splits) | One column, in the order Game, Track, Identity, Table, About. Inside a section, labels sit beside their controls when the card is at least 480px wide, otherwise above. |
+| **Landscape, at least 620px wide** (952 × 427 target, 852 × 393, 1366 × 1024) | Two columns, each `minmax(0, 1fr)`, 12px apart, inside a container at most `min(1180px, 100%)` wide: Game, Table and Reminders in the left column, Track and Identity in the right, About across both. Inside a column, each row stacks its label above its control. |
+| **Under 620px wide** (568 × 320, 640 × 360 portrait-ish splits) | One column, in the order Game, Track, Identity, Table, Reminders, About. Inside a section, labels sit beside their controls when the card is at least 480px wide, otherwise above. |
 | **Portrait** (375 × 667, 320 × 568) | One column. Labels go above their controls. The compact switches put the label over the switch (today's portrait rule). |
 
 - **Header:**
@@ -99,7 +102,7 @@ While a change is pending:
 
 ### Instant settings
 
-- Track switches, Turns, auto-empty, Show on tiles, Background and Keep awake save the moment they change, as today.
+- Track switches, Turns, auto-empty, Show on tiles, Background, the Reminders switches and Keep awake save the moment they change, as today.
 - Turns going from Off to on doesn't open "Who goes first?" while settings is open; it opens when settings closes (SPEC §8).
 
 ### Board actions
@@ -201,3 +204,18 @@ Where the build differs from the spec above, and why:
 | Identity toggles | Off is a raised disc with the symbol muted; on keeps the symbol in full colour inside a 2px accent ring, with the check | Direction A's selected style without filling the symbol, which is the information. |
 | The pill | No border; the solid `--raised` fill and a soft two-layer shadow | Direction A. The fill is `--pill-background`, the shadow `--pill-shadow`. |
 | Table: Colours and Rotate seats | Table also holds **Tile colours**, a four-stop slider in the players slider's style: Classic · Soft · Jewel · Clear, default Clear (design/polish/TILES.md) | Added after the spec, at the owner's request. It saves at once, like the switches; it isn't part of a pending new game. `tileColours` is validated in `loadGame()`, and a save without it gets Clear. The sets come from `tiles7.json`; `palette.test.mjs` checks each against it and the contrast minimums. |
+
+## 8. Reminders (added 22 November 2026)
+
+With the monarch and the initiative (SPEC.md §13), Settings gains a **Reminders** section, titled with the Phosphor bell:
+
+| Switch | Icon | Shown | Controls |
+|---|---|---|---|
+| **Turn reminders** | bell-ringing | while Monarch or Initiative is on and Turns is Turn by turn | "Monarch: draw a card" and "Initiative: venture into Undercity" on the tiles |
+| **Pass-it-on hints** | arrow-bend-up-right | while Monarch or Initiative is on | the "Pass it on" chip on an out holder's tile |
+| **Gesture hints** | hand-tap | always | the "Tap +1 · hold −1" and "Tap your colours" lines in counters, mana, commander damage and identity modes (Colours' "Your tile colour" is a label, so it stays) |
+
+- All on by default and saved the moment they change, in `game.reminders` (`loadGame()` keeps each on unless it was saved as exactly false). Gesture hints always shows, so the section always has something in it.
+- **Placement (layout B):** the left column, after Table: Game, Table and Reminders are about as tall as Track and Identity, and Reminders is the least-used section. In one column it comes after Table, before About. app.js moves it with the others.
+- **Rows:** compact switch rows like Track's, two to a line where each row has room for its whole label (13rem), otherwise one, so no label is ever cut short (a container's auto-fit grid rather than Track's label-over-switch rule).
+- Tests: `tests/monarch.test.mjs` (which rows show when, the order of the sections in both layouts, 44px rows, saving) and `sizes.test.mjs` (every screen, no label cut short).

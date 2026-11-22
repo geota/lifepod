@@ -208,7 +208,7 @@ async function checkNewCounters(t, engine) {
   // The switches are saved and stay on across launches.
   await setSwitches(page, everyTracker);
   await reload(page);
-  assert.deepEqual((await saved(page)).counters, { commander: true, poison: true, energy: true, experience: true, rad: true });
+  assert.deepEqual((await saved(page)).counters, { commander: true, poison: true, energy: true, experience: true, rad: true, monarch: false, initiative: false });
 
   // Every counter on: five circles in order, three on the first row and the last two centred under them.
   await button(page, 'Counters').tap();
@@ -290,7 +290,7 @@ async function checkNewCounters(t, engine) {
   await eventually(() => Promise.all([1, 2, 3, 4].map(number => nearBadges(page, number))), ['', '', '', ''], 'a new game clears the badges');
   const fresh = await saved(page);
   assert.deepEqual([fresh.poison, fresh.casts, fresh.energy, fresh.experience, fresh.rad], Array(5).fill([0, 0, 0, 0]), 'a new game resets every count');
-  assert.deepEqual(fresh.counters, { commander: true, poison: true, energy: true, experience: true, rad: true }, 'and keeps every switch');
+  assert.deepEqual(fresh.counters, { commander: true, poison: true, energy: true, experience: true, rad: true, monarch: false, initiative: false }, 'and keeps every switch');
   assert.ok(await button(page, 'Counters').isVisible());
 }
 

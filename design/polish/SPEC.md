@@ -29,6 +29,7 @@
 10. Data model and settings
 11. Build plan
 12. Open questions
+13. The monarch and the initiative (added after the build)
 
 ---
 
@@ -184,7 +185,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 
 - the life total;
 - both −/+ halves;
-- every count: poison, tax, energy, experience, rad and each commander damage chip;
+- every count: poison, tax, energy, experience, rad and each commander damage chip, and the monarch's crown and the initiative's castle (§13);
 - every control: the turn chip, the mana strip, map seats, counter cells, the pill.
 
 All of these keep 44px targets. Counts shrink their type before they ever leave.
@@ -193,7 +194,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 
 | # | Near row (identity and counters) | Far row (commander damage) |
 |---|---|---|
-| 1 | Words: the identity **name**, and "Turn" in the turn chip (leaving the untap symbol and "T" with the number, T12) | The **sword** label chip |
+| 1 | Words: the identity **name**, "Turn" in the turn chip (leaving the untap symbol and "T" with the number, T12), and "Pass it on" in the hint chip (§13, leaving its icon and arrow) | The **sword** label chip |
 | 2 | The identity **symbol**, when the indicator also shows (one colour mark is enough) | Shrink the type to the 11px floor |
 | 3 | Shrink the type to the 11px floor | Shrink the type to the 9px hard floor |
 | 4 | The **identity chip** entirely (the watermark still shows identity) | Wrap onto a second line |
@@ -353,7 +354,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ![Badges](renders/spec-badges.png)
 
-- **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero.
+- **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero, then the monarch's crown and the initiative's castle on their holder's tile (§13).
 - It stays on one line at full size on the target. On smaller phones the auto-drop rules (§3.2) take the name, then the identity chip, before any count shrinks below 11px.
 - **Decision: not the right side.** I mocked it with and without the identity chip. Reasons:
   - A column needs the + glyph to move in by 34px, which collides with the total at 6 players.
@@ -422,7 +423,9 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 | Field | Type | Default | Validation (anything else falls back to the default) |
 |---|---|---|---|
-| `counters` | `{ commander, poison, energy, experience, rad }` booleans | all false | strict `=== true` |
+| `counters` | `{ commander, poison, energy, experience, rad, monarch, initiative }` booleans | all false | strict `=== true` |
+| `monarch`, `initiative` | int (seat index) or null (§13) | null | a whole number from 0 to players − 1 |
+| `reminders` | `{ turns, passOn, gestures }` booleans (§13) | all true | `!== false` |
 | `energy`, `experience`, `rad` | int[players], 0–99 | zeros | `fitCounts` |
 | `pools` | int[players][6] (W U B R G C), 0–99 | zeros | new `fitPools` |
 | `manaPool` | boolean | false | |
@@ -438,7 +441,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.2 New game
 
-- **Resets:** scores, poison, casts, energy, experience, rad, commander damage, pools, and `turn` (round 1, no first or active player).
+- **Resets:** scores, poison, casts, energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), and the monarch and the initiative (nobody).
 - **Opens** "Who goes first?" if Turns isn't Off.
 - **Keeps:** every setting, colours, identities and rotations (rotations only when the player count is unchanged).
 
@@ -454,7 +457,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 | Where | How |
 |---|---|
-| Counters, commander damage, mana mode | The edit stack: Undo / ✓ / ✕, as today |
+| Counters, commander damage, mana mode | The edit stack: Undo / ✓ / ✕, as today. Giving or clearing the monarch or the initiative is an edit, and so is a transfer that commander damage or a player going out causes, inside the edit that caused it (§13). |
 | Turn steps | Hold the chip or pill to step back. That also restores auto-emptied pools. |
 | Spending from the strip | No undo. Add it back in mana mode. |
 | Clearing a pool | "Undo clear" for 5 seconds |
@@ -537,3 +540,24 @@ None are open.
 2. **Five-colour name:** WUBRG.
 3. **"Indicator backgrounds":** the background setting behind the total. Confirmed, and later changed by the owner to Symbol / Default / Off (§2.3).
 4. **New hue names:** Copper, Olive and Orchid, unless the owner renames them once `palette.mjs` produces the palettes.
+
+## 13. The monarch and the initiative (added after the build, 22 November 2026)
+
+From the Comprehensive Rules effective 6 November 2026: the monarch (CR 726) and the initiative (CR 727). Each has at most one holder, and nobody holds either until an effect says so.
+
+- **Track:** Monarch and Initiative switches after Mana pool, off by default, saved in `game.counters`. Either one shows the counters button.
+- **Icons:** the monarch is the Phosphor crown (Bold), which tax used before (§6); the initiative is Phosphor's castle-turret (Fill).
+- **Counters mode:** a crown cell and a castle cell after rad, in the circle-cell style, with the icon alone (0.51 of the cell). A tap gives it to that player and takes it from whoever had it; a tap on the holder's own cell clears it. The holder's cell fills with their seat colour. Each tap is an edit (`designation`) on the Undo / ✓ / ✕ stack.
+  - Seven cells (every counter and both designations) go four to a row, with the column gaps closing from 10px to 2px before a cell would go under 44px; a turned seat too narrow for four (568 × 320, five players) takes three to a row with its gaps closed up.
+- **At rest:** the holder's near row ends with a round crown or castle chip, like the flag. They count as counts: never dropped (§3.2).
+- **Commander damage** is combat damage: adding it to the monarch makes the attacker the monarch (CR 726.3), and the same for the initiative (CR 727.3), as transfers inside the same edit, announced. Taking damage away moves nothing.
+- **Leaving the game** (CR 726.4, 727.4), when a change puts the holder out (`isOut`):
+  - Only in Turn by turn with an active player: the active player takes it, or, if the active player is the one leaving or is already out, the next player in turn order who is still in. If nobody else is in, the monarch goes to nobody; the initiative always has a holder, so it stays. Announced, and a new initiative holder is reminded to venture.
+  - In counters or damage mode the handoff is part of the edit that caused it, so Undo or ✕ takes both back. At rest (a life total, or a Track switch that puts someone out) it saves at once.
+  - Rounds doesn't follow whose turn it is, and Off follows no turns, so neither hands anything on. Nor does Turn by turn before anyone's turn has started.
+  - Otherwise the out holder's near row shows **Pass it on** (the icon, an arrow and the words, outlined like a Start chip) until someone takes it in counters mode. It's a button with a 64 × 44 target that opens counters mode, and it doesn't dim with the out player's badges. It also shows for a holder someone gave it to after they were out, and never when nobody else is in to take it.
+- **Turn reminders,** only in Turn by turn: "Monarch: draw a card" on the monarch's tile when they pass the turn (the draw is at the beginning of their end step); "Initiative: venture into Undercity" on the holder's tile when their turn starts (by the chip, the pill, a Start chip or "Who goes first?") or when they take the initiative mid-turn (commander damage or counters mode, once the mode is saved, or a handoff). Stepping back reminds nobody.
+  - A chip in the turn chip's language: the tile's button fill, a ring and the icon in the seat colour, the label in bold. Inside the tile face, so it faces its player. 3 seconds, or until tapped (64 × 44 target), and announced.
+  - It sits on its own line above the near edge where that's 4px clear of the total, the glyphs and the "Out" tag; on a tile too short for that it takes the near edge (the row and any mana strip step aside) for its seconds. Too long for its tile, it drops its label, then wraps.
+- **Settings → Reminders** (SETTINGS-SPEC.md): Turn reminders, Pass-it-on hints and Gesture hints (the "Tap +1 · hold −1" and "Tap your colours" lines in counters, mana, commander damage and identity modes). All on by default, saved in `game.reminders`.
+- **Data:** `monarch` and `initiative` are seat indexes or null, validated in `loadGame()` (anything but a seat on the board is nobody). A new game clears both, which also covers a change of player count.

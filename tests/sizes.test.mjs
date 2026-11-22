@@ -24,12 +24,15 @@ const smallestRealPhone = 360;
 const tablets = ['iPad', 'Android tablet', 'iPad Pro 13"'];
 
 // A busy game: every counter on, colour identities set, commander damage from most opponents, Turn by turn with Player 2
-// active and Player 1 first, and mana floating in Player 1's pool, so the pill holds every button at rest.
+// active and Player 1 first, and mana floating in Player 1's pool, so the pill holds every button at rest. Every chip is
+// on: Player 2, the active player, is the monarch, and the initiative is held by a player who is out and hasn't passed
+// it on (Player 5, at −3 life, or Player 4, out on poison, with four), so their row shows the "Pass it on" hint.
 function busyGame(count) {
   return {
     startingLife: 40, scores: Array.from({ length: count }, (_, i) => [40, 33, 112, 5, -3, 19][i]),
     rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, colors: Array(count).fill(null),
-    counters: { commander: true, poison: true, energy: true, experience: true, rad: true },
+    counters: { commander: true, poison: true, energy: true, experience: true, rad: true, monarch: true, initiative: true },
+    monarch: 1, initiative: count >= 5 ? 4 : count === 4 ? 3 : 0,
     poison: Array.from({ length: count }, (_, i) => [0, 1, 7, 10, 2, 9][i]),
     casts: Array.from({ length: count }, (_, i) => [1, 2, 0, 5, 1, 3][i]),
     energy: Array.from({ length: count }, (_, i) => [12, 2, 0, 8, 1, 3][i]),

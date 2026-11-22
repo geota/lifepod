@@ -643,7 +643,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 }
 .player[data-out] .out-tag { display: block; }
 .board[data-mode="rotate"] .out-tag { visibility: hidden; }
-.player[data-out] .badges .chip:not([data-level="out"], .turn-chip, .strip-chip) { opacity: .82; filter: saturate(.35); }
+.player[data-out] .badges .chip:not([data-level="out"], .turn-chip, .strip-chip, .pass-chip) { opacity: .82; filter: saturate(.35); }
 /* The life halves have no button chrome: the − and + glyphs sit near the tile's outer edges, 5u in. */
 .controls {
   display: grid;
@@ -916,6 +916,21 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
+/* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it. The holder's
+   cell fills with their seat colour; anyone else's is muted. */
+.designation-cell .icon { font-size: 1.7em; }
+.designation-cell[data-zero] .icon { color: var(--muted); }
+.designation-cell[aria-pressed="true"] { background: var(--seat); color: var(--button); }
+.designation-cell[aria-pressed="true"] .icon { color: var(--button); }
+/* Seven counter cells (every counter, the monarch and the initiative) go four to a row, and the gaps close up to 2px
+   before a cell would go under 44px. A face too narrow for four (a turned seat at 568 × 320) takes three to a row with
+   its gaps closed up. app.js sets data-cell-grid and each face's --wide-columns and --wide-gap. */
+.board[data-cell-grid="4"] .counter-cells:not(.mana-cells) {
+  --cell: clamp(var(--tap-min), min((var(--ui, 400px) - 42px) / 4, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
+  --cell-gap: clamp(2px, (var(--ui, 400px) - 12px - 4 * var(--cell)) / 3, 10px);
+  column-gap: var(--wide-gap, var(--cell-gap));
+  width: calc(var(--wide-columns, 4) * var(--cell) + (var(--wide-columns, 4) - 1) * var(--wide-gap, var(--cell-gap)));
+}
 .mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); }
 
 /* "Who goes first?": Me first on every tile, facing its player. The shuffle lights tiles in turn; the chosen tile
@@ -1029,6 +1044,66 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .board[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
 .chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
 .chip.flag-chip .icon { width: .95em; height: .95em; }
+/* The monarch and the initiative at rest: the holder's crown or castle, round like the flag. A holder who is out and
+   hasn't handed it on gets "Pass it on" instead, outlined like a Start chip; it's a button that opens counters mode. Its
+   words give way with the identity names (design/polish/SPEC.md §3.2), leaving the icon and the arrow. */
+.chip.designation-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
+.chip.pass-chip { position: relative; gap: .22em; padding: 0 .55em 0 .45em; border: 0; background: var(--button); color: var(--seat); box-shadow: inset 0 0 0 1.5px var(--seat); font-weight: var(--weight-heavy); pointer-events: auto; }
+.chip.pass-chip > .icon[data-icon="arrow-bend-up-right"] { width: .8em; height: .8em; color: var(--text-soft); }
+.pass-chip .pass-word { margin-inline-start: .1em; color: var(--text); }
+.pass-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
+.pass-chip:active { background: var(--cell-pressed); }
+.pass-chip:focus-visible { outline-offset: 2px; }
+.board[data-drop~="name"] .pass-chip .pass-word { display: none; }
+.board[data-drop~="name"] .pass-chip { padding-inline: .38em; }
+/* Turn reminders (Settings → Reminders): "Monarch: draw a card" or "Initiative: venture into Undercity", facing the
+   player, for 3 seconds or until tapped. In the turn chip's language: the tile's button fill and a ring in the seat
+   colour, with the crown or castle in the seat colour. app.js puts them on their own line above the near edge where
+   that's clear of the total and the glyphs, and otherwise over the near edge (data-reminder="over"), whose row and
+   mana strip step aside for those seconds. A reminder too long for its tile drops its label (data-fit="compact"), then wraps. */
+.reminders {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--badge-size);
+  pointer-events: none;
+}
+.reminders:empty { display: none; }
+.chip.reminder-chip {
+  position: relative;
+  gap: .4em;
+  max-width: 100%;
+  height: auto;
+  min-height: 1.9em;
+  padding: .25em .75em .25em .55em;
+  border: 0;
+  background: var(--button);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--seat);
+  font-weight: var(--weight-semibold);
+  line-height: 1.15;
+  text-align: start;
+  white-space: nowrap;
+  pointer-events: auto;
+  animation: reminder-in var(--motion) var(--ease);
+}
+.chip.reminder-chip[data-fit] { overflow: hidden; }
+.reminder-chip[data-fit] .reminder-label { display: none; }
+.chip.reminder-chip[data-fit="wrap"] { white-space: normal; text-align: center; }
+.player[data-reminder="over"] .reminders { bottom: 0; }
+.player[data-reminder="over"] :is(.badges.near, .mana-strip) { visibility: hidden; }
+.reminder-chip > .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--seat); }
+.reminder-chip b { font-weight: var(--weight-heavy); color: var(--seat); }
+.reminder-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: max(100%, var(--tap-min)); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
+.reminder-chip:active { background: var(--cell-pressed); }
+.reminder-chip:focus-visible { outline-offset: 2px; }
+@keyframes reminder-in { from { opacity: 0; transform: translateY(.4em); } }
 /* Floating mana at rest (design/polish/FINAL-REVIEW.md #3): while a pool has mana, a strip shows each colour it holds
    and its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a
    44px-tall target at least 44px wide, on a 32px capsule. The near row always stays. app.js puts each strip in the
@@ -1404,6 +1479,8 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   .fs-content:not([data-columns]) .setting-row:not(.k-row, :has(> .compact-switches)) { grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-2); }
 }
 .fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+/* Reminders: two to a line where each row has room for its whole label, otherwise one. */
+.fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
 .fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: 6px; }
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
@@ -1648,6 +1725,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 /* Motion is 200ms emphasised easing (direction A), and none at all under reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; }
+  .chip.reminder-chip { animation: none; }
 }
 @media (max-height: 420px), (max-width: 420px) {
   .sheet { gap: var(--space-1); padding-block: var(--space-2); }
