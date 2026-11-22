@@ -1,6 +1,7 @@
 package dev.maceiras.lifepod
 
 import android.app.Activity
+import android.content.pm.ApplicationInfo
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -44,6 +45,10 @@ class MainActivity : Activity() {
             WindowInsets.CONSUMED
         }
 
+        // Only debuggable builds, which build.sh makes when it signs with the debug key, open to chrome://inspect.
+        if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            WebView.setWebContentsDebuggingEnabled(true)
+        }
         setContentView(root)
         showTracker()
     }

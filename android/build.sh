@@ -65,8 +65,11 @@ java -cp "$build_tools/lib/d8.jar" com.android.tools.r8.R8 --release --min-api 3
     --output "$work/dex" "$work/classes.jar"
 "$android_dir/check-bridge.sh" "$work/dex/classes.dex"
 
-# APK
-link -o "$work/unsigned.apk"
+# APK. One signed with the committed debug key is debuggable, which turns on WebView inspection in MainActivity.
+# One signed with a release key never is.
+apk_debug=--debug-mode
+[[ -z "${LIFE_POD_KEYSTORE:-}" ]] || apk_debug=
+link ${apk_debug:+"$apk_debug"} -o "$work/unsigned.apk"
 zip -q -j "$work/unsigned.apk" "$work/dex/"classes*.dex
 "$build_tools/zipalign" -f 4 "$work/unsigned.apk" "$work/aligned.apk"
 
@@ -89,7 +92,10 @@ echo "$apk"
 [[ -n "$bundletool" ]] || exit 0
 
 # App Bundle: bundletool expects a module zip with the manifest, dex, resources and assets in fixed folders.
-link --proto-format -o "$work/proto.apk"
+# Like the APK, it is debuggable unless it is signed with the upload key.
+aab_debug=--debug-mode
+[[ -z "${LIFE_POD_UPLOAD_KEYSTORE:-}" ]] || aab_debug=
+link ${aab_debug:+"$aab_debug"} --proto-format -o "$work/proto.apk"
 module="$work/module"
 mkdir -p "$module/manifest" "$module/dex"
 unzip -q "$work/proto.apk" -d "$module"
