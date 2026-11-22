@@ -68,6 +68,9 @@ This replaces "Mana symbols: use our own pips" below and the round 4 pip ring.
 
 - **Colour identity uses the real mana symbols** from Andrew Gioia's Mana font (v1.18.0, SIL OFL 1.1), bundled in `web/fonts/` so the app stays offline. Each pip is the symbol on the colour it's printed with.
 - **The identity button on small tiles shows the card-style colour indicator** (Mana's `ms-ci` glyphs and colours), or an empty ring when no identity is set.
+- **At rest the board shows the colour indicator**, in a round chip in the near row. The mana symbols are for setting identity.
+- **Identity watermark:** with Commander on, a tile whose identity has a Mana symbol shows it faintly behind the life total in place of the rings: the mana symbol for one colour, the Ravnica guild for two, the Khans clan for a wedge, and the colour pie for all five. Shards, four-colour identities and no identity keep the rings.
+- **Poison uses Mana's infect symbol and the dice button its d20.**
 - **The owner's decision, made knowing the risk:** the Fan Content Policy lists the mana symbols among the trademarks that need Wizards' prior written permission. The app is free and carries the policy's required notice in About and the README.
 
 ## Goals

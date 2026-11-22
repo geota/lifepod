@@ -49,6 +49,7 @@
   /* Board */
   --seam-width: 2px;
   --ring-opacity: .08;
+  --watermark-opacity: .07;
 
   /* Tile colours: nine swatches, each a full tile palette. Players 1, 2 and 5 use the lighter top-row version
      and players 3, 4 and 6 the darker bottom-row one, so neighbours stay apart for colour-blind players even
@@ -291,6 +292,42 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   opacity: var(--ring-opacity);
   content: '';
 }
+/* A tile whose colour identity has a symbol shows it faintly, centred behind the life total, like a card's
+   watermark, in place of the rings. */
+.player[data-watermark] .player-face::before {
+  inset: 50% auto auto 50%;
+  width: auto;
+  aspect-ratio: auto;
+  border-radius: 0;
+  background: none;
+  color: var(--seat);
+  font: normal normal normal min(86cqb, 62cqi)/1 Mana;
+  opacity: var(--watermark-opacity);
+  transform: translate(-50%, -50%);
+  content: var(--watermark);
+  speak: never;
+}
+.player[data-watermark="W"] { --watermark: '\e600'; }
+.player[data-watermark="U"] { --watermark: '\e601'; }
+.player[data-watermark="B"] { --watermark: '\e602'; }
+.player[data-watermark="R"] { --watermark: '\e603'; }
+.player[data-watermark="G"] { --watermark: '\e604'; }
+.player[data-watermark="WU"] { --watermark: '\e90c'; } /* Azorius */
+.player[data-watermark="WB"] { --watermark: '\e912'; } /* Orzhov */
+.player[data-watermark="UB"] { --watermark: '\e90e'; } /* Dimir */
+.player[data-watermark="UR"] { --watermark: '\e911'; } /* Izzet */
+.player[data-watermark="BG"] { --watermark: '\e90f'; } /* Golgari */
+.player[data-watermark="BR"] { --watermark: '\e913'; } /* Rakdos */
+.player[data-watermark="WR"] { --watermark: '\e90d'; } /* Boros */
+.player[data-watermark="RG"] { --watermark: '\e910'; } /* Gruul */
+.player[data-watermark="UG"] { --watermark: '\e915'; } /* Simic */
+.player[data-watermark="WG"] { --watermark: '\e914'; } /* Selesnya */
+.player[data-watermark="WBG"] { --watermark: '\e916'; } /* Abzan */
+.player[data-watermark="WUR"] { --watermark: '\e917'; } /* Jeskai */
+.player[data-watermark="UBG"] { --watermark: '\e919'; } /* Sultai */
+.player[data-watermark="WBR"] { --watermark: '\e918'; } /* Mardu */
+.player[data-watermark="URG"] { --watermark: '\e91a'; } /* Temur */
+.player[data-watermark="WUBRG"] { --watermark: '\e9f0'; } /* colour pie */
 .score {
   min-width: 0;
   font-size: clamp(2rem, 19vmin, max(7rem, 112 * var(--grow)));
@@ -596,8 +633,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
 .chip.damage[data-level="out"] { background: var(--panel); }
 /* Colour identity at rest: the colour indicator in a round chip, like the sword. */
-.chip.identity { width: 1.7em; padding: 0; justify-content: center; }
-.chip.identity .ci { font-size: 1.12em; }
+.chip.ci-chip { width: 1.7em; padding: 0; justify-content: center; }
+.chip.ci-chip .ci { font-size: 1.12em; }
 /* Colour identity: each colour's mana symbol on its disc, like a mana cost. --pip-size sets the disc; the symbol
    is 77% of it, as Mana's own cost style draws it. */
 .pip {

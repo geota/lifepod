@@ -197,8 +197,12 @@ async function checkIdentity(t, engine) {
   await turnScreen(page, 852, 393, 90);
   assert.equal(await nearBadges(page, 3), 'colour identity white, green', 'saved, and shown in W U B R G order');
   // At rest the identity is the colour indicator printed on cards, split two ways.
-  assert.deepEqual(await tile(page, 3).locator('.badges.near .chip.identity .ci').evaluate(node => [node.dataset.ci, getComputedStyle(node, '::before').content]),
+  assert.deepEqual(await tile(page, 3).locator('.badges.near .chip.ci-chip .ci').evaluate(node => [node.dataset.ci, getComputedStyle(node, '::before').content]),
     ['WG', '"\ue98b"']);
+  // White-green is Selesnya, so the guild's symbol shows faintly behind the tile in place of the rings.
+  assert.deepEqual(await tile(page, 3).evaluate(player => [player.dataset.watermark, getComputedStyle(player.querySelector('.player-face'), '::before').content]),
+    ['WG', '"\ue914"']);
+  assert.equal(await tile(page, 1).getAttribute('data-watermark'), null, 'no identity keeps the rings');
 
   // Six players on the smallest phone: the tiles are too small for the toggles, so a 44px identity button beside
   // the swatches opens the player sheet, facing that player, with identity only.

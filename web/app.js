@@ -70,6 +70,10 @@ const commanderWarning = 15;
 const poisonLethal = 10;
 const poisonWarning = 7;
 // Colour identity: any combination of the five colours, in W U B R G order. A colourless commander has none.
+// Identities with a symbol in the Mana font: each colour's mana symbol, the ten Ravnica guilds, the five Khans
+// clans and the colour pie. The shards and four-colour identities have none, so their tiles keep the rings.
+const watermarks = new Set(['W', 'U', 'B', 'R', 'G', 'WU', 'WB', 'WR', 'WG', 'UB', 'UR', 'UG', 'BR', 'BG', 'RG',
+  'WBG', 'WUR', 'UBG', 'WBR', 'URG', 'WUBRG']);
 const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
   { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
@@ -854,6 +858,10 @@ function isOut(index) {
 function renderBadges(index) {
   const player = board.children[index];
   if (!player) return;
+  // With Commander on, an identity that has its own symbol shows it faintly behind the tile in place of the rings.
+  const shown = game.counters.commander ? game.identities[index] : '';
+  if (watermarks.has(shown)) player.dataset.watermark = shown;
+  else delete player.dataset.watermark;
   const far = player.querySelector('.badges.far');
   const damage = game.counters.commander ? game.commanderDamage[index]
     .map((amount, attacker) => ({ amount, attacker })).filter(({ amount }) => amount > 0)
@@ -880,7 +888,7 @@ function renderBadges(index) {
     indicator.dataset.ci = identity;
     indicator.dataset.count = identity.length;
     indicator.setAttribute('aria-hidden', 'true');
-    chips.push(element('span', 'chip identity', indicator, visuallyHidden(identityText(identity))));
+    chips.push(element('span', 'chip ci-chip', indicator, visuallyHidden(identityText(identity))));
   }
   if (game.counters.poison && game.poison[index] > 0) {
     const chip = element('span', 'chip', manaIcon('infect'), String(game.poison[index]), visuallyHidden(' poison'));
