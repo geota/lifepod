@@ -111,6 +111,15 @@ async function checkSizes(t, engine) {
         const { page, errors } = await openBoard(browser, size, count, portrait);
         const tiles = await readTiles(page, '.controls button', `${life}, .badges .chip`);
         checkTiles(tiles, view);
+        // No badge hides under the centre controls.
+        const covered = await page.evaluate(() => {
+          const pill = document.querySelector('#board-controls').getBoundingClientRect();
+          return [...document.querySelectorAll('.badges .chip')].filter(chip => chip.offsetWidth).filter(chip => {
+            const box = chip.getBoundingClientRect();
+            return box.left < pill.right && box.right > pill.left && box.top < pill.bottom && box.bottom > pill.top;
+          }).map(chip => chip.textContent);
+        });
+        assert.deepEqual(covered, [], `${view}: no badge under the centre controls`);
         if (Math.min(...size) >= smallestRealPhone) {
           assert.deepEqual(tiles.map(tile => tile.shrunk), Array(count).fill(0), `${view}: badge rows fit without shrinking`);
         }

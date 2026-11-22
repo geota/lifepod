@@ -598,7 +598,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   pointer-events: none;
 }
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
-.badges.far { top: 22px; }
+.badges.far { top: 26px; }
+/* A sideways tile's far edge runs through the middle of the board, where the centre controls sit, so its row
+   starts at the reader's left, clear of them. */
+.player:is([data-edge="left"], [data-edge="right"]) .badges.far { justify-content: flex-start; }
 .badges.near { bottom: calc(8 * var(--grow)); }
 .chip {
   display: inline-flex;
