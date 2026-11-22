@@ -159,6 +159,51 @@ strips['pips-names'] = async () => {
   await compose('pips-names', '1 · Colour names on the shipped mana symbols', 'Names come from the colours automatically (table in RESEARCH §1.7). Identities: Esper, Simic, Mardu, Jund; WUBRG and Golgari at 6 players. The faint watermark behind each total ships in fcf2a89.', rows);
 };
 
+// A reference page drawn inside the app, so the Mana font and the app's pip, indicator and chip styles apply.
+async function appPage(name, build, width = 860) {
+  const page = await open({ width: width + 40, height: 400 }, game(4), { css: glyphCss, js: helpersJs });
+  await page.evaluate(build);
+  await page.addStyleTag({ content: `
+    html, body { height: auto !important; overflow: visible !important; }
+    body { margin: 0; background: #0c0f0d; } #mk-ref { padding: 18px 20px 22px; color: #e8e6da; font: 13px/1.4 system-ui, -apple-system, sans-serif; }
+    h1 { margin: 0 0 4px; font-size: 18px; } p.intro { margin: 0 0 14px; color: #aab3a8; }
+    table { border-collapse: collapse; width: 100%; } td, th { padding: 5px 8px; border-bottom: 1px solid #1f2620; text-align: left; vertical-align: middle; }
+    th { color: #8f998d; font-weight: 600; font-size: 12px; }
+    .pips { display: flex; gap: 3px; font-size: 18px; } .pips .pip { --pip-size: 20px; }
+    .ci { font-size: 22px; } .sym { font: normal normal normal 24px/1 Mana; color: #e8e6da; } .sym::before { content: var(--s); }
+    .none { color: #6f786d; } .group td { padding-top: 12px; color: #def09a; font-weight: 650; border-bottom-color: #2a312b; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }` });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${(await import('./lib.mjs')).outDir}${name}.png`, fullPage: true });
+  console.log('wrote', `${name}.png`);
+  await page.close();
+}
+
+strips['identity-symbols'] = () => appPage('identity-symbols', `
+  const names = ${JSON.stringify(names)};
+  const groups = [['One colour', ['W', 'U', 'B', 'R', 'G']], ['Two colours: guilds', ['WU', 'UB', 'BR', 'RG', 'WG', 'WB', 'UR', 'BG', 'WR', 'UG']],
+    ['Three colours: shards', ['WUG', 'WUB', 'UBR', 'BRG', 'WRG']], ['Three colours: wedges (clans)', ['WBG', 'WUR', 'UBG', 'WBR', 'URG']],
+    ['Four colours', ['UBRG', 'WBRG', 'WURG', 'WUBG', 'WUBR']], ['Five colours', ['WUBRG']]];
+  const mono = { W: 'Mono-white', U: 'Mono-blue', B: 'Mono-black', R: 'Mono-red', G: 'Mono-green' };
+  const probe = document.createElement('div'); probe.className = 'player'; probe.hidden = true; document.body.append(probe);
+  const symOf = id => { probe.dataset.watermark = id; return getComputedStyle(probe).getPropertyValue('--watermark').trim(); };
+  const rowFor = id => {
+    const sym = symOf(id);
+    const pips = id.split('').map(c => '<span class="pip" data-pip="' + c + '"></span>').join('');
+    return '<tr><td><div class="pips">' + pips + '</div></td><td><span class="ci" data-ci="' + id + '" data-count="' + id.length + '"></span></td><td>' +
+      (sym && sym !== 'none' && sym !== '' ? '<span class="sym" style="--s:' + sym.replace(/"/g, '&quot;') + '"></span>' : '<span class="none">— indicator</span>') +
+      '</td><td>' + (names[id] ?? mono[id]) + '</td></tr>';
+  };
+  const half = list => '<table><tr><th>Identity</th><th>Indicator</th><th>Symbol (N4, watermark)</th><th>Name</th></tr>' + list.map(([g, ids]) => '<tr class="group"><td colspan="4">' + g + '</td></tr>' + ids.map(rowFor).join('')).join('') + '</table>';
+  const ref = document.createElement('div'); ref.id = 'mk-ref'; document.querySelector('.app').style.display = 'none'; document.body.append(ref); ref.innerHTML = '<h1>Every colour identity: indicator, symbol and name</h1><p class="intro">31 identities, plus none, which shows nothing. 15 have a guild or clan symbol; of the other 16, the five mono-colour ones use their mana symbol and WUBRG the colour pie, so 21 have a symbol. The 10 left (five shards and five four-colour) have none and keep the colour indicator. Names from RESEARCH §1.7.</p><div class="cols">' + half(groups.slice(0, 3)) + half(groups.slice(3)) + '</div>';`);
+
+strips['experience-glyph'] = () => appPage('experience-glyph', `
+  const cands = [['star-four-fill', 'Four-point star (recommended)'], ['sparkle-fill', 'Sparkle'], ['graduation-cap-fill', 'Graduation cap'], ['medal-fill', 'Medal'], ['trend-up-fill', 'Trend up'], ['book-open-text-fill', 'Open book']];
+  const chips = d => '<span class="chip"><span class="mk-g" data-g="infect"></span>3</span><span class="chip"><span class="mk-g" data-g="energy"></span>5</span>' +
+    '<span class="chip"><svg class="icon" viewBox="0 0 256 256"><path d="' + mk.ph[d] + '"/></svg>2</span><span class="chip"><span class="mk-g" data-g="rad"></span>4</span>';
+  const ref = document.createElement('div'); ref.id = 'mk-ref'; document.querySelector('.app').style.display = 'none'; document.body.append(ref); ref.innerHTML = '<h1>An experience symbol</h1><p class="intro">Mana has symbols for energy (\\\\e907) and rad (\\\\ea50) but not experience. Phosphor fill-weight candidates, shown in a near badge row between poison (Mana infect), energy and rad, on a Violet tile at 2× badge size.</p>' +
+    '<table>' + cands.map(([d, label]) => '<tr><td style="width:200px">' + label + '</td><td><div class="player" data-colour="violet" data-row="bottom" style="position:relative;height:56px;width:420px;border-radius:8px"><div class="badges near" style="position:absolute;inset:auto 0 12px 0;font-size:25px;display:flex">' + chips(d) + '</div></div></td></tr>').join('') + '</table>';`);
+
 // ---- Counters: five player counters ---------------------------------------------------------------------------
 
 // A counters-mode layer built from mkDefs, replacing the app's two rows, in one of three layouts.
@@ -664,22 +709,24 @@ const poolCss = `
     color: var(--text); font-size: clamp(1.0625rem, 6cqi, max(1.625rem, 26 * var(--grow))); font-weight: var(--weight-heavy); font-variant-numeric: tabular-nums; }
   .mk-pool button[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
   .mk-pool button[data-zero] .pip { filter: saturate(.25) brightness(.8); }
-  .mk-pool .pip { --pip-size: 1.15em; }
+  .mk-pool .pip { --pip-size: 1.5em; }
   .mk-empty { min-height: 44px; padding: 0 14px; border: 0; border-radius: var(--radius-full); background: none; color: var(--text-soft); font-size: clamp(.75rem, 3.6cqi, .9375rem); font-weight: var(--weight-semibold); display: inline-flex; align-items: center; gap: 6px; }
   .mk-empty .icon { width: 1.1em; height: 1.1em; }
   .board.mk-pool-on .player-face { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding-top: 20px; }
   .board.mk-pool-on .badges.near { display: none; }
   .mk-strip { z-index: 3; display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; max-width: calc(100cqi - 8px); padding: 2px; border-radius: 14px; background: var(--chip-background); }
-  .mk-strip button { display: grid; grid-auto-flow: column; place-items: center; gap: 3px; min-width: max(44px, 50 * var(--grow)); height: max(44px, 50 * var(--grow)); padding: 0 5px; border: 0; border-radius: 11px; background: none; color: var(--text); font-size: max(15px, 20 * var(--grow)); font-weight: 750; font-variant-numeric: tabular-nums; }
+  .mk-strip button { display: grid; grid-auto-flow: column; place-items: center; gap: 3px; min-width: max(46px, 46 * var(--grow)); height: max(44px, 46 * var(--grow)); padding: 0 4px; border: 0; border-radius: 11px; background: none; color: var(--text); font-size: max(15px, 20 * var(--grow)); font-weight: 750; font-variant-numeric: tabular-nums; }
   .mk-strip button[data-zero] { color: var(--muted); font-weight: 600; }
   .mk-strip button[data-zero] .pip { filter: saturate(.25) brightness(.8); }
-  .mk-strip .pip { --pip-size: max(18px, 26 * var(--grow)); }
+  .mk-strip .pip { --pip-size: max(22px, 26 * var(--grow)); }
   .mk-strip .mk-clear { color: var(--text-soft); } .mk-strip .mk-clear .icon { width: 18px; height: 18px; }
   @container (max-height: 200px) and (max-width: 300px) {
     .board.mk-pool-on .player-face { padding-top: 4px; }
     .board.mk-pool-on .score { font-size: 46px; }
     .board.mk-pool-on .badges.far { display: none; }
-    .mk-strip { width: 192px; }
+    .mk-strip { width: 200px; }
+    .mk-strip button { padding: 0 2px; gap: 2px; }
+    .mk-strip .pip { --pip-size: 20px; }
   }
   .pill-button > .mk-g { position: relative; }
   .mk-pool-button { color: var(--accent); }
