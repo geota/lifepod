@@ -190,7 +190,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 
 | # | Near row (identity and counters) | Far row (commander damage) |
 |---|---|---|
-| 1 | Words: the identity **name**, and "Turn" in the turn chip (leaving the untap symbol and the number) | The **sword** label chip |
+| 1 | Words: the identity **name**, and "Turn" in the turn chip (leaving the untap symbol and "T" with the number, T12) | The **sword** label chip |
 | 2 | The identity **symbol**, when the indicator also shows (one colour mark is enough) | Shrink the type to the 11px floor |
 | 3 | Shrink the type to the 11px floor | Shrink the type to the 9px hard floor |
 | 4 | The **identity chip** entirely (the watermark still shows identity) | Wrap onto a second line |
@@ -363,7 +363,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - on every new game while Turns isn't Off;
   - when Turns changes from Off to on (decided: the game needs a first player).
   - Each tile offers "Me first". The pill holds a shuffle button (a random pick from `crypto.getRandomValues`, highlighting tiles in turn for about 0.8s) and ✕ to skip.
-  - Skipping leaves no first player: no flag, round 1, and in Turn by turn no active tile until someone taps a tile's turn chip.
+  - Skipping leaves no first player: no flag, round 1, and in Turn by turn no active tile until someone taps a tile's **Start** chip (the untap symbol and "Start"; "Turn N" is only ever on the active tile's chip).
 - **Play order is clockwise on screen, which is passing to the left:**
 
   | Players | Order |
@@ -398,7 +398,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode (edit kind `mana`).
 - **At rest:**
   - A tile shows a strip **only while its pool has mana**, and only the colours it holds: for example (R)3 (C)1 [eraser].
-  - The strip takes the near badge row's place, which returns when the pool empties.
+  - **The near badge row always stays** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place). The strip takes the first place that fits clear of the total, the glyphs and the near row: its own line above the near row; the end of the near row's line; folded into one chip (the pool, and a caret › that says it opens mana mode) on its own line; or that chip at the end of the near row. The turn chip never leaves the near row.
   - Strip items are 44px tall:
     - **Tap a symbol to spend 1** of that colour. It saves at once, and the strip shrinks as colours reach 0.
     - **The eraser clears the pool** and leaves "Undo clear" in the strip's place for 5 seconds; a tap restores the pool.

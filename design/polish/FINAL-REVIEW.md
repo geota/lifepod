@@ -2,6 +2,8 @@
 
 **Reviewed:** main at 2331f4d, 22 November 2026, against [SPEC.md](SPEC.md).
 
+**Status:** must-fix 1–4, should-fix 5–13 and nice-to-haves 16, 17, 18 and 20 are fixed. The re-run sweep finds none of them; its checks now look for the near row beside a strip, a cue on a folded strip, and the indicator's rim. The other nice-to-haves are open.
+
 **How:**
 
 - [final-review.mjs](final-review.mjs) opens the shipped `web/index.html` in Chromium and WebKit with seeded games, and drives every mode and dialog through the real controls.
