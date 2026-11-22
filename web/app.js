@@ -786,9 +786,13 @@ function bindCounter(button, adjust, label) {
   button.setAttribute('aria-label', label);
   const tile = button.closest('.player') ?? button;
   let press;
+  // The last pointer that pressed this button. A press that ended when the finger left the tile still owns the click
+  // that follows its pointerup.
+  let pressPointer;
 
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
+    pressPointer = event.pointerId;
     // A new touch ends any earlier press on this button, even if that press never got its pointerup.
     press?.end();
     const current = {
@@ -829,8 +833,8 @@ function bindCounter(button, adjust, label) {
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     button.addEventListener(type, (event) => {
+      if (event.pointerId === pressPointer) ignoreClicksUntil = performance.now() + 800;
       if (event.pointerId !== press?.pointerId) return;
-      ignoreClicksUntil = performance.now() + 800;
       press.end();
     });
   }
@@ -909,11 +913,21 @@ function visuallyHidden(text) {
 
 // For buttons that act once per press: a press counts the moment a finger lands, as on the life buttons.
 function bindTap(button, action) {
+  let pointerId;
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || button.disabled) return;
+    pointerId = event.pointerId;
     ignoreClicksUntil = performance.now() + 800;
     action();
   });
+  // However long the press, the click that follows it is skipped.
+  for (const type of ['pointerup', 'pointercancel']) {
+    button.addEventListener(type, (event) => {
+      if (event.pointerId !== pointerId) return;
+      pointerId = undefined;
+      ignoreClicksUntil = performance.now() + 800;
+    });
+  }
   button.addEventListener('contextmenu', (event) => event.preventDefault());
   button.addEventListener('click', (event) => {
     if (event.detail === 0 || performance.now() >= ignoreClicksUntil) action();
@@ -981,11 +995,13 @@ function toFace(angle, rows, columns, row, column) {
 // as the life buttons. Whether a press is a tap is only known when it ends, so a tap counts then, however
 // the press ends, and a hold never adds.
 function bindSeat(button, add, remove) {
-  const tile = button.closest('.player');
   let press;
+  // As in bindCounter: a press that ended when the finger left the tile still owns the click after its pointerup.
+  let pressPointer;
 
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
+    pressPointer = event.pointerId;
     press?.finish();
     const current = {
       pointerId: event.pointerId,
@@ -1019,9 +1035,11 @@ function bindSeat(button, add, remove) {
       // The pointer is already gone. The next touch ends this press.
     }
   });
+  // A hold stops when the finger leaves the player's tile. Cells are bound before they join their tile, so the tile
+  // is looked up here.
   button.addEventListener('pointermove', (event) => {
     if (event.pointerId !== press?.pointerId) return;
-    const bounds = tile.getBoundingClientRect();
+    const bounds = (button.closest('.player') ?? button).getBoundingClientRect();
     if (event.clientX < bounds.left || event.clientX > bounds.right ||
         event.clientY < bounds.top || event.clientY > bounds.bottom) {
       press.finish();
@@ -1029,8 +1047,8 @@ function bindSeat(button, add, remove) {
   });
   for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     button.addEventListener(type, (event) => {
+      if (event.pointerId === pressPointer) ignoreClicksUntil = performance.now() + 800;
       if (event.pointerId !== press?.pointerId) return;
-      ignoreClicksUntil = performance.now() + 800;
       press.finish();
     });
   }
@@ -1058,7 +1076,7 @@ function bindStep(button, forward, back) {
         delete button.dataset.pressed;
       },
       finish() {
-        const tap = press === current && !current.held;
+        const tap = press === current && !current.held && button.isConnected;
         current.end();
         if (tap) forward();
       },
@@ -1068,6 +1086,12 @@ function bindStep(button, forward, back) {
     button.dataset.pressed = '';
     ignoreClicksUntil = performance.now() + 800;
     current.timer = setTimeout(() => {
+      // A turn chip is rebuilt when someone else steps the turn, and then its pointerup never arrives. Its press
+      // is over: stepping back now would undo their step.
+      if (!button.isConnected) {
+        current.end();
+        return;
+      }
       current.held = true;
       delete button.dataset.pressed;
       back();
@@ -1505,10 +1529,13 @@ function autoEmptyPools() {
 
 // Shows a turn step on every tile and the pill, saves it at once and announces it.
 function showTurn() {
+  const turnFocus = document.activeElement?.matches('.turn-chip');
   saveGame();
   haptic();
   game.scores.forEach((_, index) => renderBadges(index));
   syncPill();
+  // A turn chip passed from the keyboard is gone, so focus moves to the chip that now has the turn.
+  if (turnFocus && !document.activeElement?.matches('.turn-chip')) board.querySelector('.active-chip, .turn-chip')?.focus();
   const { active, round } = game.turn;
   announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `Player ${active + 1}'s turn, round ${round}` : `Round ${round}`));
 }
@@ -1904,7 +1931,10 @@ function renderBadges(index) {
   // The strip folded onto the near row, shown only when it can go nowhere else.
   if (foldedChip) chips.push(foldedChip);
   for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
+  // Keep keyboard focus on a turn chip as the row is rebuilt. When the turn moves to another tile, showTurn follows it.
+  const turnFocus = near.contains(document.activeElement) && document.activeElement.matches('.turn-chip');
   near.replaceChildren(...chips);
+  if (turnFocus) near.querySelector('.turn-chip')?.focus();
   near.hidden = chips.length === 0;
   requestFit();
 }
@@ -1976,6 +2006,9 @@ function setBoardMode(mode) {
     : mode ? board.querySelector('.mode-layer button') : setupButton;
   focusTarget?.focus();
   syncBackHandling();
+  // A mode opened from setup, such as Rotate seats, was still open when setup's close event looked, so the question
+  // waits for the mode to end.
+  if (mode === null) maybeAskFirst();
 }
 
 // ✕ in an editing mode: with no changes it just closes; otherwise it asks first, and Keep editing is the default.

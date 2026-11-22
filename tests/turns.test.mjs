@@ -407,3 +407,86 @@ async function checkBackFocus(t, engine) {
 
 test('chromium: back one turn shows while it has keyboard focus', t => checkBackFocus(t, chromium));
 test('webkit: back one turn shows while it has keyboard focus', t => checkBackFocus(t, webkit));
+
+// A press on a turn chip that someone else's pass removes is over: its hold timer must not step back and undo that
+// pass (docs/review/ARCHITECTURE.md B2). The press and the pass are dispatched together, so no timing is involved
+// until the hold delay has passed.
+async function checkOrphanedChipPress(t, engine) {
+  const page = await openPage(t, engine, { game: savedGame(4, { turns: 'turns', turn: { first: 0, active: 0, round: 1 } }) });
+  assert.equal(await active(page), 1);
+  await page.evaluate(() => {
+    document.querySelector('.player:nth-child(1) .turn-chip').dispatchEvent(new PointerEvent('pointerdown', { button: 0, pointerId: 9, isPrimary: true, bubbles: true }));
+    // Another player passes the turn from the pill before P1 lifts their finger.
+    document.querySelector('#round-button').click();
+  });
+  assert.equal(await active(page), 2, 'the pill passed the turn to P2');
+  await page.waitForTimeout(900);
+  assert.equal(await active(page), 2, 'P1’s removed chip doesn’t step back once its hold delay passes');
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: 1, round: 1 });
+  // The next pass and step back still work, so the orphaned press left nothing behind.
+  await page.locator('#round-button').tap();
+  assert.equal(await active(page), 4);
+  await hold(page, page.locator('.turn-chip.active-chip'));
+  assert.equal(await active(page), 2, 'a hold still steps back one turn');
+}
+
+// Rotate seats, Colours and Choose identities close setup and open a board mode at once, so "Who goes first?" waits
+// for that mode to end, then opens (docs/review/ARCHITECTURE.md B3).
+async function checkAskFirstAfterMode(t, engine) {
+  const page = await openPage(t, engine);
+  for (const [entry, done] of [['Rotate seats', 'Done rotating seats'], ['Colours', 'Done choosing colours']]) {
+    await button(page, 'Game setup').tap();
+    await button(page, 'Track').tap();
+    await page.locator('#turn-choices').getByRole('button', { name: 'Rounds', exact: true }).tap();
+    await button(page, 'Back to setup').tap();
+    await eventually(() => page.evaluate(() => document.querySelector('#setup').open), true);
+    await button(page, entry).tap();
+    await eventually(() => page.evaluate(() => document.querySelectorAll('dialog[open]').length), 0, `${entry} closes setup`);
+    assert.notEqual(await mode(page), 'first', `not while ${entry} is open`);
+    await button(page, done).tap();
+    await eventually(() => mode(page), 'first', `"Who goes first?" opens once ${entry} is done`);
+    await button(page, 'Skip').tap();
+    assert.equal(await mode(page), null);
+    // Off, so the next round asks again.
+    await setTurns(page, 'Off');
+  }
+}
+
+// Passing the turn from the keyboard keeps focus on the turn: on the chip that now has it, or on the flag in Rounds
+// (docs/review/ARCHITECTURE.md B5).
+async function checkChipFocus(t, engine) {
+  const page = await openPage(t, engine, { game: savedGame(4, { turns: 'turns', turn: { first: 0, active: 0, round: 1 } }) });
+  const focused = () => page.evaluate(() => {
+    const node = document.activeElement;
+    const player = node.closest('.player');
+    return player ? `P${[...player.parentElement.children].indexOf(player) + 1} ${node.className}` : node.tagName;
+  });
+  await page.locator('.turn-chip.active-chip').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await active(page), 2);
+  assert.equal(await focused(), 'P2 chip turn-chip active-chip', 'focus follows the turn to P2’s chip');
+  await page.keyboard.press('Enter');
+  assert.equal(await active(page), 4);
+  assert.equal(await focused(), 'P4 chip turn-chip active-chip');
+
+  // With nobody's turn yet, a Start chip passes focus to the turn it starts.
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ ...JSON.parse(localStorage.getItem('lifepod-game')), turn: { first: null, active: null, round: 1 } })));
+  await page.reload();
+  await tile(page, 3).locator('.start-chip').focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await active(page), 3);
+  assert.equal(await focused(), 'P3 chip turn-chip active-chip', 'focus moves to the turn the Start chip started');
+
+  // Rounds: the flag is rebuilt with the next round and keeps focus.
+  await setTurns(page, 'Rounds');
+  await page.locator('.turn-chip.round-chip').focus();
+  await page.keyboard.press('Enter');
+  assert.equal((await saved(page)).turn.round, 2);
+  assert.equal(await focused(), 'P3 chip turn-chip round-chip', 'the flag keeps focus');
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: a chip press removed by another player's pass doesn't step back`, { timeout: 60000 }, t => checkOrphanedChipPress(t, engine));
+  test(`${name}: who goes first waits for Rotate seats or Colours to end, then opens`, { timeout: 60000 }, t => checkAskFirstAfterMode(t, engine));
+  test(`${name}: passing the turn from the keyboard keeps focus on the turn`, { timeout: 60000 }, t => checkChipFocus(t, engine));
+}

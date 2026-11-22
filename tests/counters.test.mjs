@@ -248,3 +248,34 @@ async function checkOut(t, engine) {
 
 test('chromium: a player who is out says so under the total and in its label', t => checkOut(t, chromium));
 test('webkit: a player who is out says so under the total and in its label', t => checkOut(t, webkit));
+
+// A life hold stops when the finger leaves the tile, and lifting the finger there adds nothing: the click that
+// follows a press is skipped however the press ended.
+async function checkHoldLeavesTile(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
+  await page.goto(app);
+  const life = async () => (await scores(page))[3];
+  const box = await button(page, 'Add one life to Player 4').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  const deadline = Date.now() + 5000;
+  while ((await life()) < 42 && Date.now() < deadline) await page.waitForTimeout(20);
+  assert.ok((await life()) >= 42, 'the hold repeats');
+  const elsewhere = await page.locator('.player:nth-child(1)').boundingBox();
+  await page.mouse.move(elsewhere.x + elsewhere.width / 2, elsewhere.y + elsewhere.height / 2);
+  const left = await life();
+  // Long enough after the press began that the shared 800ms window has run out.
+  await page.waitForTimeout(900);
+  assert.equal(await life(), left, 'the hold stops once the finger leaves the tile');
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  assert.equal(await life(), left, 'lifting off the tile adds nothing');
+}
+
+test('chromium: a life hold stops when the finger leaves the tile and adds nothing on release', t => checkHoldLeavesTile(t, chromium));
+test('webkit: a life hold stops when the finger leaves the tile and adds nothing on release', t => checkHoldLeavesTile(t, webkit));

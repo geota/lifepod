@@ -480,3 +480,48 @@ async function checkExplains(t, engine) {
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: identity toggles and the Identity sheet say what's on`, { timeout: 60000 }, t => checkExplains(t, engine));
 }
+
+// A colour toggle counts once per press, however long the press: the click after a long press is skipped
+// (docs/review/ARCHITECTURE.md B4). A mouse in both engines, and a real touch through CDP in Chromium.
+async function checkLongPressToggle(t, engine) {
+  const page = await openPage(t, engine);
+  await page.goto(app);
+  await button(page, 'Game setup').tap();
+  await button(page, 'Identity').tap();
+  await button(page, 'Choose identities').tap();
+  await eventually(() => mode(page), 'identity');
+  const toggle = colour => page.getByRole('group', { name: 'Colour identity for Player 3' }).getByRole('button', { name: colour, exact: true });
+  const identities = async () => (await saved(page)).identities;
+  const centre = async (colour) => {
+    const box = await toggle(colour).boundingBox();
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+
+  const white = await centre('White');
+  await page.mouse.move(white.x, white.y);
+  await page.mouse.down();
+  await page.waitForTimeout(1000);
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  assert.equal((await identities())[2], 'W', 'a 1s mouse press turns White on, once');
+
+  if (engine === chromium) {
+    const cdp = await page.context().newCDPSession(page);
+    const blue = await centre('Blue');
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, ...blue }] });
+    await page.waitForTimeout(1000);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForTimeout(100);
+    assert.equal((await identities())[2], 'WU', 'a 1s touch turns Blue on, once');
+  }
+  // A short tap still toggles, and the keyboard still works.
+  await toggle('White').tap();
+  assert.equal((await identities())[2].includes('W'), false, 'a tap turns White off');
+  await toggle('White').focus();
+  await page.keyboard.press('Enter');
+  assert.equal((await identities())[2].includes('W'), true, 'Enter turns White on');
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: a long press on a colour toggle counts once`, { timeout: 60000 }, t => checkLongPressToggle(t, engine));
+}

@@ -146,6 +146,40 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: counters mode edits poison and tax with undo, save and discard`, { timeout: 60000 }, t => checkCountersMode(t, engine));
 }
 
+// A hold on a cell stops when the finger leaves the player's tile, and a finger that moves never throws
+// (docs/review/ARCHITECTURE.md B1: cells are bound before they join their tile).
+async function checkHoldLeavesTile(t, engine) {
+  const page = await openPage(t, engine);
+  await page.goto(app);
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
+    startingLife: 40, scores: [40, 40, 40, 40], counters: { poison: true }, poison: [0, 0, 0, 30],
+  })));
+  await page.reload();
+  await button(page, 'Counters').tap();
+  const box = await cell(page, 4, 'poison').boundingBox();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  // A finger jitters while it holds. Within the tile, the hold goes on.
+  await page.mouse.move(x + 2, y + 1);
+  await eventually(async () => Number(await count(page, 4, 'poison')) < 30, true, 'the hold registers');
+  // Off the tile, onto another player's, the hold stops at once.
+  const elsewhere = await tile(page, 1).boundingBox();
+  await page.mouse.move(elsewhere.x + elsewhere.width / 2, elsewhere.y + elsewhere.height / 2);
+  const left = Number(await count(page, 4, 'poison'));
+  await page.waitForTimeout(600);
+  assert.equal(Number(await count(page, 4, 'poison')), left, 'nothing more is taken away once the finger leaves the tile');
+  await page.mouse.up();
+  await page.waitForTimeout(100);
+  assert.equal(Number(await count(page, 4, 'poison')), left, 'lifting off the tile adds nothing');
+  assert.ok(!(await cell(page, 4, 'poison').evaluate(node => node.hasAttribute('data-pressed'))), 'the cell no longer looks pressed');
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: a hold on a cell stops when the finger leaves the tile`, { timeout: 60000 }, t => checkHoldLeavesTile(t, engine));
+}
+
 const kinds = (page, number) => tile(page, number).locator('.counter-cell').evaluateAll(cells => cells.map(node => node.dataset.kind));
 const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')));
 const everyTracker = { Commander: true, Poison: true, Energy: true, Experience: true, Rad: true };
