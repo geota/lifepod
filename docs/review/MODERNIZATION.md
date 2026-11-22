@@ -27,6 +27,7 @@ The short answer is that the architecture is already right. The best gains are i
 ### Do later
 
 - **Raise the iOS minimum to 18** when the iOS 16 share is negligible. Going to 18 drops the same iPhones as going to 17 (8, 8 Plus and X). It unlocks View Transitions, Popover, `@scope`, `@starting-style`, style queries, relaxed CSS nesting, `Object.groupBy` and Set methods ([§4](#4-modern-platform-features)).
+  - *Done after this review: iOS 18.0 is the floor, and the Android WebView floor moved from Chrome 111 to Chrome 129, its September 2024 counterpart, so everything listed here is usable on both (AGENTS.md). `MainActivity.kt` asks players with an older WebView to update it from Google Play.*
 - **Split `app.js` into several classic `defer` scripts, the way `dice.js` already works, if it keeps growing.** Use esbuild only if real `import`s become worth a build step. Its output would be one IIFE, so `file://`, the CSP and the Android map stay as they are ([§3](#3-build-tooling)).
 - **Decide whether tile content should avoid camera cutouts.** Android WebView now forwards cutout insets to `env(safe-area-inset-*)`, but `MainActivity` consumes the insets before the WebView sees them ([§4](#4-modern-platform-features)).
 - **Move the Swift file to Swift 6 language mode.** It is small and already `@MainActor`.

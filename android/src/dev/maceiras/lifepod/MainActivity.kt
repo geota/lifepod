@@ -1,10 +1,15 @@
 package dev.maceiras.lifepod
 
 import android.app.Activity
+import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.graphics.Color
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.TypedValue
+import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.WindowInsets
 import android.view.WindowInsetsController
@@ -15,7 +20,10 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import java.io.ByteArrayInputStream
@@ -24,6 +32,9 @@ import java.io.IOException
 class MainActivity : Activity() {
     private lateinit var root: FrameLayout
     private lateinit var webView: WebView
+
+    // Shown instead of the tracker while the system WebView is older than the page supports.
+    private var updateNotice: LinearLayout? = null
 
     // Registered only while the page has a dialog or seat rotation to close, so the system handles back otherwise.
     private var backCallback: Any? = null
@@ -50,6 +61,76 @@ class MainActivity : Activity() {
             WebView.setWebContentsDebuggingEnabled(true)
         }
         setContentView(root)
+        if (webViewIsCurrent()) showTracker() else showUpdateNotice()
+    }
+
+    // The page targets Chrome 129 and later (browserslist in package.json). The Android System WebView
+    // updates through Google Play, so a phone that has skipped updates is asked to update it instead of drawing a
+    // broken board. An unknown version loads the tracker as normal.
+    private fun installedWebViewMajor(): Int? =
+        WebView
+            .getCurrentWebViewPackage()
+            ?.versionName
+            ?.substringBefore('.')
+            ?.toIntOrNull()
+
+    private fun webViewIsCurrent(): Boolean = (installedWebViewMajor() ?: MIN_WEBVIEW_MAJOR) >= MIN_WEBVIEW_MAJOR
+
+    // English only, like the page, and build.sh compiles no R class, so the text is written here.
+    @Suppress("SetTextI18n")
+    private fun showUpdateNotice() {
+        val density = resources.displayMetrics.density
+        val gap = (24 * density).toInt()
+        val message =
+            TextView(this).apply {
+                text =
+                    "LifePod needs a newer Android System WebView, version $MIN_WEBVIEW_MAJOR or later. " +
+                    "Update Android System WebView (or Chrome) from Google Play, then come back to LifePod."
+                setTextColor(Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                gravity = Gravity.CENTER
+            }
+        val openPlay =
+            Button(this).apply {
+                text = "Open Google Play"
+                setOnClickListener { openWebViewInPlay() }
+            }
+        val notice =
+            LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(gap, gap, gap, gap)
+                addView(message)
+                val wrapContent = LinearLayout.LayoutParams.WRAP_CONTENT
+                addView(openPlay, LinearLayout.LayoutParams(wrapContent, wrapContent).apply { topMargin = gap })
+            }
+        val matchParent = FrameLayout.LayoutParams.MATCH_PARENT
+        root.addView(notice, FrameLayout.LayoutParams(matchParent, matchParent))
+        updateNotice = notice
+    }
+
+    // Opens the WebView provider's page in the Play Store app, or in a browser where there is no Play Store. The app
+    // itself makes no network request.
+    private fun openWebViewInPlay() {
+        val provider = WebView.getCurrentWebViewPackage()?.packageName ?: WEBVIEW_PACKAGE
+        val pages = listOf("market://details?id=$provider", "https://play.google.com/store/apps/details?id=$provider")
+        for (page in pages) {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(page)))
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Try the next way to open it.
+            }
+        }
+    }
+
+    // Back from Google Play with the WebView updated: swap the notice for the tracker.
+    override fun onResume() {
+        super.onResume()
+        val notice = updateNotice ?: return
+        if (!webViewIsCurrent()) return
+        root.removeView(notice)
+        updateNotice = null
         showTracker()
     }
 
@@ -97,6 +178,7 @@ class MainActivity : Activity() {
     // Android 12L and earlier deliver back presses here instead of to an OnBackInvokedCallback.
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION", "GestureBackNavigation")
     override fun onBackPressed() {
+        if (!::webView.isInitialized) return super.onBackPressed()
         webView.evaluateJavascript(CLOSE_DIALOG) { handled ->
             if (handled != "true") super.onBackPressed()
         }
@@ -116,8 +198,10 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        (webView.parent as? FrameLayout)?.removeView(webView)
-        webView.destroy()
+        if (::webView.isInitialized) {
+            (webView.parent as? FrameLayout)?.removeView(webView)
+            webView.destroy()
+        }
         super.onDestroy()
     }
 
@@ -198,6 +282,11 @@ class MainActivity : Activity() {
         const val START_URL = "https://$ASSET_HOST/index.html"
         const val GAME_KEY = "currentGame"
         const val CLOSE_DIALOG = "window.closeOpenDialog?.()"
+
+        // The oldest WebView the page supports: Chrome 129, from the same month as Safari 18 (September 2024). Keep it
+        // in step with the Chrome entry of browserslist in package.json.
+        const val MIN_WEBVIEW_MAJOR = 129
+        const val WEBVIEW_PACKAGE = "com.google.android.webview"
         val MIME_TYPES =
             mapOf(
                 "/index.html" to "text/html",

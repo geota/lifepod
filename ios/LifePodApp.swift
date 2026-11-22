@@ -42,9 +42,7 @@ private struct TrackerView: UIViewRepresentable {
         view.scrollView.bounces = false
         #if DEBUG
             // Lets Safari's Web Inspector attach to Debug builds. Release builds stay closed to it.
-            if #available(iOS 16.4, *) {
-                view.isInspectable = true
-            }
+            view.isInspectable = true
         #endif
         context.coordinator.setActive(isActive)
         context.coordinator.loadTracker(in: view)

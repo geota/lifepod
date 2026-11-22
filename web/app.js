@@ -276,17 +276,8 @@ function normalizeAngle(angle) {
 
 // The angle the OS has turned the screen clockwise from the device's natural orientation.
 function readScreen() {
-  // eslint-disable-next-line compat/compat -- Safari 16.4+; the check below falls back to window.orientation.
-  const orientation = window.screen.orientation;
-  if (orientation && Number.isFinite(orientation.angle) && typeof orientation.type === 'string') {
-    return { angle: normalizeAngle(orientation.angle), landscape: orientation.type.startsWith('landscape') };
-  }
-  if (Number.isFinite(window.orientation)) {
-    const angle = normalizeAngle(window.orientation);
-    return { angle, landscape: angle % 180 !== 0 };
-  }
-  // Without an orientation API, treat the window's shape as the screen's.
-  return isPortraitWindow() ? { angle: 0, landscape: false } : { angle: 90, landscape: true };
+  const { angle, type } = window.screen.orientation;
+  return { angle: normalizeAngle(angle), landscape: type.startsWith('landscape') };
 }
 
 // The screen angle that shows the board upright in landscape, so the seats can stay fixed to the device.
@@ -962,10 +953,10 @@ async function syncWakeLock() {
     if (lock) await lock.release();
     return;
   }
-  if (lock || requestingLock || !navigator.wakeLock) return;
+  if (lock || requestingLock) return;
   try {
     requestingLock = true;
-    // eslint-disable-next-line compat/compat -- Safari 16.4+; checked just above, and a refusal is caught.
+    // Outside a secure context there is no navigator.wakeLock; that throws here and is caught like a refusal.
     const acquired = await navigator.wakeLock.request('screen');
     if (game.keepAwake && !document.hidden) {
       lock = acquired;
@@ -3286,9 +3277,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();
   else if (!android && !ios) syncWakeLock();
 });
-// eslint-disable-next-line compat/compat -- Safari 16.4+, so optional; orientationchange and resize cover iOS 16.0.
-window.screen.orientation?.addEventListener?.('change', syncBoardTurn);
-window.addEventListener('orientationchange', syncBoardTurn);
+window.screen.orientation.addEventListener('change', syncBoardTurn);
 window.addEventListener('resize', syncBoardTurn);
 portraitQuery.addEventListener('change', syncBoardTurn);
 // The board's size can also change without a resize event, such as when a browser's toolbar slides away.

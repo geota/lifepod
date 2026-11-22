@@ -27,8 +27,8 @@
     "typescript": "7.0.2"
   },
   "browserslist": [
-    "iOS >= 16",
+    "iOS >= 18",
     "Android >= 11",
-    "Chrome >= 111"
+    "Chrome >= 129"
   ]
 }

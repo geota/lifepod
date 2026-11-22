@@ -30,7 +30,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run lint:web
-      # Checks web/ against the iOS 16 and Android WebView floor in package.json's browserslist. Every finding is an
+      # Checks web/ against the iOS 18 and Android WebView 129 floor in package.json's browserslist. Every finding is an
       # error; a feature-detected line or a partial-support note that doesn't apply says why in a disable comment.
       - run: npm run lint:compat
       # Type-checks web/'s JavaScript through its JSDoc (tsconfig.json); nothing is emitted.
