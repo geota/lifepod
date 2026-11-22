@@ -101,6 +101,9 @@ export function stripProblems(page) {
 // from them, so the mocks can't drift from the wrappers.
 export const androidMethods = ['readGame', 'writeGame', 'keepAwake', 'haptic', 'setBackHandling'];
 export const iosMessages = ['game', 'keepAwake', 'haptic'];
+// What LifePodApp.swift puts on window before the page loads (user scripts), and the page functions it calls later.
+export const iosGlobals = ['initialGame', 'initialReduceTransparency'];
+export const iosCalls = ['setReduceTransparency'];
 
 // A stand-in for the Android bridge that records every call in window.bridgeCalls as [method, ...arguments]. The game
 // is kept in session storage, as SharedPreferences keeps it, so it survives a reload.
@@ -120,10 +123,12 @@ export async function mockAndroid(page) {
 
 // A stand-in for the iOS app's window.webkit.messageHandlers that records every message in window.bridgeCalls as
 // [name, body]. Like LifePodApp.swift, it keeps the last game message and injects it as window.initialGame before
-// the page loads.
-export async function mockIos(page) {
-  await page.addInitScript((messages) => {
+// the page loads, and injects Reduce Transparency as window.initialReduceTransparency (reduceTransparency, off unless
+// given). A test changes the setting as the app does, by calling window.setReduceTransparency.
+export async function mockIos(page, { reduceTransparency = false } = {}) {
+  await page.addInitScript(([messages, reduce]) => {
     window.bridgeCalls = [];
+    window.initialReduceTransparency = reduce;
     const saved = sessionStorage.getItem('ios-game');
     if (saved !== null) window.initialGame = saved;
     const messageHandlers = Object.fromEntries(messages.map(name => [name, {
@@ -133,7 +138,7 @@ export async function mockIos(page) {
       },
     }]));
     Object.defineProperty(window, 'webkit', { configurable: true, value: { messageHandlers } });
-  }, iosMessages);
+  }, [iosMessages, reduceTransparency]);
 }
 
 // A stand-in for the Screen Wake Lock API that records 'request screen' and 'release' in window.wakeLockCalls, or

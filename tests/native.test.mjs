@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { androidMethods, app, button, iosMessages, mockAndroid, mockIos, mockWakeLock, scores } from './helpers.mjs';
+import { androidMethods, app, button, iosCalls, iosGlobals, iosMessages, mockAndroid, mockIos, mockWakeLock, scores } from './helpers.mjs';
 
 // The contract between the page and the native wrappers (docs/review/TESTING.md, recommendation 1): what the Android
 // app serves and CI bundles, the bridge names on both sides, and what the page sends over each bridge. The source
@@ -69,6 +69,13 @@ test('chromium: the bridge names match the Android and iOS wrappers', () => {
   assert.deepEqual(matches(appJs, /\bios\??\.(\w+)/g), sorted(iosMessages), 'the page posts exactly those messages');
   assert.match(swift, /source: "window\.initialGame = \\\(literal\);"/, 'LifePodApp injects the saved game as window.initialGame');
   assert.match(appJs, /ios \? window\.initialGame :/, 'the page loads window.initialGame on iOS');
+  // Reduce Transparency: injected before the page loads, and passed on whenever it changes.
+  assert.deepEqual(matches(swift, /source: "window\.(\w+) = /g), sorted(iosGlobals), 'LifePodApp injects exactly the mocked globals');
+  for (const name of iosGlobals) assert.match(appJs, new RegExp(`window\\.${name}\\b`), `the page reads window.${name}`);
+  assert.match(swift, /source: "window\.initialReduceTransparency = \\\(UIAccessibility\.isReduceTransparencyEnabled\);"/);
+  assert.match(swift, /name: UIAccessibility\.reduceTransparencyStatusDidChangeNotification/, 'LifePodApp listens for Reduce Transparency changes');
+  assert.deepEqual(matches(swift, /evaluateJavaScript\("window\.(\w+)\?\./g), sorted(iosCalls), 'LifePodApp calls exactly the mocked page functions');
+  for (const name of iosCalls) assert.match(appJs, new RegExp(`window\\.${name} = `), `the page defines window.${name}`);
 
   // Both wrappers keep the game under the same key, so a save survives updates on either platform.
   assert.match(kotlin, /const val GAME_KEY = "currentGame"/);
@@ -173,6 +180,30 @@ test('webkit: the iOS bridge saves and loads, keeps the screen awake and ticks',
   assert.deepEqual((await calls(page, 'keepAwake')).at(-1), [false], 'the switch turns keep awake off');
   await page.reload();
   assert.deepEqual(await calls(page, 'keepAwake'), [[false]], 'and it stays off on the next launch');
+});
+
+// Reduce Transparency on iOS: LifePodApp.swift injects it before the page loads and runs its own script when it changes.
+// The app starts on Glass on iOS, whose pill, settings header and dialogs go solid while it's on.
+const reduceScript = enabled => swift.match(/evaluateJavaScript\("(window\.setReduceTransparency.+?)", completionHandler/)[1].replace('\\(enabled)', String(enabled));
+const glassChrome = page => page.evaluate(() => {
+  const pill = getComputedStyle(document.querySelector('#board-controls'), '::before');
+  return {
+    style: document.documentElement.dataset.style,
+    reduce: document.documentElement.hasAttribute('data-reduce-transparency'),
+    filter: pill.webkitBackdropFilter ?? pill.backdropFilter,
+    opaque: pill.backgroundColor.startsWith('rgb('),
+  };
+});
+
+test('webkit: the iOS bridge passes Reduce Transparency to Glass, at load and when it changes', async (t) => {
+  const page = await openPage(t, webkit, p => mockIos(p, { reduceTransparency: true }));
+  assert.deepEqual(await glassChrome(page), { style: 'glass', reduce: true, filter: 'none', opaque: true }, 'on at load: solid');
+  await page.evaluate(reduceScript(false));
+  assert.deepEqual(await glassChrome(page), { style: 'glass', reduce: false, filter: 'blur(18px) saturate(1.3)', opaque: false }, 'turned off: glass');
+  await page.evaluate(reduceScript(true));
+  assert.deepEqual(await glassChrome(page), { style: 'glass', reduce: true, filter: 'none', opaque: true }, 'turned on again: solid');
+  await page.reload();
+  assert.equal((await glassChrome(page)).reduce, true, 'a reload takes the injected value');
 });
 
 // In a browser, the Screen Wake Lock API keeps the screen on while the switch is on and the page is showing. The

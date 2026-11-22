@@ -69,6 +69,24 @@ private struct TrackerView: UIViewRepresentable {
         private var isActive = false
         private var keepAwake = true
         private let haptics = UISelectionFeedbackGenerator()
+        private weak var webView: WKWebView?
+
+        override init() {
+            super.init()
+            // iOS WebKit has no prefers-reduced-transparency, so the page hears Reduce Transparency from here: at load
+            // (loadTracker) and whenever it changes. The Glass style draws solid surfaces while it's on.
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(reduceTransparencyChanged),
+                name: UIAccessibility.reduceTransparencyStatusDidChangeNotification,
+                object: nil
+            )
+        }
+
+        @objc private func reduceTransparencyChanged() {
+            let enabled = UIAccessibility.isReduceTransparencyEnabled
+            webView?.evaluateJavaScript("window.setReduceTransparency?.(\(enabled));", completionHandler: nil)
+        }
 
         func setActive(_ active: Bool) {
             isActive = active
@@ -108,8 +126,15 @@ private struct TrackerView: UIViewRepresentable {
 
         func loadTracker(in webView: WKWebView) {
             guard let file = startPage else { return }
+            self.webView = webView
             let controller = webView.configuration.userContentController
             controller.removeAllUserScripts()
+            controller.addUserScript(
+                WKUserScript(
+                    source: "window.initialReduceTransparency = \(UIAccessibility.isReduceTransparencyEnabled);",
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: true
+                ))
             if let saved = UserDefaults.standard.string(forKey: gameKey),
                 let data = try? JSONEncoder().encode(saved),
                 let literal = String(data: data, encoding: .utf8)
