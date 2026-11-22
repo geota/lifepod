@@ -23,8 +23,6 @@ const saveButton = document.querySelector('#save-button');
 const cancelButton = document.querySelector('#cancel-button');
 const commanderSwitch = document.querySelector('#commander-switch');
 const poisonSwitch = document.querySelector('#poison-switch');
-const playerSheet = document.querySelector('#player-sheet');
-const sheetIdentity = document.querySelector('#sheet-identity');
 const discardDialog = document.querySelector('#discard');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
@@ -36,6 +34,11 @@ const lifeValue = document.querySelector('#life-value');
 const trackButton = document.querySelector('#track-button');
 const trackSummary = document.querySelector('#track-summary');
 const trackDialog = document.querySelector('#track');
+const identityNav = document.querySelector('#identity-nav');
+const identityDialog = document.querySelector('#identity-sheet');
+const identityShowChoices = document.querySelector('#identity-show');
+const identityBackgroundChoices = document.querySelector('#identity-background');
+const chooseIdentitiesButton = document.querySelector('#choose-identities');
 const restart = document.querySelector('#restart');
 const privacy = document.querySelector('#privacy');
 const announcer = document.querySelector('#announcer');
@@ -54,14 +57,16 @@ const seatLayouts = {
 const playerCounts = Object.keys(seatLayouts).map(Number);
 // Tile colours, in order. Players 1–6 default to the first six. Each has a lighter top-row and a darker
 // bottom-row version in styles.css: players 1, 2 and 5 use the top row, so neighbours differ in lightness too.
+// New swatches only ever join the end, so saved choices keep their colour.
 const swatches = [
   { id: 'sage', name: 'Sage' }, { id: 'sky', name: 'Sky' }, { id: 'coral', name: 'Coral' },
   { id: 'violet', name: 'Violet' }, { id: 'amber', name: 'Amber' }, { id: 'teal', name: 'Teal' },
   { id: 'rose', name: 'Rose' }, { id: 'indigo', name: 'Indigo' }, { id: 'slate', name: 'Slate' },
+  { id: 'copper', name: 'Copper' }, { id: 'olive', name: 'Olive' }, { id: 'orchid', name: 'Orchid' },
 ];
 const topRowPlayers = [0, 1, 4];
 // The centre button's label while a board mode that ends with the single check mark is open.
-const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours' };
+const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
 // Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
 const editingModes = ['damage', 'counters'];
 const discardMessages = {
@@ -73,11 +78,23 @@ const commanderLethal = 21;
 const commanderWarning = 15;
 const poisonLethal = 10;
 const poisonWarning = 7;
-// Colour identity: any combination of the five colours, in W U B R G order. A colourless commander has none.
-// Identities with a symbol in the Mana font: each colour's mana symbol, the ten Ravnica guilds, the five Khans
-// clans and the colour pie. The shards and four-colour identities have none, so their tiles keep the rings.
-const watermarks = new Set(['W', 'U', 'B', 'R', 'G', 'WU', 'WB', 'WR', 'WG', 'UB', 'UR', 'UG', 'BR', 'BG', 'RG',
-  'WBG', 'WUR', 'UBG', 'WBR', 'URG', 'WUBRG']);
+// Colour identity (design/polish/SPEC.md §2): any combination of the five colours, in W U B R G order. A colourless
+// commander has none. Each of the 31 identities has a name and a symbol. styles.css draws the symbols from the Mana
+// font: each colour's mana symbol, the ten Ravnica guilds, the five Khans clans, the five Streets of New Capenna
+// families for the shards, and the colour pie for all five. Four colours have no official symbol, so they get the
+// colour pie with the missing colour as a ghost.
+const identityNames = {
+  W: 'Mono-white', U: 'Mono-blue', B: 'Mono-black', R: 'Mono-red', G: 'Mono-green',
+  WU: 'Azorius', UB: 'Dimir', BR: 'Rakdos', RG: 'Gruul', WG: 'Selesnya',
+  WB: 'Orzhov', UR: 'Izzet', BG: 'Golgari', WR: 'Boros', UG: 'Simic',
+  WUG: 'Bant', WUB: 'Esper', UBR: 'Grixis', BRG: 'Jund', WRG: 'Naya',
+  WBG: 'Abzan', WUR: 'Jeskai', UBG: 'Sultai', WBR: 'Mardu', URG: 'Temur',
+  UBRG: 'Glint-Eye', WBRG: 'Dune-Brood', WURG: 'Ink-Treader', WUBG: 'Witch-Maw', WUBR: 'Yore-Tiller',
+  WUBRG: 'WUBRG',
+};
+// What a tile's identity chip can show, in the chip's order, and what can sit behind its life total.
+const identityParts = ['indicator', 'symbol', 'name'];
+const identityBackgrounds = ['symbol', 'indicator', 'off'];
 const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
   { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
@@ -89,9 +106,13 @@ const maxStartingLife = 999;
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
 // tile. A drop step hides something on every tile (CSS reads its token from #board's data-drop); a floor step
 // shrinks the type, but no smaller than the floor; wrap lets the row take a second line, growing toward the total.
-// Steps for parts that don't exist yet (identity names and symbols, the turn chip) join these as they're built.
+// On the near row the identity's name goes first, then its symbol where the indicator also shows (one colour mark
+// is enough). The turn chip's word joins the name step when turns are built.
 const dropSteps = {
-  near: [{ floor: 11 }, { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true }],
+  near: [
+    { drop: 'name', selector: '.ci-chip .id-name' }, { drop: 'symbol', selector: '.ci-chip .ci ~ .id-symbol' }, { floor: 11 },
+    { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true },
+  ],
   far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
 };
 // A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
@@ -110,13 +131,12 @@ let game = loadGame();
 let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
-// The open board mode: 'rotate', 'colours', 'damage' or 'counters', or null at rest.
+// The open board mode: 'rotate', 'colours', 'identity', 'damage' or 'counters', or null at rest.
 let boardMode = null;
 // While an editing mode is open: every change made in it, newest last, so it can be undone or discarded,
 // and the life totals when it opened.
 let edits = null;
 let editStartScores = [];
-let sheetOpener = null;
 let announceTimer;
 const pendingAnnouncements = new Map();
 // How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none.
@@ -329,12 +349,21 @@ function fitIdentities(saved, count) {
   return Array.from({ length: count }, (_, index) => normalizeIdentity(Array.isArray(saved) ? saved[index] : undefined));
 }
 
+// What tiles show of each identity: the chip's parts (default: indicator and name) and the background behind the
+// total (default: the symbol). Anything that isn't a valid choice falls back to its default.
+function fitIdentitySettings(saved) {
+  const defaults = { indicator: true, symbol: false, name: true };
+  const show = Object.fromEntries(identityParts.map(part =>
+    [part, typeof saved?.show?.[part] === 'boolean' ? saved.show[part] : defaults[part]]));
+  return { show, background: identityBackgrounds.includes(saved?.background) ? saved.background : 'symbol' };
+}
+
 function loadGame() {
   const defaults = {
     startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
     counters: { commander: false, poison: false }, poison: fitCounts([], 4), casts: fitCounts([], 4),
-    identities: fitIdentities([], 4), commanderDamage: fitDamage([], 4),
+    identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -355,6 +384,7 @@ function loadGame() {
       poison: fitCounts(saved.poison, saved.scores.length),
       casts: fitCounts(saved.casts, saved.scores.length),
       identities: fitIdentities(saved.identities, saved.scores.length),
+      identity: fitIdentitySettings(saved.identity),
       commanderDamage: fitDamage(saved.commanderDamage, saved.scores.length),
     };
   } catch {
@@ -493,9 +523,10 @@ function announceLife(index) {
   announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
 }
 
+// How a screen reader hears an identity, such as "Selesnya, colour identity white, green", whatever the chip shows.
 function identityText(identity) {
   if (!identity) return 'no colour identity';
-  return `colour identity ${[...identity].map(id => identityColours.find(colour => colour.id === id).name).join(', ')}`;
+  return `${identityNames[identity]}, colour identity ${[...identity].map(id => identityColours.find(colour => colour.id === id).name).join(', ')}`;
 }
 
 // Android's back gesture only needs the page while a dialog or board mode is open.
@@ -724,7 +755,7 @@ function syncSeatMap(index) {
   self.querySelector('.visually-hidden').textContent = `Your life, ${life}`;
 }
 
-// A grid of the nine swatches for one player, in that player's row lightness.
+// A grid of the twelve swatches for one player, in that player's row lightness.
 function buildSwatches(index, choose) {
   const group = document.createElement('div');
   group.className = 'swatches';
@@ -779,7 +810,7 @@ function chooseColour(index, colour) {
   saveGame();
 }
 
-// Colour identity is set in colours mode too, and saved at once in the same way.
+// Identity mode saves each change at once, like Colours.
 function toggleIdentity(index, id) {
   const identity = game.identities[index];
   game.identities[index] = identity.includes(id) ? identity.replace(id, '') : normalizeIdentity(identity + id);
@@ -789,7 +820,7 @@ function toggleIdentity(index, id) {
   saveGame();
 }
 
-// Five toggles for one player's colour identity, in W U B R G order. Any combination can be on.
+// Five toggles for one player's colour identity: the mana symbols in W U B R G order. Any combination can be on.
 function buildIdentity(index) {
   const group = element('div', 'identity');
   group.dataset.player = index;
@@ -798,7 +829,7 @@ function buildIdentity(index) {
   for (const colour of identityColours) {
     const pip = element('span', 'pip');
     pip.dataset.pip = colour.id;
-    const toggle = element('button', 'identity-toggle', pip, colour.id);
+    const toggle = element('button', 'identity-toggle', pip);
     toggle.type = 'button';
     toggle.value = colour.id;
     toggle.setAttribute('aria-label', colour.name[0].toUpperCase() + colour.name.slice(1));
@@ -808,34 +839,84 @@ function buildIdentity(index) {
   return group;
 }
 
-// On tiles too small for the toggles, a button with the player's identity as a colour indicator opens the
-// player sheet, facing them. With no identity set, the indicator is an empty ring.
-function buildIdentityButton(index) {
+// The colour indicator printed on cards: one disc split into the identity's colours.
+function colourIndicator(identity) {
   const indicator = element('span', 'ci');
+  indicator.dataset.ci = identity;
+  indicator.dataset.count = identity.length;
   indicator.setAttribute('aria-hidden', 'true');
-  const button = element('button', 'identity-button', indicator);
-  button.type = 'button';
-  button.dataset.player = index;
-  button.setAttribute('aria-haspopup', 'dialog');
-  button.addEventListener('click', () => openPlayerSheet(index, button));
-  return button;
+  return indicator;
 }
 
-// Shows every player's identity on their toggles and identity button, wherever they are.
-function syncIdentity() {
-  for (const node of document.querySelectorAll('.identity[data-player], .identity-button')) {
-    const index = Number(node.dataset.player);
-    const identity = game.identities[index];
-    for (const pip of node.querySelectorAll('.pip')) {
-      pip.closest('.identity-toggle')?.setAttribute('aria-pressed', String(identity.includes(pip.dataset.pip)));
-    }
-    if (node.matches('.identity-button')) {
-      const indicator = node.querySelector('.ci');
-      indicator.dataset.ci = identity;
-      indicator.dataset.count = identity.length;
-      node.setAttribute('aria-label', `Colour identity for Player ${index + 1}: ${identity ? identityText(identity).replace('colour identity ', '') : 'none'}`);
+// The identity's symbol. styles.css picks the glyph from data-symbol. Four colours are the colour pie drawn from
+// the five mana symbols, with the missing colour as a ghost.
+function identitySymbol(identity) {
+  const symbol = element('span', 'id-symbol');
+  symbol.dataset.symbol = identity;
+  symbol.setAttribute('aria-hidden', 'true');
+  if (identity.length === 4) {
+    symbol.classList.add('pie');
+    for (const { id } of identityColours) {
+      const part = element('span');
+      part.dataset.at = id;
+      if (!identity.includes(id)) part.dataset.ghost = '';
+      symbol.append(part);
     }
   }
+  return symbol;
+}
+
+// An identity chip: any of the indicator, the symbol and the name, in that order. With only the indicator or only
+// the symbol it's round; with the name it's a capsule. No identity, or nothing to show, is no chip.
+function identityChip(identity, show) {
+  if (!identity) return null;
+  const parts = [];
+  if (show.indicator) parts.push(colourIndicator(identity));
+  if (show.symbol) parts.push(identitySymbol(identity));
+  if (show.name) {
+    const name = element('span', 'id-name', identityNames[identity]);
+    name.setAttribute('aria-hidden', 'true');
+    parts.push(name);
+  }
+  if (!parts.length) return null;
+  return element('span', 'chip ci-chip', ...parts, visuallyHidden(identityText(identity)));
+}
+
+// Identity mode: each tile previews everything its identity can show, whatever the tiles are set to display.
+function buildIdentityPreview(index) {
+  const preview = element('div', 'identity-preview');
+  preview.dataset.player = index;
+  return preview;
+}
+
+// Shows every player's identity on their toggles and preview.
+function syncIdentity() {
+  for (const group of board.querySelectorAll('.identity[data-player]')) {
+    const identity = game.identities[Number(group.dataset.player)];
+    for (const toggle of group.querySelectorAll('.identity-toggle')) {
+      toggle.setAttribute('aria-pressed', String(identity.includes(toggle.value)));
+    }
+  }
+  for (const preview of board.querySelectorAll('.identity-preview')) {
+    const identity = game.identities[Number(preview.dataset.player)];
+    preview.replaceChildren(identityChip(identity, { indicator: true, symbol: true, name: true }) ?? element('span', 'chip', 'No identity'));
+  }
+}
+
+// The background behind a tile's total: its identity's symbol, faintly, like a card's watermark, or its colour
+// indicator, or the rings. A tile with no identity always has the rings.
+function renderWatermark(index) {
+  const player = board.children[index];
+  const identity = game.identities[index];
+  const background = identity ? game.identity.background : 'off';
+  const mark = player.querySelector('.watermark');
+  if (background === 'off') {
+    delete player.dataset.background;
+    mark.replaceChildren();
+    return;
+  }
+  player.dataset.background = background;
+  mark.replaceChildren(background === 'symbol' ? identitySymbol(identity) : colourIndicator(identity));
 }
 
 // Applies an edit forwards (1) or takes it back (-1).
@@ -928,17 +1009,11 @@ function renderModeLayer(player, index) {
   const layer = player.querySelector('.mode-layer');
   layer.replaceChildren();
   if (boardMode === 'colours') {
-    // With Commander on, colour identity sits beside the swatches: five toggles where the tile has room,
-    // otherwise a button that opens them in the player sheet. CSS shows one or the other.
-    const commander = game.counters.commander;
-    const hint = element('p', 'layer-hint', commander ? 'Your tile colour and identity' : 'Your tile colour');
+    const hint = element('p', 'layer-hint', 'Your tile colour');
     hint.setAttribute('aria-hidden', 'true');
-    const picker = element('div', 'colour-picker', buildSwatches(index, colour => chooseColour(index, colour)));
-    if (commander) {
-      picker.dataset.identity = '';
-      picker.append(buildIdentity(index), buildIdentityButton(index));
-    }
-    layer.append(hint, picker);
+    layer.append(hint, element('div', 'colour-picker', buildSwatches(index, colour => chooseColour(index, colour))));
+  } else if (boardMode === 'identity') {
+    layer.append(buildIdentityPreview(index), buildIdentity(index));
   } else if (boardMode === 'damage') {
     const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
     hint.setAttribute('aria-hidden', 'true');
@@ -970,15 +1045,12 @@ function isOut(index) {
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
-// damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first. The near edge holds colour
-// identity, poison and tax, each only when it's set and its switch is on.
+// damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first. The near
+// edge holds the colour identity chip, then poison and tax, each only when it's set and its switch is on.
 function renderBadges(index) {
   const player = board.children[index];
   if (!player) return;
-  // With Commander on, an identity that has its own symbol shows it faintly behind the tile in place of the rings.
-  const shown = game.counters.commander ? game.identities[index] : '';
-  if (watermarks.has(shown)) player.dataset.watermark = shown;
-  else delete player.dataset.watermark;
+  renderWatermark(index);
   const far = player.querySelector('.badges.far');
   const damage = game.counters.commander ? game.commanderDamage[index]
     .map((amount, attacker) => ({ amount, attacker })).filter(({ amount }) => amount > 0)
@@ -997,15 +1069,8 @@ function renderBadges(index) {
   far.hidden = damage.length === 0;
   const near = player.querySelector('.badges.near');
   const chips = [];
-  const identity = game.counters.commander ? game.identities[index] : '';
-  if (identity) {
-    // At rest the identity is the colour indicator printed on cards; the mana symbols are for setting it.
-    const indicator = element('span', 'ci');
-    indicator.dataset.ci = identity;
-    indicator.dataset.count = identity.length;
-    indicator.setAttribute('aria-hidden', 'true');
-    chips.push(element('span', 'chip ci-chip', indicator, visuallyHidden(identityText(identity))));
-  }
+  const identity = identityChip(game.identities[index], game.identity.show);
+  if (identity) chips.push(identity);
   if (game.counters.poison && game.poison[index] > 0) {
     const chip = element('span', 'chip', manaIcon('infect'), String(game.poison[index]), visuallyHidden(' poison'));
     const level = dangerLevel(game.poison[index], poisonWarning, poisonLethal);
@@ -1033,32 +1098,7 @@ function syncPill() {
   undoButton.disabled = !edits?.length;
 }
 
-// The player sheet: colour identity, for tiles in colours mode too small to hold the toggles. It faces the
-// player who opened it.
-function openPlayerSheet(index, opener) {
-  sheetOpener = opener;
-  const player = board.children[index];
-  const angle = (Number(document.querySelector('.app').dataset.boardTurn) + faceAngles[player.dataset.edge]) % 360;
-  playerSheet.style.setProperty('--sheet-angle', `${angle}deg`);
-  playerSheet.toggleAttribute('data-sideways', angle % 180 !== 0);
-  playerSheet.dataset.colour = player.dataset.colour;
-  playerSheet.dataset.row = player.dataset.row;
-  document.querySelector('#player-sheet-name').textContent = `Player ${index + 1}`;
-  sheetIdentity.replaceChildren(buildIdentity(index));
-  syncIdentity();
-  playerSheet.showModal();
-  syncBackHandling();
-}
-
-playerSheet.querySelector('[data-close]').addEventListener('click', () => playerSheet.close());
-playerSheet.addEventListener('close', () => {
-  sheetIdentity.replaceChildren();
-  syncBackHandling();
-  if (sheetOpener?.isConnected) sheetOpener.focus();
-  sheetOpener = null;
-});
-
-// Board-wide modes. Seat rotation and tile colours end with the check mark that replaces the setup button.
+// Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
 // Counters mode ends with save or ✕, and keeps a list of its edits until then.
 function setBoardMode(mode) {
   cancelPresses();
@@ -1276,26 +1316,70 @@ privacy.addEventListener('close', () => {
   setup.showModal();
   syncBackHandling();
 });
-// Track replaces setup, keeping setup's unsaved choices. ‹, Escape and Android back return to setup; ✕ closes both.
+// Track and Identity replace setup, keeping setup's unsaved choices. ‹, Escape and Android back return to setup;
+// ✕ closes both. Choose identities closes both and starts identity mode.
+function openSubSheet(dialog) {
+  dialog.returnValue = '';
+  setup.close();
+  dialog.showModal();
+  syncBackHandling();
+}
+for (const [dialog, opener] of [[trackDialog, trackButton], [identityDialog, identityNav]]) {
+  dialog.querySelector('[data-back]').addEventListener('click', () => dialog.close('back'));
+  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close('close'));
+  dialog.addEventListener('close', () => {
+    if (dialog.returnValue === 'close') {
+      setupButton.focus();
+    } else if (dialog.returnValue !== 'choose') {
+      renderSetup();
+      setup.showModal();
+      opener.focus();
+    }
+    syncBackHandling();
+  });
+}
 trackButton.addEventListener('click', () => {
   commanderSwitch.checked = game.counters.commander;
   poisonSwitch.checked = game.counters.poison;
-  trackDialog.returnValue = '';
-  setup.close();
-  trackDialog.showModal();
-  syncBackHandling();
+  openSubSheet(trackDialog);
 });
-trackDialog.querySelector('[data-back]').addEventListener('click', () => trackDialog.close('back'));
-trackDialog.querySelector('[data-close]').addEventListener('click', () => trackDialog.close('close'));
-trackDialog.addEventListener('close', () => {
-  if (trackDialog.returnValue === 'close') {
-    setupButton.focus();
-  } else {
-    renderSetup();
-    setup.showModal();
-    trackButton.focus();
+
+// The Identity sheet: what tiles show of each identity, saved the moment it changes. Choose identities keeps its
+// place but can't be used while setup would start a new game, like Colours and Rotate seats.
+function renderIdentitySheet() {
+  for (const choice of identityShowChoices.children) {
+    choice.setAttribute('aria-pressed', String(game.identity.show[choice.dataset.show]));
   }
-  syncBackHandling();
+  for (const choice of identityBackgroundChoices.children) {
+    choice.setAttribute('aria-pressed', String(game.identity.background === choice.dataset.background));
+  }
+  chooseIdentitiesButton.hidden = setupChangesGame();
+}
+
+function changeIdentitySettings(change) {
+  change(game.identity);
+  saveGame();
+  renderIdentitySheet();
+  game.scores.forEach((_, index) => renderBadges(index));
+}
+
+identityNav.addEventListener('click', () => {
+  renderIdentitySheet();
+  openSubSheet(identityDialog);
+});
+for (const choice of identityShowChoices.children) {
+  choice.addEventListener('click', () => changeIdentitySettings((settings) => {
+    settings.show[choice.dataset.show] = !settings.show[choice.dataset.show];
+  }));
+}
+for (const choice of identityBackgroundChoices.children) {
+  choice.addEventListener('click', () => changeIdentitySettings((settings) => {
+    settings.background = choice.dataset.background;
+  }));
+}
+chooseIdentitiesButton.addEventListener('click', () => {
+  identityDialog.close('choose');
+  setBoardMode('identity');
 });
 rotateSeatsButton.addEventListener('click', () => {
   setup.close();
@@ -1432,6 +1516,13 @@ window.addEventListener('resize', syncBoardTurn);
 portraitQuery.addEventListener('change', syncBoardTurn);
 // The board's size can also change without a resize event, such as when a browser's toolbar slides away.
 if (window.ResizeObserver) new ResizeObserver(measureBoard).observe(board);
+// Identity symbols come from the Mana font. Rows fitted before it loaded were measured with another font's glyphs,
+// so they're fitted again from full size once it has. The board is turned and measured again first: a font can
+// finish loading in the middle of a resize or a rotation, before the board has caught up with the window.
+document.fonts?.addEventListener?.('loadingdone', () => {
+  dropLevels = { near: 0, far: 0 };
+  syncBoardTurn();
+});
 syncBoardTurn();
 renderBoard();
 syncPill();

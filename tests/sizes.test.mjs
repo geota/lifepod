@@ -164,8 +164,15 @@ async function checkSizes(t, engine) {
 
           await button(page, 'Game setup').tap();
           await button(page, 'Colours').tap();
-          checkTiles(await readTiles(page, '.swatch, .identity-toggle, .identity-button', '.layer-hint'), `${view}, colours`);
+          checkTiles(await readTiles(page, '.swatch', '.layer-hint'), `${view}, colours`);
           if (!portrait) scale[name].swatch = await readModeScale(page, '.swatch');
+          await button(page, 'Done choosing colours').tap();
+
+          await button(page, 'Game setup').tap();
+          await button(page, 'Identity').tap();
+          await button(page, 'Choose identities').tap();
+          checkTiles(await readTiles(page, '.identity-toggle', '.identity-preview .chip'), `${view}, identity`);
+          if (!portrait) scale[name].identityToggle = await readModeScale(page, '.identity-toggle');
         }
         await page.close();
         assert.deepEqual(errors, [], `${view}: no script errors`);
@@ -189,7 +196,7 @@ test('webkit: the board fits and scales on small phones, foldables and tablets',
 
 // Game setup fits without scrolling from a 952 × 427 phone down to the 568 × 320 stress test, where the header folds
 // into the Players row. Every control is on the sheet and at least 44px, with Custom life's stepper too, and so
-// does the Track sheet.
+// do the Track and Identity sheets.
 async function checkSetup(t, engine) {
   const browser = await engine.launch();
   t.after(() => browser.close());
@@ -218,8 +225,9 @@ async function checkSetup(t, engine) {
     await button(page, 'Game setup').tap();
     const setup = await check('#setup');
     assert.deepEqual(setup.found, [], `${view}: setup`);
-    // Header (About, ✕), five players, four life choices, Track, Colours, Rotate seats, Keep awake, New game and Done.
-    assert.equal(setup.count, 17, `${view}: every setup control shows`);
+    // Header (About, ✕), five players, four life choices, Track, Identity, Colours, Rotate seats, Keep awake, New game
+    // and Done.
+    assert.equal(setup.count, 18, `${view}: every setup control shows`);
     const folded = await page.evaluate(() => {
       const title = document.querySelector('#setup-title').getBoundingClientRect();
       const close = document.querySelector('#setup [data-close]').getBoundingClientRect();
@@ -232,6 +240,12 @@ async function checkSetup(t, engine) {
     assert.deepEqual((await check('#setup')).found, [], `${view}: setup with the custom life stepper`);
     await button(page, 'Track').tap();
     assert.deepEqual((await check('#track')).found, [], `${view}: Track`);
+    await button(page, 'Back to setup').tap();
+    await button(page, 'Identity').tap();
+    const identity = await check('#identity-sheet');
+    assert.deepEqual(identity.found, [], `${view}: Identity`);
+    // ‹ and ✕, three choices of what to show, three backgrounds and Choose identities.
+    assert.equal(identity.count, 9, `${view}: every Identity control shows`);
     await button(page, 'Close setup').tap();
   }
   assert.deepEqual(errors, [], 'no script errors');

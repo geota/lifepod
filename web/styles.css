@@ -50,12 +50,13 @@
   --seam-width: 2px;
   --ring-opacity: .08;
   --watermark-opacity: .07;
+  --indicator-watermark-opacity: .1;
 
-  /* Tile colours: nine swatches, each a full tile palette. Players 1, 2 and 5 use the lighter top-row version
+  /* Tile colours: twelve swatches, each a full tile palette. Players 1, 2 and 5 use the lighter top-row version
      and players 3, 4 and 6 the darker bottom-row one, so neighbours stay apart for colour-blind players even
      when their hues are close. Players 1–6 default to Sage, Sky, Coral, Violet, Amber and Teal. Generated in
-     OKLCH by design/counters/palette.mjs: on every panel the life total is at least 9:1, small text 7.6:1 and
-     the red of a life total at 0 or below 4.79:1. */
+     OKLCH by design/counters/palette.mjs (round 3 adds Copper, Olive and Orchid): on every panel the life total
+     is at least 9:1, small text 7.6:1 and the red of a life total at 0 or below 4.79:1. */
   --sage-top-panel: #2f432f; --sage-top-rim: #556e4e; --sage-top-seat: #d3eeaa; --sage-top-button: #233324;
   --sage-bottom-panel: #253725; --sage-bottom-rim: #476548; --sage-bottom-seat: #bde7bd; --sage-bottom-button: #19281a;
   --sky-top-panel: #2c4352; --sky-top-rim: #517187; --sky-top-seat: #b6e0f7; --sky-top-button: #21323e;
@@ -74,6 +75,12 @@
   --indigo-bottom-panel: #282e56; --indigo-bottom-rim: #4c5696; --indigo-bottom-seat: #cfd8fe; --indigo-bottom-button: #1b2040;
   --slate-top-panel: #3b4045; --slate-top-rim: #646c76; --slate-top-seat: #d3e0ec; --slate-top-button: #2b3034;
   --slate-bottom-panel: #2d3238; --slate-bottom-rim: #555d66; --slate-bottom-seat: #cfdbe8; --slate-bottom-button: #202428;
+  --copper-top-panel: #563721; --copper-top-rim: #8f5e3b; --copper-top-seat: #ffd4b8; --copper-top-button: #412917;
+  --copper-bottom-panel: #472a14; --copper-bottom-rim: #7f4f2d; --copper-bottom-seat: #ffcfaf; --copper-bottom-button: #341d0c;
+  --olive-top-panel: #3b441a; --olive-top-rim: #647331; --olive-top-seat: #d4ea91; --olive-top-button: #2c3312;
+  --olive-bottom-panel: #2e360c; --olive-bottom-rim: #566420; --olive-bottom-seat: #d0e58d; --olive-bottom-button: #202706;
+  --orchid-top-panel: #503257; --orchid-top-rim: #865691; --orchid-top-seat: #f6ceff; --orchid-top-button: #3c2542;
+  --orchid-bottom-panel: #422448; --orchid-bottom-rim: #764780; --orchid-bottom-seat: #f4c8fe; --orchid-bottom-button: #301935;
 
   /* Type */
   --font-ui: system-ui, -apple-system, sans-serif;
@@ -120,11 +127,12 @@ button, .player { -webkit-user-select: none; user-select: none; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
-/* Game symbols from the Mana font: the d20 for dice, infect for poison. */
+/* Game symbols from the Mana font: the d20 for dice, infect for poison, the colour pie for identity. */
 .mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
 .mana-icon::before { content: var(--glyph); speak: never; }
 .mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
 .mana-icon[data-glyph="infect"] { --glyph: '\ea73'; }
+.mana-icon[data-glyph="pie"] { --glyph: '\e9f0'; }
 
 /* app.js turns the board so seats stay fixed to the device as the screen rotates. */
 .app {
@@ -219,10 +227,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .pill-button:active::before { background: var(--surface-pressed); }
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
-/* While rotating seats or choosing colours, only the Done disc stays. */
-.board-controls:is([data-mode="rotate"], [data-mode="colours"])::before { background: var(--accent); border-color: var(--accent); }
-.board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button { color: var(--ink); }
-.board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button::before { content: none; }
+/* While rotating seats or choosing colours or identities, only the Done disc stays. */
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--accent); border-color: var(--accent); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--ink); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button::before { content: none; }
 /* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
 .save-button { color: var(--ink); }
 .save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--accent); }
@@ -256,6 +264,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 [data-colour="indigo"][data-row="bottom"] { --panel: var(--indigo-bottom-panel); --rim: var(--indigo-bottom-rim); --seat: var(--indigo-bottom-seat); --button: var(--indigo-bottom-button); }
 [data-colour="slate"][data-row="top"] { --panel: var(--slate-top-panel); --rim: var(--slate-top-rim); --seat: var(--slate-top-seat); --button: var(--slate-top-button); }
 [data-colour="slate"][data-row="bottom"] { --panel: var(--slate-bottom-panel); --rim: var(--slate-bottom-rim); --seat: var(--slate-bottom-seat); --button: var(--slate-bottom-button); }
+[data-colour="copper"][data-row="top"] { --panel: var(--copper-top-panel); --rim: var(--copper-top-rim); --seat: var(--copper-top-seat); --button: var(--copper-top-button); }
+[data-colour="copper"][data-row="bottom"] { --panel: var(--copper-bottom-panel); --rim: var(--copper-bottom-rim); --seat: var(--copper-bottom-seat); --button: var(--copper-bottom-button); }
+[data-colour="olive"][data-row="top"] { --panel: var(--olive-top-panel); --rim: var(--olive-top-rim); --seat: var(--olive-top-seat); --button: var(--olive-top-button); }
+[data-colour="olive"][data-row="bottom"] { --panel: var(--olive-bottom-panel); --rim: var(--olive-bottom-rim); --seat: var(--olive-bottom-seat); --button: var(--olive-bottom-button); }
+[data-colour="orchid"][data-row="top"] { --panel: var(--orchid-top-panel); --rim: var(--orchid-top-rim); --seat: var(--orchid-top-seat); --button: var(--orchid-top-button); }
+[data-colour="orchid"][data-row="bottom"] { --panel: var(--orchid-bottom-panel); --rim: var(--orchid-bottom-rim); --seat: var(--orchid-bottom-seat); --button: var(--orchid-bottom-button); }
 
 .player {
   /* The tile's own panel, for rings on cells drawn in another player's colour. */
@@ -314,42 +328,66 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   opacity: var(--ring-opacity);
   content: '';
 }
-/* A tile whose colour identity has a symbol shows it faintly, centred behind the life total, like a card's
-   watermark, in place of the rings. */
-.player[data-watermark] .player-face::before {
-  inset: 50% auto auto 50%;
-  width: auto;
-  aspect-ratio: auto;
-  border-radius: 0;
-  background: none;
+/* The background behind the total (design/polish/SPEC.md §2.3): app.js puts the identity's symbol or its colour
+   indicator in .watermark, faint and centred like a card's watermark, in place of the rings. */
+.player[data-background] .player-face::before { content: none; }
+.watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  display: grid;
+  place-items: center;
   color: var(--seat);
-  font: normal normal normal min(var(--ub, 400px) * .86, var(--ui, 400px) * .62)/1 Mana;
-  opacity: var(--watermark-opacity);
   transform: translate(-50%, -50%);
-  content: var(--watermark);
-  speak: never;
+  pointer-events: none;
 }
-.player[data-watermark="W"] { --watermark: '\e600'; }
-.player[data-watermark="U"] { --watermark: '\e601'; }
-.player[data-watermark="B"] { --watermark: '\e602'; }
-.player[data-watermark="R"] { --watermark: '\e603'; }
-.player[data-watermark="G"] { --watermark: '\e604'; }
-.player[data-watermark="WU"] { --watermark: '\e90c'; } /* Azorius */
-.player[data-watermark="WB"] { --watermark: '\e912'; } /* Orzhov */
-.player[data-watermark="UB"] { --watermark: '\e90e'; } /* Dimir */
-.player[data-watermark="UR"] { --watermark: '\e911'; } /* Izzet */
-.player[data-watermark="BG"] { --watermark: '\e90f'; } /* Golgari */
-.player[data-watermark="BR"] { --watermark: '\e913'; } /* Rakdos */
-.player[data-watermark="WR"] { --watermark: '\e90d'; } /* Boros */
-.player[data-watermark="RG"] { --watermark: '\e910'; } /* Gruul */
-.player[data-watermark="UG"] { --watermark: '\e915'; } /* Simic */
-.player[data-watermark="WG"] { --watermark: '\e914'; } /* Selesnya */
-.player[data-watermark="WBG"] { --watermark: '\e916'; } /* Abzan */
-.player[data-watermark="WUR"] { --watermark: '\e917'; } /* Jeskai */
-.player[data-watermark="UBG"] { --watermark: '\e919'; } /* Sultai */
-.player[data-watermark="WBR"] { --watermark: '\e918'; } /* Mardu */
-.player[data-watermark="URG"] { --watermark: '\e91a'; } /* Temur */
-.player[data-watermark="WUBRG"] { --watermark: '\e9f0'; } /* colour pie */
+.watermark:empty { display: none; }
+.player[data-background="symbol"] .watermark { font-size: min(var(--ub, 400px) * .86, var(--ui, 400px) * .62); opacity: var(--watermark-opacity); }
+.player[data-background="indicator"] .watermark { opacity: var(--indicator-watermark-opacity); }
+.watermark .ci { font-size: min(var(--ub, 400px) * .72, var(--ui, 400px) * .52); box-shadow: none; }
+
+/* An identity's symbol, from the Mana font: a colour's mana symbol, a guild, a clan, a Streets of New Capenna
+   family or the colour pie. Four colours are the colour pie drawn from the five mana symbols on a pentagon (W at
+   the top, then clockwise U, B, R and G), with the missing colour as a ghost at 25%. */
+.id-symbol { flex: none; display: inline-grid; place-items: center; width: 1em; height: 1em; font: normal normal normal 1em/1 Mana; }
+.id-symbol::before { content: var(--symbol); speak: never; }
+.id-symbol.pie { position: relative; width: 1.1em; height: 1.1em; }
+.id-symbol.pie::before { content: none; }
+.id-symbol.pie > span { position: absolute; font-size: .46em; line-height: 1; transform: translate(-50%, -50%); }
+.id-symbol.pie > span::before { content: var(--symbol); speak: never; }
+.id-symbol.pie > [data-ghost] { opacity: .25; }
+.id-symbol.pie > [data-at="W"] { left: 50%; top: 14%; }
+.id-symbol.pie > [data-at="U"] { left: 86%; top: 40%; }
+.id-symbol.pie > [data-at="B"] { left: 72%; top: 84%; }
+.id-symbol.pie > [data-at="R"] { left: 28%; top: 84%; }
+.id-symbol.pie > [data-at="G"] { left: 14%; top: 40%; }
+:is([data-symbol="W"], .pie > [data-at="W"]) { --symbol: '\e600'; }
+:is([data-symbol="U"], .pie > [data-at="U"]) { --symbol: '\e601'; }
+:is([data-symbol="B"], .pie > [data-at="B"]) { --symbol: '\e602'; }
+:is([data-symbol="R"], .pie > [data-at="R"]) { --symbol: '\e603'; }
+:is([data-symbol="G"], .pie > [data-at="G"]) { --symbol: '\e604'; }
+[data-symbol="WU"] { --symbol: '\e90c'; } /* Azorius */
+[data-symbol="WB"] { --symbol: '\e912'; } /* Orzhov */
+[data-symbol="UB"] { --symbol: '\e90e'; } /* Dimir */
+[data-symbol="UR"] { --symbol: '\e911'; } /* Izzet */
+[data-symbol="BG"] { --symbol: '\e90f'; } /* Golgari */
+[data-symbol="BR"] { --symbol: '\e913'; } /* Rakdos */
+[data-symbol="WR"] { --symbol: '\e90d'; } /* Boros */
+[data-symbol="RG"] { --symbol: '\e910'; } /* Gruul */
+[data-symbol="UG"] { --symbol: '\e915'; } /* Simic */
+[data-symbol="WG"] { --symbol: '\e914'; } /* Selesnya */
+[data-symbol="WBG"] { --symbol: '\e916'; } /* Abzan */
+[data-symbol="WUR"] { --symbol: '\e917'; } /* Jeskai */
+[data-symbol="UBG"] { --symbol: '\e919'; } /* Sultai */
+[data-symbol="WBR"] { --symbol: '\e918'; } /* Mardu */
+[data-symbol="URG"] { --symbol: '\e91a'; } /* Temur */
+[data-symbol="WUG"] { --symbol: '\ea0d'; } /* Bant: Brokers */
+[data-symbol="WRG"] { --symbol: '\ea0e'; } /* Naya: Cabaretti */
+[data-symbol="UBR"] { --symbol: '\ea0f'; } /* Grixis: Maestros */
+[data-symbol="WUB"] { --symbol: '\ea10'; } /* Esper: Obscura */
+[data-symbol="BRG"] { --symbol: '\ea11'; } /* Jund: Riveteers */
+[data-symbol="WUBRG"] { --symbol: '\e9f0'; } /* colour pie */
 .score {
   min-width: 0;
   font-size: clamp(2rem, 19vmin, max(7rem, 112 * var(--grow)));
@@ -442,28 +480,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Mode hints show only where every tile has room: ub ≥ 200 and ui ≥ 240. */
 .board:is([data-narrow], [data-short]) .layer-hint { display: none; }
 
-/* Tile colour swatches: the panel with the seat colour as a dot. The chosen one has a ring inside it, so a
-   tile edge can't clip it. A swatch another player has keeps its full colour, shows its owner ("P2") in the
-   seat colour in place of the dot, and can't be chosen. With Commander on, colour identity sits beside them:
-   five toggles the swatches' size where the tile has room, otherwise a 44px button that opens the player
-   sheet. Every target stays at least 44px. */
+/* Tile colour swatches (design/polish/SPEC.md §5): twelve in a 4 × 3 grid, the panel with the seat colour as a
+   dot. The chosen one has a ring inside it, so a tile edge can't clip it. A swatch another player has keeps its
+   full colour, shows its owner ("P2") in the seat colour in place of the dot, and can't be chosen. The grid fits
+   under the hint and clear of the check mark, and every swatch stays at least 44px. */
 .colour-picker {
-  --swatch-size: clamp(44px, min((var(--ui, 400px) - 20px) / 3, (var(--ub, 400px) - 22px - var(--setup-button)) / 3), 60 * var(--grow));
+  --hint-space: 26px;
+  --swatch-size: clamp(44px, min((var(--ui, 400px) - 24px) / 4, (var(--ub, 400px) - var(--setup-button) / 2 - 14px - var(--hint-space)) / 3), 60 * var(--grow));
   display: flex;
   align-items: center;
-  gap: 12px;
 }
-.colour-picker[data-identity] { --swatch-size: clamp(44px, min((var(--ui, 400px) - 76px) / 3, (var(--ub, 400px) - 22px - var(--setup-button)) / 3), 60 * var(--grow)); }
-.colour-picker .identity { display: none; grid-template-columns: repeat(2, var(--swatch-size)); grid-auto-rows: var(--swatch-size); }
-.colour-picker .identity-toggle { width: var(--swatch-size); height: var(--swatch-size); font-size: max(.6875rem, var(--swatch-size) * .18); }
-/* On a tablet the toggles grow past phone size, so the disc inside grows with them. */
-.colour-picker .identity-toggle .pip { --pip-size: max(20px, var(--swatch-size) * .34); }
-.board[data-wide] .colour-picker[data-identity] { --swatch-size: clamp(44px, min((var(--ui, 400px) - 40px) / 5, (var(--ub, 400px) - 22px - var(--setup-button)) / 3), 60 * var(--grow)); }
-.board[data-wide] .colour-picker .identity { display: grid; }
-.board[data-wide] .colour-picker .identity-button { display: none; }
 .swatches {
   display: grid;
-  grid-template-columns: repeat(3, var(--swatch-size));
+  grid-template-columns: repeat(4, var(--swatch-size));
   grid-auto-rows: var(--swatch-size);
   gap: 4px;
 }
@@ -481,29 +510,45 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .swatch:disabled { cursor: default; }
 .swatch:disabled::before { content: none; }
 .swatch .owner { color: var(--seat); font-size: max(14px, var(--swatch-size) * .24); font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
-/* The identity button: the tile's own colours, with the identity as the colour indicator printed on cards. */
-.identity-button {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: var(--tap-min);
-  height: var(--tap-min);
-  padding: 0;
-  border: 1px solid var(--rim);
-  border-radius: var(--radius-md);
-  background: var(--button);
-}
-.identity-button:active { background: var(--surface-pressed); }
-.identity-button .ci { font-size: 28px; }
 /* Narrow tiles, such as 6 players on a phone, tighten the layer and drop the hint. */
 .board[data-narrow] .mode-layer { padding: calc(var(--setup-button) / 2 - 4px) 4px 1px; }
-.board[data-narrow] .mode-layer:has(.colour-picker[data-identity]) { padding-inline: 1px; }
-.board[data-narrow] .colour-picker { --swatch-size: 44px; gap: 3px; }
+.board[data-narrow] .mode-layer:has(.colour-picker) { padding-inline: 1px; }
+.board[data-narrow] .colour-picker { --swatch-size: 44px; }
 .board[data-narrow] .swatches { gap: 3px; }
-/* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches and toggles fit. */
+/* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches fit. */
 .board[data-short] .mode-layer:has(.colour-picker) { padding-block: calc(var(--setup-button) / 2 - 4px) 1px; }
-.board[data-short] .colour-picker { --swatch-size: 44px; gap: 3px; }
-.board[data-short] .colour-picker :is(.swatches, .identity) { gap: 3px; }
+.board[data-short] .colour-picker { --swatch-size: 44px; }
+.board[data-short] .swatches { gap: 3px; }
+
+/* Identity mode (design/polish/SPEC.md §2.6): a preview chip with everything the identity can show, over the five
+   mana-symbol toggles. They make one row where every tile has room for it (ui ≥ 264), otherwise three over two. */
+.identity-preview {
+  display: flex;
+  justify-content: center;
+  font-size: clamp(.875rem, calc(4.2 * var(--u)), max(1.25rem, 20 * var(--grow)));
+  pointer-events: none;
+}
+.identity {
+  --toggle: clamp(44px, calc(12 * var(--u)), 72 * var(--grow));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  width: calc(3 * var(--toggle) + 8px);
+}
+.board[data-wide] .identity { width: calc(5 * var(--toggle) + 16px); }
+.identity-toggle {
+  display: grid;
+  place-items: center;
+  width: var(--toggle);
+  height: var(--toggle);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--background);
+}
+.identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
+.identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); box-shadow: 0 0 0 1px var(--text); }
 
 /* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat showing the damage
    their commander has dealt this player. Every seat is filled with that player's own tile colour (their panel),
@@ -618,6 +663,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
 .badges.far { top: calc(var(--setup-button) / 2 + 2px); font-size: var(--far-badge-size, var(--badge-size)); }
 .badges.near { font-size: var(--near-badge-size, var(--badge-size)); }
+.board[data-drop~="name"] .badges.near .ci-chip .id-name, .board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol,
 .board[data-drop~="identity"] .badges.near .ci-chip, .board[data-drop~="sword"] .badges.far .sword { display: none; }
 .board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
 /* A sideways tile's far edge runs through the middle of the board, where the centre controls sit, so its row
@@ -656,9 +702,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
 .chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
 .chip.damage[data-level="out"] { background: var(--panel); }
-/* Colour identity at rest: the colour indicator in a round chip, like the sword. */
-.chip.ci-chip { width: 1.7em; padding: 0; justify-content: center; }
-.chip.ci-chip .ci { font-size: 1.12em; }
+/* The identity chip: any of the indicator, the symbol and the name. Its padding makes a lone indicator or symbol a
+   round chip, like the sword, and a chip with the name a capsule. */
+.chip.ci-chip { gap: .26em; padding: 0 .29em; }
+.chip.ci-chip :is(.ci, .id-symbol) { font-size: 1.12em; }
+.chip.ci-chip .id-symbol { color: var(--text); }
+.chip.ci-chip .id-name { margin-inline-end: .14em; font-size: .86em; letter-spacing: .01em; color: var(--text-soft); }
 /* Colour identity: each colour's mana symbol on its disc, like a mana cost. --pip-size sets the disc; the symbol
    is 77% of it, as Mana's own cost style draws it. */
 .pip {
@@ -730,48 +779,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .ci[data-ci="UBRG"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 135deg, #c6553e 135deg 225deg, #3d684b 225deg 315deg, #3b6ba0 315deg); }
 .ci[data-ci="WUBRG"] { background: conic-gradient(#fff 36deg, #3b6ba0 36deg 108deg, #383431 108deg 180deg, #c6553e 180deg 252deg, #3d684b 252deg 324deg, #fff 324deg); }
 
-/* The player sheet faces the player who opened it, so app.js turns it with the board and the tile. */
-#player-sheet {
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  width: max-content;
-  max-width: calc(100vw - 32px);
-  max-width: calc(100dvw - 32px);
-  max-height: calc(100vh - 12px);
-  max-height: calc(100dvh - 12px);
-  margin: 0;
-  transform: translate(-50%, -50%) rotate(var(--sheet-angle, 0deg));
-}
-#player-sheet[data-sideways] {
-  max-width: calc(100vh - 32px);
-  max-width: calc(100dvh - 32px);
-  max-height: calc(100vw - 12px);
-  max-height: calc(100dvw - 12px);
-}
-#player-sheet .sheet { gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); }
-#player-sheet h2 { display: flex; align-items: center; gap: 10px; font-size: 1.125rem; letter-spacing: -.015em; }
-.sheet-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--seat); }
-.sheet-subtitle { margin-bottom: calc(6px - var(--space-3)); font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
-.identity { display: grid; grid-template-columns: repeat(5, 44px); gap: 4px; }
-.identity-toggle {
-  display: grid;
-  place-items: center;
-  align-content: center;
-  gap: 2px;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-full);
-  background: var(--background);
-  color: var(--muted);
-  font-size: .6875rem;
-  font-weight: var(--weight-semibold);
-}
-.identity-toggle .pip { --pip-size: 20px; }
-.identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); color: var(--text); box-shadow: 0 0 0 1px var(--text); }
-
 #discard { width: min(360px, calc(100% - 32px)); }
 #discard h2 { font-size: var(--type-title); letter-spacing: -.022em; }
 #discard-message { color: var(--muted); }
@@ -820,7 +827,7 @@ dialog::backdrop { background: var(--scrim); }
 /* Setup and Track (design/polish/SPEC.md §4): six control types. Header buttons and rows are 44px; the action
    buttons 48px. The sheet is 600px wide at most and fits a 952 × 427 phone down to a 640 × 360 one without
    scrolling. Below 360px tall its header folds into the Players row. */
-#setup, #track { width: min(600px, calc(100% - 32px)); }
+#setup, #track, #identity-sheet { width: min(600px, calc(100% - 32px)); }
 .sheet.setup-sheet { gap: var(--space-2); padding: var(--space-3) var(--space-4) 14px; }
 .setup-header { gap: 6px; min-height: var(--tap-min); }
 .setup-header h2 { flex: 1; font-size: 1.25rem; letter-spacing: -.02em; }
@@ -916,7 +923,10 @@ dialog::backdrop { background: var(--scrim); }
 .switch-row .switch { margin-inline-start: auto; }
 .switch-row input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
 .switch-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
-#setup .sheet-actions :is(.primary, .secondary) { min-height: 48px; border-radius: 12px; font-size: 1rem; }
+#setup .sheet-actions :is(.primary, .secondary), #choose-identities { min-height: 48px; border-radius: 12px; font-size: 1rem; }
+.sheet-note { color: var(--muted); font-size: var(--type-small); }
+/* Choose identities keeps its place while setup would start a new game, like Colours and Rotate seats. */
+#choose-identities[hidden] { display: block; visibility: hidden; }
 /* Portrait phones stack each label over its control, so five segments keep 44px, and give each row the full
    width so its label isn't cut short. */
 @media (max-width: 480px) {
@@ -925,6 +935,15 @@ dialog::backdrop { background: var(--scrim); }
   /* The stepper needs more room than a segment here, so it takes its own line under the presets. */
   .life-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .life-choices .stepper { grid-column: 1 / -1; }
+}
+/* Short portrait phones (the 320 × 568 stress test): Track and Identity share a line, with Colours under them and
+   Track's summary left out, so setup fits with the custom life stepper open. */
+@media (max-width: 480px) and (max-height: 600px) {
+  .control-grid:has(#identity-nav) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .control-grid:has(#identity-nav) .nav-row { gap: 8px; padding-inline: 10px 8px; }
+  .control-grid:has(#identity-nav) .nav-summary { display: none; }
+  .control-grid:has(#identity-nav) .caret { margin-inline-start: auto; }
+  #tile-colours { grid-column: 1 / -1; }
 }
 /* Below 360px tall, the title goes and About · ✕ move to the end of the Players row. */
 @media (max-height: 359.98px) and (min-width: 481px) {
@@ -1093,7 +1112,7 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
   .close:hover, .segmented > button:not([aria-pressed="true"]):hover, .nav-row:hover, .switch-row:hover, .secondary:hover,
   .text-button:hover { background: var(--surface-pressed); }
   .stepper button:hover { background: var(--accent-pressed); }
-  .board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button:hover::before { content: none; }
+  .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button:hover::before { content: none; }
   .save-button:hover::before { background: var(--accent-pressed); }
   .primary:hover { background: var(--accent-pressed); }
   .dice-stage:hover { background: var(--dice-stage-pressed); }

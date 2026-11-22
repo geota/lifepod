@@ -35,6 +35,7 @@
   <template id="player-template">
     <section class="player">
       <div class="player-face">
+        <span class="watermark" aria-hidden="true"></span>
         <div class="badges far" role="list" aria-label="Commander damage" hidden></div>
         <div class="controls">
           <button type="button" class="subtract"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z"/></svg></button>
@@ -95,6 +96,7 @@
       </div>
       <div class="control-grid">
         <button class="nav-row" type="button" id="track-button" aria-haspopup="dialog"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232,56V176a8,8,0,0,1-2.76,6c-15.28,13.23-29.89,18-43.82,18-18.91,0-36.57-8.74-53-16.85C105.87,170,82.79,158.61,56,179.77V224a8,8,0,0,1-16,0V56a8,8,0,0,1,2.77-6h0c36-31.18,68.31-15.21,96.79-1.12C167,62.46,190.79,74.2,218.76,50A8,8,0,0,1,232,56Z"/></svg><span class="nav-label">Track</span><span class="nav-summary" id="track-summary" aria-hidden="true"></span><svg class="icon caret" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></svg></button>
+        <button class="nav-row" type="button" id="identity-nav" aria-haspopup="dialog"><span class="icon mana-icon" data-glyph="pie" aria-hidden="true"></span><span class="nav-label">Identity</span><svg class="icon caret" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></svg></button>
         <button class="nav-row" type="button" id="tile-colours"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M203.57,51A107.9,107.9,0,0,0,20,128c0,44.72,27.6,82.25,72,97.94A36,36,0,0,0,140,192a12,12,0,0,1,12-12h46.21a35.79,35.79,0,0,0,35.1-28A108.6,108.6,0,0,0,236,127.09,107.23,107.23,0,0,0,203.57,51Zm6.34,95.67a11.91,11.91,0,0,1-11.7,9.3H152a36,36,0,0,0-36,36,12,12,0,0,1-16,11.3c-16.65-5.88-30.65-15.76-40.48-28.56A76,76,0,0,1,44,128a84,84,0,0,1,83.13-84H128a84.35,84.35,0,0,1,84,83.29A84.72,84.72,0,0,1,209.91,146.71ZM144,76a16,16,0,1,1-16-16A16,16,0,0,1,144,76Zm-44,24A16,16,0,1,1,84,84,16,16,0,0,1,100,100Zm0,56a16,16,0,1,1-16-16A16,16,0,0,1,100,156Zm88-56a16,16,0,1,1-16-16A16,16,0,0,1,188,100Z"/></svg><span class="nav-label">Colours</span><svg class="icon caret" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"/></svg></button>
       </div>
       <div class="control-grid">
@@ -135,15 +137,34 @@
     </div>
   </dialog>
 
-  <!-- A player's colour identity, turned to face that player, for tiles too small to hold the toggles. -->
-  <dialog id="player-sheet" aria-labelledby="player-sheet-title">
-    <div class="sheet player-sheet">
-      <div class="sheet-header">
-        <h2 id="player-sheet-title"><span class="sheet-dot" aria-hidden="true"></span><span id="player-sheet-name"></span></h2>
-        <button class="close" type="button" data-close aria-label="Done" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></button>
+  <!-- Setup → Identity: what each tile shows of its player's colour identity. ‹ and Android back return to setup; ✕ closes
+       both. Choose identities closes both and starts identity mode, where every player sets their own. -->
+  <dialog id="identity-sheet" aria-labelledby="identity-title">
+    <div class="sheet setup-sheet">
+      <div class="sheet-header setup-header">
+        <button class="close" type="button" data-back aria-label="Back to setup"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z"/></svg></button>
+        <h2 id="identity-title">Identity</h2>
+        <button class="close" type="button" data-close aria-label="Close setup" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
       </div>
-      <h3 class="sheet-subtitle">Colour identity</h3>
-      <div id="sheet-identity"></div>
+      <div class="setting-row">
+        <span class="setting-label" id="identity-show-label">Show on tiles</span>
+        <!-- Any combination: each segment turns on or off by itself. -->
+        <div class="segmented" id="identity-show" role="group" aria-labelledby="identity-show-label">
+          <button type="button" data-show="indicator">Indicator</button>
+          <button type="button" data-show="symbol">Symbol</button>
+          <button type="button" data-show="name">Name</button>
+        </div>
+      </div>
+      <div class="setting-row">
+        <span class="setting-label" id="identity-background-label">Background</span>
+        <div class="segmented" id="identity-background" role="group" aria-labelledby="identity-background-label">
+          <button type="button" data-background="symbol">Symbol</button>
+          <button type="button" data-background="indicator">Indicator</button>
+          <button type="button" data-background="off">Off</button>
+        </div>
+      </div>
+      <p class="sheet-note">A tile shows nothing until its player picks an identity.</p>
+      <button class="primary" type="button" id="choose-identities">Choose identities</button>
     </div>
   </dialog>
 

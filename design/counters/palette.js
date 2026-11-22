@@ -971,5 +971,616 @@ export default {
    }
   ],
   "worst": 4.79
+ },
+ "r3": {
+  "swatches": [
+   {
+    "name": "Sage",
+    "hue": 145,
+    "top": {
+     "panel": "#2f432f",
+     "rim": "#556e4e",
+     "seat": "#d3eeaa",
+     "button": "#233324"
+    },
+    "bottom": {
+     "panel": "#253725",
+     "rim": "#476548",
+     "seat": "#bde7bd",
+     "button": "#19281a"
+    }
+   },
+   {
+    "name": "Sky",
+    "hue": 238,
+    "top": {
+     "panel": "#2c4352",
+     "rim": "#517187",
+     "seat": "#b6e0f7",
+     "button": "#21323e"
+    },
+    "bottom": {
+     "panel": "#1d3544",
+     "rim": "#3c6179",
+     "seat": "#b4e1ff",
+     "button": "#132632"
+    }
+   },
+   {
+    "name": "Coral",
+    "hue": 27,
+    "top": {
+     "panel": "#523734",
+     "rim": "#8a5e59",
+     "seat": "#ffd2cc",
+     "button": "#3e2926"
+    },
+    "bottom": {
+     "panel": "#432a27",
+     "rim": "#7b4f44",
+     "seat": "#ffc7b2",
+     "button": "#301d1a"
+    }
+   },
+   {
+    "name": "Violet",
+    "hue": 303,
+    "top": {
+     "panel": "#433a51",
+     "rim": "#726387",
+     "seat": "#e5d5fe",
+     "button": "#322b3d"
+    },
+    "bottom": {
+     "panel": "#342b41",
+     "rim": "#655179",
+     "seat": "#e4cff7",
+     "button": "#271f32"
+    }
+   },
+   {
+    "name": "Amber",
+    "hue": 90,
+    "top": {
+     "panel": "#4a4024",
+     "rim": "#7f6d49",
+     "seat": "#f6de96",
+     "button": "#362e16"
+    },
+    "bottom": {
+     "panel": "#3a3119",
+     "rim": "#695b35",
+     "seat": "#ecd8a3",
+     "button": "#2a2310"
+    }
+   },
+   {
+    "name": "Teal",
+    "hue": 184,
+    "top": {
+     "panel": "#254642",
+     "rim": "#42766f",
+     "seat": "#a8eee3",
+     "button": "#1b3531"
+    },
+    "bottom": {
+     "panel": "#1d3a36",
+     "rim": "#3f675d",
+     "seat": "#b4eddd",
+     "button": "#142925"
+    }
+   },
+   {
+    "name": "Rose",
+    "hue": 345,
+    "top": {
+     "panel": "#573147",
+     "rim": "#915477",
+     "seat": "#ffcde8",
+     "button": "#422435"
+    },
+    "bottom": {
+     "panel": "#482339",
+     "rim": "#804568",
+     "seat": "#fec7e5",
+     "button": "#351829"
+    }
+   },
+   {
+    "name": "Indigo",
+    "hue": 275,
+    "top": {
+     "panel": "#343b65",
+     "rim": "#5a65a7",
+     "seat": "#d4dcfe",
+     "button": "#262c4d"
+    },
+    "bottom": {
+     "panel": "#282e56",
+     "rim": "#4c5696",
+     "seat": "#cfd8fe",
+     "button": "#1b2040"
+    }
+   },
+   {
+    "name": "Slate",
+    "hue": 250,
+    "top": {
+     "panel": "#3b4045",
+     "rim": "#646c76",
+     "seat": "#d3e0ec",
+     "button": "#2b3034"
+    },
+    "bottom": {
+     "panel": "#2d3238",
+     "rim": "#555d66",
+     "seat": "#cfdbe8",
+     "button": "#202428"
+    }
+   },
+   {
+    "name": "Copper",
+    "hue": 55,
+    "top": {
+     "panel": "#563721",
+     "rim": "#8f5e3b",
+     "seat": "#ffd4b8",
+     "button": "#412917"
+    },
+    "bottom": {
+     "panel": "#472a14",
+     "rim": "#7f4f2d",
+     "seat": "#ffcfaf",
+     "button": "#341d0c"
+    }
+   },
+   {
+    "name": "Olive",
+    "hue": 120,
+    "top": {
+     "panel": "#3b441a",
+     "rim": "#647331",
+     "seat": "#d4ea91",
+     "button": "#2c3312"
+    },
+    "bottom": {
+     "panel": "#2e360c",
+     "rim": "#566420",
+     "seat": "#d0e58d",
+     "button": "#202706"
+    }
+   },
+   {
+    "name": "Orchid",
+    "hue": 320,
+    "top": {
+     "panel": "#503257",
+     "rim": "#865691",
+     "seat": "#f6ceff",
+     "button": "#3c2542"
+    },
+    "bottom": {
+     "panel": "#422448",
+     "rim": "#764780",
+     "seat": "#f4c8fe",
+     "button": "#301935"
+    }
+   }
+  ],
+  "checks": [
+   {
+    "name": "Sage",
+    "row": "top",
+    "panel": "#2f432f",
+    "rim": "#556e4e",
+    "seat": "#d3eeaa",
+    "button": "#233324",
+    "life": 9.43,
+    "small": 7.93,
+    "lifeOut": 5,
+    "warn": 6.56,
+    "pressed": 10.56,
+    "chipText": 12.88,
+    "warnChip": 6.18,
+    "outChip": 5.07,
+    "nearest": 0.03
+   },
+   {
+    "name": "Sage",
+    "row": "bottom",
+    "panel": "#253725",
+    "rim": "#476548",
+    "seat": "#bde7bd",
+    "button": "#19281a",
+    "life": 11.21,
+    "small": 9.44,
+    "lifeOut": 5.95,
+    "warn": 7.8,
+    "pressed": 11.27,
+    "chipText": 14.02,
+    "warnChip": 6.75,
+    "outChip": 5.47,
+    "nearest": 0.0273
+   },
+   {
+    "name": "Sky",
+    "row": "top",
+    "panel": "#2c4352",
+    "rim": "#517187",
+    "seat": "#b6e0f7",
+    "button": "#21323e",
+    "life": 9.12,
+    "small": 7.67,
+    "lifeOut": 4.84,
+    "warn": 6.35,
+    "pressed": 9.43,
+    "chipText": 12.69,
+    "warnChip": 6.13,
+    "outChip": 5.02,
+    "nearest": 0.028
+   },
+   {
+    "name": "Sky",
+    "row": "bottom",
+    "panel": "#1d3544",
+    "rim": "#3c6179",
+    "seat": "#b4e1ff",
+    "button": "#132632",
+    "life": 11.26,
+    "small": 9.48,
+    "lifeOut": 5.97,
+    "warn": 7.84,
+    "pressed": 11.22,
+    "chipText": 14.04,
+    "warnChip": 6.75,
+    "outChip": 5.5,
+    "nearest": 0.0283
+   },
+   {
+    "name": "Coral",
+    "row": "top",
+    "panel": "#523734",
+    "rim": "#8a5e59",
+    "seat": "#ffd2cc",
+    "button": "#3e2926",
+    "life": 9.48,
+    "small": 7.98,
+    "lifeOut": 5.03,
+    "warn": 6.6,
+    "pressed": 9.9,
+    "chipText": 13.01,
+    "warnChip": 6.2,
+    "outChip": 5,
+    "nearest": 0.029
+   },
+   {
+    "name": "Coral",
+    "row": "bottom",
+    "panel": "#432a27",
+    "rim": "#7b4f44",
+    "seat": "#ffc7b2",
+    "button": "#301d1a",
+    "life": 11.58,
+    "small": 9.75,
+    "lifeOut": 6.14,
+    "warn": 8.06,
+    "pressed": 10.68,
+    "chipText": 14.25,
+    "warnChip": 6.76,
+    "outChip": 5.5,
+    "nearest": 0.0287
+   },
+   {
+    "name": "Violet",
+    "row": "top",
+    "panel": "#433a51",
+    "rim": "#726387",
+    "seat": "#e5d5fe",
+    "button": "#322b3d",
+    "life": 9.44,
+    "small": 7.94,
+    "lifeOut": 5.01,
+    "warn": 6.57,
+    "pressed": 9.87,
+    "chipText": 12.91,
+    "warnChip": 6.18,
+    "outChip": 5.03,
+    "nearest": 0.0353
+   },
+   {
+    "name": "Violet",
+    "row": "bottom",
+    "panel": "#342b41",
+    "rim": "#655179",
+    "seat": "#e4cff7",
+    "button": "#271f32",
+    "life": 11.81,
+    "small": 9.94,
+    "lifeOut": 6.27,
+    "warn": 8.22,
+    "pressed": 10.97,
+    "chipText": 14.41,
+    "warnChip": 6.88,
+    "outChip": 5.57,
+    "nearest": 0.0342
+   },
+   {
+    "name": "Amber",
+    "row": "top",
+    "panel": "#4a4024",
+    "rim": "#7f6d49",
+    "seat": "#f6de96",
+    "button": "#362e16",
+    "life": 9.04,
+    "small": 7.6,
+    "lifeOut": 4.79,
+    "warn": 6.29,
+    "pressed": 10.14,
+    "chipText": 12.68,
+    "warnChip": 6.01,
+    "outChip": 4.89,
+    "nearest": 0.0328
+   },
+   {
+    "name": "Amber",
+    "row": "bottom",
+    "panel": "#3a3119",
+    "rim": "#695b35",
+    "seat": "#ecd8a3",
+    "button": "#2a2310",
+    "life": 11.34,
+    "small": 9.55,
+    "lifeOut": 6.02,
+    "warn": 7.89,
+    "pressed": 11.08,
+    "chipText": 14.07,
+    "warnChip": 6.68,
+    "outChip": 5.46,
+    "nearest": 0.0307
+   },
+   {
+    "name": "Teal",
+    "row": "top",
+    "panel": "#254642",
+    "rim": "#42766f",
+    "seat": "#a8eee3",
+    "button": "#1b3531",
+    "life": 9.11,
+    "small": 7.67,
+    "lifeOut": 4.83,
+    "warn": 6.34,
+    "pressed": 10,
+    "chipText": 12.77,
+    "warnChip": 6.15,
+    "outChip": 5.05,
+    "nearest": 0.03
+   },
+   {
+    "name": "Teal",
+    "row": "bottom",
+    "panel": "#1d3a36",
+    "rim": "#3f675d",
+    "seat": "#b4eddd",
+    "button": "#142925",
+    "life": 10.83,
+    "small": 9.11,
+    "lifeOut": 5.74,
+    "warn": 7.54,
+    "pressed": 11.72,
+    "chipText": 13.76,
+    "warnChip": 6.64,
+    "outChip": 5.43,
+    "nearest": 0.0273
+   },
+   {
+    "name": "Rose",
+    "row": "top",
+    "panel": "#573147",
+    "rim": "#915477",
+    "seat": "#ffcde8",
+    "button": "#422435",
+    "life": 9.57,
+    "small": 8.05,
+    "lifeOut": 5.08,
+    "warn": 6.66,
+    "pressed": 9.87,
+    "chipText": 13.06,
+    "warnChip": 6.23,
+    "outChip": 5.03,
+    "nearest": 0.0307
+   },
+   {
+    "name": "Rose",
+    "row": "bottom",
+    "panel": "#482339",
+    "rim": "#804568",
+    "seat": "#fec7e5",
+    "button": "#351829",
+    "life": 11.76,
+    "small": 9.9,
+    "lifeOut": 6.24,
+    "warn": 8.19,
+    "pressed": 11.05,
+    "chipText": 14.4,
+    "warnChip": 6.9,
+    "outChip": 5.58,
+    "nearest": 0.0298
+   },
+   {
+    "name": "Indigo",
+    "row": "top",
+    "panel": "#343b65",
+    "rim": "#5a65a7",
+    "seat": "#d4dcfe",
+    "button": "#262c4d",
+    "life": 9.45,
+    "small": 7.96,
+    "lifeOut": 5.01,
+    "warn": 6.58,
+    "pressed": 9.98,
+    "chipText": 12.99,
+    "warnChip": 6.26,
+    "outChip": 5.08,
+    "nearest": 0.0412
+   },
+   {
+    "name": "Indigo",
+    "row": "bottom",
+    "panel": "#282e56",
+    "rim": "#4c5696",
+    "seat": "#cfd8fe",
+    "button": "#1b2040",
+    "life": 11.47,
+    "small": 9.65,
+    "lifeOut": 6.08,
+    "warn": 7.98,
+    "pressed": 11.23,
+    "chipText": 14.2,
+    "warnChip": 6.88,
+    "outChip": 5.58,
+    "nearest": 0.0412
+   },
+   {
+    "name": "Slate",
+    "row": "top",
+    "panel": "#3b4045",
+    "rim": "#646c76",
+    "seat": "#d3e0ec",
+    "button": "#2b3034",
+    "life": 9.24,
+    "small": 7.77,
+    "lifeOut": 4.9,
+    "warn": 6.43,
+    "pressed": 9.93,
+    "chipText": 12.81,
+    "warnChip": 6.09,
+    "outChip": 4.98,
+    "nearest": 0.028
+   },
+   {
+    "name": "Slate",
+    "row": "bottom",
+    "panel": "#2d3238",
+    "rim": "#555d66",
+    "seat": "#cfdbe8",
+    "button": "#202428",
+    "life": 11.4,
+    "small": 9.59,
+    "lifeOut": 6.05,
+    "warn": 7.93,
+    "pressed": 11.12,
+    "chipText": 14.15,
+    "warnChip": 6.76,
+    "outChip": 5.52,
+    "nearest": 0.0283
+   },
+   {
+    "name": "Copper",
+    "row": "top",
+    "panel": "#563721",
+    "rim": "#8f5e3b",
+    "seat": "#ffd4b8",
+    "button": "#412917",
+    "life": 9.43,
+    "small": 7.94,
+    "lifeOut": 5,
+    "warn": 6.56,
+    "pressed": 9.88,
+    "chipText": 12.97,
+    "warnChip": 6.19,
+    "outChip": 4.97,
+    "nearest": 0.029
+   },
+   {
+    "name": "Copper",
+    "row": "bottom",
+    "panel": "#472a14",
+    "rim": "#7f4f2d",
+    "seat": "#ffcfaf",
+    "button": "#341d0c",
+    "life": 11.51,
+    "small": 9.69,
+    "lifeOut": 6.11,
+    "warn": 8.01,
+    "pressed": 11.15,
+    "chipText": 14.25,
+    "warnChip": 6.74,
+    "outChip": 5.49,
+    "nearest": 0.0287
+   },
+   {
+    "name": "Olive",
+    "row": "top",
+    "panel": "#3b441a",
+    "rim": "#647331",
+    "seat": "#d4ea91",
+    "button": "#2c3312",
+    "life": 9.14,
+    "small": 7.69,
+    "lifeOut": 4.85,
+    "warn": 6.36,
+    "pressed": 10.05,
+    "chipText": 12.79,
+    "warnChip": 6.11,
+    "outChip": 5.02,
+    "nearest": 0.0325
+   },
+   {
+    "name": "Olive",
+    "row": "bottom",
+    "panel": "#2e360c",
+    "rim": "#566420",
+    "seat": "#d0e58d",
+    "button": "#202706",
+    "life": 11.23,
+    "small": 9.45,
+    "lifeOut": 5.96,
+    "warn": 7.82,
+    "pressed": 11.28,
+    "chipText": 14.11,
+    "warnChip": 6.7,
+    "outChip": 5.5,
+    "nearest": 0.0321
+   },
+   {
+    "name": "Orchid",
+    "row": "top",
+    "panel": "#503257",
+    "rim": "#865691",
+    "seat": "#f6ceff",
+    "button": "#3c2542",
+    "life": 9.57,
+    "small": 8.06,
+    "lifeOut": 5.08,
+    "warn": 6.66,
+    "pressed": 9.89,
+    "chipText": 13.11,
+    "warnChip": 6.26,
+    "outChip": 5.07,
+    "nearest": 0.0307
+   },
+   {
+    "name": "Orchid",
+    "row": "bottom",
+    "panel": "#422448",
+    "rim": "#764780",
+    "seat": "#f4c8fe",
+    "button": "#301935",
+    "life": 11.74,
+    "small": 9.88,
+    "lifeOut": 6.23,
+    "warn": 8.17,
+    "pressed": 11.05,
+    "chipText": 14.47,
+    "warnChip": 6.98,
+    "outChip": 5.64,
+    "nearest": 0.0298
+   }
+  ],
+  "minimums": {
+   "life": 9,
+   "small": 7.6,
+   "lifeOut": 4.79
+  }
  }
 };
