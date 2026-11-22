@@ -219,3 +219,33 @@ With the monarch and the initiative (SPEC.md §13), Settings gains a **Reminders
 - **Placement (layout B):** the left column, after Table: Game, Table and Reminders are about as tall as Track and Identity, and Reminders is the least-used section. In one column it comes after Table, before About. app.js moves it with the others.
 - **Rows:** compact switch rows like Track's, two to a line where each row has room for its whole label (13rem), otherwise one, so no label is ever cut short (a container's auto-fit grid rather than Track's label-over-switch rule).
 - Tests: `tests/monarch.test.mjs` (which rows show when, the order of the sections in both layouts, 44px rows, saving) and `sizes.test.mjs` (every screen, no label cut short).
+
+## 9. Style (added 22 November 2026)
+
+At the owner's request, Settings → **Table** gains **Style: Material · Glass**, a segmented control above Tile colours. It switches the whole app between [STYLE.md](STYLE.md)'s direction A (Material, as in §7) and direction B (Glass, iOS 26).
+
+| | Material | Glass |
+|---|---|---|
+| Floating chrome: the pill, the settings header, dialogs (dice, New game, discard) | Solid, as in §7 | Tinted glass ([GLASS.md](GLASS.md)'s recipe): the surface at 68% over `blur(18px) saturate(1.3)`, a 1px light edge and a top highlight |
+| Settings header | Its own row above the body | Floats 8px in from the top and sides, rounded 22px; the body scrolls under it |
+| Cards and rows | Filled rows on 24px cards | Grouped lists: rows share a 20px card, split by hairlines, with switches on the right edge |
+| Segmented controls, dice picker | Accent fill on the chosen one | One track; the chosen segment or die is a neutral raised thumb (#707379, white text) |
+| Switches | 36 × 20, outlined off, accent on | 40 × 24: a grey track (3.6:1 on the card) with a white thumb off; the accent with an ink thumb on |
+| Sliders | 16px track, dot notches, 4px bar handle | 4px track, tick lines, a round white 28px thumb |
+| Identity toggles | Accent ring | Light ring; the accent stays on the check |
+| Map seats, swatches | 16px corners | 12px corners |
+| Pressed | 10% layer | 10% layer and a shrink to 96% |
+| Motion | 200ms emphasised easing | A 250ms spring with a gentle overshoot |
+
+- **Unchanged in both:** the tiles, the life halves, the twelve tile palettes and Tile colours (a separate setting), chips, the Graphite + lime palette, the 2px accent focus ring and 44px targets.
+- **The default:** until the player picks, the iOS app (WKWebView with the app's `game` message handler) starts on Glass, and Android and browsers on Material. A pick, including picking the default back, is saved in `game.style` at once and wins from then on. `loadGame()` keeps `style` only if it's `material` or `glass`; anything else, or a save from before the setting, means the platform's default.
+- **Fallbacks to solid surfaces:**
+  - no `backdrop-filter` (`@supports not`, for both the prefixed and unprefixed property);
+  - `prefers-reduced-transparency: reduce`;
+  - iOS Reduce Transparency, which WebKit doesn't expose as the media query: `LifePodApp.swift` injects `window.initialReduceTransparency` before the page loads and calls `window.setReduceTransparency(…)` on `UIAccessibility.reduceTransparencyStatusDidChangeNotification`; app.js sets `data-reduce-transparency` on `<html>`, which CSS treats like the media query;
+  - `prefers-contrast: more`, which also gives each surface a 2px `--control-border` outline (5.3:1).
+- **Reduced motion:** no transitions in either style, and Glass's presses don't shrink.
+- **How it's built:** Glass is one block of token overrides, `[data-style="glass"]`, after Material's in `web/styles.css`; app.js sets `data-style` on `<html>`. Where Material hard-coded a value (row fill and spacing, the segment track, the dice pick, slider ticks, the header's place, the press scale, the backdrop filter, edge colours), it's now a token both styles set. The fallbacks are token overrides too. There are no per-style component rules.
+- **Focus under the floating header:** the body's `scroll-padding-top` and the content's top padding both include the header's height (`--head-clear`), so the header can't cover the focused control (WCAG 2.4.11), and the life field still scrolls clear of the header and the keyboard.
+
+Tests: `tests/style.test.mjs` (the default on the web, Android and iOS, the pick persisting and winning, Glass on the key surfaces, each fallback and reduced motion); `tests/native.test.mjs` (the Reduce Transparency bridge, in the contract and in WebKit); `tests/settings.test.mjs` (the header never covers focus and the life field, in both styles); `tests/sizes.test.mjs` and `tests/sizes-glass.test.mjs` (every screen, one style each). `node design/polish/final-review.mjs --sweep` sweeps both styles.

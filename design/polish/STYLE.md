@@ -1,6 +1,6 @@
 # Control styling: research, inventory and options
 
-**Status:** options for the owner, 22 November 2026. Nothing in `web/` has changed.
+**Status:** built, 22 November 2026. Direction A ships as **Material** and direction B as **Glass**, picked in Settings → Table → Style; iOS starts on Glass, Android and browsers on Material. See [As built](#as-built-both-directions) at the end and [SETTINGS-SPEC.md](SETTINGS-SPEC.md) §7 and §9.
 
 **The ask:**
 
@@ -339,3 +339,29 @@ Measured with `node design/polish/palettes7.mjs`, WCAG 2.2.
 - Yes · Frosted, translucent pill over the tiles (from B) · `renders/style7-b.png`
 - No · A solid pill in the chosen direction · `renders/style7-a.png`
 - **Recommended: No.** A solid pill reads better over busy tiles and costs nothing on low-end phones. Yes is a fair taste call.
+
+---
+
+## As built: both directions
+
+The owner picked A with Graphite + lime first (SETTINGS-SPEC.md §7), then asked for B as a second whole-app style beside it. Both are in `web/styles.css`: A's tokens under `:root, [data-style="material"]`, and B as a block of overrides under `[data-style="glass"]`. Component rules read only tokens. Settings → Table → **Style** switches between them; it's saved, and until it's picked iOS starts on Glass and Android and browsers on Material.
+
+Glass follows §3 B, with these differences:
+
+| §3 B | As built | Why |
+|---|---|---|
+| Palette: Midnight + ice in the mock-up | Graphite + lime, as in Material | The owner kept one palette; only the control style changes. |
+| Glass on the pill and the settings header | Also on dialogs (dice, New game, discard) | The owner's call: all the floating chrome. Cards and rows stay solid. |
+| `blur(16–22px) saturate(1.5)` | GLASS.md's tinted recipe: the surface at 68% over `blur(18px) saturate(1.3)`, a 1px `#ffffff1f` edge and an `inset 0 1px 0 #ffffff22` highlight | GLASS.md measured it at 10:1 or better for the pill's icons on any tile. |
+| The settings header floats | It floats 8px in from the top and sides, rounded 22px, and the body scrolls under it; focus scrolls clear of it | So the glass has something to show, without covering the focused control. |
+| Switch: a white 20px thumb | White when off; **ink when on** | White on the lime accent is 1.1:1 and the thumb would vanish; ink is 12.6:1. Off, the grey track is 3.6:1 on the card and the white thumb 4.75:1 on the track. |
+| Segments: a raised light thumb | A neutral thumb, `#707379`, with white text, in a `--raised` track; the dice picker's chosen die too | 3.2:1 against the track (WCAG 1.4.11 for the selected state) and 4.75:1 for its text. |
+| Slider: a thin track | 4px in the thumb grey (3.6:1 on the card), the accent fill, tick lines (the accent where filled), a round white 28px thumb | The track keeps a visible boundary. |
+| Pressed scales to 96% | Buttons, segments, the dice picker, the life value, the pill's discs, and the counter, mana, map, swatch and identity cells; rows only take the 10% layer | Rows press like iOS list rows. Chips keep their size, so the badge rows' fitting never measures a shrunk chip. |
+| Reduced motion falls back to a fade | No transitions and no shrinking | As in Material: nothing moves. |
+| Identity toggles: not specified | A light ring when on, the accent check kept | B keeps the accent for Done and switches; the check reads as "on". |
+
+**Fallbacks** (GLASS.md): solid surfaces without `backdrop-filter`, under `prefers-reduced-transparency: reduce`, and under iOS Reduce Transparency (passed from `LifePodApp.swift` as `data-reduce-transparency`); solid with a 2px `--control-border` outline under `prefers-contrast: more`.
+
+**Checks:** `tests/style.test.mjs`, `tests/sizes.test.mjs` with `tests/sizes-glass.test.mjs`, and `node design/polish/final-review.mjs --sweep`, which sweeps every state in both styles.
+
