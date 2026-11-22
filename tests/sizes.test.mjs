@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, turnScreen } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, stripProblems, turnScreen } from './helpers.mjs';
 
 // Screens the board is checked on, by CSS size in landscape. The design target is a Pixel 11 Pro class phone at
 // 952 × 427. 320 × 568 is a stress test: no phone people still use is that small, but if it fits there it fits
@@ -135,6 +135,8 @@ async function checkSizes(t, engine) {
         const { page, errors } = await openBoard(browser, size, count, portrait);
         const tiles = await readTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`);
         checkTiles(tiles, view);
+        // The mana strip never covers a life total or its glyphs.
+        assert.deepEqual(await stripProblems(page), [], `${view}: the mana strip is clear of the total and glyphs`);
         // One size per board: every tile draws its total, glyphs and badges at the same size.
         checkUniform(await readUniform(page), view);
         // The centre pill's buttons are targets too.

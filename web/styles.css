@@ -777,38 +777,43 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
 .chip.flag-chip .icon { width: .95em; height: .95em; }
 /* Floating mana at rest: while a pool has mana, a strip takes the near row's place with each colour it holds and
-   its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Items are 44px
-   tall. When one line can't hold it, it wraps upward toward the total, keeping its first items at the edge, and it
-   never gives way. */
+   its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a
+   44px-tall target at least 44px wide, on a 32px capsule along the tile's edge. The strip never covers the life
+   total or the − and + glyphs: app.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every strip at once.
+   strip-turn moves the turn chips out, --strip-size shrinks the type, strip-wrap lets it grow upward onto a second
+   line, and data-fold turns a strip that still can't fit into one button showing the pool. */
 .mana-strip {
   position: absolute;
-  bottom: calc(6 * var(--grow));
+  bottom: 2px;
   left: 0;
   right: 0;
   z-index: 3;
   display: flex;
-  flex-wrap: wrap-reverse;
+  flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
-  gap: 0 2px;
+  gap: 0;
   width: fit-content;
   max-width: calc(100% - 8px);
   margin-inline: auto;
-  padding: 0 2px 0 6px;
-  border-radius: 22px;
-  background: var(--chip-background);
-  font-size: clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow)));
+  padding: 0 2px;
+  font-size: var(--strip-size, clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))));
 }
+.mana-strip::before { position: absolute; inset: 6px 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
 .mana-strip[hidden], .board[data-mode]:not([data-mode="rotate"]) .mana-strip { display: none; }
-.mana-strip > .chip { margin-inline: 4px; font-size: var(--near-badge-size, var(--badge-size)); }
+.board[data-drop~="strip-wrap"] .mana-strip { flex-wrap: wrap-reverse; }
+.board[data-drop~="strip-turn"] .mana-strip > .chip,
+.mana-strip[data-fold] > :is(.strip-spend, .strip-clear), .mana-strip:not([data-fold]) > .strip-summary { display: none; }
+.mana-strip > .chip { flex: none; margin-inline: 6px 4px; font-size: var(--near-badge-size, var(--badge-size)); }
 .mana-strip > button:not(.chip) {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   min-width: var(--tap-min);
   height: var(--tap-min);
-  padding: 0 6px;
+  padding: 0 4px;
   border: 0;
   border-radius: var(--radius-full);
   background: none;
@@ -818,11 +823,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   line-height: 1;
 }
 .mana-strip > button:not(.chip):active { background: var(--wash); }
-.mana-strip .pip { --pip-size: 1.3em; }
+.mana-strip .pip { --pip-size: 1.25em; }
 .mana-strip > button.strip-clear { color: var(--text-soft); }
 .strip-clear .icon { width: 1.05em; height: 1.05em; }
-.mana-strip > button.strip-undo { gap: 6px; padding: 0 14px 0 10px; color: var(--text-soft); font-size: .85em; font-weight: var(--weight-semibold); }
+.mana-strip > button.strip-undo { gap: 6px; padding: 0 12px 0 8px; color: var(--text-soft); font-size: .85em; font-weight: var(--weight-semibold); }
 .strip-undo .icon { width: 1.1em; height: 1.1em; }
+/* Folded: the pool's colours and amounts in one button, a little smaller. */
+.mana-strip > button.strip-summary { gap: 6px; padding: 0 10px; font-size: .85em; }
+.summary-item { display: flex; align-items: center; gap: 2px; }
 /* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
 .chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
 .chip.damage[data-level="out"] { background: var(--panel); }

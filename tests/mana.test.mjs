@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, setSwitches } from './helpers.mjs';
+import { app, button, setSwitches, stripProblems } from './helpers.mjs';
 
 // Floating mana (design/polish/SPEC.md §9): the Mana pool switch, mana mode, the strip at rest (spend, clear, undo
 // clear) and emptying pools when the turn passes.
@@ -62,9 +62,10 @@ const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const cell = (page, number, colour) => tile(page, number).locator(`.mana-cell[data-colour="${colour}"]`);
 const amount = (page, number, colour) => cell(page, number, colour).locator('b').textContent();
 const isOpen = (page, id) => page.locator(`#${id}`).evaluate(dialog => dialog.open);
-// Each tile's strip as it reads: 'R3 C1 clear', 'undo', or '' with no strip.
+// Each tile's strip as it reads: 'R3 C1 clear', 'undo', or '' with no strip. Turn chips and the folded summary,
+// which shows only where the strip can't fit, are left out.
 const strips = page => page.locator('.mana-strip').evaluateAll(rows => rows.map(row => (row.hidden ? '' : [...row.children]
-  .filter(item => !item.matches('.chip'))
+  .filter(item => !item.matches('.chip') && item.checkVisibility())
   .map(item => (item.matches('.strip-clear') ? 'clear' : item.matches('.strip-undo') ? 'undo' : `${item.dataset.colour}${item.textContent}`)).join(' '))));
 const nearShown = page => page.locator('.badges.near').evaluateAll(rows => rows.map(row => !row.hidden && row.childElementCount > 0));
 const floating = page => page.locator('#mana-button').evaluate(node => node.hasAttribute('data-floating'));
@@ -134,7 +135,7 @@ async function checkManaMode(t, engine) {
   // Every strip item is a 44px target inside its tile.
   const targets = await page.locator('.player').evaluateAll(players => players.flatMap((player, index) => {
     const bounds = player.getBoundingClientRect();
-    return [...player.querySelectorAll('.mana-strip button')].map((item) => {
+    return [...player.querySelectorAll('.mana-strip button')].filter(item => item.checkVisibility()).map((item) => {
       const box = item.getBoundingClientRect();
       const inside = box.left >= bounds.left - 0.5 && box.right <= bounds.right + 0.5 && box.top >= bounds.top - 0.5 && box.bottom <= bounds.bottom + 0.5;
       return box.width >= 43.5 && box.height >= 43.5 && inside ? '' : `P${index + 1} ${item.getAttribute('aria-label')} ${box.width}×${box.height}`;
@@ -302,6 +303,65 @@ test('chromium: mana mode fits six players on the smallest phone', async (t) => 
   assert.equal(await page.locator('.mana-cell').count(), 36);
   assert.deepEqual(await problems(), [], 'the mana cells fit');
 });
+
+// The strip never covers a life total or its − and + glyphs. With three or all six colours on every tile, with and
+// without the active player's turn chip, on the target, the smallest real phone and the stress size: the turn chips
+// leave the strip first, then the type shrinks, and a strip that still can't fit clear of the total folds into one
+// button that opens mana mode.
+async function checkStripClear(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  const three = [0, 2, 0, 3, 0, 1];
+  const six = [2, 1, 3, 4, 5, 6];
+  for (const [width, height] of [[952, 427], [640, 360], [568, 320]]) {
+    for (const count of [4, 6]) {
+      for (const [colours, pool] of [['three colours', three], ['six colours', six]]) {
+        for (const turn of [false, true]) {
+          const view = `${width} × ${height}, ${count} players, ${colours}${turn ? ', turn chip' : ''}`;
+          const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
+          const errors = [];
+          page.on('pageerror', error => errors.push(error.message));
+          const game = savedGame(count, {
+            manaPool: true, pools: Array(count).fill(pool), counters: { commander: true, poison: true }, poison: Array(count).fill(9),
+            ...(turn ? { turns: 'turns', turn: { first: 0, active: 0, round: 12 } } : {}),
+          });
+          await page.addInitScript(saved => localStorage.setItem('lifepod-game', saved), JSON.stringify(game));
+          await page.goto(app);
+          await page.evaluate(() => document.fonts.ready);
+          await page.waitForTimeout(100);
+          assert.deepEqual(await stripProblems(page), [], `${view}: every strip is clear of the totals and glyphs`);
+          const state = await page.evaluate(() => ({
+            strips: [...document.querySelectorAll('.mana-strip')].filter(strip => !strip.hidden).length,
+            folded: document.querySelectorAll('.mana-strip[data-fold]').length,
+            turnChip: [...document.querySelectorAll('.mana-strip .turn-chip')].some(chip => chip.checkVisibility()),
+            drop: document.querySelector('#board').dataset.drop ?? '',
+          }));
+          assert.equal(state.strips, count, `${view}: every tile with mana has a strip`);
+          // A turn chip that left its strip is never the only way to pass: the pill's round button does the same.
+          if (turn && !state.turnChip) {
+            assert.ok(state.drop.includes('strip-turn'), `${view}: the turn chip left the strip as an auto-drop step`);
+            assert.ok(await page.locator('#round-button').isVisible(), `${view}: the pill's round button stays`);
+          }
+          if (state.folded) {
+            // A folded strip shows the pool and opens mana mode.
+            const summary = page.locator('.mana-strip[data-fold] .strip-summary').first();
+            assert.match(await summary.getAttribute('aria-label'), /^Player \d, mana pool .+\. Open mana$/);
+            await summary.tap();
+            assert.equal(await mode(page), 'mana', `${view}: a folded strip opens mana mode`);
+          }
+          if (width === 952 && count === 4) assert.equal(state.folded, 0, `${view}: nothing folds on the target with four players`);
+          if (colours === 'three colours' && !(width === 568 && count === 6)) assert.equal(state.folded, 0, `${view}: three colours never fold`);
+          assert.deepEqual(errors, [], `${view}: no script errors`);
+          await page.close();
+        }
+      }
+    }
+  }
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: the mana strip never covers a life total or its glyphs`, { timeout: 120000 }, t => checkStripClear(t, engine));
+}
 
 test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {
   const page = await openPage(t, chromium, { android: true, game: savedGame(4, { manaPool: true }) });

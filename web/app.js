@@ -148,6 +148,13 @@ const dropSteps = {
     { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true },
   ],
   far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
+  // The mana strip never covers the life total or the − and + glyphs. The turn chips leave it first (the pill's round
+  // button does the same and stays), then the type shrinks, then it wraps upward if there's room above it. Where even
+  // that would cover the total, a strip folds into one button that shows the pool and opens mana mode. Only the strips
+  // that need it fold, so a short pool elsewhere keeps its spend buttons.
+  strip: [
+    { drop: 'strip-turn', selector: '.mana-strip > .chip' }, { floor: 11 }, { drop: 'strip-wrap', wrap: true }, { fold: true },
+  ],
 };
 // A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
 // down by one can't make it blink.
@@ -182,7 +189,7 @@ let editStartScores = [];
 let announceTimer;
 const pendingAnnouncements = new Map();
 // How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none.
-let dropLevels = { near: 0, far: 0 };
+let dropLevels = { near: 0, far: 0, strip: 0 };
 let fitQueued = false;
 // Setup's starting life, before Done applies it, and whether Custom is chosen.
 let selectedLife = game.startingLife;
@@ -277,6 +284,7 @@ function fitBadgeRows() {
   fitQueued = false;
   fitBadgeSide('near');
   fitBadgeSide('far');
+  fitStrips();
 }
 
 function syncDropTokens(levels) {
@@ -293,7 +301,7 @@ function dropTokens(side, level, rows = badgeRows(side)) {
 }
 
 function badgeRows(side) {
-  return [...board.querySelectorAll(`.badges.${side}`)].filter(row => !row.hidden && row.offsetParent !== null && row.childElementCount);
+  return [...board.querySelectorAll(side === 'strip' ? '.mana-strip' : `.badges.${side}`)].filter(row => !row.hidden && row.offsetParent !== null && row.childElementCount);
 }
 
 // The chips' width at the row's current type, from the first chip shown to the last, gaps included.
@@ -350,6 +358,71 @@ function fitBadgeSide(side) {
   if (!state.wrap && state.ratio < 1 && state.floor !== null) {
     board.style.setProperty(property, `${Math.max(state.floor, Math.floor(base * state.ratio * 10) / 10)}px`);
   }
+}
+
+// Whether two boxes overlap by more than a rounding error.
+function overlaps(a, b) {
+  return a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+}
+
+// The mana strips take the fewest steps that keep every strip on one line, inside its tile and clear of its life
+// total and − and + glyphs, board-wide like the badge rows, with the same 15% to spare before a step is undone.
+function fitStrips() {
+  const strips = badgeRows('strip');
+  board.style.removeProperty('--strip-size');
+  if (!strips.length) {
+    syncDropTokens(dropLevels);
+    return;
+  }
+  const steps = dropSteps.strip;
+  const base = parseFloat(getComputedStyle(strips[0]).fontSize);
+  const measure = (level, slack) => {
+    syncDropTokens({ ...dropLevels, strip: level });
+    board.style.removeProperty('--strip-size');
+    const taken = steps.slice(0, level);
+    const floors = taken.filter(step => step.floor).map(step => step.floor);
+    const wrap = taken.some(step => step.wrap);
+    const fold = taken.some(step => step.fold);
+    for (const strip of strips) delete strip.dataset.fold;
+    // Room for one line: the tile's width, less the strip's inset.
+    const room = strip => strip.parentElement.clientWidth - 8;
+    // One line's width, even where the strips may wrap.
+    const lineWidth = (strip) => {
+      strip.style.flexWrap = 'nowrap';
+      const width = strip.scrollWidth;
+      strip.style.removeProperty('flex-wrap');
+      return width;
+    };
+    if (floors.length) {
+      const ratio = Math.min(...strips.map(strip => room(strip) / (lineWidth(strip) * slack)));
+      if (ratio < 1) board.style.setProperty('--strip-size', `${Math.max(Math.min(...floors), Math.floor(base * ratio * 10) / 10)}px`);
+    }
+    const clear = (strip) => {
+      const box = strip.getBoundingClientRect();
+      const face = strip.parentElement;
+      return ![face.querySelector('.score'), ...face.querySelectorAll('.controls button')]
+        .some(blocker => overlaps(box, blocker.getBoundingClientRect()));
+    };
+    const fits = strip => (wrap || strip.scrollWidth * slack <= room(strip) + 1) && clear(strip);
+    if (fold) for (const strip of strips) if (!fits(strip)) strip.dataset.fold = '';
+    return strips.every(strip => ('fold' in strip.dataset ? clear(strip) : fits(strip)));
+  };
+  let needed = 0;
+  while (needed < steps.length && !measure(needed, 1)) needed++;
+  let level = needed;
+  const current = dropLevels.strip;
+  if (needed < current) {
+    const kept = dropTokens('strip', current, strips).length;
+    level = current;
+    for (let candidate = needed; candidate < current; candidate++) {
+      if (dropTokens('strip', candidate, strips).length === kept || measure(candidate, dropSlack)) {
+        level = candidate;
+        break;
+      }
+    }
+  }
+  dropLevels = { ...dropLevels, strip: level };
+  measure(level, 1);
 }
 
 function seatRow(index) {
@@ -1539,11 +1612,22 @@ function stripItems(index) {
     bindTap(spend, () => spendMana(index, at));
     return [spend];
   });
+  // Folded, where the strip can't fit clear of the total: one button that shows the pool and opens mana mode.
+  const summary = element('button', 'strip-summary', ...manaColours.flatMap((colour, at) => {
+    const amount = game.pools[index][at];
+    if (!amount) return [];
+    const pip = element('span', 'pip');
+    pip.dataset.pip = colour.id;
+    return [element('span', 'summary-item', pip, String(amount))];
+  }));
+  summary.type = 'button';
+  summary.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(index)}. Open mana`);
+  bindTap(summary, () => setBoardMode('mana'));
   const eraser = element('button', 'strip-clear', icon('eraser'));
   eraser.type = 'button';
   eraser.setAttribute('aria-label', `Clear Player ${index + 1}'s mana pool`);
   bindTap(eraser, () => clearPool(index));
-  return [...items, eraser];
+  return [...items, eraser, summary];
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
@@ -1770,7 +1854,7 @@ function startGame(playerCount, startingLife) {
   // A new game takes the screen's current landscape as upright.
   game.landscapeAngle = currentLandscapeAngle();
   // A new game starts with every badge at full size.
-  dropLevels = { near: 0, far: 0 };
+  dropLevels = { near: 0, far: 0, strip: 0 };
   saveGame();
   syncBoardTurn();
   renderBoard();
@@ -2129,7 +2213,7 @@ if (window.ResizeObserver) new ResizeObserver(measureBoard).observe(board);
 // so they're fitted again from full size once it has. The board is turned and measured again first: a font can
 // finish loading in the middle of a resize or a rotation, before the board has caught up with the window.
 document.fonts?.addEventListener?.('loadingdone', () => {
-  dropLevels = { near: 0, far: 0 };
+  dropLevels = { near: 0, far: 0, strip: 0 };
   syncBoardTurn();
 });
 syncBoardTurn();
