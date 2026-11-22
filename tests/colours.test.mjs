@@ -237,3 +237,49 @@ test('chromium: Android back closes the colours mode', async (t) => {
   assert.equal(await back(), false, 'back at rest leaves the app');
   assert.equal(JSON.parse(await page.evaluate(() => sessionStorage.getItem('game'))).colors[1], 8, 'the choice is kept');
 });
+
+// Rotated seats on short phones (design/polish/FINAL-REVIEW.md #5): a sideways face narrower than four swatches lays
+// them out 3 wide × 4 tall, and every swatch and owner label stays inside its tile, clear of the check mark.
+async function checkRotatedColours(t, engine) {
+  const page = await openPage(t, engine);
+  for (const [width, height, angle] of [[640, 360, 90], [568, 320, 90], [320, 568, 0]]) {
+    await turnScreen(page, width, height, angle);
+    for (const players of [3, 4, 5, 6]) {
+      for (const rotations of [[1, 2, 3, 0, 1, 3], [1, 1, 1, 1, 1, 1], [3, 3, 3, 3, 3, 3]]) {
+        const view = `${players} players, ${width} × ${height}, seats ${rotations.slice(0, players).join('')}`;
+        await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify({
+          startingLife: 40, scores: Array(players).fill(40), rotations: rotations.slice(0, players), landscapeAngle: 90,
+        }));
+        await page.reload();
+        await openColours(page);
+        const found = await page.evaluate(() => {
+          const controls = document.querySelector('#board-controls').getBoundingClientRect();
+          const disc = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
+          const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+          return [...document.querySelectorAll('.player')].flatMap((player, index) => {
+            const bounds = player.getBoundingClientRect();
+            const face = player.querySelector('.player-face');
+            const grid = player.querySelector('.swatches');
+            const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
+            const issues = [...player.querySelectorAll('.swatch, .swatch .owner')].map((node) => {
+              const box = node.getBoundingClientRect();
+              const problems = [];
+              if (node.matches('.swatch') && Math.min(box.width, box.height) < 43.5) problems.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
+              if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) problems.push('outside its tile');
+              if (overlaps(box, disc)) problems.push('under the check mark');
+              return problems.length ? `P${index + 1} ${node.getAttribute('aria-label') ?? node.textContent}: ${problems.join(', ')}` : '';
+            }).filter(Boolean);
+            if (face.offsetWidth < 4 * 44 + 3 * 3 + 2 && columns !== 3) issues.push(`P${index + 1}'s face is ${face.offsetWidth}px wide but its swatches are ${columns} wide`);
+            return issues;
+          });
+        });
+        assert.deepEqual(found, [], view);
+        await button(page, 'Done choosing colours').tap();
+      }
+    }
+  }
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: Colours fits rotated seats on short phones`, { timeout: 120000 }, t => checkRotatedColours(t, engine));
+}

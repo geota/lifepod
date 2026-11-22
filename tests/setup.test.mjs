@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, scores } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, scores, turnScreen } from './helpers.mjs';
 
 // Game setup and its Track sheet (design/polish/SPEC.md §4): segmented choices, the custom life stepper,
 // navigation rows, switch rows and the sheet buttons.
@@ -118,7 +118,14 @@ async function checkTrack(t, engine) {
   const page = await openPage(t, engine, engine === chromium);
   await page.goto(app);
   const saved = () => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
-  const summary = () => page.locator('#track-summary').evaluate(node => [...node.children].map(icon => icon.dataset.glyph ?? icon.dataset.icon));
+  const summary = () => page.locator('#track-summary').evaluate(node => [...node.children].map(icon => icon.dataset.glyph ?? icon.dataset.icon ?? icon.textContent));
+  // Track sums up what's on in order: as many icons as fit, at most three, then "+N" for the rest.
+  const sums = async (all) => {
+    const shown = await summary();
+    const icons = shown.filter(item => !item.startsWith('+'));
+    return icons.length >= 1 && icons.length <= 3 && isDeepStrictEqual(icons, all.slice(0, icons.length))
+      && isDeepStrictEqual(shown.slice(icons.length), icons.length < all.length ? [`+${all.length - icons.length}`] : []) ? all : shown;
+  };
 
   // Setup's unsaved choices survive a trip to Track and back with ‹.
   await button(page, 'Game setup').tap();
@@ -151,11 +158,11 @@ async function checkTrack(t, engine) {
   // Escape goes back to setup too, where Track sums up what's on, in the same order.
   await page.keyboard.press('Escape');
   await eventually(() => openDialogs(page), ['setup'], 'Escape returns to setup');
-  assert.deepEqual(await summary(), ['sword', 'infect', 'energy', 'rad'], 'Track shows the icons of the trackers that are on');
+  assert.deepEqual(await sums(['sword', 'infect', 'energy', 'rad']), ['sword', 'infect', 'energy', 'rad'], 'Track shows the icons of the trackers that are on');
   await button(page, 'Track').tap();
   await page.locator('#track label', { has: page.getByRole('switch', { name: 'Experience', exact: true }) }).tap();
   await button(page, 'Back to setup').tap();
-  await eventually(() => summary(), ['sword', 'infect', 'energy', 'graduation-cap', 'rad']);
+  await eventually(() => sums(['sword', 'infect', 'energy', 'graduation-cap', 'rad']), ['sword', 'infect', 'energy', 'graduation-cap', 'rad']);
 
   // ✕ in Track closes everything.
   await button(page, 'Track').tap();
@@ -179,4 +186,81 @@ async function checkTrack(t, engine) {
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: Track holds the tracker switches and returns to setup`, { timeout: 60000 }, t => checkTrack(t, engine));
+}
+
+// The Track row keeps its label whole and its caret inside the row, however many trackers are on
+// (design/polish/FINAL-REVIEW.md #4): the summary shows as many icons as fit beside "Track", at most three, then "+N".
+// Its icon is a checklist, not the flag that marks Rounds and the first player (#18).
+async function checkTrackRow(t, engine) {
+  const page = await openPage(t, engine);
+  await fakeScreenOrientation(page);
+  await page.goto(app);
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
+    startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'rounds', turn: { first: 0, active: 0, round: 1 },
+    counters: { commander: true, poison: true, energy: true, experience: true, rad: true },
+  })));
+  await page.reload();
+  for (const [width, height, angle] of [[952, 427, 90], [852, 393, 90], [640, 360, 90], [568, 320, 90], [375, 667, 0]]) {
+    await turnScreen(page, width, height, angle);
+    await button(page, 'Game setup').tap();
+    const row = await page.locator('#track-button').evaluate((track) => {
+      const box = node => node.getBoundingClientRect();
+      const inside = (node) => {
+        const outer = box(track);
+        const inner = box(node);
+        return inner.left >= outer.left - 0.5 && inner.right <= outer.right + 0.5;
+      };
+      const label = track.querySelector('.nav-label');
+      const summary = track.querySelector('.nav-summary');
+      const items = [...summary.children].filter(item => item.checkVisibility());
+      // The label's text at its natural width.
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      return {
+        label: label.textContent,
+        whole: label.clientWidth >= Math.floor(range.getBoundingClientRect().width) && label.scrollWidth <= label.clientWidth,
+        caret: inside(track.querySelector('.caret')),
+        summary: summary.offsetWidth === 0 || (inside(summary) && summary.scrollWidth <= summary.clientWidth + 0.5),
+        icons: items.filter(item => !item.matches('.more')).length,
+        more: items.find(item => item.matches('.more'))?.textContent ?? '',
+        flag: track.querySelector(':scope > svg path').getAttribute('d').startsWith('M232,56V176'),
+      };
+    });
+    const view = `${width} × ${height}`;
+    assert.deepEqual([row.label, row.whole, row.caret, row.summary, row.flag], ['Track', true, true, true, false],
+      `${view}: "Track" shows whole, with the caret and the summary inside the row and a checklist icon`);
+    if (width > 480) {
+      assert.ok(row.icons >= 1 && row.icons <= 3, `${view}: one to three icons (${row.icons})`);
+      assert.equal(row.more, `+${7 - row.icons}`, `${view}: "+N" counts the rest of the seven`);
+    }
+    await button(page, 'Close setup').tap();
+  }
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: the Track row keeps its label and caret with every tracker on`, { timeout: 60000 }, t => checkTrackRow(t, engine));
+}
+
+// About scrolls on short screens, with a fade along the bottom while there's more below, gone once the end is reached
+// (design/polish/FINAL-REVIEW.md #20).
+async function checkAboutCue(t, engine) {
+  const page = await openPage(t, engine);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto(app);
+  const cue = () => page.locator('#privacy').evaluate(dialog => ({
+    scrolls: dialog.scrollHeight > dialog.clientHeight + 1,
+    more: dialog.querySelector('.scroll-cue').hasAttribute('data-more'),
+  }));
+  await button(page, 'Game setup').tap();
+  await button(page, 'About').tap();
+  assert.deepEqual(await cue(), { scrolls: true, more: true }, 'at 952 × 427 About scrolls, and the fade says there is more');
+  await page.locator('#privacy').evaluate((dialog) => { dialog.scrollTop = dialog.scrollHeight; });
+  await page.waitForFunction(() => !document.querySelector('#privacy .scroll-cue').hasAttribute('data-more'));
+  assert.deepEqual(await cue(), { scrolls: true, more: false }, 'at the end the fade goes');
+  await page.locator('#privacy').evaluate((dialog) => { dialog.scrollTop = 0; });
+  await page.waitForFunction(() => document.querySelector('#privacy .scroll-cue').hasAttribute('data-more'));
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: About shows a fade while there's more to read`, t => checkAboutCue(t, engine));
 }

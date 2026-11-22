@@ -247,7 +247,7 @@ async function checkNearSteps(t, engine) {
     const page = await openBoard(t, engine, worstGame(6, { show, everyCounter }), { width: start, height: Math.round(start * 0.5625) });
     let reached = 0;
     const seen = new Set();
-    for (let width = start; width >= 300; width -= step) {
+    for (let width = start; width >= 290; width -= step) {
       await resize(page, width);
       const drops = await readDrops(page);
       const view = `${label}, ${width}px`;
@@ -318,6 +318,8 @@ async function checkTurnWord(t, engine) {
   assert.deepEqual([drops.drop, drops.near, drops.problems], ['name', '', []], `${width}px: the word "Turn" is the first thing to go`);
   assert.equal(await page.locator('.turn-word').evaluate(word => word.checkVisibility()), false);
   assert.equal(await page.locator('.turn-chip').textContent(), 'Turn12', 'the chip keeps the untap symbol and the round');
+  // The round keeps a "T" (T12), so the untap symbol doesn't read as a letter (design/polish/FINAL-REVIEW.md #17).
+  assert.equal(await page.locator('.turn-chip .turn-round').evaluate(round => getComputedStyle(round, '::before').content), '"T"');
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {

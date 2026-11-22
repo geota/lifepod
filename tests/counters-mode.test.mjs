@@ -371,3 +371,27 @@ test('chromium: saved counters are checked when a game loads', async (t) => {
     ...game, counters: { energy: true, experience: 1, rad: true }, energy: [5, -2, 'x', 99], experience: [4, 4, 4, 4], rad: [1.5, 100, 7],
   }), { counters: true, near: ['5 energy', '', '7 rad', '99 energy'] }, 'experience stays off, and bad counts start at 0');
 });
+
+// Counter icons stay legible on small boards (design/polish/FINAL-REVIEW.md #16): the icon is 0.42 of the cell and the
+// count 0.3, at 568 × 320 with six players as on the target.
+test('chromium: counter cells draw their icon at 0.42 of the cell and the count at 0.3', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  for (const viewport of [{ width: 568, height: 320 }, { width: 952, height: 427 }]) {
+    const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport });
+    await page.goto(app);
+    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
+      startingLife: 40, scores: Array(6).fill(40), landscapeAngle: 90,
+      counters: { commander: true, poison: true, energy: true, experience: true, rad: true },
+    })));
+    await page.reload();
+    await button(page, 'Counters').tap();
+    const ratios = await page.locator('.player:nth-child(1) .counter-cell').evaluateAll(cells => cells.map((cell) => {
+      const size = cell.offsetWidth;
+      const icon = cell.querySelector('.icon, .mana-icon');
+      return [Math.round(parseFloat(getComputedStyle(icon).fontSize) / size * 100) / 100, Math.round(parseFloat(getComputedStyle(cell.querySelector('b')).fontSize) / size * 100) / 100];
+    }));
+    assert.deepEqual(ratios, Array(5).fill([0.42, 0.3]), `${viewport.width} × ${viewport.height}`);
+    await page.close();
+  }
+});

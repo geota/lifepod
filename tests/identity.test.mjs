@@ -426,3 +426,57 @@ test('chromium: saved identity settings are checked when a game loads', async (t
   assert.deepEqual((await load({ show: { symbol: true }, background: 'indicator' })).settings, [['Indicator', 'Symbol', 'Name'], ['Indicator']],
     'missing parts get their defaults');
 });
+
+// Identity mode and the Identity sheet explain themselves (design/polish/FINAL-REVIEW.md #9 and #10). An off toggle's
+// symbol is muted and an on one has a check, under the hint "Tap your colours". Each "Show on tiles" segment has the
+// mark it adds (the colour disc, the symbol, "Aa"), shows a check while it's on, and the note says what tiles show.
+async function checkExplains(t, engine) {
+  const page = await openPage(t, engine);
+  await page.goto(app);
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
+    startingLife: 40, scores: [40, 40, 40, 40, 40, 40], identities: ['WUBG', 'UB', '', 'G', 'WUBRG', 'R'], landscapeAngle: 90,
+  })));
+  await page.reload();
+  await button(page, 'Game setup').tap();
+  await button(page, 'Identity').tap();
+  const sheet = () => page.locator('#identity-show').evaluate(group => ({
+    segments: [...group.children].map(segment => ({
+      label: segment.textContent.trim(),
+      mark: Boolean(segment.querySelector(':scope > :first-child:is(.ci, .mana-icon, svg:not(.segment-check))')),
+      check: segment.querySelector('.segment-check').checkVisibility(),
+    })),
+    note: document.querySelector('#identity-note').textContent,
+  }));
+  assert.deepEqual(await sheet(), {
+    segments: [{ label: 'Indicator', mark: true, check: true }, { label: 'Symbol', mark: true, check: false }, { label: 'Name', mark: true, check: true }],
+    note: "Tiles show the colour disc and name of each player's identity.",
+  }, 'the default: the colour disc and the name, each with a check');
+  await page.locator('#identity-show').getByRole('button', { name: 'Symbol' }).tap();
+  assert.equal((await sheet()).note, "Tiles show the colour disc, symbol and name of each player's identity.");
+  for (const part of ['Indicator', 'Symbol', 'Name']) await page.locator('#identity-show').getByRole('button', { name: part }).tap();
+  const none = await sheet();
+  assert.deepEqual(none.segments.map(segment => segment.check), [false, false, false], 'no checks with nothing on');
+  assert.equal(none.note, 'Identity is hidden on tiles. Players keep their picks.');
+  await page.locator('#identity-show').getByRole('button', { name: 'Name' }).tap();
+  assert.equal((await sheet()).note, "Tiles show the name of each player's identity.");
+
+  // Identity mode: Player 1 has W, U, B and G, so red is off.
+  await button(page, 'Choose identities').tap();
+  const toggles = await tile(page, 1).locator('.identity-toggle').evaluateAll(buttons => buttons.map((toggle) => {
+    const pip = getComputedStyle(toggle.querySelector('.pip'));
+    return { colour: toggle.value, on: toggle.getAttribute('aria-pressed') === 'true', muted: pip.filter !== 'none' && Number(pip.opacity) < 1, check: toggle.querySelector('.toggle-check').checkVisibility() };
+  }));
+  assert.deepEqual(toggles, [
+    { colour: 'W', on: true, muted: false, check: true }, { colour: 'U', on: true, muted: false, check: true },
+    { colour: 'B', on: true, muted: false, check: true }, { colour: 'R', on: false, muted: true, check: false },
+    { colour: 'G', on: true, muted: false, check: true },
+  ], 'off is muted with no check; on is in full colour with a check');
+  assert.equal(await tile(page, 1).locator('.layer-hint').textContent(), 'Tap your colours');
+  assert.ok(await tile(page, 1).locator('.layer-hint').isVisible(), 'the hint shows on the target phone');
+  await tile(page, 1).locator('.identity-toggle[value="R"]').tap();
+  assert.equal(await tile(page, 1).locator('.identity-toggle[value="R"] .toggle-check').isVisible(), true, 'turning red on adds its check');
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: identity toggles and the Identity sheet say what's on`, { timeout: 60000 }, t => checkExplains(t, engine));
+}

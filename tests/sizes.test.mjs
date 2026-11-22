@@ -281,3 +281,125 @@ async function checkSetup(t, engine) {
 
 test('chromium: setup fits phones from 427 to 320 tall without scrolling', t => checkSetup(t, chromium));
 test('webkit: setup fits phones from 427 to 320 tall without scrolling', t => checkSetup(t, webkit));
+
+// The centre pill never covers a life total, a − or + glyph, a badge, a strip or the "Out" tag
+// (design/polish/FINAL-REVIEW.md #1 and #2), at its widest (round, commander damage, counters, mana, dice and setup), at
+// every player count, on phones from 952 × 427 down to 568 × 320 and 320 × 568, on the foldable and the tablet, with
+// the seats as dealt and rotated every way. Board modes keep their targets clear of it too, inside their tiles.
+const pillScreens = [[952, 427], [852, 393], [640, 360], [568, 320], [320, 568], [375, 667], [841, 701], [1366, 1024]];
+const pillRotations = [null, [1, 2, 3, 0, 1, 3], [2, 2, 2, 2, 2, 2], [3, 1, 2, 3, 3, 1], [1, 1, 1, 1, 1, 1]];
+
+// What a tile shows that sits under the pill, or outside its tile. Display parts are checked against the pill's whole
+// box; the strip's and the modes' targets against the pill they can see, inside its 1/8 inset.
+function underPill(page) {
+  return page.evaluate(() => {
+    const controls = document.querySelector('#board-controls').getBoundingClientRect();
+    const inset = Math.min(controls.width, controls.height) / 8;
+    const seen = { left: controls.left + inset, right: controls.right - inset, top: controls.top + inset, bottom: controls.bottom - inset };
+    const overlaps = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+    const shown = element => element.checkVisibility({ visibilityProperty: true }) && element.offsetWidth > 0;
+    return [...document.querySelectorAll('.player')].flatMap((player, index) => {
+      const tile = player.getBoundingClientRect();
+      const found = [];
+      const check = (selector, pill) => {
+        for (const element of [...player.querySelectorAll(selector)].filter(shown)) {
+          const box = element.getBoundingClientRect();
+          const name = `P${index + 1} ${element.className.baseVal ?? element.className}`;
+          if (overlaps(box, pill)) found.push(`${name} under the pill`);
+          if (box.left < tile.left - 0.5 || box.right > tile.right + 0.5 || box.top < tile.top - 0.5 || box.bottom > tile.bottom + 0.5) found.push(`${name} outside its tile`);
+        }
+      };
+      check('.score, .out-tag, .controls button .icon, .badges .chip, .rotate-badge', controls);
+      check('.mana-strip button, .mode-layer button:not(.visually-hidden), .mode-layer .identity-preview > *', seen);
+      return found;
+    });
+  });
+}
+
+function pillGame(count, rotations) {
+  return { ...busyGame(count), rotations: rotations ? rotations.slice(0, count) : Array(count).fill(0) };
+}
+
+async function checkPill(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  for (const [width, height] of pillScreens) {
+    const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await fakeScreenOrientation(page);
+    await page.goto(app);
+    await turnScreen(page, width, height, height > width ? 0 : 90);
+    for (const count of [2, 3, 4, 5, 6]) {
+      for (const rotations of pillRotations) {
+        const view = `${width} × ${height}, ${count} players, seats ${rotations ? rotations.slice(0, count).join('') : 'as dealt'}`;
+        await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify(pillGame(count, rotations)));
+        await page.reload();
+        await page.evaluate(() => document.fonts.ready);
+        assert.equal(await page.locator('#board-controls .pill-button:not([hidden])').count(), 6, `${view}: the pill is at its widest`);
+        assert.deepEqual(await underPill(page), [], `${view}: nothing is under the pill`);
+        // The board modes, at the target and the stress size.
+        if ((width === 952 || width === 568) && rotations !== pillRotations[2]) {
+          for (const [open, close] of [['Commander damage', 'Cancel'], ['Counters', 'Cancel'], ['Mana pool', 'Cancel']]) {
+            await button(page, open).tap();
+            assert.deepEqual(await underPill(page), [], `${view}, ${open}: every target is clear of the pill and inside its tile`);
+            await button(page, close).tap();
+          }
+          for (const [row, done] of [[['Colours'], 'Done choosing colours'], [['Identity', 'Choose identities'], 'Done choosing identities'], [['Rotate seats'], 'Done rotating seats']]) {
+            await button(page, 'Game setup').tap();
+            for (const name of row) await button(page, name).tap();
+            assert.deepEqual(await underPill(page), [], `${view}, ${row.at(-1)}: every target is clear of the pill and inside its tile`);
+            await button(page, done).tap();
+          }
+        }
+      }
+    }
+    assert.deepEqual(errors, [], `${width} × ${height}: no script errors`);
+    await page.close();
+  }
+}
+
+test('chromium: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation', { timeout: 300000 }, t => checkPill(t, chromium));
+test('webkit: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation', { timeout: 300000 }, t => checkPill(t, webkit));
+
+// A rotated seat's edge that faces the pill gets the far row's clearance (design/polish/FINAL-REVIEW.md #2). With 2 players
+// the pill stands along the middle seam. Player 1 turned upside down faces it with the start of its face (its − glyph),
+// and Player 2 turned twice with its near row (its identity chip); both stay in full view beside the pill.
+async function checkRotatedClearance(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
+  await fakeScreenOrientation(page);
+  await page.goto(app);
+  await turnScreen(page, 952, 427, 90);
+  const game = {
+    ...busyGame(2), rotations: [1, 2], counters: { commander: true }, turns: 'rounds', turn: { first: 0, active: 0, round: 9 },
+    manaPool: false, identities: ['WR', 'UBRG'], identity: { show: { name: true }, background: 'off' },
+  };
+  await page.evaluate(saved => localStorage.setItem('lifepod-game', saved), JSON.stringify(game));
+  await page.reload();
+  await page.evaluate(() => document.fonts.ready);
+  const state = await page.evaluate(() => {
+    const pill = document.querySelector('#board-controls');
+    const box = pill.getBoundingClientRect();
+    const players = [...document.querySelectorAll('.player')];
+    const clearance = player => Object.fromEntries(['far', 'end', 'near', 'start'].map(edge => [edge, player.style.getPropertyValue(`--clear-${edge}`)]).filter(([, value]) => value));
+    const gap = (element) => {
+      const part = element.getBoundingClientRect();
+      return Math.round(Math.max(box.left - part.right, part.left - box.right, box.top - part.bottom, part.top - box.bottom));
+    };
+    return {
+      vertical: box.height > box.width && pill.hasAttribute('data-vertical'),
+      clearance: players.map(clearance),
+      glyph: gap(players[0].querySelector('.subtract .icon')),
+      chip: gap(players[1].querySelector('.ci-chip')),
+    };
+  });
+  assert.equal(state.vertical, true, 'with 2 players the pill stands along the middle seam');
+  assert.deepEqual(state.clearance.map(Object.keys), [['start'], ['near']], 'each tile clears the edge it turns toward the pill');
+  assert.ok(state.glyph >= 2, `Player 1's − glyph is beside the pill, not under it (${state.glyph}px)`);
+  assert.ok(state.chip >= 2, `Player 2's identity chip is beside the pill, not under it (${state.chip}px)`);
+}
+
+test('chromium: a rotated seat keeps the edge it turns toward the pill clear', t => checkRotatedClearance(t, chromium));
+test('webkit: a rotated seat keeps the edge it turns toward the pill clear', t => checkRotatedClearance(t, webkit));

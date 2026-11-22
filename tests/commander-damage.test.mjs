@@ -438,3 +438,54 @@ test('chromium: Android back cancels commander damage the way ✕ does', async (
   assert.equal(saved.scores[1], 38);
   assert.equal(await back(), false, 'back at rest leaves the app');
 });
+
+// Map seats are one size on every tile, whichever way a tile's map is turned (design/polish/FINAL-REVIEW.md #13): the
+// 5-player end seat, drawn sideways, gets seats as big as everyone else's, and so do rotated seats. Every seat stays
+// inside its tile and clear of the pill.
+async function checkSeatSizes(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  for (const [width, height] of [[952, 427], [640, 360], [568, 320], [1366, 1024]]) {
+    const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
+    await page.goto(app);
+    for (const [count, rotations] of [[5, [0, 0, 0, 0, 0]], [5, [1, 2, 3, 0, 1]], [6, [1, 2, 3, 0, 1, 3]], [2, [1, 2]], [3, [0, 1, 0]]]) {
+      const view = `${width} × ${height}, ${count} players, seats ${rotations.join('')}`;
+      await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify({
+        startingLife: 40, scores: Array(count).fill(40), rotations, landscapeAngle: 90, counters: { commander: true },
+      }));
+      await page.reload();
+      await button(page, 'Commander damage').tap();
+      const seats = await page.evaluate(() => {
+        const controls = document.querySelector('#board-controls').getBoundingClientRect();
+        const pill = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
+        const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+        const problems = [];
+        const sizes = [...document.querySelectorAll('.player')].map((player, index) => {
+          const tile = player.getBoundingClientRect();
+          const cells = [...player.querySelectorAll('.map-cell[data-attacker]')];
+          for (const cell of cells) {
+            const box = cell.getBoundingClientRect();
+            if (box.left < tile.left - 0.5 || box.right > tile.right + 0.5 || box.top < tile.top - 0.5 || box.bottom > tile.bottom + 0.5) problems.push(`P${index + 1} seat outside its tile`);
+            if (overlaps(box, pill)) problems.push(`P${index + 1} seat under the pill`);
+            if (Math.min(cell.offsetWidth, cell.offsetHeight) < 43.5) problems.push(`P${index + 1} seat under 44px`);
+          }
+          // A seat that spans one cell, by its short side and its long side in the face's own frame.
+          const single = cells.find(cell => cell.style.gridRow.split('/').map(Number).reduce((a, b) => b - a) === 1
+            && cell.style.gridColumn.split('/').map(Number).reduce((a, b) => b - a) === 1);
+          return single ? [Math.min(single.offsetWidth, single.offsetHeight), Math.max(single.offsetWidth, single.offsetHeight)] : null;
+        });
+        return { problems, sizes: sizes.filter(Boolean) };
+      });
+      assert.deepEqual(seats.problems, [], view);
+      for (const side of [0, 1]) {
+        const values = seats.sizes.map(size => size[side]);
+        assert.ok(Math.max(...values) - Math.min(...values) <= 0.5, `${view}: every seat is the same size (${values.join(' / ')})`);
+      }
+      await button(page, 'Cancel').tap();
+    }
+    await page.close();
+  }
+}
+
+test('chromium: map seats are the same size on every tile, however the map is turned', { timeout: 120000 }, t => checkSeatSizes(t, chromium));
+test('webkit: map seats are the same size on every tile, however the map is turned', { timeout: 120000 }, t => checkSeatSizes(t, webkit));

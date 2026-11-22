@@ -267,7 +267,9 @@ function audit() {
     if (!box.width) continue;
     const frame = tileOf(el) ?? el.closest('dialog') ?? document.documentElement;
     const frameBox = frame === document.documentElement ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight } : rect(frame);
-    if (!inside(box, frameBox)) add('clip', `${who(el)}${name(el)} text "${node.textContent.trim().slice(0, 24)}" runs outside its ${tileOf(el) ? 'tile' : 'sheet'}`);
+    // A sheet that scrolls with a cue at the bottom (About) shows the rest when scrolled; that's covered by the scroll check.
+    const cued = frame.matches?.('dialog') && frame.querySelector('.scroll-cue[data-more]') && box.left >= frameBox.left - 1 && box.right <= frameBox.right + 1;
+    if (!inside(box, frameBox) && !cued) add('clip', `${who(el)}${name(el)} text "${node.textContent.trim().slice(0, 24)}" runs outside its ${tileOf(el) ? 'tile' : 'sheet'}`);
     for (let n = el; n && n !== frame; n = n.parentElement) {
       const s = getComputedStyle(n);
       if (s.overflow !== 'visible' || s.textOverflow === 'ellipsis') {
@@ -311,7 +313,13 @@ function audit() {
   // 5. Sheets: no scrolling, and inside the window.
   if (dialog) {
     const box = rect(dialog);
-    if (dialog.scrollHeight > dialog.clientHeight + 1) add('scroll', `#${dialog.id} scrolls: ${dialog.scrollHeight}px of content in ${dialog.clientHeight}px`);
+    const cue = dialog.querySelector('.scroll-cue');
+    if (dialog.scrollHeight > dialog.clientHeight + 1) {
+      // About may scroll, but only with its cue showing (design/polish/FINAL-REVIEW.md #20).
+      if (!cue) add('scroll', `#${dialog.id} scrolls: ${dialog.scrollHeight}px of content in ${dialog.clientHeight}px`);
+      else if (!cue.hasAttribute('data-more') || getComputedStyle(cue, '::before').opacity === '0') add('scroll', `#${dialog.id} scrolls with no cue that there's more`);
+      else facts.scrollCue = `${dialog.scrollHeight}px in ${dialog.clientHeight}px, cue shown`;
+    }
     if (!inside(box, { left: 0, top: 0, right: innerWidth, bottom: innerHeight })) add('clip', `#${dialog.id} runs outside the window`);
     facts.sheet = `${px(box.width)}×${px(box.height)}`;
     return { problems, facts };
@@ -326,6 +334,7 @@ function audit() {
   })();
   const groups = {
     score: '.controls .score',
+    out: '.controls .out-tag',
     glyphs: '.controls button .icon',
     near: '.badges.near > *',
     far: '.badges.far > *',
@@ -333,7 +342,8 @@ function audit() {
     layer: '.mode-layer button, .mode-layer .layer-hint, .mode-layer .identity-preview > *, .mode-layer .map-cell',
     rotate: '.rotate-badge',
   };
-  const pairs = [['score', 'near'], ['score', 'far'], ['score', 'strip'], ['score', 'glyphs'], ['glyphs', 'near'], ['glyphs', 'far'], ['glyphs', 'strip'], ['near', 'far'], ['strip', 'far']];
+  const pairs = [['score', 'near'], ['score', 'far'], ['score', 'strip'], ['score', 'glyphs'], ['glyphs', 'near'], ['glyphs', 'far'], ['glyphs', 'strip'], ['near', 'far'], ['strip', 'far'],
+    ['out', 'near'], ['out', 'far'], ['out', 'strip'], ['strip', 'near']];
   const sizesBy = {};
   const note = (key, value) => { (sizesBy[key] ??= []).push(value); };
   for (const player of players) {
@@ -381,19 +391,27 @@ function audit() {
     if (spread > 0.5) add('uniform', `${key} differs between tiles: ${shown.map(px).join(' / ')}`);
   }
   facts.sizes = Object.fromEntries(Object.entries(sizesBy).map(([k, v]) => [k, [...new Set(v.filter(x => x !== null).map(px))]]).filter(([, v]) => v.length));
-  // While a pool has mana, its strip takes the near row's place: list the counts that are hidden by it.
+  // While a pool has mana, its strip must leave the near row in place: list the counts and chips that don't show. A
+  // strip folded into one chip must say that it opens mana mode (a caret).
   const game = JSON.parse(localStorage.getItem('lifepod-game'));
   if (!facts.mode) {
     players.forEach((player, index) => {
-      const strip = player.querySelector('.mana-strip');
-      if (!visible(strip)) return;
+      if (!game.manaPool || !game.pools[index].some(Boolean)) return;
+      const near = player.querySelector('.badges.near');
+      const shownKinds = [...near.querySelectorAll('.chip[data-kind]')].filter(visible).map(chip => chip.dataset.kind);
       const hidden = ['poison', 'casts', 'energy', 'experience', 'rad']
-        .filter(kind => game.counters[kind === 'casts' ? 'commander' : kind] && game[kind]?.[index] > 0)
+        .filter(kind => game.counters[kind === 'casts' ? 'commander' : kind] && game[kind]?.[index] > 0 && !shownKinds.includes(kind))
         .map(kind => `${kind} ${game[kind][index]}`);
-      if (game.identities[index] && Object.values(game.identity.show).some(Boolean)) hidden.unshift('identity chip');
+      const dropped = (document.querySelector('#board').dataset.drop ?? '').split(' ').includes('identity');
+      if (game.identities[index] && Object.values(game.identity.show).some(Boolean) && !dropped && ![...near.querySelectorAll('.ci-chip')].some(visible)) hidden.unshift('identity chip');
       if (hidden.length) add('hidden', `P${index + 1} mana strip hides ${hidden.join(', ')}`);
-      if (game.turns !== 'off' && strip.querySelector('.chip') && !visible(strip.querySelector('.chip'))) add('hidden', `P${index + 1} mana strip drops the turn chip (${strip.querySelector('.chip').className})`);
-      if (strip.dataset.fold !== undefined) add('hidden', `P${index + 1} mana strip is folded into one button that opens mana mode`);
+      const turnChip = player.querySelector('.turn-chip');
+      if (turnChip && !visible(turnChip)) add('hidden', `P${index + 1} mana strip hides the turn chip (${turnChip.className})`);
+      const folded = ['fold', 'fold-inline'].includes(player.dataset.strip);
+      const chip = [...player.querySelectorAll('.strip-chip')].find(visible);
+      if (folded && !chip) add('hidden', `P${index + 1} folded mana strip shows no chip`);
+      if (chip && !chip.querySelector('.icon[data-icon="caret-right"], .icon[data-icon="undo"]')) add('hidden', `P${index + 1} folded mana strip has no cue that it opens mana mode`);
+      if (!folded && !visible(player.querySelector('.mana-strip'))) add('hidden', `P${index + 1} mana strip doesn't show`);
     });
   }
   // Every count chip must be visible (never dropped).
@@ -643,7 +661,8 @@ async function webkitShots() {
 }
 
 // The colour indicator's one-colour discs against the chip they sit on (#0a0e0b at 44% over each tile panel), from
-// web/styles.css. Non-text marks need 3:1. Printed, and kept in findings.json.
+// web/styles.css, and the rim each disc has around it (--ci-rim). Non-text marks need 3:1: a disc whose fill is below
+// that still shows its edge when the rim clears it. Printed, and kept in findings.json.
 async function indicatorContrast() {
   const css = await readFile(fileURLToPath(new URL('../../web/styles.css', import.meta.url)), 'utf8');
   const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -652,10 +671,22 @@ async function indicatorContrast() {
   const panels = [...css.matchAll(/--(\w+-(?:top|bottom))-panel: (#[0-9a-f]{6})/g)].map(m => [m[1], hex(m[2])]);
   const chip = hex('#0a0e0b');
   const discs = [...css.matchAll(/\.ci\[data-ci="([WUBRG])"\] \{ background: (#[0-9a-f]{6}); \}/g)];
+  const rimMatch = css.match(/--ci-rim: (#[0-9a-f]{6})([0-9a-f]{2})?;/);
+  const on = rgb => rgb.map((v, i) => chip[i] * 0.44 + v * 0.56);
+  const rimOn = (bg) => {
+    if (!rimMatch) return null;
+    const alpha = rimMatch[2] ? parseInt(rimMatch[2], 16) / 255 : 1;
+    return hex(rimMatch[1]).map((v, i) => v * alpha + bg[i] * (1 - alpha));
+  };
   return discs.map(([, colour, value]) => {
-    const ratios = panels.map(([panel, rgb]) => [panel, ratio(hex(value), rgb.map((v, i) => chip[i] * 0.44 + v * 0.56))]);
+    const ratios = panels.map(([panel, rgb]) => [panel, ratio(hex(value), on(rgb))]);
     ratios.sort((x, y) => x[1] - y[1]);
-    return { colour, disc: value, lowest: `${ratios[0][1].toFixed(2)}:1 on ${ratios[0][0]}`, highest: `${ratios.at(-1)[1].toFixed(2)}:1 on ${ratios.at(-1)[0]}` };
+    const rims = rimMatch ? panels.map(([panel, rgb]) => [panel, ratio(rimOn(on(rgb)), on(rgb))]).sort((x, y) => x[1] - y[1]) : null;
+    return {
+      colour, disc: value, lowest: `${ratios[0][1].toFixed(2)}:1 on ${ratios[0][0]}`, highest: `${ratios.at(-1)[1].toFixed(2)}:1 on ${ratios.at(-1)[0]}`,
+      rim: rims ? `${rims[0][1].toFixed(2)}:1 on ${rims[0][0]}` : 'none',
+      visible: Math.max(ratios[0][1], rims ? rims[0][1] : 0) >= 3,
+    };
   });
 }
 
@@ -683,7 +714,7 @@ const summary = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length
 }));
 const indicators = await indicatorContrast();
 await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
-console.log('Indicator discs on chips (need 3:1):', indicators.map(d => `${d.colour} ${d.lowest}`).join(' · '));
+console.log('Indicator discs on chips (need 3:1 from the fill or the rim):', indicators.map(d => `${d.colour} fill ${d.lowest}, rim ${d.rim}${d.visible ? '' : ' FAILS'}`).join(' · '));
 console.log(`${runs} sweep states, ${allFindings.length} problems in ${summary.length} groups, ${pageErrors.length} page errors, ${Math.round((Date.now() - started) / 1000)}s`);
 for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      sizes ${s.sizes.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.size} ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
 if (pageErrors.length) console.log('Page errors:\n' + [...new Set(pageErrors)].join('\n'));

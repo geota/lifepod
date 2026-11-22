@@ -208,3 +208,43 @@ async function checkWash(t, engine) {
 
 test('chromium: pressing a life half washes it in the seat colour', t => checkWash(t, chromium));
 test('webkit: pressing a life half washes it in the seat colour', t => checkWash(t, webkit));
+
+// A player who is out says so (design/polish/FINAL-REVIEW.md #11): an "Out" tag under the total, a label that says why,
+// and dimmed badges, except the lethal chip that put them out.
+async function checkOut(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
+  await page.goto(app);
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
+    startingLife: 40, scores: [-3, 27, 40, 40], counters: { commander: true, poison: true }, poison: [0, 10, 0, 2], casts: [0, 1, 0, 0],
+    commanderDamage: [[0, 0, 0, 0], [0, 0, 0, 0], [21, 0, 0, 0], [0, 0, 0, 0]],
+  })));
+  await page.reload();
+  const state = await page.locator('.player').evaluateAll(players => players.map((player) => {
+    const score = player.querySelector('.score');
+    const tag = player.querySelector('.out-tag');
+    const shown = tag.checkVisibility() && tag.offsetWidth > 0;
+    // Under the total in the tile's own frame (the top row's tiles are turned), and centred on it.
+    const middle = node => node.offsetLeft + node.offsetWidth / 2;
+    return {
+      label: score.getAttribute('aria-label'),
+      tag: shown ? tag.textContent : '',
+      under: !shown || (tag.offsetTop > score.offsetTop + score.offsetHeight / 2 && Math.abs(middle(tag) - middle(score)) < 2),
+      dimmed: [...player.querySelectorAll('.badges .chip:not(.sword)')].filter(chip => chip.offsetWidth).map(chip => `${chip.dataset.kind ?? 'damage'} ${Number(getComputedStyle(chip).opacity) < 1 ? 'dim' : 'full'}`),
+    };
+  }));
+  assert.deepEqual(state, [
+    { label: '-3 life, out', tag: 'Out', under: true, dimmed: [] },
+    { label: '27 life, out on poison', tag: 'Out', under: true, dimmed: ['poison full', 'casts dim'] },
+    { label: '40 life, out on commander damage', tag: 'Out', under: true, dimmed: ['damage full'] },
+    { label: '40 life', tag: '', under: true, dimmed: ['poison full'] },
+  ]);
+  // Back above 0, Player 1 is in again.
+  for (let step = 0; step < 4; step++) await button(page, 'Add one life to Player 1').click();
+  assert.equal(await page.locator('.player:nth-child(1) .score').getAttribute('aria-label'), '1 life');
+  assert.equal(await page.locator('.player:nth-child(1) .out-tag').isVisible(), false);
+}
+
+test('chromium: a player who is out says so under the total and in its label', t => checkOut(t, chromium));
+test('webkit: a player who is out says so under the total and in its label', t => checkOut(t, webkit));

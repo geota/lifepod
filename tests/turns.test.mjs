@@ -77,11 +77,11 @@ const active = page => page.evaluate(() => {
   return index === -1 ? null : index + 1;
 });
 const pillRound = page => page.locator('#round-button .round').evaluate(round => [...round.children].map(number => number.textContent));
-// What each tile's turn chips say, in order: 'flag 3' (Rounds), 'turn 3' (the active player), 'start 1' (nobody's turn
-// yet) and 'went first'.
+// What each tile's turn chips say, in order: 'flag 3' (Rounds), 'turn 3' (the active player, "Turn 3"), 'start' (nobody's
+// turn yet: a "Start" chip with no round, design/polish/FINAL-REVIEW.md #7) and 'went first'.
 const chips = page => page.locator('.player').evaluateAll(players => players.map(player => [...player.querySelectorAll('.turn-chip, .flag-chip')]
-  .map(chip => (chip.matches('.flag-chip') ? 'went first'
-    : `${chip.matches('.round-chip') ? 'flag' : chip.matches('.active-chip') ? 'turn' : 'start'} ${chip.textContent.replace('Turn', '')}`))));
+  .map(chip => (chip.matches('.flag-chip') ? 'went first' : chip.matches('.start-chip') ? (chip.textContent === 'Start' ? 'start' : `start ${chip.textContent}`)
+    : `${chip.matches('.round-chip') ? 'flag' : 'turn'} ${chip.textContent.replace('Turn', '')}`))));
 
 // Holds a control long enough for the hold to register, then lets go.
 async function hold(page, locator, ms = 900) {
@@ -245,7 +245,7 @@ async function checkWhoGoesFirst(t, engine) {
   assert.deepEqual(await chips(page), [[], [], ['flag 1'], []]);
   await setTurns(page, 'Turn by turn');
   assert.equal(await mode(page), null, 'Rounds → Turn by turn doesn’t ask');
-  assert.deepEqual(await chips(page), [['start 1'], ['start 1'], ['start 1', 'went first'], ['start 1']]);
+  assert.deepEqual(await chips(page), [['start'], ['start'], ['start', 'went first'], ['start']]);
   await tile(page, 2).locator('.start-chip').tap();
   assert.equal(await active(page), 2, 'a tile’s chip starts that player’s turn');
 
@@ -270,7 +270,7 @@ async function checkWhoGoesFirst(t, engine) {
   await button(page, 'Skip').tap();
   assert.equal(await mode(page), null);
   assert.equal(await active(page), null);
-  assert.deepEqual(await chips(page), [['start 1'], ['start 1'], ['start 1'], ['start 1']]);
+  assert.deepEqual(await chips(page), [['start'], ['start'], ['start'], ['start']]);
   assert.deepEqual(await pillRound(page), ['1', '1']);
   // The pill can't pass a turn nobody has, so it asks who goes first again.
   await page.locator('#round-button').tap();
@@ -364,7 +364,7 @@ test('chromium: saved turns are checked when a game loads', async (t) => {
   assert.deepEqual(await load({ ...base, turns: 'sometimes', turn: { first: 2, active: 2, round: 3 } }),
     { chips: [[], [], [], []], pill: false, round: '3' }, 'a mode that isn’t one of the three is Off');
   assert.deepEqual(await load({ ...base, turns: 'turns', turn: { first: 2, active: 1.5, round: 4 } }),
-    { chips: [['start 4'], ['start 4'], ['start 4', 'went first'], ['start 4']], pill: true, round: '4' }, 'a bad active seat is nobody');
+    { chips: [['start'], ['start'], ['start', 'went first'], ['start']], pill: true, round: '4' }, 'a bad active seat is nobody');
   assert.deepEqual(await load({ ...base, turns: 'rounds', turn: { first: 4, active: 1, round: 'x' } }),
     { chips: [[], [], [], []], pill: true, round: '1' }, 'a seat off the board is nobody, and a bad round is 1');
   assert.deepEqual(await load({ ...base, turns: 'rounds', turn: { first: 0, round: 1000 } }),
@@ -373,3 +373,37 @@ test('chromium: saved turns are checked when a game loads', async (t) => {
   await page.locator('#round-button').tap();
   assert.deepEqual((await saved(page)).turn, { first: 0, active: null, round: 2 });
 });
+
+// "Back one turn" is hidden beside the pill's round button for keyboards and screen readers, and shows as a ‹ button
+// there while it has keyboard focus (design/polish/FINAL-REVIEW.md #12).
+async function checkBackFocus(t, engine) {
+  const page = await openPage(t, engine, { game: savedGame(4, { turns: 'turns', turn: { first: 0, active: 1, round: 3 } }) });
+  const look = () => page.locator('#round-back').evaluate((back) => {
+    const box = back.getBoundingClientRect();
+    const pill = document.querySelector('#board-controls').getBoundingClientRect();
+    const style = getComputedStyle(back);
+    return {
+      focused: document.activeElement === back,
+      shown: style.clipPath === 'none' && Math.min(box.width, box.height) >= 44,
+      inPill: box.left >= pill.left - 0.5 && box.right <= pill.right + 0.5 && box.top >= pill.top - 0.5 && box.bottom <= pill.bottom + 0.5,
+      outline: style.outlineStyle,
+    };
+  });
+  assert.equal((await look()).shown, false, 'hidden until it has focus');
+  // Keyboard focus: Tab from the round button in Chromium; WebKit on macOS doesn't tab to buttons, so it's focused after a
+  // key press, which still counts as keyboard focus.
+  await page.locator('#round-button').focus();
+  if (engine === chromium) await page.keyboard.press('Tab');
+  else {
+    await page.keyboard.press('Shift');
+    await page.locator('#round-back').focus();
+  }
+  assert.deepEqual(await look(), { focused: true, shown: true, inPill: true, outline: 'solid' }, 'focused, it shows in the pill with a focus ring');
+  await page.keyboard.press('Enter');
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: 0, round: 3 }, 'Enter steps back one turn');
+  await page.locator('#round-back').blur();
+  assert.equal((await look()).shown, false, 'without focus it hides again');
+}
+
+test('chromium: back one turn shows while it has keyboard focus', t => checkBackFocus(t, chromium));
+test('webkit: back one turn shows while it has keyboard focus', t => checkBackFocus(t, webkit));

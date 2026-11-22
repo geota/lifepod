@@ -42,3 +42,33 @@ test('chromium: every tile palette is palette.mjs’s and passes its contrast ch
     }
   }
 });
+
+// The colour indicator's one-colour discs for black, green and blue are close to the dark chip they sit on, so each disc
+// has a light rim (design/polish/FINAL-REVIEW.md #6). The rim clears 3:1 against the chip on every tile colour.
+test('chromium: the colour indicator has a rim that clears 3:1 on every chip', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.goto(app);
+  const tokens = await page.evaluate(() => {
+    const style = getComputedStyle(document.documentElement);
+    return { rim: style.getPropertyValue('--ci-rim').trim(), chip: style.getPropertyValue('--chip-background').trim() };
+  });
+  const rgba = hex => [1, 3, 5, 7].map(at => (at < 7 ? parseInt(hex.slice(at, at + 2), 16) : hex.length > 7 ? parseInt(hex.slice(7, 9), 16) / 255 : 1));
+  const over = (top, bottom) => bottom.slice(0, 3).map((value, at) => top[at] * top[3] + value * (1 - top[3]));
+  const hex = rgb => `#${rgb.map(value => Math.round(value).toString(16).padStart(2, '0')).join('')}`;
+  for (const swatch of generated.r3.swatches) {
+    for (const row of ['top', 'bottom']) {
+      const chip = over(rgba(tokens.chip), rgba(swatch[row].panel));
+      const rim = over(rgba(tokens.rim), chip);
+      const ratio = contrast(hex(rim), hex(chip));
+      assert.ok(ratio >= 3, `${swatch.name} ${row}: the rim is ${ratio.toFixed(2)}:1 on the chip`);
+    }
+  }
+  // Every indicator in a chip draws that rim around its disc.
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40], identities: ['B', 'UG'] })));
+  await page.reload();
+  const shadows = await page.locator('.badges .ci').evaluateAll(discs => discs.map(disc => getComputedStyle(disc).boxShadow));
+  assert.equal(shadows.length, 2);
+  for (const shadow of shadows) assert.match(shadow, /rgba\(243, 241, 229, 0\.65\d*\) 0px 0px 0px 1\.5px/);
+});

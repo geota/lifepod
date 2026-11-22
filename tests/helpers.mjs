@@ -51,8 +51,8 @@ export async function setSwitches(page, wanted) {
   await button(page, 'Close setup').tap();
 }
 
-// Anything wrong with the mana strips at rest: a strip over its tile's life total or − and + glyphs, a strip
-// target under 44px, or one outside its tile.
+// Anything wrong with the mana strips at rest: a strip over its tile's life total, − and + glyphs, "Out" tag or near
+// row, a strip target under 44px, or one outside its tile.
 export function stripProblems(page) {
   return page.evaluate(() => {
     const overlaps = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
@@ -62,7 +62,8 @@ export function stripProblems(page) {
       const problems = [];
       const box = strip.getBoundingClientRect();
       const tile = player.getBoundingClientRect();
-      for (const blocker of player.querySelectorAll('.score, .controls button')) {
+      for (const blocker of player.querySelectorAll('.score, .controls button, .out-tag, .badges.near > *')) {
+        if (!blocker.checkVisibility() || !blocker.offsetWidth) continue;
         if (overlaps(box, blocker.getBoundingClientRect())) problems.push(`covers ${blocker.className}`);
       }
       for (const item of strip.querySelectorAll('button:not(.chip)')) {

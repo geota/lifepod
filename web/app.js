@@ -41,12 +41,14 @@ const autoEmptySwitch = document.querySelector('#auto-empty-switch');
 const autoEmptyRow = document.querySelector('#auto-empty-row');
 const turnChoices = document.querySelector('#turn-choices');
 const identityNav = document.querySelector('#identity-nav');
+const identityNote = document.querySelector('#identity-note');
 const identityDialog = document.querySelector('#identity-sheet');
 const identityShowChoices = document.querySelector('#identity-show');
 const identityBackgroundChoices = document.querySelector('#identity-background');
 const chooseIdentitiesButton = document.querySelector('#choose-identities');
 const restart = document.querySelector('#restart');
 const privacy = document.querySelector('#privacy');
+const privacyCue = privacy.querySelector('.scroll-cue');
 const announcer = document.querySelector('#announcer');
 const portraitQuery = window.matchMedia('(orientation: portrait)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -140,26 +142,29 @@ const maxStartingLife = 999;
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
 // tile. A drop step hides something on every tile (CSS reads its token from #board's data-drop); a floor step
 // shrinks the type, but no smaller than the floor; wrap lets the row take a second line, growing toward the total.
-// On the near row the identity's name and the turn chip's word "Turn" go first, leaving the untap symbol and the round,
-// then the identity's symbol where the indicator also shows (one colour mark is enough).
+// On the near row the identity's name and the turn chip's word "Turn" go first, leaving the untap symbol and "T" with the
+// round, then the identity's symbol where the indicator also shows (one colour mark is enough).
 const dropSteps = {
   near: [
     { drop: 'name', selector: '.ci-chip .id-name, .turn-chip .turn-word' }, { drop: 'symbol', selector: '.ci-chip .ci ~ .id-symbol' }, { floor: 11 },
     { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true },
   ],
   far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
-  // The mana strip never covers the life total or the − and + glyphs. The turn chips leave it first (the pill's round
-  // button does the same and stays), then the type shrinks, then it wraps upward if there's room above it. Where even
-  // that would cover the total, a strip folds into one button that shows the pool and opens mana mode. Only the strips
-  // that need it fold, so a short pool elsewhere keeps its spend buttons.
-  strip: [
-    { drop: 'strip-turn', selector: '.mana-strip > .chip' }, { floor: 11 }, { drop: 'strip-wrap', wrap: true }, { fold: true },
-  ],
+  // The mana strip never covers the life total, the − and + glyphs or the near row. Its type shrinks first, then it
+  // wraps upward if there's room above it. Each strip then takes the first place that fits (fitStrips): its own line
+  // above the near row, or the end of the near row's line, or, folded, one chip in the near row that shows the pool and
+  // opens mana mode. Only the strips that need it fold, so a short pool elsewhere keeps its spend buttons.
+  strip: [{ floor: 11 }, { drop: 'strip-wrap', wrap: true }],
 };
 // A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
 // down by one can't make it blink.
 const dropSlack = 1.15;
 const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
+// A tile face's edges, clockwise from the far edge (its top, toward the table).
+const faceEdges = ['far', 'end', 'near', 'start'];
+// Colours mode's grids for its twelve 44px swatches on narrow or short boards, in the order a face takes the first that
+// fits: 4 × 3, 3 × 4, 6 × 2 and 2 × 6, with 3px gaps.
+const swatchColumns = [4, 3, 6, 2];
 // Phosphor Icons (MIT, phosphoricons.com), Bold weight, for controls drawn by this script. Experience's graduation
 // cap is Fill weight, so it holds up at badge size.
 const iconPaths = {
@@ -173,6 +178,8 @@ const iconPaths = {
   'hand-tap': 'M228,156v36c0,13.85-1.63,26.52-4.58,35.68a12,12,0,1,1-22.84-7.36c2.14-6.65,3.42-17.24,3.42-28.32V156a8,8,0,0,0-16,0v4a12,12,0,0,1-24,0V140a8,8,0,0,0-16,0v12a12,12,0,0,1-24,0V84a8,8,0,0,0-16,0V192a12,12,0,0,1-22.18,6.34l-18.68-30-.21-.34A8,8,0,0,0,53,175.92L78.27,217.8a12,12,0,0,1-20.56,12.39l-25.31-42-.12-.2A32,32,0,0,1,84,150.83V84a32,32,0,0,1,64,0v25a32,32,0,0,1,36.78,17A32,32,0,0,1,228,156ZM56,96A12,12,0,0,0,68,84a48,48,0,0,1,96,0,12,12,0,0,0,24,0A72,72,0,0,0,44,84,12,12,0,0,0,56,96Z',
   eraser: 'M216,204H141l86.84-86.84a28,28,0,0,0,0-39.6L186.43,36.19a28,28,0,0,0-39.6,0L28.19,154.82a28,28,0,0,0,0,39.6l30.06,30.07A12,12,0,0,0,66.74,228H216a12,12,0,0,0,0-24ZM163.8,53.16a4,4,0,0,1,5.66,0l41.38,41.38a4,4,0,0,1,0,5.65L160,151l-47-47ZM71.71,204,45.16,177.45a4,4,0,0,1,0-5.65L96,121l47,47-36,36Z',
   undo: 'M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z',
+  check: 'M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z',
+  'caret-right': 'M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z',
 };
 
 let game = loadGame();
@@ -191,6 +198,8 @@ const pendingAnnouncements = new Map();
 // How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none.
 let dropLevels = { near: 0, far: 0, strip: 0 };
 let fitQueued = false;
+// The pill's buttons now and at rest, as last measured.
+let pillShape = '';
 // Setup's starting life, before Done applies it, and whether Custom is chosen.
 let selectedLife = game.startingLife;
 let customLife = false;
@@ -247,24 +256,167 @@ function boardTurn() {
 function syncBoardTurn() {
   document.querySelector('.app').dataset.boardTurn = String(boardTurn());
   measureBoard();
+  if (setup.open) renderTrackSummary();
+  if (privacy.open) syncPrivacyCue();
 }
 
 // One size per board (design/polish/SPEC.md §3.1): every tile draws its content at the size that fits the smallest
 // tile. --ui and --ub are the smallest tile face's width and height, and CSS sizes tile content from them instead of
 // from each tile's own size. The flags set the board-wide thresholds that hide mode hints and pick layouts.
+//
+// The centre pill never covers a total, a glyph or a badge (design/polish/FINAL-REVIEW.md #1 and #2). It sits on a seam
+// that the tiles' far rows face: upright along the middle seam with 2 players, and otherwise on the horizontal seam
+// through the middle of the board, kept to the columns whose seats are split into two rows. Any face edge it still
+// reaches past, such as a rotated seat's near row or one end, gets the far row's clearance, and --ui and --ub are what
+// each face has left inside its clearances, so tile content is sized to fit them.
 function measureBoard() {
   const faces = [...board.querySelectorAll('.player-face')];
-  if (!faces.length) return;
-  const width = Math.min(...faces.map(face => face.offsetWidth));
-  const height = Math.min(...faces.map(face => face.offsetHeight));
-  if (!width || !height) return;
+  // A new player count is measured once its tiles are drawn.
+  if (faces.length !== game.scores.length || !board.clientWidth || !board.clientHeight) return;
+  const size = Math.max(...[...boardControls.querySelectorAll('.pill-button')].map(button => button.offsetWidth));
+  const pill = placePill(size);
+  // The far row already keeps this clear of the board's middle.
+  const farClear = size / 2 + 2;
+  const usable = faces.map((face) => {
+    const player = face.parentElement;
+    const clear = centreClearance(player, face, pill, farClear);
+    for (const edge of faceEdges) {
+      if (clear[edge]) player.style.setProperty(`--clear-${edge}`, `${clear[edge]}px`);
+      else player.style.removeProperty(`--clear-${edge}`);
+    }
+    return { player, face, clear, width: face.offsetWidth - clear.start - clear.end, height: face.offsetHeight - clear.near - Math.max(0, clear.far - farClear) };
+  });
+  const width = Math.min(...usable.map(face => face.width));
+  const height = Math.min(...usable.map(face => face.height));
+  if (!(width > 0) || !(height > 0)) return;
   board.style.setProperty('--ui', `${width}px`);
   board.style.setProperty('--ub', `${height}px`);
   board.toggleAttribute('data-narrow', width < 240);
   board.toggleAttribute('data-short', height < 200);
   board.toggleAttribute('data-wide', width >= 264);
+  sizeMapSeats(usable, size, width < 240 || height < 200);
+  fitModeGrids(usable, { width, height, size, tight: width < 240 || height < 200 });
   syncBoardDigits();
   requestFit();
+}
+
+// styles.css's --grow in pixels: 1 on phones, up to 2 on tablets.
+function growPixel() {
+  return Math.min(2, Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 430));
+}
+
+// How many buttons the pill holds at rest: the round, commander damage, counters and mana when they're on, then dice
+// and setup.
+function restPillButtons() {
+  return 2 + Number(game.turns !== 'off') + Number(game.counters.commander) + Number(shownCounters().length > 0) + Number(game.manaPool);
+}
+
+// Places the pill and returns the box its buttons cover now, in the board's own coordinates. The place is chosen for
+// the pill at its widest, so it doesn't move when a mode opens with fewer buttons.
+function placePill(size) {
+  const shown = [...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length;
+  const width = board.clientWidth;
+  const height = board.clientHeight;
+  const vertical = game.scores.length === 2;
+  const widest = Math.max(shown, restPillButtons()) * size;
+  let x = width / 2;
+  const y = height / 2;
+  if (!vertical) {
+    const [top, bottom] = seatLayouts[game.scores.length].map(row => row.split(' '));
+    const split = top.filter((seat, column) => seat !== bottom[column]).map(seat => board.children[Number(seat.split('-')[1]) - 1]);
+    const start = Math.min(...split.map(tile => tile.offsetLeft - board.offsetLeft));
+    const end = Math.max(...split.map(tile => tile.offsetLeft - board.offsetLeft + tile.offsetWidth));
+    // At the board's centre where that's on the seam and the pill fits there, otherwise centred on the seam (3 players).
+    x = x > start + 1 && x < end - 1 && end - start >= widest ? Math.min(Math.max(x, start + widest / 2), end - widest / 2) : (start + end) / 2;
+    x = Math.min(Math.max(x, widest / 2), width - widest / 2);
+  }
+  boardControls.style.left = `${board.offsetLeft + x}px`;
+  boardControls.style.top = `${board.offsetTop + y}px`;
+  boardControls.toggleAttribute('data-vertical', vertical);
+  const along = shown * size / 2;
+  const across = size / 2;
+  return vertical ? { left: x - across, right: x + across, top: y - along, bottom: y + along }
+    : { left: x - along, right: x + along, top: y - across, bottom: y + across };
+}
+
+// The clearance a face needs from the pill on each of its edges. Where the pill reaches into a tile past two edges (at
+// a corner), clearing the edge it reaches least far past is enough, and the far edge already has its clearance.
+function centreClearance(player, face, pill, farClear) {
+  const clear = { far: 0, end: 0, near: 0, start: 0 };
+  const tile = { left: player.offsetLeft - board.offsetLeft, top: player.offsetTop - board.offsetTop };
+  tile.right = tile.left + player.offsetWidth;
+  tile.bottom = tile.top + player.offsetHeight;
+  const left = Math.max(tile.left, pill.left);
+  const right = Math.min(tile.right, pill.right);
+  const top = Math.max(tile.top, pill.top);
+  const bottom = Math.min(tile.bottom, pill.bottom);
+  if (right - left < 0.5 || bottom - top < 0.5) return clear;
+  // The tile's edges clockwise from its top, with how far the pill reaches past each one it crosses.
+  const depths = [
+    top <= tile.top + 0.5 ? bottom - tile.top : null,
+    right >= tile.right - 0.5 ? tile.right - left : null,
+    bottom >= tile.bottom - 0.5 ? tile.bottom - top : null,
+    left <= tile.left + 0.5 ? right - tile.left : null,
+  ];
+  const turn = faceAngles[player.dataset.edge] / 90;
+  let best = null;
+  depths.forEach((depth, side) => {
+    if (depth === null) return;
+    const edge = faceEdges[(side - turn + 4) % 4];
+    const need = Math.ceil(depth + 2);
+    // The share of the face it costs, across that edge.
+    const across = edge === 'far' || edge === 'near' ? face.offsetHeight : face.offsetWidth;
+    const cost = (edge === 'far' ? Math.max(0, need - farClear) : need) / across;
+    if (!best || cost < best.cost) best = { edge, need, cost };
+  });
+  if (best) clear[best.edge] = best.need;
+  return clear;
+}
+
+// The mode grids are one size on every tile, and each face lays its grid out with as many columns as fit inside its
+// mode layer, which keeps clear of the pill on the edges the pill reaches: a narrow rotated seat gets fewer, taller
+// columns. Colours: on narrow or short boards, the first of 4 × 3, 3 × 4, 6 × 2 and 2 × 6 that fits (the layer keeps
+// 6px less than the clearance there, and 1px from other edges); elsewhere 4 × 3 always fits. Counter and mana cells:
+// three to a row, or two. Identity toggles: five in a row where every tile has room (ui ≥ 264), otherwise three, or two.
+// The cell and toggle sizes follow styles.css (.counter-cells, .identity).
+function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
+  const grow = growPixel();
+  const cell = Math.min(Math.max(44, Math.min((ui - 20) / 3, (ub - 10 - size) / 2)), 92 * grow);
+  const toggle = Math.min(Math.max(44, 12 * ui / 100), 72 * grow);
+  const swatchSpan = count => count * 44 + (count - 1) * 3;
+  for (const { player, face, clear } of faces) {
+    const swatchPad = edge => Math.max(1, clear[edge] - 6);
+    const swatchWidth = face.offsetWidth - swatchPad('start') - swatchPad('end');
+    const swatchHeight = face.offsetHeight - swatchPad('far') - swatchPad('near');
+    const swatches = tight ? swatchColumns.find(count => swatchSpan(count) <= swatchWidth + 0.5 && swatchSpan(12 / count) <= swatchHeight + 0.5) ?? 4 : 4;
+    player.style.setProperty('--swatch-columns', swatches);
+    // The width the face leaves inside its clearances. The grids may reach into the layers' small default padding.
+    const room = face.offsetWidth - clear.start - clear.end + 0.5;
+    player.style.setProperty('--cell-columns', 3 * cell + 20 <= room ? 3 : 2);
+    const toggles = [ui >= 264 ? 5 : 3, 3, 2].find(count => count * toggle + (count - 1) * 4 <= room) ?? 2;
+    player.style.setProperty('--toggle-columns', toggles);
+  }
+}
+
+// Commander damage map seats are one size on every tile (design/polish/FINAL-REVIEW.md #13), the largest that fits every
+// face, whichever way its map is turned: a sideways face draws the table's rows as its columns.
+function sizeMapSeats(faces, size, tight) {
+  const { rows, columns } = seatGrid();
+  const grow = growPixel();
+  const gap = 4;
+  let seatWidth = Infinity;
+  let seatHeight = Infinity;
+  for (const { player, width, height } of faces) {
+    const sideways = faceAngles[player.dataset.edge] % 180 !== 0;
+    const across = sideways ? rows : columns;
+    const down = sideways ? columns : rows;
+    // The map keeps 12px from the face's ends, and its layer's padding and the hint above it.
+    const room = { width: Math.min(width - 12, across * 120 * grow), height: Math.min(height - 6 - size / 2 - (tight ? 0 : 24), down * 80 * grow) };
+    seatWidth = Math.min(seatWidth, (room.width - gap * (across - 1)) / across);
+    seatHeight = Math.min(seatHeight, (room.height - gap * (down - 1)) / down);
+  }
+  board.style.setProperty('--seat-width', `${Math.max(44, Math.floor(seatWidth * 10) / 10)}px`);
+  board.style.setProperty('--seat-height', `${Math.max(44, Math.floor(seatHeight * 10) / 10)}px`);
 }
 
 // The most digits in any total, at least 2. A three-digit total shrinks every total together.
@@ -280,11 +432,17 @@ function requestFit() {
   queueMicrotask(fitBadgeRows);
 }
 
+// The near rows are fitted first, then each mana strip takes the first place that fits. A strip folded onto the end of
+// its near row's line takes room from that row, so the near rows are fitted again around it.
 function fitBadgeRows() {
   fitQueued = false;
+  for (const player of board.children) {
+    if (player.querySelector('.mana-strip').hidden) delete player.dataset.strip;
+    else player.dataset.strip = 'above';
+  }
   fitBadgeSide('near');
   fitBadgeSide('far');
-  fitStrips();
+  if (fitStrips()) fitBadgeSide('near');
 }
 
 function syncDropTokens(levels) {
@@ -365,57 +523,86 @@ function overlaps(a, b) {
   return a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
 }
 
-// The mana strips take the fewest steps that keep every strip on one line, inside its tile and clear of its life
-// total and − and + glyphs, board-wide like the badge rows, with the same 15% to spare before a step is undone.
+// The mana strips never cover a life total, its − and + glyphs, the "Out" tag, the far row, the near row or the pill,
+// and the near rows always stay (design/polish/FINAL-REVIEW.md #3). Each strip takes the first of these that fits:
+//   'above': its own line between the total and the near row;
+//   'inline': at the end of the near row's line, where the near row leaves room;
+//   'fold': folded into one chip that shows the pool and opens mana mode, on its own line above the near row;
+//   'fold-inline': that chip at the end of the near row, which wraps around it like any other chip.
+// The type steps (shrink, then wrap) are board-wide like the badge rows: the fewest that fold the fewest strips, with
+// the same 15% to spare before a step is undone. Returns whether a chip took room on a near row's line.
 function fitStrips() {
-  const strips = badgeRows('strip');
+  const strips = [...board.querySelectorAll('.mana-strip')].filter(strip => !strip.hidden && strip.parentElement.offsetParent !== null);
   board.style.removeProperty('--strip-size');
   if (!strips.length) {
     syncDropTokens(dropLevels);
-    return;
+    return false;
   }
   const steps = dropSteps.strip;
+  const controls = boardControls.getBoundingClientRect();
+  const inset = controls.height > controls.width ? controls.width / 8 : controls.height / 8;
+  const pill = { left: controls.left + inset, right: controls.right - inset, top: controls.top + inset, bottom: controls.bottom - inset };
+  const tileOf = strip => strip.closest('.player');
+  // One line's width, even where the strips may wrap.
+  const lineWidth = (strip) => {
+    strip.style.flexWrap = 'nowrap';
+    const width = strip.scrollWidth;
+    strip.style.removeProperty('flex-wrap');
+    return width;
+  };
+  const clear = (strip) => {
+    const box = strip.getBoundingClientRect();
+    const face = strip.closest('.player-face');
+    const blockers = [face.querySelector('.score'), face.querySelector('.out-tag'), ...face.querySelectorAll('.controls button, .badges.far > *')];
+    return !overlaps(box, pill) && !blockers.some(blocker => blocker.offsetWidth && overlaps(box, blocker.getBoundingClientRect()));
+  };
+  // Where one strip goes at the current type, with slack to spare across the line, and what that costs: a folded strip
+  // costs one, and one on the near row's line two.
+  const place = (strip, slack, wrap) => {
+    const player = tileOf(strip);
+    const room = strip.parentElement.clientWidth;
+    const near = player.querySelector('.badges.near');
+    const nearWidth = near.hidden ? 0 : chipsWidth(near);
+    const besideNear = width => nearWidth + (nearWidth ? 4 : 0) + width <= room + 1;
+    player.dataset.strip = 'above';
+    if ((wrap || lineWidth(strip) * slack <= room + 1) && clear(strip)) return 0;
+    player.dataset.strip = 'inline';
+    if (besideNear(lineWidth(strip) * slack) && clear(strip)) return 0;
+    player.dataset.strip = 'fold';
+    if (strip.offsetWidth * slack <= room + 1 && clear(strip)) return 1;
+    player.dataset.strip = 'fold-inline';
+    return 2;
+  };
   const base = parseFloat(getComputedStyle(strips[0]).fontSize);
+  // What the strips' places cost at a level.
   const measure = (level, slack) => {
     syncDropTokens({ ...dropLevels, strip: level });
     board.style.removeProperty('--strip-size');
     const taken = steps.slice(0, level);
     const floors = taken.filter(step => step.floor).map(step => step.floor);
     const wrap = taken.some(step => step.wrap);
-    const fold = taken.some(step => step.fold);
-    for (const strip of strips) delete strip.dataset.fold;
-    // Room for one line: the tile's width, less the strip's inset.
-    const room = strip => strip.parentElement.clientWidth - 8;
-    // One line's width, even where the strips may wrap.
-    const lineWidth = (strip) => {
-      strip.style.flexWrap = 'nowrap';
-      const width = strip.scrollWidth;
-      strip.style.removeProperty('flex-wrap');
-      return width;
-    };
     if (floors.length) {
-      const ratio = Math.min(...strips.map(strip => room(strip) / (lineWidth(strip) * slack)));
+      // Each strip shrinks toward the line it can have: its own line where that's clear of the total, otherwise what the
+      // near row leaves on its line.
+      const ratio = Math.min(...strips.map((strip) => {
+        const player = tileOf(strip);
+        const near = player.querySelector('.badges.near');
+        player.dataset.strip = 'above';
+        const room = strip.parentElement.clientWidth - (clear(strip) || near.hidden ? 0 : chipsWidth(near) + 4);
+        return room / (lineWidth(strip) * slack);
+      }));
       if (ratio < 1) board.style.setProperty('--strip-size', `${Math.max(Math.min(...floors), Math.floor(base * ratio * 10) / 10)}px`);
     }
-    const clear = (strip) => {
-      const box = strip.getBoundingClientRect();
-      const face = strip.parentElement;
-      return ![face.querySelector('.score'), ...face.querySelectorAll('.controls button')]
-        .some(blocker => overlaps(box, blocker.getBoundingClientRect()));
-    };
-    const fits = strip => (wrap || strip.scrollWidth * slack <= room(strip) + 1) && clear(strip);
-    if (fold) for (const strip of strips) if (!fits(strip)) strip.dataset.fold = '';
-    return strips.every(strip => ('fold' in strip.dataset ? clear(strip) : fits(strip)));
+    return strips.reduce((cost, strip) => cost + place(strip, slack, wrap), 0);
   };
-  let needed = 0;
-  while (needed < steps.length && !measure(needed, 1)) needed++;
+  const folds = steps.map((_, level) => measure(level, 1)).concat(measure(steps.length, 1));
+  const needed = folds.indexOf(Math.min(...folds));
   let level = needed;
   const current = dropLevels.strip;
   if (needed < current) {
-    const kept = dropTokens('strip', current, strips).length;
     level = current;
     for (let candidate = needed; candidate < current; candidate++) {
-      if (dropTokens('strip', candidate, strips).length === kept || measure(candidate, dropSlack)) {
+      if (measure(candidate, dropSlack) <= folds[current]) {
         level = candidate;
         break;
       }
@@ -423,6 +610,7 @@ function fitStrips() {
   }
   dropLevels = { ...dropLevels, strip: level };
   measure(level, 1);
+  return strips.some(strip => tileOf(strip).dataset.strip === 'fold-inline');
 }
 
 function seatRow(index) {
@@ -1025,7 +1213,8 @@ function toggleIdentity(index, id) {
   saveGame();
 }
 
-// Five toggles for one player's colour identity: the mana symbols in W U B R G order. Any combination can be on.
+// Five toggles for one player's colour identity: the mana symbols in W U B R G order. Any combination can be on. An off
+// toggle's symbol is muted, and an on one has a check.
 function buildIdentity(index) {
   const group = element('div', 'identity');
   group.dataset.player = index;
@@ -1034,7 +1223,9 @@ function buildIdentity(index) {
   for (const colour of identityColours) {
     const pip = element('span', 'pip');
     pip.dataset.pip = colour.id;
-    const toggle = element('button', 'identity-toggle', pip);
+    const check = element('span', 'toggle-check', icon('check'));
+    check.setAttribute('aria-hidden', 'true');
+    const toggle = element('button', 'identity-toggle', pip, check);
     toggle.type = 'button';
     toggle.value = colour.id;
     toggle.setAttribute('aria-label', colour.name[0].toUpperCase() + colour.name.slice(1));
@@ -1236,7 +1427,9 @@ function renderModeLayer(player, index) {
     hint.setAttribute('aria-hidden', 'true');
     layer.append(hint, element('div', 'colour-picker', buildSwatches(index, colour => chooseColour(index, colour))));
   } else if (boardMode === 'identity') {
-    layer.append(buildIdentityPreview(index), buildIdentity(index));
+    const hint = element('p', 'layer-hint', 'Tap your colours');
+    hint.setAttribute('aria-hidden', 'true');
+    layer.append(hint, buildIdentityPreview(index), buildIdentity(index));
   } else if (boardMode === 'damage') {
     const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
     hint.setAttribute('aria-hidden', 'true');
@@ -1271,10 +1464,17 @@ function dangerLevel(value, warning, lethal) {
 }
 
 function isOut(index) {
-  return game.scores[index] <= 0 ||
-    (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) ||
-    (game.counters.poison && game.poison[index] >= poisonLethal);
+  return outReason(index) !== null;
 }
+
+// Why a player is out: 'life' at 0 or below, then 'poison' at 10, then 'commander' at 21 commander damage, or null.
+function outReason(index) {
+  if (game.scores[index] <= 0) return 'life';
+  if (game.counters.poison && game.poison[index] >= poisonLethal) return 'poison';
+  if (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) return 'commander';
+  return null;
+}
+const outLabels = { life: 'out', poison: 'out on poison', commander: 'out on commander damage' };
 
 // A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
 function randomBelow(count) {
@@ -1460,9 +1660,9 @@ function buildFirstPicker(index) {
   return element('div', 'first-picker', go, hint);
 }
 
-// The turn chips that lead a tile's near row (or its mana strip). Rounds: the first player's flag carries the round
-// and steps it. Turn by turn: the active player's chip passes the turn, and the first player keeps a small flag; with
-// nobody's turn yet, every player who isn't out has a chip to start theirs.
+// The turn chips that lead a tile's near row. Rounds: the first player's flag carries the round and steps it. Turn by
+// turn: the active player's chip says "Turn" and the round and passes the turn, and the first player keeps a small
+// flag; with nobody's turn yet, every player who isn't out has a "Start" chip to start theirs.
 function turnChips(index) {
   const { turns } = game;
   const { first, active, round } = game.turn;
@@ -1474,8 +1674,10 @@ function turnChips(index) {
     chips.push(chip);
   } else if (turns === 'turns') {
     if (active === index || (active === null && !isOut(index))) {
-      const chip = element('button', `chip turn-chip ${active === index ? 'active-chip' : 'start-chip'}`, manaIcon('untap'),
-        element('span', 'turn-word', 'Turn'), String(round));
+      // When the word "Turn" gives way, the round keeps a "T" so the untap symbol doesn't read as a letter.
+      const chip = active === index
+        ? element('button', 'chip turn-chip active-chip', manaIcon('untap'), element('span', 'turn-word', 'Turn'), element('span', 'turn-round', String(round)))
+        : element('button', 'chip turn-chip start-chip', manaIcon('untap'), 'Start');
       chip.setAttribute('aria-label', active === index ? `Player ${index + 1}'s turn, round ${round}. Pass the turn`
         : `Start Player ${index + 1}'s turn`);
       if (active === index) bindStep(chip, stepTurn, stepBack);
@@ -1597,7 +1799,7 @@ function stripItems(index) {
     undo.type = 'button';
     undo.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
     bindTap(undo, () => undoClear(index));
-    return [undo];
+    return [undo, stripChip(index)];
   }
   const items = manaColours.flatMap((colour, at) => {
     const amount = game.pools[index][at];
@@ -1612,22 +1814,38 @@ function stripItems(index) {
     bindTap(spend, () => spendMana(index, at));
     return [spend];
   });
-  // Folded, where the strip can't fit clear of the total: one button that shows the pool and opens mana mode.
-  const summary = element('button', 'strip-summary', ...manaColours.flatMap((colour, at) => {
-    const amount = game.pools[index][at];
-    if (!amount) return [];
-    const pip = element('span', 'pip');
-    pip.dataset.pip = colour.id;
-    return [element('span', 'summary-item', pip, String(amount))];
-  }));
-  summary.type = 'button';
-  summary.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(index)}. Open mana`);
-  bindTap(summary, () => setBoardMode('mana'));
   const eraser = element('button', 'strip-clear', icon('eraser'));
   eraser.type = 'button';
   eraser.setAttribute('aria-label', `Clear Player ${index + 1}'s mana pool`);
   bindTap(eraser, () => clearPool(index));
-  return [...items, eraser, summary];
+  return [...items, eraser, stripChip(index)];
+}
+
+// The strip folded into one chip, where the strip can't fit: the pool's colours and amounts with a caret, which opens
+// mana mode. Or, for 5 seconds after the eraser, "Undo".
+function stripChip(index) {
+  let chip;
+  if (clearedPools.has(index)) {
+    chip = element('button', 'chip strip-chip', icon('undo'), 'Undo');
+    chip.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
+    bindTap(chip, () => undoClear(index));
+  } else {
+    // One colour and its amount, or several colours' symbols stacked before the pool's total, so the chip stays short.
+    const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
+    const pip = (colour) => {
+      const symbol = element('span', 'pip');
+      symbol.dataset.pip = colour.id;
+      return symbol;
+    };
+    const parts = held.length > 1
+      ? [element('span', 'summary-item', ...held.map(({ colour }) => pip(colour)), String(held.reduce((sum, { amount }) => sum + amount, 0)))]
+      : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
+    chip = element('button', 'chip strip-chip', ...parts, icon('caret-right'));
+    chip.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(index)}. Open mana`);
+    bindTap(chip, () => setBoardMode('mana'));
+  }
+  chip.type = 'button';
+  return chip;
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
@@ -1655,26 +1873,22 @@ function renderBadges(index) {
   }));
   far.hidden = damage.length === 0;
   const near = player.querySelector('.badges.near');
-  const turns = turnChips(index);
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
-  // While a pool has mana, or for 5 seconds after the eraser, its strip takes the near row's place. The turn chips
-  // come along, since they're controls and never give way.
+  // While a pool has mana, or for 5 seconds after the eraser, its strip shows over the near row, which stays.
   const strip = player.querySelector('.mana-strip');
   const hadFocus = strip.contains(document.activeElement) ? document.activeElement.dataset.colour ?? '' : null;
-  if (game.manaPool && (hasMana(index) || clearedPools.has(index))) {
-    strip.replaceChildren(...turns, ...stripItems(index));
-    strip.hidden = false;
-    near.replaceChildren();
-    near.hidden = true;
+  const floating = game.manaPool && (hasMana(index) || clearedPools.has(index));
+  strip.replaceChildren(...(floating ? stripItems(index) : []));
+  strip.hidden = !floating;
+  if (floating) {
     // Keep keyboard focus in the strip as items come and go.
     if (hadFocus !== null) (strip.querySelector(`[data-colour="${hadFocus}"]`) ?? strip.querySelector('.strip-spend, .strip-clear, .strip-undo'))?.focus();
-    requestFit();
-    return;
+  } else {
+    delete player.dataset.strip;
+    if (hadFocus !== null) setupButton.focus();
   }
-  strip.replaceChildren();
-  strip.hidden = true;
-  if (hadFocus !== null) setupButton.focus();
-  const chips = [...turns];
+  const chips = [...turnChips(index)];
+  const foldedChip = floating ? stripChip(index) : null;
   const identity = identityChip(game.identities[index], game.identity.show);
   if (identity) chips.push(identity);
   for (const { kind } of shownCounters()) {
@@ -1687,6 +1901,8 @@ function renderBadges(index) {
     if (level) chip.dataset.level = level;
     chips.push(chip);
   }
+  // The strip folded onto the near row, shown only when it can go nowhere else.
+  if (foldedChip) chips.push(foldedChip);
   for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
   near.replaceChildren(...chips);
   near.hidden = chips.length === 0;
@@ -1718,6 +1934,12 @@ function syncPill() {
   roundBackButton.setAttribute('aria-label', game.turns === 'rounds' ? 'Back one round' : 'Back one turn');
   // The tap symbol gets a dot while any pool has mana.
   manaButton.toggleAttribute('data-floating', game.pools.some((_, index) => hasMana(index)));
+  // The pill's length decides which face edges it reaches, so the board is measured again when it changes.
+  const shape = `${[...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length} ${restPillButtons()}`;
+  if (shape !== pillShape) {
+    pillShape = shape;
+    measureBoard();
+  }
 }
 
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
@@ -1787,9 +2009,12 @@ function renderScore(index) {
   const score = board.children[index].querySelector('.score');
   const value = String(game.scores[index]).replace('-', '−');
   score.value = value;
-  score.setAttribute('aria-label', `${game.scores[index]} life`);
+  // A player who is out says so under the total, and their other badges dim.
+  const out = outReason(index);
+  score.setAttribute('aria-label', `${game.scores[index]} life${out ? `, ${outLabels[out]}` : ''}`);
   syncBoardDigits();
-  score.toggleAttribute('data-out', isOut(index));
+  score.toggleAttribute('data-out', out !== null);
+  board.children[index].toggleAttribute('data-out', out !== null);
 }
 
 function renderBoard() {
@@ -1867,12 +2092,19 @@ function setupChangesGame() {
   return selectedPlayerCount !== game.scores.length || selectedLife !== game.startingLife;
 }
 
-// Track's summary: the icon of each tracker that's on, then the mana pool and turns.
+// Track's summary: the icon of each tracker that's on, then the mana pool and turns. It shows at most three icons, and
+// as many as fit beside the word "Track", then "+N" for the rest, so the label and the caret always keep their room.
 function renderTrackSummary() {
-  trackSummary.replaceChildren(...trackers.filter(tracker => game.counters[tracker])
+  const icons = () => [...trackers.filter(tracker => game.counters[tracker])
     .map(tracker => (tracker === 'commander' ? icon('sword') : counterIcon(tracker))),
   ...(game.manaPool ? [manaIcon('tap')] : []),
-  ...(game.turns === 'rounds' ? [icon('flag')] : game.turns === 'turns' ? [manaIcon('untap')] : []));
+  ...(game.turns === 'rounds' ? [icon('flag')] : game.turns === 'turns' ? [manaIcon('untap')] : [])];
+  const total = icons().length;
+  const show = count => trackSummary.replaceChildren(...icons().slice(0, count), ...(total > count ? [element('span', 'more', `+${total - count}`)] : []));
+  let count = Math.min(3, total);
+  show(count);
+  // Measured only while setup is open; it's fitted again each time setup opens.
+  while (count > 0 && setup.open && trackSummary.scrollWidth > trackSummary.clientWidth + 0.5) show(--count);
 }
 
 // Track's own state: the switches, the Turns choice, and the auto-empty switch, which only shows while it applies.
@@ -1958,6 +2190,7 @@ setupButton.addEventListener('click', () => {
   wakeInput.checked = game.keepAwake;
   renderSetup();
   setup.showModal();
+  renderTrackSummary();
   syncBackHandling();
 });
 setup.querySelector('[data-close]').addEventListener('click', () => setup.close());
@@ -1965,12 +2198,20 @@ setup.querySelector('[data-close]').addEventListener('click', () => setup.close(
 document.querySelector('#privacy-button').addEventListener('click', () => {
   setup.close();
   privacy.showModal();
+  privacy.scrollTop = 0;
+  syncPrivacyCue();
   syncBackHandling();
 });
 privacy.addEventListener('close', () => {
   setup.showModal();
+  renderTrackSummary();
   syncBackHandling();
 });
+// About scrolls on short screens, with a fade along the bottom while there's more below.
+function syncPrivacyCue() {
+  privacyCue.toggleAttribute('data-more', privacy.scrollTop + privacy.clientHeight < privacy.scrollHeight - 1);
+}
+privacy.addEventListener('scroll', syncPrivacyCue, { passive: true });
 // Track and Identity replace setup, keeping setup's unsaved choices. ‹, Escape and Android back return to setup;
 // ✕ closes both. Choose identities closes both and starts identity mode.
 function openSubSheet(dialog) {
@@ -1988,6 +2229,7 @@ for (const [dialog, opener] of [[trackDialog, trackButton], [identityDialog, ide
     } else if (dialog.returnValue !== 'choose') {
       renderSetup();
       setup.showModal();
+      renderTrackSummary();
       opener.focus();
     }
     syncBackHandling();
@@ -2035,7 +2277,16 @@ function renderIdentitySheet() {
   for (const choice of identityBackgroundChoices.children) {
     choice.setAttribute('aria-pressed', String(game.identity.background === choice.dataset.background));
   }
+  identityNote.textContent = identityNoteText(game.identity.show);
   chooseIdentitiesButton.hidden = setupChangesGame();
+}
+
+// The Identity sheet's note says what the tiles show: "Tiles show the colour disc and name", or that the chip is off.
+function identityNoteText(show) {
+  const parts = [['indicator', 'colour disc'], ['symbol', 'symbol'], ['name', 'name']].filter(([part]) => show[part]).map(([, words]) => words);
+  if (!parts.length) return 'Identity is hidden on tiles. Players keep their picks.';
+  const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+  return `Tiles show the ${list} of each player's identity.`;
 }
 
 function changeIdentitySettings(change) {

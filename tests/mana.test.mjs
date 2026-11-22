@@ -62,12 +62,13 @@ const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const cell = (page, number, colour) => tile(page, number).locator(`.mana-cell[data-colour="${colour}"]`);
 const amount = (page, number, colour) => cell(page, number, colour).locator('b').textContent();
 const isOpen = (page, id) => page.locator(`#${id}`).evaluate(dialog => dialog.open);
-// Each tile's strip as it reads: 'R3 C1 clear', 'undo', or '' with no strip. Turn chips and the folded summary,
-// which shows only where the strip can't fit, are left out.
+// Each tile's strip as it reads: 'R3 C1 clear', 'undo', or '' with no strip. The folded chip, which shows only where
+// the strip can't fit, is left out.
 const strips = page => page.locator('.mana-strip').evaluateAll(rows => rows.map(row => (row.hidden ? '' : [...row.children]
   .filter(item => !item.matches('.chip') && item.checkVisibility())
   .map(item => (item.matches('.strip-clear') ? 'clear' : item.matches('.strip-undo') ? 'undo' : `${item.dataset.colour}${item.textContent}`)).join(' '))));
-const nearShown = page => page.locator('.badges.near').evaluateAll(rows => rows.map(row => !row.hidden && row.childElementCount > 0));
+// Whether each tile's near row shows anything.
+const nearShown = page => page.locator('.badges.near').evaluateAll(rows => rows.map(row => !row.hidden && [...row.children].some(chip => chip.checkVisibility() && chip.offsetWidth > 0)));
 const floating = page => page.locator('#mana-button').evaluate(node => node.hasAttribute('data-floating'));
 
 // Mana mode: six circles per tile, W U B R G and colourless, each a mana symbol over its amount. Tap +1, hold −1, and
@@ -117,8 +118,8 @@ async function checkManaMode(t, engine) {
   assert.deepEqual((await saved(page)).pools, Array(4).fill([0, 0, 0, 0, 0, 0]), 'the discard is saved');
   assert.deepEqual(await strips(page), ['', '', '', '']);
 
-  // The check mark saves. Only tiles with mana show a strip, holding only the colours they have, in place of the
-  // near row; the pill's tap symbol gets a dot.
+  // The check mark saves. Only tiles with mana show a strip, holding only the colours they have, and every near row
+  // stays (design/polish/FINAL-REVIEW.md #3); the pill's tap symbol gets a dot.
   await setSwitches(page, { Poison: true, Commander: true });
   await button(page, 'Counters').tap();
   await tile(page, 2).locator('.counter-cell[data-kind="poison"]').tap();
@@ -129,7 +130,7 @@ async function checkManaMode(t, engine) {
   await button(page, 'Save').tap();
   assert.equal(await mode(page), null);
   assert.deepEqual(await strips(page), ['W2 U1 clear', '', 'R3 C1 clear', '']);
-  assert.deepEqual(await nearShown(page), [false, true, false, false], 'the strip takes the near row’s place');
+  assert.deepEqual(await nearShown(page), [false, true, true, false], 'Player 3’s poison stays beside its strip');
   assert.equal(await floating(page), true, 'the pill’s tap symbol has a dot');
   assert.deepEqual((await saved(page)).pools, [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 3, 0, 1], [0, 0, 0, 0, 0, 0]]);
   // Every strip item is a 44px target inside its tile.
@@ -160,14 +161,16 @@ async function checkStrip(t, engine) {
   assert.deepEqual(await strips(page), ['W2 U1 clear', '', 'R3 C1 clear', '']);
   assert.equal(await tile(page, 1).locator('.strip-spend[data-colour="U"]').getAttribute('aria-label'), 'Player 1, 1 blue mana. Spend one');
 
-  // Spending saves at once. A colour at 0 leaves the strip; an empty pool brings the near row back.
+  // Every near row stays while its pool has mana.
+  assert.deepEqual(await nearShown(page), [true, true, true, true], 'every near row stays beside its strip');
+  // Spending saves at once. A colour at 0 leaves the strip, and an empty pool hides it.
   await tile(page, 1).locator('.strip-spend[data-colour="U"]').tap();
   assert.deepEqual(await strips(page), ['W2 clear', '', 'R3 C1 clear', '']);
   assert.deepEqual((await saved(page)).pools[0], [2, 0, 0, 0, 0, 0]);
   await tile(page, 1).locator('.strip-spend[data-colour="W"]').tap();
   await tile(page, 1).locator('.strip-spend[data-colour="W"]').tap();
   assert.deepEqual(await strips(page), ['', '', 'R3 C1 clear', '']);
-  assert.deepEqual(await nearShown(page), [true, true, false, true], 'the near row returns when the pool empties');
+  assert.deepEqual(await nearShown(page), [true, true, true, true], 'the near rows stay as pools empty');
   assert.equal(await floating(page), true);
 
   // The eraser clears P3's pool and leaves "Undo clear"; a tap puts the pool back.
@@ -180,7 +183,7 @@ async function checkStrip(t, engine) {
   assert.deepEqual(await strips(page), ['', '', 'R3 C1 clear', '']);
   assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 3, 0, 1], 'Undo clear restores the pool');
 
-  // "Undo clear" lasts 5 seconds, then the near row comes back and the pool stays empty.
+  // "Undo clear" lasts 5 seconds, then the strip goes and the pool stays empty.
   await tile(page, 3).locator('.strip-clear').tap();
   await page.clock.runFor(4900);
   assert.deepEqual(await strips(page), ['', '', 'undo', ''], 'still there just before 5 seconds');
@@ -195,8 +198,10 @@ async function checkStrip(t, engine) {
 async function checkAutoEmpty(t, engine) {
   const pools = [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 3, 0, 1], [0, 0, 0, 0, 0, 0]];
   const page = await openPage(t, engine, { game: savedGame(4, { manaPool: true, pools, turns: 'turns', turn: { first: 0, active: 0, round: 1 } }) });
-  // The active player's turn chip leads their strip, since it never gives way.
-  assert.equal(await tile(page, 1).locator('.mana-strip .turn-chip.active-chip').count(), 1, 'the turn chip leads the strip');
+  // The active player's turn chip stays in their near row beside the strip, since it never gives way.
+  assert.equal(await tile(page, 1).locator('.badges.near .turn-chip.active-chip').count(), 1, 'the turn chip stays in the near row');
+  assert.ok(await tile(page, 1).locator('.badges.near .turn-chip.active-chip').isVisible(), 'and shows');
+  assert.equal(await page.locator('.mana-strip .turn-chip').count(), 0, 'no turn chip moves into a strip');
   await tile(page, 1).locator('.turn-chip').tap();
   assert.deepEqual(await strips(page), ['', '', '', ''], 'a pass empties every pool');
   assert.deepEqual((await saved(page)).pools, Array(4).fill([0, 0, 0, 0, 0, 0]));
@@ -290,24 +295,28 @@ test('chromium: mana mode fits six players on the smallest phone', async (t) => 
       return [...player.querySelectorAll('.mode-layer .mana-cell, .mana-strip button')].filter(node => node.offsetWidth).map((target) => {
         const box = target.getBoundingClientRect();
         const issues = [];
-        if (Math.min(box.width, box.height) < 43.5) issues.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
+        // A folded strip's chip is a target through its 64 × 44 touch area, like the turn chip.
+        const touch = getComputedStyle(target, '::after');
+        const size = target.matches('.chip') ? [parseFloat(touch.width), parseFloat(touch.height)] : [box.width, box.height];
+        if (Math.min(...size) < 43.5) issues.push(`${Math.round(size[0])}×${Math.round(size[1])}`);
         if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) issues.push('outside its tile');
         if (overlaps(box, pill)) issues.push('under the centre controls');
         return issues.length ? `P${index + 1} ${target.getAttribute('aria-label')}: ${issues.join(', ')}` : '';
       }).filter(Boolean);
     });
   });
-  // Every colour held: the strip wraps onto a second line and stays inside the tile.
+  // Every colour held: each strip folds into its chip, which stays inside the tile.
   assert.deepEqual(await problems(), [], 'the strips fit');
   await button(page, 'Mana pool').tap();
   assert.equal(await page.locator('.mana-cell').count(), 36);
   assert.deepEqual(await problems(), [], 'the mana cells fit');
 });
 
-// The strip never covers a life total or its − and + glyphs. With three or all six colours on every tile, with and
-// without the active player's turn chip, on the target, the smallest real phone and the stress size: the turn chips
-// leave the strip first, then the type shrinks, and a strip that still can't fit clear of the total folds into one
-// button that opens mana mode.
+// The strip never covers a life total, its − and + glyphs or the near row, and the near row and its counts always show
+// (design/polish/FINAL-REVIEW.md #3). With three or all six colours on every tile, with and without the active player's
+// turn chip, on the target, the smallest real phone and the stress size: a strip sits on its own line above the near
+// row, or at the end of the near row's line, and one that can't fit either folds into a chip with a caret that opens
+// mana mode, on its own line or at the end of the near row. The turn chip never leaves the near row.
 async function checkStripClear(t, engine) {
   const browser = await engine.launch();
   t.after(() => browser.close());
@@ -329,28 +338,41 @@ async function checkStripClear(t, engine) {
           await page.goto(app);
           await page.evaluate(() => document.fonts.ready);
           await page.waitForTimeout(100);
-          assert.deepEqual(await stripProblems(page), [], `${view}: every strip is clear of the totals and glyphs`);
-          const state = await page.evaluate(() => ({
-            strips: [...document.querySelectorAll('.mana-strip')].filter(strip => !strip.hidden).length,
-            folded: document.querySelectorAll('.mana-strip[data-fold]').length,
-            turnChip: [...document.querySelectorAll('.mana-strip .turn-chip')].some(chip => chip.checkVisibility()),
-            drop: document.querySelector('#board').dataset.drop ?? '',
-          }));
-          assert.equal(state.strips, count, `${view}: every tile with mana has a strip`);
-          // A turn chip that left its strip is never the only way to pass: the pill's round button does the same.
-          if (turn && !state.turnChip) {
-            assert.ok(state.drop.includes('strip-turn'), `${view}: the turn chip left the strip as an auto-drop step`);
-            assert.ok(await page.locator('#round-button').isVisible(), `${view}: the pill's round button stays`);
+          assert.deepEqual(await stripProblems(page), [], `${view}: every strip is clear of the totals, glyphs and near rows`);
+          const state = await page.evaluate(() => {
+            const shown = node => node.checkVisibility() && node.offsetWidth > 0;
+            const players = [...document.querySelectorAll('.player')];
+            return {
+              places: players.map(player => player.dataset.strip ?? ''),
+              // A strip shows its spend buttons, or its folded chip shows.
+              shown: players.filter(player => [...player.querySelectorAll('.mana-strip .strip-spend, .strip-chip')].some(shown)).length,
+              poison: players.filter(player => [...player.querySelectorAll('.badges.near .chip[data-kind="poison"]')].some(shown)).length,
+              turnChip: [...document.querySelectorAll('.badges.near .turn-chip')].some(shown),
+              chips: [...document.querySelectorAll('.strip-chip')].filter(shown).map(chip => ({
+                caret: Boolean(chip.querySelector('.icon[data-icon="caret-right"]')), label: chip.getAttribute('aria-label'),
+              })),
+            };
+          });
+          assert.equal(state.shown, count, `${view}: every tile with mana shows its strip or its folded chip (${state.places})`);
+          assert.equal(state.poison, count, `${view}: every near row keeps its poison count`);
+          if (turn) assert.ok(state.turnChip, `${view}: the turn chip stays in the near row`);
+          const folded = state.places.filter(place => place.startsWith('fold')).length;
+          assert.equal(state.chips.length, folded, `${view}: each folded strip shows its chip`);
+          for (const chip of state.chips) {
+            assert.ok(chip.caret, `${view}: a folded chip has a caret`);
+            assert.match(chip.label, /^Player \d, mana pool .+\. Open mana$/);
           }
-          if (state.folded) {
-            // A folded strip shows the pool and opens mana mode.
-            const summary = page.locator('.mana-strip[data-fold] .strip-summary').first();
-            assert.match(await summary.getAttribute('aria-label'), /^Player \d, mana pool .+\. Open mana$/);
-            await summary.tap();
+          if (folded) {
+            await page.locator('.strip-chip').filter({ visible: true }).first().tap();
             assert.equal(await mode(page), 'mana', `${view}: a folded strip opens mana mode`);
           }
-          if (width === 952 && count === 4) assert.equal(state.folded, 0, `${view}: nothing folds on the target with four players`);
-          if (colours === 'three colours' && !(width === 568 && count === 6)) assert.equal(state.folded, 0, `${view}: three colours never fold`);
+          // On the target, a strip beside a near row of just the poison count never folds, with three colours at 4 or 6
+          // players or six colours at 4. Only the active tile, whose near row also has the turn chip and the flag, may run
+          // out of room for its 44px targets.
+          if (width === 952 && (colours === 'three colours' || count === 4)) {
+            const folds = state.places.flatMap((place, index) => (place.startsWith('fold') && !(turn && index === 0) ? [`P${index + 1}`] : []));
+            assert.deepEqual(folds, [], `${view}: on the target only the tile with the turn chip may fold`);
+          }
           assert.deepEqual(errors, [], `${view}: no script errors`);
           await page.close();
         }

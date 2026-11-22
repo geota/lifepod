@@ -37,6 +37,8 @@
      the symbols are printed with, with the symbol itself in near-black. */
   --pip-w: #fdfbce; --pip-u: #bcdaf7; --pip-b: #a7999e; --pip-r: #f19b79; --pip-g: #9fcba6; --pip-c: #cdc8c4;
   --pip-ink: #111;
+  /* The colour indicator's rim: the text colour at 65%. */
+  --ci-rim: #f3f1e5a6;
 
   /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
   --die-shadow: #070a08;
@@ -187,6 +189,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   display: flex;
   transform: translate(-50%, -50%);
 }
+/* app.js places the pill on a seam that only far rows face (design/polish/FINAL-REVIEW.md #1). With 2 players that's the
+   middle seam, so the pill stands upright along it, and the round's two copies face the two players. */
+.board-controls[data-vertical] { transform: translate(-50%, -50%) rotate(90deg); }
 /* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target, or up to
    64px on tablets. app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
 .board-controls::before {
@@ -242,6 +247,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .save-button:active::before { background: var(--accent-pressed); }
 #board-controls .save-button::after, #board-controls .save-button:not([hidden]) + .pill-button::after { content: none; }
 .pill-button:disabled { opacity: .38; cursor: default; }
+/* "Back one turn" for keyboards and screen readers: hidden beside the round button, and shown as a ‹ button there while
+   it has keyboard focus. */
+#round-back:focus-visible {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--setup-button);
+  height: var(--setup-button);
+  padding: 0;
+  overflow: visible;
+  clip-path: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text);
+  font-size: clamp(1.25rem, 20 * var(--grow), 1.625rem);
+  outline-offset: -4px;
+}
 .pill-button:disabled::before { content: none; }
 /* The round button: the round printed twice like a card index, the top copy upside down, on a disc ringed in the
    accent. */
@@ -438,6 +461,30 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: var(--text);
 }
 .score[data-out] { color: var(--life-out); }
+/* A player who is out (0 life, 10 poison or 21 commander damage) says so under the total, in the total's red, and
+   their other badges dim. The cause, a lethal poison or damage chip, keeps its full colour. */
+.out-tag {
+  grid-area: 1 / 2;
+  align-self: end;
+  justify-self: center;
+  display: none;
+  position: relative;
+  top: .95em;
+  padding: .12em .5em;
+  border-radius: var(--radius-full);
+  background: linear-gradient(var(--life-out-tint), var(--life-out-tint)), var(--chip-background);
+  box-shadow: inset 0 0 0 1.5px var(--life-out);
+  color: var(--life-out);
+  font-size: max(.6875rem, calc(var(--badge-size) * .86));
+  font-weight: var(--weight-heavy);
+  letter-spacing: .08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.player[data-out] .out-tag { display: block; }
+.board[data-mode="rotate"] .out-tag { visibility: hidden; }
+.player[data-out] .badges .chip:not([data-level="out"], .turn-chip, .strip-chip) { opacity: .82; filter: saturate(.35); }
 /* The life halves have no button chrome: the − and + glyphs sit near the tile's outer edges, 5u in. */
 .controls {
   display: grid;
@@ -445,6 +492,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   align-items: center;
   gap: var(--control-gap);
   width: 100%;
+  /* An end of the face the centre pill reaches past (a rotated seat) keeps clear of it, as the far row does. app.js
+     sets --clear-far, --clear-end, --clear-near and --clear-start on each tile from where the pill is. */
+  padding-inline: var(--clear-start, 0px) var(--clear-end, 0px);
 }
 .controls button {
   display: grid;
@@ -510,7 +560,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   place-content: center;
   justify-items: center;
   gap: 6px;
-  padding: calc(var(--setup-button) / 2 - 2px) 6px 4px;
+  padding: max(calc(var(--setup-button) / 2 - 2px), var(--clear-far, 0px) - 4px) max(6px, var(--clear-end, 0px)) max(4px, var(--clear-near, 0px)) max(6px, var(--clear-start, 0px));
   text-align: center;
 }
 .mode-layer[hidden] { display: none; }
@@ -530,7 +580,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .swatches {
   display: grid;
-  grid-template-columns: repeat(4, var(--swatch-size));
   grid-auto-rows: var(--swatch-size);
   gap: 4px;
 }
@@ -549,12 +598,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .swatch:disabled::before { content: none; }
 .swatch .owner { color: var(--seat); font-size: max(14px, var(--swatch-size) * .24); font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
 /* Narrow tiles, such as 6 players on a phone, tighten the layer and drop the hint. */
-.board[data-narrow] .mode-layer { padding: calc(var(--setup-button) / 2 - 4px) 4px 1px; }
-.board[data-narrow] .mode-layer:has(.colour-picker) { padding-inline: 1px; }
+.board[data-narrow] .mode-layer {
+  padding: max(calc(var(--setup-button) / 2 - 4px), var(--clear-far, 0px) - 4px) max(4px, var(--clear-end, 0px)) max(1px, var(--clear-near, 0px)) max(4px, var(--clear-start, 0px));
+}
 .board[data-narrow] .colour-picker { --swatch-size: 44px; }
 .board[data-narrow] .swatches { gap: 3px; }
 /* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches fit. */
-.board[data-short] .mode-layer:has(.colour-picker) { padding-block: calc(var(--setup-button) / 2 - 4px) 1px; }
+/* On narrow or short boards the swatches are 44px, and each face lays them out in the grid that fits it: 4 × 3, or
+   3 × 4 on a face narrower than four swatches, such as a rotated seat in a short tile (app.js sets --swatch-columns).
+   The layer keeps clear of the pill only on the edges it reaches, so the grid can use the rest of the face. */
+.swatches { grid-template-columns: repeat(var(--swatch-columns, 4), var(--swatch-size)); }
+.board:is([data-narrow], [data-short]) .mode-layer:has(.colour-picker) {
+  padding: max(1px, var(--clear-far, 0px) - 6px) max(1px, var(--clear-end, 0px) - 6px) max(1px, var(--clear-near, 0px) - 6px) max(1px, var(--clear-start, 0px) - 6px);
+}
 .board[data-short] .colour-picker { --swatch-size: 44px; }
 .board[data-short] .swatches { gap: 3px; }
 
@@ -572,10 +628,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   flex-wrap: wrap;
   justify-content: center;
   gap: 4px;
-  width: calc(3 * var(--toggle) + 8px);
+  /* Five in a row, three, or two (app.js sets --toggle-columns from each face's room). */
+  width: calc(var(--toggle-columns, 3) * var(--toggle) + (var(--toggle-columns, 3) - 1) * 4px);
 }
-.board[data-wide] .identity { width: calc(5 * var(--toggle) + 16px); }
 .identity-toggle {
+  position: relative;
   display: grid;
   place-items: center;
   width: var(--toggle);
@@ -586,7 +643,24 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   background: var(--background);
 }
 .identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
+/* Off, the symbol is muted like an empty mana cell. On, it's in full colour inside a light ring, with a check. */
+.identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
 .identity-toggle[aria-pressed="true"] { border-color: var(--text); background: var(--surface-pressed); box-shadow: 0 0 0 1px var(--text); }
+.toggle-check {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: none;
+  place-items: center;
+  width: max(16px, calc(var(--toggle) * .34));
+  height: max(16px, calc(var(--toggle) * .34));
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--tile-panel);
+  color: var(--ink);
+}
+.toggle-check .icon { width: 62%; height: 62%; }
+.identity-toggle[aria-pressed="true"] .toggle-check { display: grid; }
 
 /* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat showing the damage
    their commander has dealt this player. Every seat is filled with that player's own tile colour (their panel),
@@ -595,13 +669,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
    number gets heavier. Nothing is transparent. Cells are at least 44px; the hint goes on narrow tiles. app.js
    sets the grid's rows and columns and places each seat. */
 .seat-map {
-  --hint-space: 24px;
   display: grid;
-  grid-template-columns: repeat(var(--columns), minmax(44px, 1fr));
-  grid-template-rows: repeat(var(--rows), minmax(44px, 1fr));
+  /* Every seat is the same size on every tile, whichever way the map is turned (app.js: sizeMapSeats). */
+  grid-template-columns: repeat(var(--columns), var(--seat-width, 44px));
+  grid-template-rows: repeat(var(--rows), var(--seat-height, 44px));
   gap: 4px;
-  width: min(var(--ui, 400px) - 12px, var(--columns) * 120 * var(--grow));
-  height: min(var(--ub, 400px) - 6px - var(--setup-button) / 2 - var(--hint-space), var(--rows) * 80 * var(--grow));
 }
 .map-cell {
   /* The seat's own ring, kept under the changed and pressed rings below. */
@@ -644,10 +716,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .map-cell.self strong[data-out] { color: var(--life-out); }
 .life-change { font-size: max(.75rem, .5em); font-weight: var(--weight-semibold); color: var(--text-soft); letter-spacing: normal; }
 .life-change[data-loss] { color: var(--life-out); }
-.board:is([data-narrow], [data-short]) .seat-map { --hint-space: 0px; }
 
-/* Counters mode: one circle per counter that's on, its icon over its count, three to a row with the last row
-   centred. A tap adds one and a hold takes one away. Cells are the same size on every tile and never under 44px:
+/* Counters mode: one circle per counter that's on, its icon (0.42 of the cell) over its count (0.3), three to a row
+   with the last row centred. A tap adds one and a hold takes one away. Cells are the same size on every tile and never under 44px:
    78px on a 952 × 427 phone at 4 or 6 players, 50px at 568 × 320 with 6. */
 .counter-cells {
   --cell: clamp(44px, min((var(--ui, 400px) - 20px) / 3, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
@@ -655,7 +726,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   flex-wrap: wrap;
   justify-content: center;
   gap: 4px 10px;
-  width: calc(3 * var(--cell) + 20px);
+  /* Three to a row, or two on a face too narrow for three (app.js sets --cell-columns). */
+  width: calc(var(--cell-columns, 3) * var(--cell) + (var(--cell-columns, 3) - 1) * 10px);
 }
 .counter-cell {
   display: grid;
@@ -675,7 +747,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   letter-spacing: -.03em;
   line-height: 1;
 }
-.counter-cell :is(.icon, .mana-icon) { color: var(--seat); font-size: .8em; }
+.counter-cell :is(.icon, .mana-icon) { color: var(--seat); font-size: 1.4em; }
 .counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
 .counter-cell:is(:active, [data-pressed]) { background: var(--cell-pressed); }
 .counter-cell:has(+ .counter-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
@@ -714,26 +786,41 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
    out of room, app.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every tile at once: data-drop
    tokens on #board hide parts, and --near-badge-size and --far-badge-size shrink the type. */
 .badges {
-  position: absolute;
-  left: 4px;
-  right: 4px;
-  z-index: 2;
   display: flex;
   flex-wrap: nowrap;
   justify-content: center;
   gap: 2px;
   pointer-events: none;
 }
-.badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
-.badges.far { top: calc(var(--setup-button) / 2 + 2px); font-size: var(--far-badge-size, var(--badge-size)); }
-.badges.near { font-size: var(--near-badge-size, var(--badge-size)); }
+.badges[hidden], .board[data-mode]:not([data-mode="rotate"]) :is(.badges, .near-edge) { display: none; }
+.badges.far {
+  position: absolute;
+  z-index: 2;
+  top: max(calc(var(--setup-button) / 2 + 2px), var(--clear-far, 0px));
+  left: calc(4px + var(--clear-start, 0px));
+  right: calc(4px + var(--clear-end, 0px));
+  font-size: var(--far-badge-size, var(--badge-size));
+}
+/* The near edge stacks the mana strip, while a pool has mana, over the near row, 3px in from the tile's sides. It keeps
+   the far row's clearance where the pill reaches past it (a rotated seat). */
+.near-edge {
+  position: absolute;
+  z-index: 3;
+  left: calc(3px + var(--clear-start, 0px));
+  right: calc(3px + var(--clear-end, 0px));
+  bottom: max(calc(8 * var(--grow)), var(--clear-near, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--badge-size)); }
 .board[data-drop~="name"] .badges.near .ci-chip .id-name, .board[data-drop~="name"] .turn-word, .board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol,
 .board[data-drop~="identity"] .badges.near .ci-chip, .board[data-drop~="sword"] .badges.far .sword { display: none; }
 .board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
-/* A sideways tile's far edge runs through the middle of the board, where the centre controls sit, so its row
-   starts at the reader's left, clear of them. */
+/* A sideways tile's far edge runs along a seam through the middle of the board, so its row starts at the reader's
+   left, away from the centre. */
 .player:is([data-edge="left"], [data-edge="right"]) .badges.far { justify-content: flex-start; }
-.badges.near { bottom: calc(8 * var(--grow)); }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -767,44 +854,66 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
    Turn by turn: the active player's untap symbol, "Turn" and the round, filled with the seat colour (with nobody's
    turn yet, every player's chip is outlined), and the first player's small flag. The chips are buttons with a
    64 × 44 hit area, in a row that's otherwise display-only. */
-.turn-chip { position: relative; gap: .32em; padding: 0 .55em 0 .45em; border: 0; font-weight: var(--weight-heavy); pointer-events: auto; }
-.turn-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: 44px; content: ''; border-radius: 22px; transform: translate(-50%, -50%); }
+.turn-chip, .strip-chip { position: relative; gap: .32em; padding: 0 .55em 0 .45em; border: 0; font-weight: var(--weight-heavy); pointer-events: auto; }
+.turn-chip::after, .strip-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: 44px; content: ''; border-radius: 22px; transform: translate(-50%, -50%); }
 .turn-chip :is(.icon, .mana-icon) { width: 1em; height: 1em; font-size: 1em; }
 .turn-chip:is(.round-chip, .start-chip) { background: var(--button); color: var(--seat); box-shadow: inset 0 0 0 1.5px var(--seat); }
 .turn-chip.active-chip { background: var(--seat); color: var(--button); }
-.turn-chip:is(:active, [data-pressed]) { background: var(--cell-pressed); color: var(--text); }
-.turn-chip:focus-visible { outline-offset: 2px; }
+.turn-chip:is(:active, [data-pressed]), .strip-chip:active { background: var(--cell-pressed); color: var(--text); }
+.turn-chip:focus-visible, .strip-chip:focus-visible { outline-offset: 2px; }
+/* Once "Turn" gives way, the round keeps a "T" (T12), so the untap symbol doesn't read as a letter. The chip tightens
+   a little to make room for it. */
+.board[data-drop~="name"] .turn-round::before { content: 'T'; letter-spacing: -.02em; }
+.board[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
 .chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
 .chip.flag-chip .icon { width: .95em; height: .95em; }
-/* Floating mana at rest: while a pool has mana, a strip takes the near row's place with each colour it holds and
-   its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a
-   44px-tall target at least 44px wide, on a 32px capsule along the tile's edge. The strip never covers the life
-   total or the − and + glyphs: app.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every strip at once.
-   strip-turn moves the turn chips out, --strip-size shrinks the type, strip-wrap lets it grow upward onto a second
-   line, and data-fold turns a strip that still can't fit into one button showing the pool. */
+/* Floating mana at rest (design/polish/FINAL-REVIEW.md #3): while a pool has mana, a strip shows each colour it holds
+   and its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a
+   44px-tall target at least 44px wide, on a 32px capsule. The near row always stays. app.js puts each strip in the
+   first place that fits clear of the life total, the − and + glyphs and the near row (data-strip on the tile):
+   above, on its own line over the near row; inline, at the end of the near row's line; or fold, one chip at the end
+   of the near row that shows the pool and opens mana mode. --strip-size shrinks the type and strip-wrap lets a strip
+   above grow upward onto a second line. */
 .mana-strip {
-  position: absolute;
-  bottom: 2px;
-  left: 0;
-  right: 0;
-  z-index: 3;
+  position: relative;
+  z-index: 1;
   display: flex;
+  flex: none;
   flex-wrap: nowrap;
   justify-content: center;
   align-items: center;
   gap: 0;
   width: fit-content;
-  max-width: calc(100% - 8px);
-  margin-inline: auto;
+  max-width: 100%;
   padding: 0 2px;
   font-size: var(--strip-size, clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))));
+  pointer-events: auto;
 }
+/* Above: the strip's targets sit 2px over the near row, or with no near row its capsule sits where the near row would. */
+.player[data-strip="above"] .mana-strip { margin-bottom: -6px; }
+.player[data-strip="above"] .near-edge:has(> .badges.near:not([hidden])) > .mana-strip { margin-bottom: 2px; }
 .mana-strip::before { position: absolute; inset: 6px 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
-.mana-strip[hidden], .board[data-mode]:not([data-mode="rotate"]) .mana-strip { display: none; }
-.board[data-drop~="strip-wrap"] .mana-strip { flex-wrap: wrap-reverse; }
-.board[data-drop~="strip-turn"] .mana-strip > .chip,
-.mana-strip[data-fold] > :is(.strip-spend, .strip-clear), .mana-strip:not([data-fold]) > .strip-summary { display: none; }
-.mana-strip > .chip { flex: none; margin-inline: 6px 4px; font-size: var(--near-badge-size, var(--badge-size)); }
+.mana-strip[hidden] { display: none; }
+.board[data-drop~="strip-wrap"] .player[data-strip="above"] .mana-strip { flex-wrap: wrap-reverse; }
+/* Inline: the near row, then the strip, on one line whose targets reach 2px from the tile's edge. */
+.player[data-strip="inline"] .near-edge { flex-direction: row; justify-content: center; gap: 4px; bottom: max(2px, var(--clear-near, 0px) - 6px); }
+.player[data-strip="inline"] .badges.near { flex: 1 1 0; min-width: 0; align-self: center; }
+.player[data-strip="inline"] .mana-strip { order: 1; }
+/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line over the near row.
+   Where even that can't fit, the strip hides and the same chip ends the near row (fold-inline). */
+.player[data-strip="fold-inline"] .mana-strip, .badges.near > .strip-chip { display: none; }
+.player[data-strip="fold-inline"] .badges.near > .strip-chip { display: inline-flex; }
+.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--near-badge-size, var(--badge-size)); }
+.player[data-strip="fold"] .mana-strip { padding: 0; }
+.player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
+.player[data-strip="fold"] .mana-strip > .strip-chip { display: inline-flex; }
+.player[data-strip="fold"] .near-edge:has(> .badges.near:not([hidden])) > .mana-strip { margin-bottom: 2px; }
+.strip-chip .pip { --pip-size: 1.15em; }
+.strip-chip .summary-item { display: flex; align-items: center; gap: .12em; }
+/* Three colours or more overlap like a stack of coins, before the pool's total. */
+.strip-chip .pip + .pip { margin-inline-start: -.45em; box-shadow: 0 0 0 1.5px var(--button); }
+.strip-chip > .icon { width: .9em; height: .9em; color: var(--seat); }
+.strip-chip > .icon[data-icon="undo"] { color: var(--text-soft); }
 .mana-strip > button:not(.chip) {
   flex: none;
   display: flex;
@@ -828,9 +937,6 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .strip-clear .icon { width: 1.05em; height: 1.05em; }
 .mana-strip > button.strip-undo { gap: 6px; padding: 0 12px 0 8px; color: var(--text-soft); font-size: .85em; font-weight: var(--weight-semibold); }
 .strip-undo .icon { width: 1.1em; height: 1.1em; }
-/* Folded: the pool's colours and amounts in one button, a little smaller. */
-.mana-strip > button.strip-summary { gap: 6px; padding: 0 10px; font-size: .85em; }
-.summary-item { display: flex; align-items: center; gap: 2px; }
 /* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
 .chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
 .chip.damage[data-level="out"] { background: var(--panel); }
@@ -863,6 +969,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* The colour indicator printed on cards: one disc split into the identity's colours, with Mana's dividing lines
    on top. With no identity set it's an empty ring. */
+/* A light rim gives every slice an edge on the dark chip, so black, green and blue stay visible without changing the
+   printed colours. */
 .ci {
   flex: none;
   display: grid;
@@ -870,7 +978,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   width: 1em;
   height: 1em;
   border-radius: 50%;
-  box-shadow: inset 0 0 1px #fff;
+  box-shadow: 0 0 0 1.5px var(--ci-rim);
   color: #010101;
 }
 .ci::before { font: normal normal normal 1em/1 Mana; speak: never; }
@@ -947,6 +1055,20 @@ dialog::backdrop { background: var(--scrim); }
 .privacy-text { display: grid; gap: var(--space-3); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
 .privacy-text h3 { margin: var(--space-2) 0 0; font-size: 1rem; color: var(--text); }
 .privacy-text h3:first-child { margin-top: 0; }
+/* About scrolls on short screens: a fade along the bottom says there's more below, until the end is reached. */
+.scroll-cue { position: sticky; bottom: 0; height: 0; pointer-events: none; }
+.scroll-cue::before {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  content: '';
+  background: linear-gradient(#20272000, var(--surface) 85%);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.scroll-cue[data-more]::before { opacity: 1; }
 .close, .primary, .secondary {
   min-height: var(--tap-min);
   border: 1px solid var(--border);
@@ -996,6 +1118,13 @@ dialog::backdrop { background: var(--scrim); }
 .segmented > button[hidden] { display: none; }
 .segmented > button:active { background: var(--surface-pressed); }
 .segmented > button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
+/* A multi-select segmented choice (Show on tiles): each segment that's on shows a check, so it reads as several
+   switches rather than one choice. The colour disc keeps a dark rim on the accent. */
+.segmented > button > .ci { flex: none; width: 16px; height: 16px; font-size: 16px; }
+.segmented > button[aria-pressed="true"] > .ci { --ci-rim: var(--ink); }
+.segment-check { display: none; flex: none; width: 13px; height: 13px; }
+.multi > button[aria-pressed="true"] > .segment-check { display: block; }
+.multi > button { gap: 5px; padding-inline: 4px; }
 /* Starting life: the stepper needs a little more room than a number. */
 .life-choices { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(7.5rem, 1.3fr); }
 /* Stepper: − value + inside the selected segment's accent fill, with 44px buttons. */
@@ -1054,8 +1183,12 @@ dialog::backdrop { background: var(--scrim); }
 .nav-row:active, .switch-row:active { background: var(--surface-pressed); }
 .nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--accent); }
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-summary { display: flex; gap: 4px; margin-inline-start: auto; color: var(--muted); font-size: 14px; }
-.nav-summary :is(.icon, .mana-icon) { width: 14px; height: 14px; }
+/* Track keeps its label whole: the summary takes what's left (app.js shows as many icons as fit, at most three, then
+   "+N"). */
+#track-button .nav-label { flex: none; }
+.nav-summary { display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden; margin-inline-start: auto; color: var(--muted); font-size: 14px; }
+.nav-summary :is(.icon, .mana-icon) { flex: none; width: 14px; height: 14px; }
+.nav-summary .more { flex: none; font-size: var(--type-small); font-variant-numeric: tabular-nums; }
 .nav-row .caret { flex: none; width: 14px; height: 14px; margin-inline-start: auto; color: var(--muted); }
 .nav-summary + .caret { margin-inline-start: 0; }
 .switch-row .switch { margin-inline-start: auto; }
