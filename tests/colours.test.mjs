@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, startGame, turnScreen, useClassicTiles } from './helpers.mjs';
 
 // Today's six seat panels, which stay the defaults: Sage, Sky, Coral, Violet, Amber and Teal.
 const defaultPanels = ['rgb(47, 67, 47)', 'rgb(44, 67, 82)', 'rgb(67, 42, 39)', 'rgb(52, 43, 65)', 'rgb(74, 64, 36)', 'rgb(29, 58, 54)'];
@@ -22,6 +22,8 @@ async function openPage(t, engine) {
   t.after(() => assert.deepEqual(errors, [], 'no script errors'));
   await fakeScreenOrientation(page);
   await page.goto(app);
+  // These checks are written against Classic's palettes and names.
+  await useClassicTiles(page);
   return page;
 }
 
@@ -225,6 +227,7 @@ test('chromium: Android back closes the colours mode', async (t) => {
     };
   });
   await page.goto(app);
+  await useClassicTiles(page, 'sessionStorage', 'game');
   const back = () => page.evaluate(() => window.closeOpenDialog());
   const handling = () => page.evaluate(() => window.backHandling.at(-1));
   assert.equal(await handling(), false, 'back leaves the app at rest');

@@ -636,3 +636,58 @@ test('chromium: the fixed header never covers the focused control', async (t) =>
     assert.ok(seen.has(id), `Tab reaches ${id}`);
   }
 });
+
+// ---- Tile colours -------------------------------------------------------------------------------------------------
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: Tile colours switches sets, keeping every player's colour and no two alike, and saves at once`, async (t) => {
+    const page = await openPage(t, engine);
+    await page.goto(app);
+    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')));
+    const tiles = () => page.evaluate(() => ({
+      set: document.documentElement.dataset.tiles,
+      colours: [...document.querySelectorAll('.player')].map(player => player.dataset.colour),
+      panels: [...document.querySelectorAll('.player')].map(player => getComputedStyle(player).backgroundColor),
+    }));
+    // A save from before the setting gets Clear.
+    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40, 40, 40, 40, 40], colors: [6, 1, 2, 3, 4, 5] })));
+    await page.reload();
+    const start = await tiles();
+    assert.equal(start.set, 'clear', 'an old save gets Clear');
+    assert.deepEqual(start.colours, ['rose', 'sky', 'coral', 'violet', 'amber', 'teal']);
+    await button(page, 'Settings').tap();
+    assert.deepEqual(await sliderState(page, 'tiles'), { now: 3, text: 'Clear tile colours', at: 1, pinned: '' });
+    assert.deepEqual(await page.locator('#tile-set-choices .k-stop').allTextContents(), ['Classic', 'Soft', 'Jewel', 'Clear']);
+
+    // Each set, by tap and by key: the same swatch for every player, all different, in that set's colours.
+    const seen = new Set([start.panels.join()]);
+    await button(page, 'Classic').tap();
+    const classic = await tiles();
+    assert.equal(classic.set, 'classic');
+    assert.equal((await saved()).tileColours, 'classic', 'saved the moment it changes');
+    for (const [key, set] of [['ArrowRight', 'soft'], ['ArrowRight', 'jewel']]) {
+      await page.locator('#tiles-track').focus();
+      await page.keyboard.press(key);
+      assert.equal((await tiles()).set, set);
+    }
+    for (const state of [classic, await tiles()]) {
+      assert.deepEqual(state.colours, start.colours, `${state.set}: every player keeps their colour`);
+      assert.equal(new Set(state.colours).size, 6, `${state.set}: no two players share a colour`);
+      assert.equal(new Set(state.panels).size, 6, `${state.set}: no two tiles look alike`);
+      seen.add(state.panels.join());
+    }
+    assert.equal(seen.size, 3, 'each set draws different panels');
+    assert.equal(await doneLabel(page), 'Done', 'a set is not a new game');
+    // The swatches take the set's names.
+    await button(page, 'Clear').tap();
+    await button(page, 'Choose tile colours on the board').tap();
+    assert.equal(await page.locator('.player:nth-child(1) .swatch').first().getAttribute('aria-label'), 'Coral', 'Clear names its first swatch Coral');
+    await button(page, 'Done choosing colours').tap();
+    await page.reload();
+    assert.equal((await tiles()).set, 'clear', 'the set survives a reload');
+    // An unknown set falls back to Clear.
+    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40], tileColours: 'neon' })));
+    await page.reload();
+    assert.equal((await tiles()).set, 'clear', 'an unknown set gets Clear');
+  });
+}

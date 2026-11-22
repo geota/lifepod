@@ -67,14 +67,21 @@ const seatLayouts = {
 const playerCounts = Object.keys(seatLayouts).map(Number);
 // Tile colours, in order. Players 1–6 default to the first six. Each has a lighter top-row and a darker
 // bottom-row version in styles.css: players 1, 2 and 5 use the top row, so neighbours differ in lightness too.
-// New swatches only ever join the end, so saved choices keep their colour.
-const swatches = [
-  { id: 'sage', name: 'Sage' }, { id: 'sky', name: 'Sky' }, { id: 'coral', name: 'Coral' },
-  { id: 'violet', name: 'Violet' }, { id: 'amber', name: 'Amber' }, { id: 'teal', name: 'Teal' },
-  { id: 'rose', name: 'Rose' }, { id: 'indigo', name: 'Indigo' }, { id: 'slate', name: 'Slate' },
-  { id: 'copper', name: 'Copper' }, { id: 'olive', name: 'Olive' }, { id: 'orchid', name: 'Orchid' },
-];
+// New swatches only ever join the end, so saved choices keep their colour. The ids are Classic's names; each tile set
+// below names them for itself.
+const swatches = ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid'].map(id => ({ id }));
 const topRowPlayers = [0, 1, 4];
+// Tile colour sets (design/polish/TILES.md), in the Tile colours slider's order: the same twelve swatch ids in each, so a
+// player's colour carries over, with each set's own names for screen readers. Classic is the original twelve; Clear,
+// the default, keeps tiles apart for colour-blind players. styles.css holds each set's palettes under data-tiles.
+const tileSets = {
+  classic: { label: 'Classic', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'] },
+  soft: { label: 'Soft', names: ['Coral', 'Copper', 'Olive', 'Lime', 'Jade', 'Teal', 'Sky', 'Azure', 'Violet', 'Orchid', 'Plum', 'Slate'] },
+  jewel: { label: 'Jewel', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'] },
+  clear: { label: 'Clear', names: ['Coral', 'Copper', 'Olive', 'Lime', 'Jade', 'Cyan', 'Sky', 'Indigo', 'Violet', 'Orchid', 'Pale plum', 'Deep plum'] },
+};
+const tileSetOrder = Object.keys(tileSets);
+const defaultTileSet = 'clear';
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
 // Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
@@ -712,7 +719,7 @@ function loadGame() {
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
     counters: fitTrackers(), ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)])),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
-    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4),
+    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet,
   };
   try {
     const snapshot = android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);
@@ -739,6 +746,8 @@ function loadGame() {
       pools: fitPools(saved.pools, saved.scores.length),
       turns: turnModes.includes(saved.turns) ? saved.turns : 'off',
       turn: fitTurn(saved.turn, saved.scores.length),
+      // A save from before the setting, or with an unknown set, gets the default.
+      tileColours: tileSetOrder.includes(saved.tileColours) ? saved.tileColours : defaultTileSet,
     };
   } catch {
     return defaults;
@@ -1219,7 +1228,7 @@ function syncSwatches(group) {
     const taken = owner !== -1 && owner !== index;
     button.disabled = taken;
     button.setAttribute('aria-pressed', String(owner === index));
-    const name = swatches[colour].name;
+    const name = tileSets[game.tileColours].names[colour];
     button.setAttribute('aria-label', taken ? `${name}, taken by Player ${owner + 1}` : name);
     // A free swatch shows the seat colour as a dot. A taken one shows its owner, such as "P2", in its place.
     const tag = taken ? `P${owner + 1}` : '';
@@ -2177,13 +2186,14 @@ function notchedSlider({ root, min, max, snap, step, page, lowest, highest, get,
     if (settings.hasAttribute('data-flipped')) along = 1 - along;
     return Math.min(max, Math.max(min, Math.round((min + along * (max - min)) / snap) * snap));
   };
-  for (const stop of root.querySelectorAll('.k-stop')) stop.style.left = at(Number(stop.value || stop.dataset.life));
+  const stopValue = stop => Number(stop.dataset.value ?? (stop.value || stop.dataset.life));
+  for (const stop of root.querySelectorAll('.k-stop')) stop.style.left = at(stopValue(stop));
   const ticks = root.querySelector('.k-ticks');
   for (let value = min; value <= max; value += snap) {
     const tick = element('span', 'k-tick');
     tick.style.left = at(value);
     tick.dataset.value = value;
-    if (root.querySelector(`.k-stop[value="${value}"], .k-stop[data-life="${value}"]`)) tick.dataset.stop = '';
+    if ([...root.querySelectorAll('.k-stop')].some(stop => stopValue(stop) === value)) tick.dataset.stop = '';
     ticks.append(tick);
   }
   // A press only picks a value once it lifts without moving (a tap) or moves sideways (a drag). A vertical swipe is
@@ -2276,6 +2286,30 @@ const lifeSlider = notchedSlider({
   },
   describe: life => `Starting life ${life}`,
 });
+
+// Tile colours: saved the moment it changes, like the switches. Swatch ids stay, so every player keeps their colour.
+const tileSetChoices = document.querySelector('#tile-set-choices');
+function applyTileColours() {
+  document.documentElement.dataset.tiles = game.tileColours;
+}
+function setTileColours(set) {
+  if (set === game.tileColours) return;
+  game.tileColours = set;
+  saveGame();
+  applyTileColours();
+  renderTileSetting();
+}
+const tilesSlider = notchedSlider({
+  root: document.querySelector('#tiles-slider'), min: 0, max: 3, snap: 1, step: 1, page: 1, lowest: 0, highest: 3,
+  get: () => tileSetOrder.indexOf(game.tileColours),
+  set: at => setTileColours(tileSetOrder[at]),
+  describe: at => `${tileSets[tileSetOrder[at]].label} tile colours`,
+});
+for (const choice of tileSetChoices.children) choice.addEventListener('click', () => setTileColours(choice.dataset.set));
+function renderTileSetting() {
+  for (const choice of tileSetChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.set === game.tileColours));
+  tilesSlider.render();
+}
 
 function renderSettings() {
   for (const choice of playerChoices.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === selectedPlayerCount));
@@ -2391,6 +2425,7 @@ function openSettings() {
   renderSettings();
   renderTrackSheet();
   renderIdentitySheet();
+  renderTileSetting();
   placeSettingsSections();
   settings.showModal();
   // Settings always open at the top.
@@ -2641,6 +2676,7 @@ document.fonts?.addEventListener?.('loadingdone', () => {
   dropLevels = { near: 0, far: 0, strip: 0 };
   syncBoardTurn();
 });
+applyTileColours();
 syncBoardTurn();
 renderBoard();
 syncPill();

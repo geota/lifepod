@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, scores, setSwitches, startGame, turnScreen } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, scores, setSwitches, startGame, turnScreen, useClassicTiles } from './helpers.mjs';
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 // The seat for an attacker on a defender's map.
@@ -73,6 +73,8 @@ async function reload(page) {
 async function checkDamage(t, engine) {
   const page = await openPage(t, engine);
   await page.goto(app);
+  // The colour checks below are written against Classic's palettes.
+  await useClassicTiles(page);
   assert.ok(!(await button(page, 'Commander damage').isVisible()), 'no sword with Commander off');
   await turnOnCommander(page);
 
@@ -283,7 +285,8 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
   const page = await openPage(t, chromium);
   await page.goto(app);
   const load = async (saved) => {
-    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), saved);
+    // In Classic's colours, which the expected chips are written against.
+    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), { ...saved, tileColours: 'classic' });
     await page.reload();
     return page.evaluate(() => [...document.querySelectorAll('.player')].map(player => ({
       out: player.querySelector('.score').hasAttribute('data-out'),

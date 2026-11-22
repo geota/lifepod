@@ -36,6 +36,13 @@ export async function startGame(page, count) {
   await page.locator('#save-setup').tap();
 }
 
+// A fresh game in the Classic tile colours, for checks written against Classic's palettes and swatch names. Clear is
+// the default set.
+export async function useClassicTiles(page, storage = 'localStorage', key = 'lifepod-game') {
+  await page.evaluate(([storage, key]) => window[storage].setItem(key, JSON.stringify({ startingLife: 40, scores: [40, 40, 40, 40], tileColours: 'classic' })), [storage, key]);
+  await page.reload();
+}
+
 export function scores(page) {
   return page.locator('.score').evaluateAll(outputs => outputs.map(output => Number(output.value.replace('−', '-'))));
 }

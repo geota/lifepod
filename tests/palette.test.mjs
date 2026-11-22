@@ -18,7 +18,9 @@ test('chromium: every tile palette is palette.mjs’s and passes its contrast ch
   await page.goto(app);
   const ids = generated.r3.swatches.map(swatch => swatch.name.toLowerCase());
   assert.deepEqual(ids, ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid']);
+  // Classic, the Tile colours setting's first set, is the twelve palette.mjs made.
   const shipped = await page.evaluate((ids) => {
+    document.documentElement.dataset.tiles = 'classic';
     const style = getComputedStyle(document.documentElement);
     const read = name => style.getPropertyValue(name).trim();
     return Object.fromEntries(ids.map(id => [id, Object.fromEntries(['top', 'bottom'].map(row => [row,
@@ -57,12 +59,16 @@ test('chromium: the colour indicator has a rim that clears 3:1 on every chip', a
   const rgba = hex => [1, 3, 5, 7].map(at => (at < 7 ? parseInt(hex.slice(at, at + 2), 16) : hex.length > 7 ? parseInt(hex.slice(7, 9), 16) / 255 : 1));
   const over = (top, bottom) => bottom.slice(0, 3).map((value, at) => top[at] * top[3] + value * (1 - top[3]));
   const hex = rgb => `#${rgb.map(value => Math.round(value).toString(16).padStart(2, '0')).join('')}`;
-  for (const swatch of generated.r3.swatches) {
-    for (const row of ['top', 'bottom']) {
-      const chip = over(rgba(tokens.chip), rgba(swatch[row].panel));
-      const rim = over(rgba(tokens.rim), chip);
-      const ratio = contrast(hex(rim), hex(chip));
-      assert.ok(ratio >= 3, `${swatch.name} ${row}: the rim is ${ratio.toFixed(2)}:1 on the chip`);
+  // On every panel of every tile colour set (tiles7.json; Classic is its "today").
+  const sets = JSON.parse(readFileSync(new URL('../design/polish/tiles7.json', import.meta.url), 'utf8'));
+  for (const [setName, { set }] of Object.entries(sets)) {
+    for (const [id, rows] of Object.entries(set)) {
+      for (const row of ['top', 'bottom']) {
+        const chip = over(rgba(tokens.chip), rgba(rows[row].panel));
+        const rim = over(rgba(tokens.rim), chip);
+        const ratio = contrast(hex(rim), hex(chip));
+        assert.ok(ratio >= 3, `${setName} ${id} ${row}: the rim is ${ratio.toFixed(2)}:1 on the chip`);
+      }
     }
   }
   // Every indicator in a chip draws that rim around its disc.
@@ -71,4 +77,39 @@ test('chromium: the colour indicator has a rim that clears 3:1 on every chip', a
   const shadows = await page.locator('.badges .ci').evaluateAll(discs => discs.map(disc => getComputedStyle(disc).boxShadow));
   assert.equal(shadows.length, 2);
   for (const shadow of shadows) assert.match(shadow, /rgba\(242, 242, 239, 0\.65\d*\) 0px 0px 0px 1\.5px/);
+});
+
+// The Tile colours setting's four sets (design/polish/TILES.md): each is tiles7.mjs's set exactly (Classic is its
+// "today"), and on every panel of every set the life total is at least 9:1, small text 7.6:1, the life-out red 4.79:1
+// and the seat colour 7.35:1.
+const sets = JSON.parse(readFileSync(new URL('../design/polish/tiles7.json', import.meta.url), 'utf8'));
+
+test('chromium: every tile colour set is tiles7.mjs’s and passes the contrast minimums', async (t) => {
+  const browser = await chromium.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.goto(app);
+  const ids = Object.keys(sets.today.set);
+  for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
+    const read = await page.evaluate(([setting, ids]) => {
+      document.documentElement.dataset.tiles = setting;
+      const style = getComputedStyle(document.documentElement);
+      const value = name => style.getPropertyValue(name).trim();
+      return {
+        palettes: Object.fromEntries(ids.map(id => [id, Object.fromEntries(['top', 'bottom'].map(row => [row,
+          Object.fromEntries(['panel', 'rim', 'seat', 'button'].map(role => [role, value(`--${id}-${row}-${role}`)]))]))])),
+        text: value('--text'), soft: value('--text-soft'), out: value('--life-out'),
+      };
+    }, [setting, ids]);
+    assert.deepEqual(read.palettes, sets[source].set, `${setting}: styles.css matches tiles7.json's ${source}`);
+    for (const id of ids) {
+      for (const row of ['top', 'bottom']) {
+        const { panel, seat } = read.palettes[id][row];
+        const checks = { life: [contrast(read.text, panel), 9], small: [contrast(read.soft, panel), 7.6], lifeOut: [contrast(read.out, panel), 4.79], seat: [contrast(seat, panel), 7.35] };
+        for (const [check, [ratio, minimum]] of Object.entries(checks)) {
+          assert.ok(ratio >= minimum, `${setting} ${id} ${row}: ${check} ${ratio.toFixed(2)}:1 is at least ${minimum}:1`);
+        }
+      }
+    }
+  }
 });

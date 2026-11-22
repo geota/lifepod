@@ -606,6 +606,16 @@ async function sweep() {
       record({ size, count: 6, seed: 'everything', mode }, await page.evaluate(audit));
       runs++;
     }
+    // The other tile colour sets (Clear, the default, is everything above): the board at rest, the map and Colours.
+    for (const tileColours of ['classic', 'soft', 'jewel']) {
+      const game = { ...seeds.everything(6), tileColours };
+      for (const mode of ['rest', 'damage', 'colours']) {
+        await load(page, game);
+        await enter(page, mode, game);
+        record({ size, count: 6, seed: `everything, ${tileColours} tiles`, mode }, await page.evaluate(audit));
+        runs++;
+      }
+    }
     // Settings with a life off the track (the handle pinned), and with Turns off (no auto-empty row).
     await load(page, { ...seeds.everything(6), startingLife: 100 });
     await enter(page, 'settings');
