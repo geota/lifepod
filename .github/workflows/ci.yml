@@ -30,6 +30,24 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run lint:web
+      # The board's type is system-ui, which is Roboto on Android. Ubuntu falls back to the much wider DejaVu
+      # Sans, which would make badge-fit and auto-drop tests measure text no phone shows.
+      - name: Use Roboto as the system font, like Android
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q --no-install-recommends fonts-roboto
+          mkdir -p ~/.config/fontconfig
+          cat > ~/.config/fontconfig/fonts.conf <<'XML'
+          <?xml version="1.0"?>
+          <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+          <fontconfig>
+            <alias binding="strong"><family>system-ui</family><prefer><family>Roboto</family></prefer></alias>
+            <alias binding="strong"><family>sans-serif</family><prefer><family>Roboto</family></prefer></alias>
+          </fontconfig>
+          XML
+          fc-cache -f
+          fc-match system-ui
+          fc-match sans-serif
       - name: Check seat layouts in Chromium
         run: |
           npx playwright-core install --only-shell chromium
