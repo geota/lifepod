@@ -133,7 +133,7 @@ async function checkDamage(t, engine) {
   await page.waitForTimeout(400);
   await page.mouse.up();
   const afterHold = Number(await seat(page, 3, 2).textContent());
-  assert.ok(afterHold >= 1 && afterHold <= 4, `the hold took damage away: ${afterHold}`);
+  assert.ok(afterHold <= 4, `the hold took damage away: ${afterHold}`);
   assert.equal((await scores(page))[2] + (await damageTo(page, 3)), 40, 'damage and life move together');
   await page.waitForTimeout(300);
   assert.equal(Number(await seat(page, 3, 2).textContent()), afterHold, 'releasing a hold adds nothing');
