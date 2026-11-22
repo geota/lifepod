@@ -21,8 +21,6 @@ const countersButton = document.querySelector('#counters-button');
 const undoButton = document.querySelector('#undo-button');
 const saveButton = document.querySelector('#save-button');
 const cancelButton = document.querySelector('#cancel-button');
-const commanderSwitch = document.querySelector('#commander-switch');
-const poisonSwitch = document.querySelector('#poison-switch');
 const discardDialog = document.querySelector('#discard');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
@@ -71,8 +69,21 @@ const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colo
 const editingModes = ['damage', 'counters'];
 const discardMessages = {
   damage: 'Commander damage and life go back to how they were when you opened commander damage.',
-  counters: 'Poison and commander tax go back to how they were when you opened counters.',
+  counters: 'Every counter goes back to how it was when you opened counters.',
 };
+// Player counters (design/polish/SPEC.md §6), in the order they appear everywhere: counters mode, the near badge row,
+// the Track sheet and its summary. Each is one count per player in game[kind], shown while its Track switch is on.
+// Commander tax counts casts and comes with the Commander switch. phrase names one counter for screen readers.
+const counterKinds = [
+  { kind: 'poison', tracker: 'poison', phrase: 'poison counter' },
+  { kind: 'casts', tracker: 'commander', phrase: 'commander cast' },
+  { kind: 'energy', tracker: 'energy', phrase: 'energy counter' },
+  { kind: 'experience', tracker: 'experience', phrase: 'experience counter' },
+  { kind: 'rad', tracker: 'rad', phrase: 'rad counter' },
+];
+const countKinds = counterKinds.map(counter => counter.kind);
+// The Track switches, in the sheet's order. Each is saved in game.counters.
+const trackers = ['commander', 'poison', 'energy', 'experience', 'rad'];
 // Losing amounts (CR 903.10a and 704.5c), and where the warning starts.
 const commanderLethal = 21;
 const commanderWarning = 15;
@@ -99,7 +110,7 @@ const identityColours = [
   { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
   { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
 ];
-// Poison, casts and commander damage stop at this, which keeps every tile readable.
+// Player counters and commander damage stop at this, which keeps every tile readable.
 const maxCount = 99;
 // The custom starting life stepper's range.
 const maxStartingLife = 999;
@@ -119,11 +130,13 @@ const dropSteps = {
 // down by one can't make it blink.
 const dropSlack = 1.15;
 const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
-// Phosphor Icons (MIT, phosphoricons.com), Bold weight, for controls drawn by this script.
+// Phosphor Icons (MIT, phosphoricons.com), Bold weight, for controls drawn by this script. Experience's graduation
+// cap is Fill weight, so it holds up at badge size.
 const iconPaths = {
   minus: 'M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z',
   plus: 'M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z',
   crown: 'M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z',
+  'graduation-cap': 'M176,207.24a119,119,0,0,0,16-7.73V240a8,8,0,0,1-16,0Zm11.76-88.43-56-29.87a8,8,0,0,0-7.52,14.12L171,128l17-9.06Zm64-29.87-120-64a8,8,0,0,0-7.52,0l-120,64a8,8,0,0,0,0,14.12L32,117.87v48.42a15.91,15.91,0,0,0,4.06,10.65C49.16,191.53,78.51,216,128,216a130,130,0,0,0,48-8.76V130.67L171,128l-43,22.93L43.83,106l0,0L25,96,128,41.07,231,96l-18.78,10-.06,0L188,118.94a8,8,0,0,1,4,6.93v73.64a115.63,115.63,0,0,0,27.94-22.57A15.91,15.91,0,0,0,224,166.29V117.87l27.76-14.81a8,8,0,0,0,0-14.12Z',
   sword: 'M216,28H152a12,12,0,0,0-9.33,4.45L79.5,110.51l-4.66-4.65a20,20,0,0,0-28.29,0L29.86,122.55a20,20,0,0,0,0,28.29h0L45,166,23.86,187.17a20,20,0,0,0,0,28.28l16.69,16.69a20,20,0,0,0,28.28,0L90,211l15.17,15.16a20,20,0,0,0,28.29,0l16.69-16.69a20,20,0,0,0,0-28.3l-4.65-4.65,78.06-63.17A12,12,0,0,0,228,104V40A12,12,0,0,0,216,28ZM54.69,212.34l-11-11L62,183l11,11Zm64.61-6L49.65,136.7l11.05-11,69.65,69.65ZM204,98.27l-75.58,61.17L121,152l47.51-47.5a12,12,0,0,0-17-17L104,135l-7.45-7.44L157.73,52H204Z',
 };
 
@@ -358,11 +371,16 @@ function fitIdentitySettings(saved) {
   return { show, background: identityBackgrounds.includes(saved?.background) ? saved.background : 'symbol' };
 }
 
+// Which trackers are on. Each is off unless it was saved as exactly true.
+function fitTrackers(saved) {
+  return Object.fromEntries(trackers.map(tracker => [tracker, saved?.[tracker] === true]));
+}
+
 function loadGame() {
   const defaults = {
     startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true,
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
-    counters: { commander: false, poison: false }, poison: fitCounts([], 4), casts: fitCounts([], 4),
+    counters: fitTrackers(), ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)])),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
   };
   try {
@@ -380,9 +398,8 @@ function loadGame() {
     return {
       startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false, landscapeAngle,
       colors: fitColors(saved.colors, saved.scores.length),
-      counters: { commander: saved.counters?.commander === true, poison: saved.counters?.poison === true },
-      poison: fitCounts(saved.poison, saved.scores.length),
-      casts: fitCounts(saved.casts, saved.scores.length),
+      counters: fitTrackers(saved.counters),
+      ...Object.fromEntries(countKinds.map(kind => [kind, fitCounts(saved[kind], saved.scores.length)])),
       identities: fitIdentities(saved.identities, saved.scores.length),
       identity: fitIdentitySettings(saved.identity),
       commanderDamage: fitDamage(saved.commanderDamage, saved.scores.length),
@@ -540,6 +557,7 @@ function icon(name) {
   svg.setAttribute('viewBox', '0 0 256 256');
   svg.setAttribute('aria-hidden', 'true');
   svg.setAttribute('focusable', 'false');
+  svg.dataset.icon = name;
   const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
   path.setAttribute('d', iconPaths[name]);
   svg.append(path);
@@ -921,7 +939,7 @@ function renderWatermark(index) {
 
 // Applies an edit forwards (1) or takes it back (-1).
 function applyEdit(edit, direction) {
-  if (edit.kind === 'poison' || edit.kind === 'casts') game[edit.kind][edit.index] += edit.delta * direction;
+  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += edit.delta * direction;
   else if (edit.kind === 'damage') {
     // Commander damage is damage, so the defender loses the same life in the same save.
     game.commanderDamage[edit.index][edit.attacker] += edit.delta * direction;
@@ -932,10 +950,10 @@ function applyEdit(edit, direction) {
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
 function showEdit(edit) {
   const { index } = edit;
-  if (edit.kind === 'poison') {
-    announce(index, 'poison', () => `Player ${index + 1}, ${game.poison[index]} poison`);
-  } else if (edit.kind === 'casts') {
+  if (edit.kind === 'casts') {
     announce(index, 'casts', () => `Player ${index + 1}, commander tax ${game.casts[index] * 2}`);
+  } else if (countKinds.includes(edit.kind)) {
+    announce(index, edit.kind, () => `Player ${index + 1}, ${game[edit.kind][index]} ${edit.kind}`);
   } else if (edit.kind === 'damage') {
     const { attacker } = edit;
     announce(index, `damage ${attacker}`, () =>
@@ -974,17 +992,30 @@ function stepCount(kind, index, delta) {
   if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
 }
 
+// Each counter's icon: Mana's infect, energy and rad symbols, Phosphor's crown for tax and its graduation cap for
+// experience.
+function counterIcon(kind) {
+  if (kind === 'casts') return icon('crown');
+  if (kind === 'experience') return icon('graduation-cap');
+  return manaIcon(kind === 'poison' ? 'infect' : kind);
+}
+
+// The counters that are on, in order.
+function shownCounters() {
+  return counterKinds.filter(counter => game.counters[counter.tracker]);
+}
+
 // A counter cell: a circle with the counter's icon over its count. A tap adds one, and holding takes one away
 // with repeats, as on the commander damage map. A visually hidden button beside it takes one away for keyboards
 // and screen readers.
-function buildCounterCell(kind, index) {
+function buildCounterCell({ kind, phrase }, index) {
   const name = `Player ${index + 1}`;
-  const cell = element('button', 'counter-cell', kind === 'poison' ? manaIcon('infect') : icon('crown'), element('b'));
+  const cell = element('button', 'counter-cell', counterIcon(kind), element('b'));
   cell.type = 'button';
   cell.dataset.kind = kind;
   const remove = element('button', 'visually-hidden counter-remove');
   remove.type = 'button';
-  remove.setAttribute('aria-label', kind === 'poison' ? `Remove one poison counter from ${name}` : `Remove one commander cast from ${name}`);
+  remove.setAttribute('aria-label', `Remove one ${phrase} from ${name}`);
   remove.addEventListener('click', () => stepCount(kind, index, -1));
   bindSeat(cell, () => stepCount(kind, index, 1), () => stepCount(kind, index, -1));
   return [cell, remove];
@@ -995,12 +1026,13 @@ function syncCounterCells(index) {
   if (!layer) return;
   for (const cell of layer.querySelectorAll('.counter-cell')) {
     const name = `Player ${index + 1}`;
-    const casts = game.casts[index];
-    const value = cell.dataset.kind === 'poison' ? game.poison[index] : casts;
-    cell.querySelector('b').textContent = cell.dataset.kind === 'poison' ? value : `+${value * 2}`;
+    const { kind } = cell.dataset;
+    const value = game[kind][index];
+    cell.querySelector('b').textContent = kind === 'casts' ? `+${value * 2}` : value;
     cell.toggleAttribute('data-zero', value === 0);
-    cell.setAttribute('aria-label', cell.dataset.kind === 'poison' ? `${name} poison, ${value}. Add one`
-      : `${name} commander tax, ${casts * 2}, ${casts} ${casts === 1 ? 'cast' : 'casts'}. Add one cast`);
+    cell.setAttribute('aria-label', kind === 'casts'
+      ? `${name} commander tax, ${value * 2}, ${value} ${value === 1 ? 'cast' : 'casts'}. Add one cast`
+      : `${name} ${kind}, ${value}. Add one`);
   }
 }
 
@@ -1019,12 +1051,11 @@ function renderModeLayer(player, index) {
     hint.setAttribute('aria-hidden', 'true');
     layer.append(hint, buildSeatMap(index));
   } else if (boardMode === 'counters') {
-    // One circle per counter that's on, three to a row, in the order poison, then tax.
+    // One circle per counter that's on, three to a row, in the order poison, tax, energy, experience, rad.
     const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
     hint.setAttribute('aria-hidden', 'true');
     const cells = element('div', 'counter-cells');
-    if (game.counters.poison) cells.append(...buildCounterCell('poison', index));
-    if (game.counters.commander) cells.append(...buildCounterCell('casts', index));
+    for (const counter of shownCounters()) cells.append(...buildCounterCell(counter, index));
     layer.append(hint, cells);
   }
   layer.hidden = layer.childElementCount === 0;
@@ -1046,7 +1077,8 @@ function isOut(index) {
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
 // damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first. The near
-// edge holds the colour identity chip, then poison and tax, each only when it's set and its switch is on.
+// edge holds the colour identity chip, then poison, tax, energy, experience and rad, each only when it's set and its
+// switch is on.
 function renderBadges(index) {
   const player = board.children[index];
   if (!player) return;
@@ -1071,14 +1103,15 @@ function renderBadges(index) {
   const chips = [];
   const identity = identityChip(game.identities[index], game.identity.show);
   if (identity) chips.push(identity);
-  if (game.counters.poison && game.poison[index] > 0) {
-    const chip = element('span', 'chip', manaIcon('infect'), String(game.poison[index]), visuallyHidden(' poison'));
-    const level = dangerLevel(game.poison[index], poisonWarning, poisonLethal);
+  for (const { kind } of shownCounters()) {
+    const value = game[kind][index];
+    if (value === 0) continue;
+    const chip = kind === 'casts' ? element('span', 'chip', visuallyHidden('Commander tax '), counterIcon(kind), `+${value * 2}`)
+      : element('span', 'chip', counterIcon(kind), String(value), visuallyHidden(` ${kind}`));
+    chip.dataset.kind = kind;
+    const level = kind === 'poison' ? dangerLevel(value, poisonWarning, poisonLethal) : '';
     if (level) chip.dataset.level = level;
     chips.push(chip);
-  }
-  if (game.counters.commander && game.casts[index] > 0) {
-    chips.push(element('span', 'chip', visuallyHidden('Commander tax '), icon('crown'), `+${game.casts[index] * 2}`));
   }
   for (const chip of chips) chip.setAttribute('role', 'listitem');
   near.replaceChildren(...chips);
@@ -1091,7 +1124,7 @@ function renderBadges(index) {
 function syncPill() {
   const editing = editingModes.includes(boardMode);
   damageButton.hidden = boardMode !== null || !game.counters.commander;
-  countersButton.hidden = boardMode !== null || !(game.counters.commander || game.counters.poison);
+  countersButton.hidden = boardMode !== null || shownCounters().length === 0;
   diceButton.hidden = boardMode !== null;
   setupButton.hidden = editing;
   for (const button of [undoButton, saveButton, cancelButton]) button.hidden = !editing;
@@ -1210,8 +1243,7 @@ function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
   game.colors = fitColors(game.colors, playerCount);
   // A new game resets the counts and keeps the counter switches, colours and colour identities.
-  game.poison = fitCounts([], playerCount);
-  game.casts = fitCounts([], playerCount);
+  for (const kind of countKinds) game[kind] = fitCounts([], playerCount);
   game.identities = fitIdentities(game.identities, playerCount);
   game.commanderDamage = fitDamage([], playerCount);
   game.startingLife = startingLife;
@@ -1231,10 +1263,8 @@ function setupChangesGame() {
 
 // Track's summary: the icon of each tracker that's on.
 function renderTrackSummary() {
-  const icons = [];
-  if (game.counters.commander) icons.push(icon('sword'));
-  if (game.counters.poison) icons.push(manaIcon('infect'));
-  trackSummary.replaceChildren(...icons);
+  trackSummary.replaceChildren(...trackers.filter(tracker => game.counters[tracker])
+    .map(tracker => (tracker === 'commander' ? icon('sword') : counterIcon(tracker))));
 }
 
 function renderSetup() {
@@ -1339,8 +1369,7 @@ for (const [dialog, opener] of [[trackDialog, trackButton], [identityDialog, ide
   });
 }
 trackButton.addEventListener('click', () => {
-  commanderSwitch.checked = game.counters.commander;
-  poisonSwitch.checked = game.counters.poison;
+  for (const tracker of trackers) document.querySelector(`#${tracker}-switch`).checked = game.counters[tracker];
   openSubSheet(trackDialog);
 });
 
@@ -1495,9 +1524,10 @@ wakeInput.addEventListener('change', () => {
   syncWakeLock();
 });
 // The counter switches are saved at once and stay on across launches and new games.
-for (const [input, key] of [[commanderSwitch, 'commander'], [poisonSwitch, 'poison']]) {
+for (const tracker of trackers) {
+  const input = document.querySelector(`#${tracker}-switch`);
   input.addEventListener('change', () => {
-    game.counters[key] = input.checked;
+    game.counters[tracker] = input.checked;
     saveGame();
     game.scores.forEach((_, index) => {
       renderScore(index);

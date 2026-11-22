@@ -127,11 +127,13 @@ button, .player { -webkit-user-select: none; user-select: none; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
-/* Game symbols from the Mana font: the d20 for dice, infect for poison, the colour pie for identity. */
+/* Game symbols from the Mana font: the d20 for dice, infect for poison, energy, rad, the colour pie for identity. */
 .mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
 .mana-icon::before { content: var(--glyph); speak: never; }
 .mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
 .mana-icon[data-glyph="infect"] { --glyph: '\ea73'; }
+.mana-icon[data-glyph="energy"] { --glyph: '\e907'; }
+.mana-icon[data-glyph="rad"] { --glyph: '\ea50'; }
 .mana-icon[data-glyph="pie"] { --glyph: '\e9f0'; }
 
 /* app.js turns the board so seats stay fixed to the device as the screen rotates. */
@@ -644,11 +646,10 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 /* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
    toward the table, holds commander damage, led by a sword in its own circle, and sits clear of the centre
-   controls; the near edge (the player's
-   own) holds colour identity, poison and tax. Tight chips keep the busiest row on one line at 6 players on a
-   320 × 568 phone. When a row still runs out of room, app.js takes the auto-drop steps (design/polish/SPEC.md
-   §3.2) on every tile at once: data-drop tokens on #board hide parts, and --near-badge-size and --far-badge-size
-   shrink the type. */
+   controls; the near edge (the player's own) holds colour identity, then poison, tax, energy, experience and rad.
+   Tight chips keep a busy poison and tax row on one line at 6 players on a 320 × 568 phone. When a row still runs
+   out of room, app.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every tile at once: data-drop
+   tokens on #board hide parts, and --near-badge-size and --far-badge-size shrink the type. */
 .badges {
   position: absolute;
   left: 4px;
@@ -893,7 +894,12 @@ dialog::backdrop { background: var(--scrim); }
 /* Navigation and switch rows share a grid. A navigation row opens a sheet or a board mode; in a switch row the
    whole row toggles the switch. */
 .control-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+/* Track's switch rows, three to a line in landscape. */
 .tracker-grid { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
+/* On the narrowest landscape sheets (568 × 320) the rows tighten so "Commander" and "Experience" aren't cut short. */
+@media (max-width: 620px) {
+  .tracker-grid .switch-row { gap: 6px; padding-inline: 8px 6px; font-size: var(--type-small); }
+}
 .nav-row, .switch-row {
   position: relative;
   display: flex;

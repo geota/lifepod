@@ -28,9 +28,12 @@ function busyGame(count) {
   return {
     startingLife: 40, scores: Array.from({ length: count }, (_, i) => [40, 33, 112, 5, -3, 19][i]),
     rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, colors: Array(count).fill(null),
-    counters: { commander: true, poison: true },
+    counters: { commander: true, poison: true, energy: true, experience: true, rad: true },
     poison: Array.from({ length: count }, (_, i) => [0, 1, 7, 10, 2, 9][i]),
     casts: Array.from({ length: count }, (_, i) => [1, 2, 0, 5, 1, 3][i]),
+    energy: Array.from({ length: count }, (_, i) => [12, 2, 0, 8, 1, 3][i]),
+    experience: Array.from({ length: count }, (_, i) => [10, 0, 1, 0, 3, 1][i]),
+    rad: Array.from({ length: count }, (_, i) => [14, 0, 0, 2, 0, 6][i]),
     identities: ['WUBRG', 'UB', 'R', 'BG', 'WUR', 'RG'].slice(0, count),
     commanderDamage: Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) =>
       (defender === attacker ? 0 : [21, 16, 12, 8, 3][(defender + attacker) % 5]))),
@@ -147,7 +150,10 @@ async function checkSizes(t, engine) {
         if (Math.min(...size) >= smallestRealPhone) {
           const drops = await page.locator('#board').evaluate(node => [node.dataset.drop ?? '',
             node.style.getPropertyValue('--near-badge-size'), node.style.getPropertyValue('--far-badge-size')]);
-          assert.deepEqual(drops, ['', '', ''], `${view}: badge rows fit at full size with nothing dropped`);
+          // With every counter on, the identity names may go on the smallest real phones (design/polish/SPEC.md §3.2,
+          // a typical 6-player game at 640 × 360), but nothing else does and no type shrinks.
+          assert.ok(['', 'name'].includes(drops[0]), `${view}: at most the identity names give way (${drops[0]})`);
+          assert.deepEqual(drops.slice(1), ['', ''], `${view}: badge rows keep their full type`);
         }
         if (count === 4 && !portrait) scale[name] = await readScale(page);
 
@@ -217,6 +223,10 @@ async function checkSetup(t, engine) {
       if (target.width < 43.5 || target.height < 43.5) found.push(`${name} ${Math.round(target.width)}×${Math.round(target.height)}`);
       if (target.top < box.top || target.bottom > box.bottom || target.left < box.left || target.right > box.right) found.push(`${name} off the sheet`);
     }
+    // A label cut short with an ellipsis.
+    for (const label of sheet.querySelectorAll('.nav-label')) {
+      if (label.checkVisibility() && label.scrollWidth > label.clientWidth) found.push(`${label.textContent} is cut short`);
+    }
     return { found, height: Math.round(box.height), count: shown.length };
   });
   for (const [width, height, angle] of [[952, 427, 90], [852, 393, 90], [640, 360, 90], [568, 320, 90], [320, 568, 0]]) {
@@ -239,7 +249,10 @@ async function checkSetup(t, engine) {
     await page.locator('#custom-life').tap();
     assert.deepEqual((await check('#setup')).found, [], `${view}: setup with the custom life stepper`);
     await button(page, 'Track').tap();
-    assert.deepEqual((await check('#track')).found, [], `${view}: Track`);
+    const track = await check('#track');
+    assert.deepEqual(track.found, [], `${view}: Track`);
+    // ‹ and ✕, then the Commander, Poison, Energy, Experience and Rad switches.
+    assert.equal(track.count, 7, `${view}: every Track control shows`);
     await button(page, 'Back to setup').tap();
     await button(page, 'Identity').tap();
     const identity = await check('#identity-sheet');

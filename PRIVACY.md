@@ -1,6 +1,6 @@
 # LifePod privacy policy
 
-Effective November 20, 2026
+Effective November 22, 2026
 
 LifePod is a life counter for tabletop games. It does not collect, transmit, sell, or share any personal or usage data.
 
@@ -10,8 +10,9 @@ LifePod saves the current game on your device so it is still there the next time
 
 - the player count, starting life, and each player's life total
 - each seat's rotation and tile colour
-- each player's commander damage, poison, commander tax and colour identity
-- whether **Keep awake** and the **Commander** and **Poison** counters are on
+- each player's commander damage, poison, commander tax, energy, experience, rad and colour identity
+- what tiles show of each colour identity
+- whether **Keep awake** and the **Commander**, **Poison**, **Energy**, **Experience** and **Rad** counters are on
 
 This stays on your device: in the app's private storage on Android and iOS, or in your browser's local storage on the web. Deleting the app or clearing its data removes it.
 

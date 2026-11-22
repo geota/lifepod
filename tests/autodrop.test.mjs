@@ -4,8 +4,8 @@ import { chromium, webkit } from 'playwright-core';
 import { app, button } from './helpers.mjs';
 
 // Auto-drop (design/polish/SPEC.md §3.2): when a badge row runs out of room, parts give way in a fixed order on
-// every tile at once, and no count is ever hidden. Today's rows hold the colour identity chip, poison and tax
-// (near) and commander damage led by a sword (far); the turn chip comes later.
+// every tile at once, and no count is ever hidden. Today's rows hold the colour identity chip, poison, tax, energy,
+// experience and rad (near) and commander damage led by a sword (far); the turn chip comes later.
 
 const seats = [0, 1, 2, 3, 4, 5];
 // Long names, a four-colour pie and a shard symbol, so the identity chips are as wide as they get.
@@ -13,12 +13,14 @@ const longIdentities = ['WURG', 'UBRG', 'WBR', 'WUBG', 'WUBRG', 'R'];
 const allParts = { indicator: true, symbol: true, name: true };
 
 // Every counter on with two-digit counts, an identity on every tile and commander damage from every opponent.
-// The chip shows the indicator, symbol and name unless told otherwise.
-function worstGame(count, { damage = () => 19, show = allParts, poison = () => 19, identities = longIdentities } = {}) {
+// The chip shows the indicator, symbol and name unless told otherwise. everyCounter: false leaves energy, experience
+// and rad off, for the checks that walk one row's steps with only poison and tax.
+function worstGame(count, { damage = () => 19, show = allParts, poison = () => 19, identities = longIdentities, everyCounter = true } = {}) {
   return {
     startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90,
-    colors: [], counters: { commander: true, poison: true },
+    colors: [], counters: { commander: true, poison: true, energy: everyCounter, experience: everyCounter, rad: everyCounter },
     poison: seats.slice(0, count).map(poison), casts: Array(count).fill(49), identities: identities.slice(0, count),
+    energy: Array(count).fill(19), experience: Array(count).fill(19), rad: Array(count).fill(19),
     identity: { show, background: 'symbol' },
     commanderDamage: seats.slice(0, count).map(defender => seats.slice(0, count).map(attacker =>
       (defender === attacker ? 0 : damage(defender, attacker)))),
@@ -94,19 +96,57 @@ function nearStep({ drop, near }) {
   return tokens.includes('name') ? 1 : 0;
 }
 
-// The busiest game today, with the identity chip showing all three parts, stays at full size on the target phone
-// and the smallest real phone, and at the stress size nothing is hidden or clipped whatever the platform's font.
+// The busiest game today, with every counter on and the identity chip showing all three parts. The far row stays
+// at full size on the target phone and the smallest real phone, and the near row goes no further than the worst
+// case in design/polish/SPEC.md §3.2: the names (step 1) on the target. At the stress size nothing is hidden or
+// clipped whatever the platform's font. With only poison and tax on, both rows stay at full size on phones.
 async function checkWorstCase(t, engine) {
   for (const count of [4, 6]) {
     const page = await openBoard(t, engine, worstGame(count), { width: 952, height: 427 });
-    for (const [width, height, full] of [[952, 427, true], [640, 360, true], [568, 320, false]]) {
+    for (const [width, height, far, nearLimit] of [[952, 427, true, 1], [640, 360, true, 6], [568, 320, false, 6]]) {
       await resize(page, width, height);
       const view = `${count} players, ${width} × ${height}`;
       const drops = await readDrops(page);
       assert.deepEqual(drops.problems, [], `${view}: every count shows inside its tile`);
-      if (full) assert.deepEqual([drops.drop, drops.near, drops.far], ['', '', ''], `${view}: full size, nothing dropped`);
+      if (far) assert.deepEqual([drops.drop.includes('sword'), drops.far], [false, ''], `${view}: the far row is at full size`);
+      assert.ok(nearStep(drops) <= nearLimit, `${view}: near row at step ${nearStep(drops)}, at most ${nearLimit} (${drops.drop} ${drops.near})`);
+    }
+    const twoCounters = await openBoard(t, engine, worstGame(count, { everyCounter: false }), { width: 952, height: 427 });
+    for (const [width, height] of [[952, 427], [640, 360]]) {
+      await resize(twoCounters, width, height);
+      const drops = await readDrops(twoCounters);
+      assert.deepEqual([drops.drop, drops.near, drops.far, drops.problems], ['', '', '', []],
+        `${count} players, ${width} × ${height}, poison and tax only: full size, nothing dropped`);
     }
   }
+}
+
+// What each tile's near row holds, in order: 'identity' for the identity chip, then each counter's kind.
+function nearOrder(page) {
+  return page.locator('.badges.near').evaluateAll(rows => rows.map(row => [...row.children].map(chip => (chip.matches('.ci-chip') ? 'identity'
+    : chip.dataset.kind))));
+}
+
+// Six players on the smallest real phone with every counter at two digits: each near row is the identity chip, then
+// poison, tax, energy, experience and rad. Every count shows inside its tile, clear of the life total, and the far
+// row keeps its full size.
+async function checkCounterRow(t, engine) {
+  const page = await openBoard(t, engine, worstGame(6), { width: 640, height: 360 });
+  await resize(page, 640, 360);
+  assert.deepEqual(await nearOrder(page), Array(6).fill(['identity', 'poison', 'casts', 'energy', 'experience', 'rad']));
+  assert.deepEqual(await page.locator('.badges.near').evaluateAll(rows => rows.map(row => [...row.children].slice(1).map(chip => chip.textContent).join(' '))),
+    Array(6).fill('19 poison Commander tax +98 19 energy 19 experience 19 rad'), 'two-digit counts show in full');
+  const drops = await readDrops(page);
+  assert.deepEqual(drops.problems, [], 'every count shows inside its tile');
+  assert.deepEqual([drops.drop.includes('sword'), drops.far], [false, ''], 'the far row is at full size');
+  const overlaps = await page.locator('.player').evaluateAll(players => players.flatMap((player, index) => {
+    const score = player.querySelector('.score').getBoundingClientRect();
+    return [...player.querySelectorAll('.badges.near .chip')].filter(chip => chip.offsetWidth).filter((chip) => {
+      const box = chip.getBoundingClientRect();
+      return box.left < score.right && score.left < box.right && box.top < score.bottom && score.top < box.bottom;
+    }).map(chip => `P${index + 1} ${chip.textContent}`);
+  }));
+  assert.deepEqual(overlaps, [], 'no badge covers a life total');
 }
 
 // On windows narrower than any phone, today's rows do run out of room. The steps come in the spec's order, every
@@ -116,7 +156,7 @@ async function checkWorstCase(t, engine) {
 async function checkSteps(t, engine) {
   // Player 1's far row is the busiest: 10 from Player 2's commander, 9 from everyone else.
   const indicator = { indicator: true, symbol: false, name: false };
-  const game = worstGame(6, { show: indicator, damage: (defender, attacker) => (defender === 0 && attacker === 1 ? 10 : 9) });
+  const game = worstGame(6, { show: indicator, everyCounter: false, damage: (defender, attacker) => (defender === 0 && attacker === 1 ? 10 : 9) });
   const page = await openBoard(t, engine, game, { width: 640, height: 360 });
   await resize(page, 640);
   assert.equal((await readDrops(page)).drop, '', 'full size at 640 × 360');
@@ -150,7 +190,7 @@ async function checkSteps(t, engine) {
   // With every count at 19, narrower windows take every far step: the sword goes, the type shrinks, never under
   // 9px, then the row wraps at full size. The near row shrinks its type before the identity chip goes. Every tile
   // uses the same steps and sizes throughout.
-  const busy = await openBoard(t, engine, worstGame(6, { show: indicator }), { width: 560, height: 315 });
+  const busy = await openBoard(t, engine, worstGame(6, { show: indicator, everyCounter: false }), { width: 560, height: 315 });
   const order = ['sword', 'far type', 'wrap-far'];
   let reached = -1;
   for (width = 560; width >= 300 && reached < 2; width -= 10) {
@@ -181,13 +221,18 @@ async function checkSteps(t, engine) {
 // The near row gives way in the spec's order as the window narrows: the identity names, then the symbol (one colour
 // mark is enough beside the indicator), then the type down to 11px, then the identity chip, then the type down to
 // 9px, then a second line. Without the indicator the symbol is the chip's only colour mark, so it stays until the
-// whole chip goes.
+// whole chip goes. The order holds with only poison and tax on, from the smallest real phone down, and with every
+// counter on, from the target phone down.
 async function checkNearSteps(t, engine) {
-  for (const [show, label] of [[allParts, 'all three parts'], [{ indicator: false, symbol: true, name: true }, 'symbol and name']]) {
-    const page = await openBoard(t, engine, worstGame(6, { show }), { width: 640, height: 360 });
+  const passes = [
+    [allParts, 'all three parts', false, 640, 10], [{ indicator: false, symbol: true, name: true }, 'symbol and name', false, 640, 10],
+    [allParts, 'every counter, all three parts', true, 952, 8], [{ indicator: false, symbol: true, name: true }, 'every counter, symbol and name', true, 952, 8],
+  ];
+  for (const [show, label, everyCounter, start, step] of passes) {
+    const page = await openBoard(t, engine, worstGame(6, { show, everyCounter }), { width: start, height: Math.round(start * 0.5625) });
     let reached = 0;
     const seen = new Set();
-    for (let width = 640; width >= 300; width -= 10) {
+    for (let width = start; width >= 300; width -= step) {
       await resize(page, width);
       const drops = await readDrops(page);
       const view = `${label}, ${width}px`;
@@ -218,7 +263,7 @@ async function checkNearSteps(t, engine) {
 // A name dropped for a count of 10 doesn't come back at 9, as with the sword.
 async function checkNameHysteresis(t, engine) {
   // Player 1's near row is the busiest: poison 10 against 9 everywhere else, with the same long name on every tile.
-  const game = worstGame(6, { poison: index => (index === 0 ? 10 : 9), identities: Array(6).fill('WURG') });
+  const game = worstGame(6, { poison: index => (index === 0 ? 10 : 9), identities: Array(6).fill('WURG'), everyCounter: false });
   const page = await openBoard(t, engine, game, { width: 640, height: 360 });
   await resize(page, 640);
   assert.equal((await readDrops(page)).drop, '', 'full size at 640 × 360');
@@ -245,8 +290,9 @@ async function checkNameHysteresis(t, engine) {
 }
 
 for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: the busiest board today keeps every badge at full size on phones`, { timeout: 60000 }, t => checkWorstCase(t, engine));
+  test(`${name}: the busiest board today stays within the drop table on phones`, { timeout: 60000 }, t => checkWorstCase(t, engine));
   test(`${name}: badge rows give way in order, board-wide, without blinking`, { timeout: 120000 }, t => checkSteps(t, engine));
-  test(`${name}: the near row drops names, then the symbol, before its type shrinks`, { timeout: 120000 }, t => checkNearSteps(t, engine));
+  test(`${name}: the near row drops names, then the symbol, before its type shrinks`, { timeout: 240000 }, t => checkNearSteps(t, engine));
   test(`${name}: a dropped name doesn't blink back when a count ticks down`, { timeout: 60000 }, t => checkNameHysteresis(t, engine));
+  test(`${name}: every counter's badge shows in order and fits six players at 640 × 360`, { timeout: 60000 }, t => checkCounterRow(t, engine));
 }

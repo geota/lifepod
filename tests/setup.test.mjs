@@ -118,7 +118,7 @@ async function checkTrack(t, engine) {
   const page = await openPage(t, engine, engine === chromium);
   await page.goto(app);
   const saved = () => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
-  const summary = () => page.locator('#track-summary').evaluate(node => [...node.children].map(icon => icon.dataset.glyph ?? 'sword'));
+  const summary = () => page.locator('#track-summary').evaluate(node => [...node.children].map(icon => icon.dataset.glyph ?? icon.dataset.icon));
 
   // Setup's unsaved choices survive a trip to Track and back with ‹.
   await button(page, 'Game setup').tap();
@@ -141,10 +141,19 @@ async function checkTrack(t, engine) {
   assert.ok(!(await page.locator('#counters-button').evaluate(node => node.hidden)), 'the counters button shows');
   await page.locator('#track label', { has: page.getByRole('switch', { name: 'Commander', exact: true }) }).tap();
   assert.equal((await saved()).counters.commander, true);
-  // Escape goes back to setup too, where Track sums up what's on.
+  // The switches come in the order Commander, Poison, Energy, Experience, Rad, and each saves at once too.
+  assert.deepEqual(await page.locator('#track [role="switch"]').evaluateAll(inputs => inputs.map(input => input.closest('label').textContent.trim())),
+    ['Commander', 'Poison', 'Energy', 'Experience', 'Rad']);
+  for (const name of ['Rad', 'Energy']) await page.locator('#track label', { has: page.getByRole('switch', { name, exact: true }) }).tap();
+  assert.deepEqual((await saved()).counters, { commander: true, poison: true, energy: true, experience: false, rad: true });
+  // Escape goes back to setup too, where Track sums up what's on, in the same order.
   await page.keyboard.press('Escape');
   await eventually(() => openDialogs(page), ['setup'], 'Escape returns to setup');
-  assert.deepEqual(await summary(), ['sword', 'infect'], 'Track shows the icons of the trackers that are on');
+  assert.deepEqual(await summary(), ['sword', 'infect', 'energy', 'rad'], 'Track shows the icons of the trackers that are on');
+  await button(page, 'Track').tap();
+  await page.locator('#track label', { has: page.getByRole('switch', { name: 'Experience', exact: true }) }).tap();
+  await button(page, 'Back to setup').tap();
+  await eventually(() => summary(), ['sword', 'infect', 'energy', 'graduation-cap', 'rad']);
 
   // ✕ in Track closes everything.
   await button(page, 'Track').tap();

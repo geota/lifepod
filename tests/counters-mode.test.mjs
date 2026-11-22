@@ -146,11 +146,129 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: counters mode edits poison and tax with undo, save and discard`, { timeout: 60000 }, t => checkCountersMode(t, engine));
 }
 
-test('chromium: counters mode fits six players on the smallest phone', { timeout: 60000 }, async (t) => {
+const kinds = (page, number) => tile(page, number).locator('.counter-cell').evaluateAll(cells => cells.map(node => node.dataset.kind));
+const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')));
+const everyTracker = { Commander: true, Poison: true, Energy: true, Experience: true, Rad: true };
+
+// Energy, experience and rad (design/polish/SPEC.md §6 and §7): each has its own Track switch, a circle in counters
+// mode and a badge at rest, always in the order poison, tax, energy, experience, rad.
+async function checkNewCounters(t, engine) {
+  const page = await openPage(t, engine);
+  await page.goto(app);
+
+  // Each new tracker on its own shows the counters button and only its own circle, with its icon.
+  const icons = { energy: '.mana-icon[data-glyph="energy"]', experience: 'svg[data-icon="graduation-cap"]', rad: '.mana-icon[data-glyph="rad"]' };
+  for (const [name, kind] of [['Energy', 'energy'], ['Experience', 'experience'], ['Rad', 'rad']]) {
+    await setSwitches(page, { [name]: true });
+    assert.ok(await button(page, 'Counters').isVisible(), `${name} shows the counters button`);
+    await button(page, 'Counters').tap();
+    assert.deepEqual(await kinds(page, 1), [kind], `${name} alone: one circle per tile`);
+    assert.equal(await page.locator('.counter-cell').count(), 4);
+    assert.equal(await cell(page, 1, kind).locator(icons[kind]).count(), 1, `${name}'s icon over its count`);
+    assert.equal(await count(page, 1, kind), '0');
+    await button(page, 'Cancel').tap();
+    await setSwitches(page, { [name]: false });
+    assert.ok(!(await button(page, 'Counters').isVisible()), `no counters button once ${name} is off again`);
+  }
+
+  // The switches are saved and stay on across launches.
+  await setSwitches(page, everyTracker);
+  await reload(page);
+  assert.deepEqual((await saved(page)).counters, { commander: true, poison: true, energy: true, experience: true, rad: true });
+
+  // Every counter on: five circles in order, three on the first row and the last two centred under them.
+  await button(page, 'Counters').tap();
+  assert.deepEqual(await kinds(page, 3), ['poison', 'casts', 'energy', 'experience', 'rad']);
+  assert.equal(await page.locator('.counter-cell').count(), 20);
+  const boxes = await tile(page, 3).locator('.counter-cell').evaluateAll(cells => cells.map((node) => {
+    const box = node.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+  }));
+  assert.ok(Math.abs(boxes[0].y - boxes[2].y) < 1 && boxes[3].y - boxes[0].y > 40 && Math.abs(boxes[3].y - boxes[4].y) < 1, 'three over two');
+  assert.ok(Math.abs((boxes[3].x + boxes[4].x) / 2 - boxes[1].x) < 1, 'the last row is centred');
+
+  // Taps add one, the hidden buttons take one away, and Undo steps back through the new kinds too.
+  for (let tap = 0; tap < 3; tap++) await cell(page, 3, 'energy').tap();
+  await cell(page, 1, 'experience').tap();
+  await cell(page, 2, 'rad').tap();
+  await cell(page, 2, 'rad').tap();
+  await removeOne(page, 'Remove one rad counter from Player 2');
+  assert.equal(await count(page, 3, 'energy'), '3');
+  assert.equal(await count(page, 1, 'experience'), '1');
+  assert.equal(await count(page, 2, 'rad'), '1');
+  assert.equal(await cell(page, 3, 'energy').getAttribute('aria-label'), 'Player 3 energy, 3. Add one');
+  assert.equal(await cell(page, 1, 'experience').getAttribute('aria-label'), 'Player 1 experience, 1. Add one');
+  assert.equal(await cell(page, 2, 'rad').getAttribute('aria-label'), 'Player 2 rad, 1. Add one');
+  await removeOne(page, 'Remove one experience counter from Player 1');
+  await removeOne(page, 'Remove one energy counter from Player 3');
+  assert.equal(await count(page, 1, 'experience'), '0');
+  assert.equal(await count(page, 3, 'energy'), '2');
+  await button(page, 'Undo').tap();
+  await button(page, 'Undo').tap();
+  await button(page, 'Undo').tap();
+  assert.deepEqual([await count(page, 3, 'energy'), await count(page, 1, 'experience'), await count(page, 2, 'rad')], ['3', '1', '2'],
+    'Undo puts back energy, experience and rad');
+
+  // Discard takes every new kind back to how it was when the mode opened, and that's saved.
+  await button(page, 'Cancel').tap();
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 6 changes?');
+  assert.equal(await page.locator('#discard-message').textContent(), 'Every counter goes back to how it was when you opened counters.');
+  await button(page, 'Discard').tap();
+  await eventually(() => mode(page), null, 'Discard closes the mode');
+  assert.deepEqual(await Promise.all([1, 2, 3, 4].map(number => nearBadges(page, number))), ['', '', '', '']);
+  await reload(page);
+  const discarded = await saved(page);
+  assert.deepEqual([discarded.energy, discarded.experience, discarded.rad], [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]], 'the discard is saved');
+
+  // The check mark saves. Badges follow the identity chip in the order poison, tax, energy, experience, rad, each
+  // only where it's above zero, and two-digit counts show in full.
+  await button(page, 'Counters').tap();
+  for (let tap = 0; tap < 12; tap++) await cell(page, 3, 'energy').tap();
+  for (let tap = 0; tap < 10; tap++) await cell(page, 1, 'experience').tap();
+  for (const kind of ['rad', 'experience', 'energy', 'casts', 'poison']) await cell(page, 4, kind).tap();
+  await cell(page, 2, 'rad').tap();
+  await button(page, 'Save').tap();
+  assert.equal(await mode(page), null);
+  assert.equal(await nearBadges(page, 4), '1 poison | Commander tax +2 | 1 energy | 1 experience | 1 rad');
+  assert.equal(await nearBadges(page, 3), '12 energy');
+  assert.equal(await nearBadges(page, 1), '10 experience');
+  assert.equal(await nearBadges(page, 2), '1 rad');
+  assert.deepEqual(await tile(page, 4).locator('.badges.near .chip').evaluateAll(chips => chips.map(chip =>
+    chip.querySelector('[data-glyph], [data-icon]')?.dataset.glyph ?? chip.querySelector('[data-icon]').dataset.icon)),
+  ['infect', 'crown', 'energy', 'graduation-cap', 'rad'], 'each badge has its counter’s icon');
+  await reload(page);
+  assert.equal(await nearBadges(page, 3), '12 energy', 'saved counts survive a reload');
+
+  // Turning a switch off hides its badges and circles, and keeps the count for when it comes back.
+  await setSwitches(page, { Energy: false });
+  assert.equal(await nearBadges(page, 3), '');
+  assert.equal(await nearBadges(page, 4), '1 poison | Commander tax +2 | 1 experience | 1 rad');
+  await button(page, 'Counters').tap();
+  assert.deepEqual(await kinds(page, 4), ['poison', 'casts', 'experience', 'rad']);
+  await button(page, 'Cancel').tap();
+  await setSwitches(page, { Energy: true });
+  assert.equal(await nearBadges(page, 3), '12 energy');
+
+  // A new game resets every count and keeps the switches.
+  await button(page, 'Game setup').tap();
+  await button(page, 'New game').tap();
+  await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
+  await eventually(() => Promise.all([1, 2, 3, 4].map(number => nearBadges(page, number))), ['', '', '', ''], 'a new game clears the badges');
+  const fresh = await saved(page);
+  assert.deepEqual([fresh.poison, fresh.casts, fresh.energy, fresh.experience, fresh.rad], Array(5).fill([0, 0, 0, 0]), 'a new game resets every count');
+  assert.deepEqual(fresh.counters, { commander: true, poison: true, energy: true, experience: true, rad: true }, 'and keeps every switch');
+  assert.ok(await button(page, 'Counters').isVisible());
+}
+
+for (const [name, engine] of Object.entries({ chromium, webkit })) {
+  test(`${name}: energy, experience and rad have switches, circles and badges in order`, { timeout: 90000 }, t => checkNewCounters(t, engine));
+}
+
+test('chromium: counters mode fits six players with every counter on the smallest phone', { timeout: 60000 }, async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 } });
   await fakeScreenOrientation(page);
   await page.goto(app);
-  await setSwitches(page, { Commander: true, Poison: true });
+  await setSwitches(page, { Commander: true, Poison: true, Energy: true, Experience: true, Rad: true });
   await turnScreen(page, 320, 568, 0);
   await startGame(page, 6);
   await button(page, 'Counters').tap();
@@ -173,7 +291,7 @@ test('chromium: counters mode fits six players on the smallest phone', { timeout
     });
   });
   assert.deepEqual(problems, []);
-  assert.equal(await page.locator('.mode-layer .counter-cell').count(), 12, 'two cells per tile');
+  assert.equal(await page.locator('.mode-layer .counter-cell').count(), 30, 'five cells per tile');
 
   // Setup still fits the smallest landscape phone.
   await button(page, 'Cancel').tap();
@@ -248,4 +366,8 @@ test('chromium: saved counters are checked when a game loads', async (t) => {
   assert.deepEqual((await load({ ...game, identities: ['C', 'GRBUW', 'UC', 'WW'] })).near,
     ['', 'WUBRG, colour identity white, blue, black, red, green', '', 'Mono-white, colour identity white']);
   assert.deepEqual((await load({ ...game, counters: { poison: true }, poison: [3, 0, 0, 99] })).near, ['3 poison', '', '', '99 poison']);
+  // Energy, experience and rad: only a true switch is on, and a bad or missing count starts at 0.
+  assert.deepEqual(await load({
+    ...game, counters: { energy: true, experience: 1, rad: true }, energy: [5, -2, 'x', 99], experience: [4, 4, 4, 4], rad: [1.5, 100, 7],
+  }), { counters: true, near: ['5 energy', '', '7 rad', '99 energy'] }, 'experience stays off, and bad counts start at 0');
 });
