@@ -338,7 +338,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - Each circle shows the icon over the count. Tap +1; hold −1 with repeat (500ms, then every 100ms), the map's rule. The hint is "Tap +1 · hold −1", hidden on short tiles.
   - Cell size: `clamp(44px, min((ui − 20px)/3, (ub − 58px)/2), 92 × grow)`. That's 78px on the target at 4 or 6 players, 61px at 640 × 360 and 50px at 568 × 320 (6 players).
   - Undo, ✓ and ✕ work as today. Counts are 0–99, and tax shows +2n.
-- **Icons:** poison is Mana infect `\ea73` (shipped), tax the Phosphor crown, energy Mana `\e907`, rad Mana `\ea50`, experience the **Phosphor graduation cap (fill)**.
+- **Icons:** poison is Mana infect `\ea73` (shipped), tax Mana's commander symbol `\e9c6` (`.ms-commander`; it was the Phosphor crown until the crown went to the monarch, §13), energy Mana `\e907`, rad Mana `\ea50`, experience the **Phosphor graduation cap (fill)**.
 
 ![Experience](renders/spec-experience.png)
 

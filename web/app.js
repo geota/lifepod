@@ -1421,12 +1421,10 @@ function stepCount(kind, index, delta) {
   if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
 }
 
-// Each counter's icon: Mana's infect, energy and rad symbols, Phosphor's crown for tax and its graduation cap for
-// experience.
+// Each counter's icon: Mana's infect, commander, energy and rad symbols, and Phosphor's graduation cap for experience.
 function counterIcon(kind) {
-  if (kind === 'casts') return icon('crown');
   if (kind === 'experience') return icon('graduation-cap');
-  return manaIcon(kind === 'poison' ? 'infect' : kind);
+  return manaIcon({ poison: 'infect', casts: 'commander' }[kind] ?? kind);
 }
 
 // The counters that are on, in order.

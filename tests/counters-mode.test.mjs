@@ -269,7 +269,7 @@ async function checkNewCounters(t, engine) {
   assert.equal(await nearBadges(page, 2), '1 rad');
   assert.deepEqual(await tile(page, 4).locator('.badges.near .chip').evaluateAll(chips => chips.map(chip =>
     chip.querySelector('[data-glyph], [data-icon]')?.dataset.glyph ?? chip.querySelector('[data-icon]').dataset.icon)),
-  ['infect', 'crown', 'energy', 'graduation-cap', 'rad'], 'each badge has its counter’s icon');
+  ['infect', 'commander', 'energy', 'graduation-cap', 'rad'], 'each badge has its counter’s icon');
   await reload(page);
   assert.equal(await nearBadges(page, 3), '12 energy', 'saved counts survive a reload');
 

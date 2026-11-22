@@ -206,8 +206,8 @@ button, .player { -webkit-user-select: none; user-select: none; }
 button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
-/* Game symbols from the Mana font: the d20 for dice, infect for poison, energy, rad, the colour pie for identity, the
-   tap symbol for the mana pool and the untap symbol for turns. */
+/* Game symbols from the Mana font: the d20 for dice, infect for poison, the commander symbol for commander tax, energy,
+   rad, the colour pie for identity, the tap symbol for the mana pool and the untap symbol for turns. */
 .mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
 .mana-icon::before { content: var(--glyph); speak: never; }
 .mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
@@ -217,6 +217,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .mana-icon[data-glyph="pie"] { --glyph: '\e9f0'; }
 .mana-icon[data-glyph="tap"] { --glyph: '\e61a'; }
 .mana-icon[data-glyph="untap"] { --glyph: '\e61b'; }
+.mana-icon[data-glyph="commander"] { --glyph: '\e9c6'; }
 
 /* app.js turns the board so seats stay fixed to the device as the screen rotates. */
 .app {
