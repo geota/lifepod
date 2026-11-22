@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, scores, startGame, turnScreen } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, scores, setSwitches, startGame, turnScreen } from './helpers.mjs';
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 // The seat for an attacker on a defender's map.
@@ -61,9 +61,7 @@ async function openPage(t, engine, options = {}) {
 }
 
 async function turnOnCommander(page) {
-  await button(page, 'Game setup').tap();
-  await page.locator('#setup label', { has: page.getByRole('switch', { name: 'Commander' }) }).tap();
-  await button(page, 'Close setup').tap();
+  await setSwitches(page, { Commander: true });
 }
 
 // Chromium writes page storage in the background, so give a write a moment to land before a reload.
@@ -83,7 +81,13 @@ async function checkDamage(t, engine) {
   assert.equal(await mode(page), 'damage');
   assert.equal(await page.locator('.map-cell[data-attacker]').count(), 12, 'three opponents on each of four maps');
   assert.equal(await page.locator('.map-cell.self').count(), 4);
-  assert.ok(await tile(page, 3).getByText('Tap +1 · hold −1').isVisible());
+  // The hint shows only where every tile has room for it (SPEC §3.2): 4-player tiles are 195px tall at 852 × 393,
+  // and 212px on a 952 × 427 phone.
+  assert.ok(!(await tile(page, 3).getByText('Tap +1 · hold −1').isVisible()), 'no hint on short tiles');
+  await page.setViewportSize({ width: 952, height: 427 });
+  await tile(page, 3).getByText('Tap +1 · hold −1').waitFor({ state: 'visible', timeout: 2000 });
+  await page.setViewportSize({ width: 852, height: 393 });
+  await tile(page, 3).getByText('Tap +1 · hold −1').waitFor({ state: 'hidden', timeout: 2000 });
   assert.ok(await button(page, 'Undo').isDisabled());
   assert.deepEqual(await ownSeat(page, 3), ['40', 'you']);
 

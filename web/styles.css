@@ -100,7 +100,10 @@
      1px there; an unfolded foldable or a tablet gets up to 2px, so tile content keeps scaling with the tile
      instead of stopping at phone-sized limits. Use it only in the upper bound of a clamp(). */
   --grow: clamp(1px, 100vmin / 430, 2px);
-  --setup-button: 48px;
+  /* The centre pill's buttons: 48px on phones, growing to 64px on tablets. */
+  --setup-button: clamp(48px, 48 * var(--grow), 64px);
+  /* How far the pill's disc and pressed discs sit inside each button: 7px of a 48px button. */
+  --pill-inset: calc(var(--setup-button) * 7 / 48);
 
   font: 16px/var(--leading) var(--font-ui);
   color: var(--text);
@@ -171,11 +174,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   display: flex;
   transform: translate(-50%, -50%);
 }
-/* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target.
-   app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
+/* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target, or up to
+   64px on tablets. app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
 .board-controls::before {
   position: absolute;
-  inset: 6px;
+  inset: calc(var(--setup-button) / 8);
   content: '';
   border: 1px solid var(--control-border);
   border-radius: var(--radius-full);
@@ -193,21 +196,21 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-soft);
-  font-size: 1.25rem;
+  font-size: clamp(1.25rem, 20 * var(--grow), 1.625rem);
 }
 .pill-button[hidden] { display: none; }
 .pill-button::before {
   position: absolute;
-  inset: 7px 2px;
+  inset: var(--pill-inset) 2px;
   content: '';
   border-radius: var(--radius-full);
 }
-.pill-button:nth-child(1 of :not([hidden]))::before { inset-inline-start: 7px; }
-.pill-button:nth-last-child(1 of :not([hidden]))::before { inset-inline-end: 7px; }
+.pill-button:nth-child(1 of :not([hidden]))::before { inset-inline-start: var(--pill-inset); }
+.pill-button:nth-last-child(1 of :not([hidden]))::before { inset-inline-end: var(--pill-inset); }
 .pill-button:not([hidden]) ~ .pill-button::after {
   position: absolute;
-  top: 14px;
-  bottom: 14px;
+  top: calc(2 * var(--pill-inset));
+  bottom: calc(2 * var(--pill-inset));
   left: 0;
   width: 1px;
   content: '';
@@ -222,7 +225,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button::before { content: none; }
 /* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
 .save-button { color: var(--ink); }
-.save-button::before, .save-button:active::before { inset: 7px 3px; background: var(--accent); }
+.save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--accent); }
 .save-button:active::before { background: var(--accent-pressed); }
 #board-controls .save-button::after, #board-controls .save-button + .pill-button::after { content: none; }
 .pill-button:disabled { opacity: .38; cursor: default; }
@@ -257,15 +260,34 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .player {
   /* The tile's own panel, for rings on cells drawn in another player's colour. */
   --tile-panel: var(--panel);
+  /* A pressed life half is washed in the seat colour, only while a finger is down. Counter cells are a quiet
+     disc that lights toward the seat colour while pressed. */
+  --wash: color-mix(in oklab, var(--seat) 17%, transparent);
+  --cell-fill: color-mix(in oklab, var(--button) 55%, var(--panel));
+  --cell-pressed: color-mix(in oklab, var(--seat) 26%, var(--panel));
   position: relative;
   container-type: size;
   overflow: hidden;
   background: var(--panel);
 }
+/* WebViews from before color-mix() (iOS 16.0 and 16.1) get the nearest plain colours. */
+@supports not (color: color-mix(in oklab, red 50%, blue)) {
+  .player { --wash: var(--press-overlay); --cell-fill: var(--button); --cell-pressed: var(--surface-pressed); }
+}
+
+/* One size per board (design/polish/SPEC.md §3.1): app.js sets --ui and --ub to the smallest tile face's width and
+   height, and tile content is sized from u, a hundredth of --ui, instead of from each tile's own size. Every tile
+   then draws its total, glyphs, badges and mode layers at the same size. --board-digits is the most digits in any
+   total. The board flags are board-wide thresholds: data-narrow (ui < 240), data-short (ub < 200) and data-wide
+   (ui ≥ 264). */
+.board {
+  --u: calc(var(--ui, 400px) / 100);
+  --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
+}
 
 .player-face {
-  --control-size: clamp(44px, 18cqi, 74 * var(--grow));
-  --control-gap: clamp(4px, 3cqi, 16 * var(--grow));
+  --control-size: clamp(44px, calc(18 * var(--u)), 74 * var(--grow));
+  --control-gap: clamp(4px, calc(3 * var(--u)), 16 * var(--grow));
   position: absolute;
   top: 50%;
   left: 50%;
@@ -301,7 +323,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border-radius: 0;
   background: none;
   color: var(--seat);
-  font: normal normal normal min(86cqb, 62cqi)/1 Mana;
+  font: normal normal normal min(var(--ub, 400px) * .86, var(--ui, 400px) * .62)/1 Mana;
   opacity: var(--watermark-opacity);
   transform: translate(-50%, -50%);
   content: var(--watermark);
@@ -331,7 +353,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .score {
   min-width: 0;
   font-size: clamp(2rem, 19vmin, max(7rem, 112 * var(--grow)));
-  font-size: min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((100cqi - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--digits, 2)));
+  font-size: min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2)));
   line-height: 1;
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
@@ -340,30 +362,36 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   color: var(--text);
 }
 .score[data-out] { color: var(--life-out); }
+/* The life halves have no button chrome: the − and + glyphs sit near the tile's outer edges, 5u in. */
 .controls {
   display: grid;
-  grid-template-columns: var(--control-size) auto var(--control-size);
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--control-gap);
+  width: 100%;
 }
 .controls button {
   display: grid;
   place-items: center;
+  width: clamp(44px, calc(16 * var(--u)), 84 * var(--grow));
   min-height: var(--tap-min);
-  height: clamp(44px, 15cqi, 57 * var(--grow));
+  height: clamp(44px, calc(15 * var(--u)), 57 * var(--grow));
   padding: 0;
-  font-size: clamp(1.25rem, 9cqi, max(1.625rem, 26 * var(--grow)));
-  border-radius: var(--radius-md);
-  border: 1px solid var(--rim);
-  background: var(--button);
+  font-size: clamp(1.75rem, calc(12 * var(--u)), max(2.5rem, 46 * var(--grow)));
+  border: 0;
+  background: none;
   color: var(--seat);
 }
-.controls button:is(:active, [data-pressed]) { background: var(--seat); color: var(--button); }
-/* Each button's touch area covers its half of the tile: − on the reader's left, + on the right. */
+.controls .subtract { justify-self: start; margin-inline-start: calc(5 * var(--u)); }
+.controls .add { justify-self: end; margin-inline-end: calc(5 * var(--u)); }
+.controls button:is(:active, [data-pressed]) { color: var(--text); }
+/* Each button's touch area covers its half of the tile: − on the reader's left, + on the right. A press washes
+   that half, rounded on its inner corners. */
 /* z-index keeps the touch areas above the total while its change animation runs. */
 .controls button::after { position: absolute; z-index: 1; top: 0; bottom: 0; content: ''; }
-.controls .subtract::after { left: 0; right: 50%; }
-.controls .add::after { left: 50%; right: 0; }
+.controls .subtract::after { left: 0; right: 50%; border-radius: 0 28px 28px 0; }
+.controls .add::after { left: 50%; right: 0; border-radius: 28px 0 0 28px; }
+.controls button:is(:active, [data-pressed])::after { background: var(--wash); }
 
 .rotate-seat {
   position: absolute;
@@ -378,23 +406,25 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .controls .add { grid-area: 1 / 3; }
 .rotate-badge {
   grid-area: 1 / 3;
-  justify-self: center;
+  justify-self: end;
+  margin-inline-end: calc(5 * var(--u));
   display: grid;
   place-items: center;
-  width: clamp(36px, 13cqi, 48 * var(--grow));
+  width: clamp(36px, calc(13 * var(--u)), 48 * var(--grow));
   aspect-ratio: 1;
   border: 1px solid var(--rim);
   border-radius: var(--radius-full);
   background: var(--button);
   color: var(--seat);
-  font-size: clamp(1.125rem, 7cqi, max(1.5rem, 24 * var(--grow)));
+  font-size: clamp(1.125rem, calc(7 * var(--u)), max(1.5rem, 24 * var(--grow)));
 }
 .board:not([data-mode="rotate"]) .rotate-badge, .board[data-mode="rotate"] .controls button { visibility: hidden; }
 .rotate-seat:active { background: var(--press-overlay); }
 .rotate-seat:focus-visible { outline-offset: -3px; }
 
 /* Board modes other than seat rotation swap the life controls for a layer facing the tile's player. It keeps
-   22px clear on its far side, where the centre controls reach up to 18px into the tiles next to them. */
+   22px clear on its far side, where the centre controls reach up to 18px into the tiles next to them (more on
+   tablets, where the pill grows). */
 .board[data-mode]:not([data-mode="rotate"]) .controls { visibility: hidden; }
 .mode-layer {
   position: absolute;
@@ -404,11 +434,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   place-content: center;
   justify-items: center;
   gap: 6px;
-  padding: 22px 6px 4px;
+  padding: calc(var(--setup-button) / 2 - 2px) 6px 4px;
   text-align: center;
 }
 .mode-layer[hidden] { display: none; }
-.layer-hint { font-size: clamp(.75rem, 3.6cqi, max(.875rem, 14 * var(--grow))); font-weight: var(--weight-semibold); color: var(--text-soft); }
+.layer-hint { font-size: clamp(.75rem, calc(3.6 * var(--u)), max(.875rem, 14 * var(--grow))); font-weight: var(--weight-semibold); color: var(--text-soft); }
+/* Mode hints show only where every tile has room: ub ≥ 200 and ui ≥ 240. */
+.board:is([data-narrow], [data-short]) .layer-hint { display: none; }
 
 /* Tile colour swatches: the panel with the seat colour as a dot. The chosen one has a ring inside it, so a
    tile edge can't clip it. A swatch another player has keeps its full colour, shows its owner ("P2") in the
@@ -416,21 +448,19 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
    five toggles the swatches' size where the tile has room, otherwise a 44px button that opens the player
    sheet. Every target stays at least 44px. */
 .colour-picker {
-  --swatch-size: clamp(44px, min((100cqi - 20px) / 3, (100cqb - 70px) / 3), 60 * var(--grow));
+  --swatch-size: clamp(44px, min((var(--ui, 400px) - 20px) / 3, (var(--ub, 400px) - 22px - var(--setup-button)) / 3), 60 * var(--grow));
   display: flex;
   align-items: center;
   gap: 12px;
 }
-.colour-picker[data-identity] { --swatch-size: clamp(44px, min((100cqi - 76px) / 3, (100cqb - 70px) / 3), 60 * var(--grow)); }
+.colour-picker[data-identity] { --swatch-size: clamp(44px, min((var(--ui, 400px) - 76px) / 3, (var(--ub, 400px) - 22px - var(--setup-button)) / 3), 60 * var(--grow)); }
 .colour-picker .identity { display: none; grid-template-columns: repeat(2, var(--swatch-size)); grid-auto-rows: var(--swatch-size); }
 .colour-picker .identity-toggle { width: var(--swatch-size); height: var(--swatch-size); font-size: max(.6875rem, var(--swatch-size) * .18); }
 /* On a tablet the toggles grow past phone size, so the disc inside grows with them. */
 .colour-picker .identity-toggle .pip { --pip-size: max(20px, var(--swatch-size) * .34); }
-@container (min-width: 264px) {
-  .colour-picker[data-identity] { --swatch-size: clamp(44px, min((100cqi - 40px) / 5, (100cqb - 70px) / 3), 60 * var(--grow)); }
-  .colour-picker .identity { display: grid; }
-  .colour-picker .identity-button { display: none; }
-}
+.board[data-wide] .colour-picker[data-identity] { --swatch-size: clamp(44px, min((var(--ui, 400px) - 40px) / 5, (var(--ub, 400px) - 22px - var(--setup-button)) / 3), 60 * var(--grow)); }
+.board[data-wide] .colour-picker .identity { display: grid; }
+.board[data-wide] .colour-picker .identity-button { display: none; }
 .swatches {
   display: grid;
   grid-template-columns: repeat(3, var(--swatch-size));
@@ -465,20 +495,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 }
 .identity-button:active { background: var(--surface-pressed); }
 .identity-button .ci { font-size: 28px; }
-@container (max-width: 240px) {
-  .mode-layer { padding: 20px 4px 1px; }
-  .mode-layer:has(.colour-picker[data-identity]) { padding-inline: 1px; }
-  .layer-hint { display: none; }
-  .colour-picker { --swatch-size: 44px; gap: 3px; }
-  .swatches { gap: 3px; }
-}
+/* Narrow tiles, such as 6 players on a phone, tighten the layer and drop the hint. */
+.board[data-narrow] .mode-layer { padding: calc(var(--setup-button) / 2 - 4px) 4px 1px; }
+.board[data-narrow] .mode-layer:has(.colour-picker[data-identity]) { padding-inline: 1px; }
+.board[data-narrow] .colour-picker { --swatch-size: 44px; gap: 3px; }
+.board[data-narrow] .swatches { gap: 3px; }
 /* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches and toggles fit. */
-@container (max-height: 200px) {
-  .mode-layer:has(.colour-picker) { padding-block: 20px 1px; }
-  .mode-layer:has(.colour-picker) .layer-hint { display: none; }
-  .colour-picker { --swatch-size: 44px; gap: 3px; }
-  .colour-picker :is(.swatches, .identity) { gap: 3px; }
-}
+.board[data-short] .mode-layer:has(.colour-picker) { padding-block: calc(var(--setup-button) / 2 - 4px) 1px; }
+.board[data-short] .colour-picker { --swatch-size: 44px; gap: 3px; }
+.board[data-short] .colour-picker :is(.swatches, .identity) { gap: 3px; }
 
 /* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat showing the damage
    their commander has dealt this player. Every seat is filled with that player's own tile colour (their panel),
@@ -492,8 +517,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   grid-template-columns: repeat(var(--columns), minmax(44px, 1fr));
   grid-template-rows: repeat(var(--rows), minmax(44px, 1fr));
   gap: 4px;
-  width: min(100cqi - 12px, var(--columns) * 120 * var(--grow));
-  height: min(100cqb - 30px - var(--hint-space), var(--rows) * 80 * var(--grow));
+  width: min(var(--ui, 400px) - 12px, var(--columns) * 120 * var(--grow));
+  height: min(var(--ub, 400px) - 6px - var(--setup-button) / 2 - var(--hint-space), var(--rows) * 80 * var(--grow));
 }
 .map-cell {
   /* The seat's own ring, kept under the changed and pressed rings below. */
@@ -507,7 +532,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--seat);
-  font-size: clamp(1.0625rem, 6cqi, max(1.625rem, 26 * var(--grow)));
+  font-size: clamp(1.0625rem, calc(6 * var(--u)), max(1.625rem, 26 * var(--grow)));
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.03em;
@@ -529,62 +554,56 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   border: 1.5px solid var(--rim);
   background: transparent;
   color: var(--text);
-  font-size: clamp(1rem, 5.4cqi, max(1.5rem, 24 * var(--grow)));
+  font-size: clamp(1rem, calc(5.4 * var(--u)), max(1.5rem, 24 * var(--grow)));
   line-height: 1.05;
   box-shadow: none;
 }
 .map-cell.self strong[data-out] { color: var(--life-out); }
 .life-change { font-size: max(.75rem, .5em); font-weight: var(--weight-semibold); color: var(--text-soft); letter-spacing: normal; }
 .life-change[data-loss] { color: var(--life-out); }
-@container (max-width: 240px) {
-  .seat-map { --hint-space: 0px; }
-}
+.board:is([data-narrow], [data-short]) .seat-map { --hint-space: 0px; }
 
-/* Counters mode: each tile shows [− flask n +] for poison and [− crown +2n +] for tax, laid out like the life
-   controls. */
-.counter-rows { --counter-font: clamp(1.25rem, 7cqi, max(1.875rem, 30 * var(--grow))); display: grid; justify-items: center; gap: 6px; }
-.counter-row {
-  display: grid;
-  /* The count column has a floor that grows with the count, so the poison and tax rows line up. */
-  grid-template-columns: auto minmax(max(4.2em, var(--counter-font) * 2.2), auto) auto;
-  align-items: center;
-  gap: clamp(4px, 3cqi, 14 * var(--grow));
-}
-.counter-row button {
-  display: grid;
-  place-items: center;
-  width: clamp(44px, 14cqi, 60 * var(--grow));
-  height: clamp(var(--tap-min), 10cqi, 44 * var(--grow));
-  padding: 0;
-  border: 1px solid var(--rim);
-  border-radius: var(--radius-md);
-  background: var(--button);
-  color: var(--seat);
-  font-size: clamp(1.125rem, 4.5cqi, max(1.125rem, 18 * var(--grow)));
-}
-.counter-row button:is(:active, [data-pressed]) { background: var(--seat); color: var(--button); }
-.counter-value {
+/* Counters mode: one circle per counter that's on, its icon over its count, three to a row with the last row
+   centred. A tap adds one and a hold takes one away. Cells are the same size on every tile and never under 44px:
+   78px on a 952 × 427 phone at 4 or 6 players, 50px at 568 × 320 with 6. */
+.counter-cells {
+  --cell: clamp(44px, min((var(--ui, 400px) - 20px) / 3, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 6px;
-  font-size: var(--counter-font);
+  gap: 4px 10px;
+  width: calc(3 * var(--cell) + 20px);
+}
+.counter-cell {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1px;
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cell-fill);
+  color: var(--text);
+  font-size: calc(var(--cell) * .3);
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
   letter-spacing: -.03em;
+  line-height: 1;
 }
-.counter-value .icon { color: var(--seat); font-size: .78em; }
-@container (max-width: 240px) {
-  .counter-rows { gap: 3px; }
-  .counter-row { gap: 4px; }
-}
+.counter-cell :is(.icon, .mana-icon) { color: var(--seat); font-size: .8em; }
+.counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
+.counter-cell:is(:active, [data-pressed]) { background: var(--cell-pressed); }
+.counter-cell:has(+ .counter-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 /* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
    toward the table, holds commander damage, led by a sword in its own circle, and sits clear of the centre
    controls; the near edge (the player's
    own) holds colour identity, poison and tax. Tight chips keep the busiest row on one line at 6 players on a
-   320 × 568 phone. A row never wraps: if a wider font would still overflow the tile, app.js shrinks that row's
-   type until every chip fits. */
+   320 × 568 phone. When a row still runs out of room, app.js takes the auto-drop steps (design/polish/SPEC.md
+   §3.2) on every tile at once: data-drop tokens on #board hide parts, and --near-badge-size and --far-badge-size
+   shrink the type. */
 .badges {
   position: absolute;
   left: 4px;
@@ -594,11 +613,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   flex-wrap: nowrap;
   justify-content: center;
   gap: 2px;
-  font-size: clamp(.78125rem, 3.6cqi, max(1rem, 16 * var(--grow)));
   pointer-events: none;
 }
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) .badges { display: none; }
-.badges.far { top: 26px; }
+.badges.far { top: calc(var(--setup-button) / 2 + 2px); font-size: var(--far-badge-size, var(--badge-size)); }
+.badges.near { font-size: var(--near-badge-size, var(--badge-size)); }
+.board[data-drop~="identity"] .badges.near .ci-chip, .board[data-drop~="sword"] .badges.far .sword { display: none; }
+.board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
 /* A sideways tile's far edge runs through the middle of the board, where the centre controls sit, so its row
    starts at the reader's left, clear of them. */
 .player:is([data-edge="left"], [data-edge="right"]) .badges.far { justify-content: flex-start; }
@@ -786,46 +807,141 @@ dialog::backdrop { background: var(--scrim); }
 .privacy-text { display: grid; gap: var(--space-3); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
 .privacy-text h3 { margin: var(--space-2) 0 0; font-size: 1rem; color: var(--text); }
 .privacy-text h3:first-child { margin-top: 0; }
-.close, .choices button, .primary, .secondary {
+.close, .primary, .secondary {
   min-height: var(--tap-min);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
   font-weight: var(--weight-semibold);
 }
-.close:active, .choices button:active, .secondary:active { background: var(--surface-pressed); }
+.close:active, .secondary:active { background: var(--surface-pressed); }
 .close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: 1.125rem; }
-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
-legend, .life-setting label {
-  display: block;
-  margin-bottom: var(--space-2);
-  padding: 0;
-  font-size: var(--type-label);
-  font-weight: var(--weight-semibold);
-}
-.choices { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1); }
-.choices button { padding: 0; border-radius: var(--radius-sm); background: var(--background); }
-.choices button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--ink); }
-.starting-life-row { display: grid; grid-template-columns: 3fr 2fr; gap: var(--space-3); }
-#starting-life {
-  width: 100%;
-  padding: 0 var(--space-3);
+
+/* Setup and Track (design/polish/SPEC.md §4): six control types. Header buttons and rows are 44px; the action
+   buttons 48px. The sheet is 600px wide at most and fits a 952 × 427 phone down to a 640 × 360 one without
+   scrolling. Below 360px tall its header folds into the Players row. */
+#setup, #track { width: min(600px, calc(100% - 32px)); }
+.sheet.setup-sheet { gap: var(--space-2); padding: var(--space-3) var(--space-4) 14px; }
+.setup-header { gap: 6px; min-height: var(--tap-min); }
+.setup-header h2 { flex: 1; font-size: 1.25rem; letter-spacing: -.02em; }
+.setup-header .close { border-radius: 12px; }
+.setting-row { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); align-items: center; gap: var(--space-2); }
+.setting-label { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
+/* Segmented choice: equal 44px segments in one 48px group. The selected one is filled with the accent. */
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 2px;
+  padding: 2px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 12px;
   background: var(--background);
 }
-.field-error { margin-top: var(--space-1); color: var(--danger-text); font-size: var(--type-small); }
-.switch-setting {
+.segmented > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-soft);
+  font-size: .9375rem;
+  font-weight: var(--weight-semibold);
+}
+.segmented > button[hidden] { display: none; }
+.segmented > button:active { background: var(--surface-pressed); }
+.segmented > button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
+/* Starting life: the stepper needs a little more room than a number. */
+.life-choices { grid-auto-flow: row; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(7.5rem, 1.3fr); }
+/* Stepper: − value + inside the selected segment's accent fill, with 44px buttons. */
+.stepper {
+  display: grid;
+  grid-template-columns: var(--tap-min) minmax(0, 1fr) var(--tap-min);
+  align-items: center;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.stepper[hidden] { display: none; }
+.stepper button {
+  display: grid;
+  place-items: center;
+  min-height: var(--tap-min);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--ink);
+  font-size: 1rem;
+}
+.stepper button:is(:active, [data-pressed]) { background: var(--accent-pressed); }
+/* Navigation and switch rows share a grid. A navigation row opens a sheet or a board mode; in a switch row the
+   whole row toggles the switch. */
+.control-grid { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 6px; }
+.tracker-grid { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr)); }
+.nav-row, .switch-row {
   position: relative;
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 10px;
+  min-width: 0;
   min-height: var(--tap-min);
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  color: var(--text);
   font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  text-align: start;
   cursor: pointer;
 }
-.switch-setting input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
-.switch-setting input:focus-visible + .switch { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* A navigation row that can't be used yet, such as Colours while setup would start a new game, keeps its place. */
+.nav-row[hidden] { display: flex; visibility: hidden; }
+.nav-row:active, .switch-row:active { background: var(--surface-pressed); }
+.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--accent); }
+.nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-summary { display: flex; gap: 4px; margin-inline-start: auto; color: var(--muted); font-size: 14px; }
+.nav-summary :is(.icon, .mana-icon) { width: 14px; height: 14px; }
+.nav-row .caret { flex: none; width: 14px; height: 14px; margin-inline-start: auto; color: var(--muted); }
+.nav-summary + .caret { margin-inline-start: 0; }
+.switch-row .switch { margin-inline-start: auto; }
+.switch-row input { position: absolute; inline-size: 1px; block-size: 1px; opacity: 0; }
+.switch-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+#setup .sheet-actions :is(.primary, .secondary) { min-height: 48px; border-radius: 12px; font-size: 1rem; }
+/* Portrait phones stack each label over its control, so five segments keep 44px, and give each row the full
+   width so its label isn't cut short. */
+@media (max-width: 480px) {
+  .setting-row { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); }
+  .control-grid { grid-auto-flow: row; }
+  /* The stepper needs more room than a segment here, so it takes its own line under the presets. */
+  .life-choices { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .life-choices .stepper { grid-column: 1 / -1; }
+}
+/* Below 360px tall, the title goes and About · ✕ move to the end of the Players row. */
+@media (max-height: 359.98px) and (min-width: 481px) {
+  .sheet.setup-sheet:has(#players-row) { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding-block: 10px; }
+  .setup-sheet:has(#players-row) > * { grid-column: 1 / -1; }
+  .setup-sheet .setup-header:has(#setup-title) { display: contents; }
+  #setup-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  .setup-sheet > #players-row { grid-row: 1; grid-column: 1; }
+  .setup-header > .sheet-header-actions { grid-row: 1; grid-column: 2; }
+}
 .switch {
   position: relative;
   flex: none;
@@ -847,13 +963,7 @@ legend, .life-setting label {
 }
 input:checked + .switch { background: var(--accent); border-color: var(--accent); }
 input:checked + .switch::after { transform: translateX(13px); background: var(--ink); }
-.counter-switches { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
 .sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
-.setup-options { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: var(--space-2); }
-.setup-mode-buttons { display: flex; gap: var(--space-2); }
-#rotate-seats, #tile-colours { padding-inline: var(--space-3); font-size: var(--type-label); }
-#tile-colours { display: flex; align-items: center; gap: 6px; }
-#tile-colours[hidden] { display: none; }
 .primary { background: var(--accent); border-color: var(--accent); color: var(--ink); }
 .primary:active { background: var(--accent-pressed); }
 #restart-message { color: var(--muted); }
@@ -980,7 +1090,9 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 /* Mouse pointers get a hover state on the board and sheet controls. */
 @media (hover: hover) {
   .pill-button:not(:disabled, .save-button):hover::before, .dice-picker button:not([aria-pressed="true"]):hover,
-  .close:hover, .choices button:not([aria-pressed="true"]):hover, .secondary:hover, .text-button:hover { background: var(--surface-pressed); }
+  .close:hover, .segmented > button:not([aria-pressed="true"]):hover, .nav-row:hover, .switch-row:hover, .secondary:hover,
+  .text-button:hover { background: var(--surface-pressed); }
+  .stepper button:hover { background: var(--accent-pressed); }
   .board-controls:is([data-mode="rotate"], [data-mode="colours"]) #setup-button:hover::before { content: none; }
   .save-button:hover::before { background: var(--accent-pressed); }
   .primary:hover { background: var(--accent-pressed); }
@@ -988,16 +1100,4 @@ input:checked + .switch::after { transform: translateX(13px); background: var(--
 }
 @media (max-height: 420px), (max-width: 420px) {
   .sheet { gap: var(--space-1); padding-block: var(--space-2); }
-  legend, .life-setting label { margin-bottom: var(--space-1); }
-}
-/* Landscape phones put each setup label beside its controls, so the sheet fits without scrolling: from the
-   smallest (568 × 320) to tall ones such as a Pixel 10 Pro (952 × 427). The smallest also tighten the gaps. */
-@media (max-height: 500px) and (min-width: 500px) {
-  #setup-form { gap: var(--space-3); padding-block: var(--space-3) var(--space-4); }
-  #setup-form :is(legend, .life-setting > label) { float: left; width: 7.25rem; margin: 0; line-height: var(--tap-min); }
-  #setup-form :is(.choices, .starting-life-row, .counter-switches, .field-error) { margin-inline-start: 7.25rem; }
-  #setup-form .starting-life-row .choices { margin-inline-start: 0; }
-}
-@media (max-height: 360px) and (min-width: 500px) {
-  #setup-form { gap: var(--space-1); padding-block: var(--space-2); }
 }

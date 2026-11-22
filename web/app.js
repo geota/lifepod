@@ -29,9 +29,13 @@ const discardDialog = document.querySelector('#discard');
 const setup = document.querySelector('#setup');
 const setupForm = document.querySelector('#setup-form');
 const playerChoices = document.querySelector('#player-choices');
-const startingLifeInput = document.querySelector('#starting-life');
 const lifePresets = document.querySelector('#life-presets');
-const lifeError = document.querySelector('#life-error');
+const customLifeButton = document.querySelector('#custom-life');
+const lifeStepper = document.querySelector('#life-stepper');
+const lifeValue = document.querySelector('#life-value');
+const trackButton = document.querySelector('#track-button');
+const trackSummary = document.querySelector('#track-summary');
+const trackDialog = document.querySelector('#track');
 const restart = document.querySelector('#restart');
 const privacy = document.querySelector('#privacy');
 const announcer = document.querySelector('#announcer');
@@ -80,6 +84,19 @@ const identityColours = [
 ];
 // Poison, casts and commander damage stop at this, which keeps every tile readable.
 const maxCount = 99;
+// The custom starting life stepper's range.
+const maxStartingLife = 999;
+// Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
+// tile. A drop step hides something on every tile (CSS reads its token from #board's data-drop); a floor step
+// shrinks the type, but no smaller than the floor; wrap lets the row take a second line, growing toward the total.
+// Steps for parts that don't exist yet (identity names and symbols, the turn chip) join these as they're built.
+const dropSteps = {
+  near: [{ floor: 11 }, { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true }],
+  far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
+};
+// A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
+// down by one can't make it blink.
+const dropSlack = 1.15;
 const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
 // Phosphor Icons (MIT, phosphoricons.com), Bold weight, for controls drawn by this script.
 const iconPaths = {
@@ -102,6 +119,12 @@ let editStartScores = [];
 let sheetOpener = null;
 let announceTimer;
 const pendingAnnouncements = new Map();
+// How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none.
+let dropLevels = { near: 0, far: 0 };
+let fitQueued = false;
+// Setup's starting life, before Done applies it, and whether Custom is chosen.
+let selectedLife = game.startingLife;
+let customLife = false;
 let diceSides = 20;
 let die;
 let stopRoll;
@@ -146,26 +169,117 @@ function boardTurn() {
 
 function syncBoardTurn() {
   document.querySelector('.app').dataset.boardTurn = String(boardTurn());
-  fitAllBadges();
+  measureBoard();
 }
 
-// Keeps a badge row on one line whatever the font's width: a row wider than its tile shrinks its type, and
-// with it the chips' padding, until every chip fits. Rows that aren't shown are fitted when they next are.
-function fitBadgeRow(row) {
-  row.style.removeProperty('font-size');
-  if (row.hidden || row.offsetParent === null || row.childElementCount === 0) return;
-  const room = row.clientWidth;
-  const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
-  const width = () => [...row.children].reduce((sum, chip) => sum + chip.offsetWidth, 0) + gap * (row.childElementCount - 1);
-  let size = parseFloat(getComputedStyle(row).fontSize);
-  for (let step = 0; step < 10 && width() > room && size > 6; step++) {
-    size = Math.max(6, Math.floor(size * Math.min(room / width(), 0.97) * 10) / 10);
-    row.style.fontSize = `${size}px`;
+// One size per board (design/polish/SPEC.md §3.1): every tile draws its content at the size that fits the smallest
+// tile. --ui and --ub are the smallest tile face's width and height, and CSS sizes tile content from them instead of
+// from each tile's own size. The flags set the board-wide thresholds that hide mode hints and pick layouts.
+function measureBoard() {
+  const faces = [...board.querySelectorAll('.player-face')];
+  if (!faces.length) return;
+  const width = Math.min(...faces.map(face => face.offsetWidth));
+  const height = Math.min(...faces.map(face => face.offsetHeight));
+  if (!width || !height) return;
+  board.style.setProperty('--ui', `${width}px`);
+  board.style.setProperty('--ub', `${height}px`);
+  board.toggleAttribute('data-narrow', width < 240);
+  board.toggleAttribute('data-short', height < 200);
+  board.toggleAttribute('data-wide', width >= 264);
+  syncBoardDigits();
+  requestFit();
+}
+
+// The most digits in any total, at least 2. A three-digit total shrinks every total together.
+function syncBoardDigits() {
+  const digits = String(Math.max(2, ...game.scores.map(score => String(score).length)));
+  if (board.style.getPropertyValue('--board-digits') !== digits) board.style.setProperty('--board-digits', digits);
+}
+
+// Badge rows are fitted once whatever changed them has finished, so a loop over the tiles fits only the end result.
+function requestFit() {
+  if (fitQueued) return;
+  fitQueued = true;
+  queueMicrotask(fitBadgeRows);
+}
+
+function fitBadgeRows() {
+  fitQueued = false;
+  fitBadgeSide('near');
+  fitBadgeSide('far');
+}
+
+function syncDropTokens(levels) {
+  const tokens = Object.keys(dropSteps).flatMap(side => dropTokens(side, levels[side]));
+  if (tokens.length) board.dataset.drop = tokens.join(' ');
+  else delete board.dataset.drop;
+}
+
+// The drop tokens a side has at a level. A step that would hide nothing on the board is skipped.
+function dropTokens(side, level, rows = badgeRows(side)) {
+  return dropSteps[side].slice(0, level)
+    .filter(step => step.drop && (!step.selector || rows.some(row => row.querySelector(step.selector))))
+    .map(step => step.drop);
+}
+
+function badgeRows(side) {
+  return [...board.querySelectorAll(`.badges.${side}`)].filter(row => !row.hidden && row.offsetParent !== null && row.childElementCount);
+}
+
+// The chips' width at the row's current type, from the first chip shown to the last, gaps included.
+function chipsWidth(row) {
+  const chips = [...row.children].filter(chip => chip.offsetWidth);
+  if (!chips.length) return 0;
+  const last = chips.at(-1);
+  return last.offsetLeft + last.offsetWidth - chips[0].offsetLeft;
+}
+
+// Takes the fewest steps that make every row on one side of the board fit at the same type size. The busiest
+// tile decides for every tile, so the board stays uniform. A step already taken is only undone when the rows
+// would fit without it with 15% to spare.
+function fitBadgeSide(side) {
+  const rows = badgeRows(side);
+  const property = `--${side}-badge-size`;
+  board.style.removeProperty(property);
+  if (!rows.length) {
+    syncDropTokens(dropLevels);
+    return;
   }
-}
-
-function fitAllBadges() {
-  for (const row of document.querySelectorAll('.badges')) fitBadgeRow(row);
+  const steps = dropSteps[side];
+  const base = parseFloat(getComputedStyle(rows[0]).fontSize);
+  const measure = (level) => {
+    syncDropTokens({ ...dropLevels, [side]: level });
+    const taken = steps.slice(0, level);
+    const floors = taken.filter(step => step.floor).map(step => step.floor);
+    return {
+      // A pixel to spare absorbs the rounding of each chip's width.
+      ratio: Math.min(...rows.map(row => (row.clientWidth - 1) / Math.max(1, chipsWidth(row)))),
+      floor: floors.length ? Math.min(...floors) : null,
+      wrap: taken.some(step => step.wrap),
+    };
+  };
+  const fits = (state, slack) => state.wrap || state.ratio >= slack || (state.floor !== null && base * state.ratio / slack >= state.floor);
+  let needed = 0;
+  let state = measure(0);
+  while (!fits(state, 1) && needed < steps.length) state = measure(++needed);
+  let level = needed;
+  const current = dropLevels[side];
+  if (needed < current) {
+    const kept = dropTokens(side, current, rows).length;
+    level = current;
+    for (let candidate = needed; candidate < current; candidate++) {
+      if (dropTokens(side, candidate, rows).length === kept || fits(measure(candidate), dropSlack)) {
+        level = candidate;
+        break;
+      }
+    }
+  }
+  dropLevels = { ...dropLevels, [side]: level };
+  state = measure(level);
+  // A wrapped row keeps its full type, since it has a second line to use.
+  if (!state.wrap && state.ratio < 1 && state.floor !== null) {
+    board.style.setProperty(property, `${Math.max(state.floor, Math.floor(base * state.ratio * 10) / 10)}px`);
+  }
 }
 
 function seatRow(index) {
@@ -295,9 +409,10 @@ function cancelPresses() {
 // A press counts the moment a finger lands, so a tap can't be lost to a finger drifting off the button
 // or to Android cancelling touches when several fingers land at once. Holding repeats after a pause.
 // Clicks still handle keyboards and assistive technology.
+// adjust gets how long the press has been held, in milliseconds (0 for a tap or a click).
 function bindCounter(button, adjust, label) {
   button.setAttribute('aria-label', label);
-  const tile = button.closest('.player');
+  const tile = button.closest('.player') ?? button;
   let press;
   let ignoreClicksUntil = 0;
 
@@ -307,6 +422,7 @@ function bindCounter(button, adjust, label) {
     press?.end();
     const current = {
       pointerId: event.pointerId,
+      start: performance.now(),
       end() {
         clearTimeout(current.timer);
         activePresses.delete(current);
@@ -316,14 +432,14 @@ function bindCounter(button, adjust, label) {
       },
     };
     function repeat() {
-      adjust();
+      adjust(performance.now() - current.start);
       current.timer = setTimeout(repeat, 100);
     }
     press = current;
     activePresses.add(current);
     button.dataset.pressed = '';
     ignoreClicksUntil = performance.now() + 800;
-    adjust();
+    adjust(0);
     current.timer = setTimeout(repeat, 500);
     try {
       button.setPointerCapture(event.pointerId);
@@ -350,7 +466,7 @@ function bindCounter(button, adjust, label) {
   button.addEventListener('contextmenu', (event) => event.preventDefault());
   // Skip the click that follows a press already counted on pointerdown. Keyboard clicks have no detail.
   button.addEventListener('click', (event) => {
-    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) adjust();
+    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) adjust(0);
   });
 }
 
@@ -443,8 +559,8 @@ function layoutBoard() {
     player.style.gridArea = seat;
     player.dataset.edge = clockwiseEdges[turn];
   }
-  // A rotated seat changes its tile's width.
-  fitAllBadges();
+  // A rotated seat changes its tile's size, and the board's size follows the smallest tile.
+  measureBoard();
 }
 
 function paintColours() {
@@ -746,7 +862,7 @@ function showEdit(edit) {
     announceLife(index);
     syncSeatMap(index);
   }
-  syncCounterRows(index);
+  syncCounterCells(index);
   renderScore(index);
   renderBadges(index);
   syncPill();
@@ -777,35 +893,33 @@ function stepCount(kind, index, delta) {
   if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
 }
 
-// A counter row laid out like the life controls: − on the reader's left, the count, + on the right.
-function buildCounterRow(kind, index) {
+// A counter cell: a circle with the counter's icon over its count. A tap adds one, and holding takes one away
+// with repeats, as on the commander damage map. A visually hidden button beside it takes one away for keyboards
+// and screen readers.
+function buildCounterCell(kind, index) {
   const name = `Player ${index + 1}`;
-  const [subtract, add] = ['minus', 'plus'].map((glyph) => {
-    const button = element('button', '', icon(glyph));
-    button.type = 'button';
-    return button;
-  });
-  const value = element('output', 'counter-value', kind === 'poison' ? manaIcon('infect') : icon('crown'), element('b'));
-  value.dataset.kind = kind;
-  const row = element('div', 'counter-row', subtract, value, add);
-  if (kind === 'poison') {
-    bindCounter(subtract, () => stepCount('poison', index, -1), `Remove one poison counter from ${name}`);
-    bindCounter(add, () => stepCount('poison', index, 1), `Add one poison counter to ${name}`);
-  } else {
-    bindCounter(subtract, () => stepCount('casts', index, -1), `Remove one commander cast from ${name}`);
-    bindCounter(add, () => stepCount('casts', index, 1), `Add one commander cast for ${name}`);
-  }
-  return row;
+  const cell = element('button', 'counter-cell', kind === 'poison' ? manaIcon('infect') : icon('crown'), element('b'));
+  cell.type = 'button';
+  cell.dataset.kind = kind;
+  const remove = element('button', 'visually-hidden counter-remove');
+  remove.type = 'button';
+  remove.setAttribute('aria-label', kind === 'poison' ? `Remove one poison counter from ${name}` : `Remove one commander cast from ${name}`);
+  remove.addEventListener('click', () => stepCount(kind, index, -1));
+  bindSeat(cell, () => stepCount(kind, index, 1), () => stepCount(kind, index, -1));
+  return [cell, remove];
 }
 
-function syncCounterRows(index) {
-  const layer = board.children[index]?.querySelector('.counter-rows');
+function syncCounterCells(index) {
+  const layer = board.children[index]?.querySelector('.counter-cells');
   if (!layer) return;
-  for (const value of layer.querySelectorAll('.counter-value')) {
-    const poison = value.dataset.kind === 'poison';
-    value.querySelector('b').textContent = poison ? game.poison[index] : `+${game.casts[index] * 2}`;
-    value.setAttribute('aria-label', poison ? `${game.poison[index]} poison`
-      : `Commander tax ${game.casts[index] * 2}, ${game.casts[index]} ${game.casts[index] === 1 ? 'cast' : 'casts'}`);
+  for (const cell of layer.querySelectorAll('.counter-cell')) {
+    const name = `Player ${index + 1}`;
+    const casts = game.casts[index];
+    const value = cell.dataset.kind === 'poison' ? game.poison[index] : casts;
+    cell.querySelector('b').textContent = cell.dataset.kind === 'poison' ? value : `+${value * 2}`;
+    cell.toggleAttribute('data-zero', value === 0);
+    cell.setAttribute('aria-label', cell.dataset.kind === 'poison' ? `${name} poison, ${value}. Add one`
+      : `${name} commander tax, ${casts * 2}, ${casts} ${casts === 1 ? 'cast' : 'casts'}. Add one cast`);
   }
 }
 
@@ -830,14 +944,17 @@ function renderModeLayer(player, index) {
     hint.setAttribute('aria-hidden', 'true');
     layer.append(hint, buildSeatMap(index));
   } else if (boardMode === 'counters') {
-    const rows = element('div', 'counter-rows');
-    if (game.counters.poison) rows.append(buildCounterRow('poison', index));
-    if (game.counters.commander) rows.append(buildCounterRow('casts', index));
-    layer.append(rows);
+    // One circle per counter that's on, three to a row, in the order poison, then tax.
+    const hint = element('p', 'layer-hint', 'Tap +1 · hold −1');
+    hint.setAttribute('aria-hidden', 'true');
+    const cells = element('div', 'counter-cells');
+    if (game.counters.poison) cells.append(...buildCounterCell('poison', index));
+    if (game.counters.commander) cells.append(...buildCounterCell('casts', index));
+    layer.append(hint, cells);
   }
   layer.hidden = layer.childElementCount === 0;
   syncIdentity();
-  syncCounterRows(index);
+  syncCounterCells(index);
   syncSeatMap(index);
 }
 
@@ -878,7 +995,6 @@ function renderBadges(index) {
     return chip;
   }));
   far.hidden = damage.length === 0;
-  fitBadgeRow(far);
   const near = player.querySelector('.badges.near');
   const chips = [];
   const identity = game.counters.commander ? game.identities[index] : '';
@@ -902,7 +1018,7 @@ function renderBadges(index) {
   for (const chip of chips) chip.setAttribute('role', 'listitem');
   near.replaceChildren(...chips);
   near.hidden = chips.length === 0;
-  fitBadgeRow(near);
+  requestFit();
 }
 
 // The centre pill: commander damage (when Commander is on), counters (when a counter is on), dice and setup
@@ -960,7 +1076,7 @@ function setBoardMode(mode) {
     else delete node.dataset.mode;
   }
   // The badges were hidden while the mode was open, so they're measured now that they show again.
-  fitAllBadges();
+  requestFit();
   setupButton.setAttribute('aria-label', mode ? doneLabels[mode] ?? 'Game setup' : 'Game setup');
   setupButton.setAttribute('aria-haspopup', mode ? 'false' : 'dialog');
   setupButton.querySelector('.setup-icon').hidden = mode !== null;
@@ -1005,7 +1121,7 @@ function renderScore(index) {
   const value = String(game.scores[index]).replace('-', '−');
   score.value = value;
   score.setAttribute('aria-label', `${game.scores[index]} life`);
-  score.style.setProperty('--digits', value.length);
+  syncBoardDigits();
   score.toggleAttribute('data-out', isOut(index));
 }
 
@@ -1062,36 +1178,42 @@ function startGame(playerCount, startingLife) {
   game.scores = Array(playerCount).fill(startingLife);
   // A new game takes the screen's current landscape as upright.
   game.landscapeAngle = currentLandscapeAngle();
+  // A new game starts with every badge at full size.
+  dropLevels = { near: 0, far: 0 };
   saveGame();
   syncBoardTurn();
   renderBoard();
 }
 
-function readStartingLife() {
-  const value = startingLifeInput.value.trim();
-  const number = Number(value);
-  return /^\d+$/.test(value) && Number.isSafeInteger(number) && number > 0 ? number : null;
+function setupChangesGame() {
+  return selectedPlayerCount !== game.scores.length || selectedLife !== game.startingLife;
 }
 
-function setupChangesGame() {
-  return selectedPlayerCount !== game.scores.length || readStartingLife() !== game.startingLife;
+// Track's summary: the icon of each tracker that's on.
+function renderTrackSummary() {
+  const icons = [];
+  if (game.counters.commander) icons.push(icon('sword'));
+  if (game.counters.poison) icons.push(manaIcon('infect'));
+  trackSummary.replaceChildren(...icons);
 }
 
 function renderSetup() {
   for (const choice of playerChoices.children) {
     choice.setAttribute('aria-pressed', String(Number(choice.value) === selectedPlayerCount));
   }
-  for (const preset of lifePresets.children) {
-    preset.setAttribute('aria-pressed', String(Number(preset.dataset.life) === readStartingLife()));
-  }
+  // Custom is chosen when the player picks it, or when the life isn't one of the presets, such as an old save at 25.
+  const presets = [...lifePresets.querySelectorAll('[data-life]')];
+  const custom = customLife || !presets.some(preset => Number(preset.dataset.life) === selectedLife);
+  for (const preset of presets) preset.setAttribute('aria-pressed', String(!custom && Number(preset.dataset.life) === selectedLife));
+  customLifeButton.hidden = custom;
+  lifeStepper.hidden = !custom;
+  lifeValue.textContent = selectedLife;
   const changesGame = setupChangesGame();
   document.querySelector('#save-setup').textContent = changesGame ? 'Start new game' : 'Done';
   document.querySelector('#restart-button').hidden = changesGame;
   rotateSeatsButton.hidden = changesGame;
   tileColoursButton.hidden = changesGame;
-  lifeError.hidden = true;
-  startingLifeInput.removeAttribute('aria-invalid');
-  startingLifeInput.removeAttribute('aria-describedby');
+  renderTrackSummary();
 }
 
 for (const count of playerCounts) {
@@ -1107,24 +1229,38 @@ for (const count of playerCounts) {
   playerChoices.append(choice);
 }
 
-for (const preset of lifePresets.children) {
+for (const preset of lifePresets.querySelectorAll('[data-life]')) {
   preset.addEventListener('click', () => {
-    startingLifeInput.value = preset.dataset.life;
+    selectedLife = Number(preset.dataset.life);
+    customLife = false;
     renderSetup();
   });
 }
+// Custom becomes the stepper, starting at the current value.
+customLifeButton.addEventListener('click', () => {
+  customLife = true;
+  renderSetup();
+  document.querySelector('#life-up').focus();
+});
+// The stepper counts 1 to 999. Holding repeats ten times a second, in steps of 5 once held for a second.
+function stepStartingLife(direction, held) {
+  const next = Math.min(maxStartingLife, Math.max(1, selectedLife + direction * (held >= 1000 ? 5 : 1)));
+  if (next === selectedLife) return;
+  selectedLife = next;
+  renderSetup();
+}
+bindCounter(document.querySelector('#life-down'), held => stepStartingLife(-1, held), 'Less starting life');
+bindCounter(document.querySelector('#life-up'), held => stepStartingLife(1, held), 'More starting life');
 
-startingLifeInput.addEventListener('input', renderSetup);
 setupButton.addEventListener('click', () => {
   if (boardMode) {
     setBoardMode(null);
     return;
   }
   selectedPlayerCount = game.scores.length;
-  startingLifeInput.value = game.startingLife;
+  selectedLife = game.startingLife;
+  customLife = false;
   wakeInput.checked = game.keepAwake;
-  commanderSwitch.checked = game.counters.commander;
-  poisonSwitch.checked = game.counters.poison;
   renderSetup();
   setup.showModal();
   syncBackHandling();
@@ -1140,6 +1276,27 @@ privacy.addEventListener('close', () => {
   setup.showModal();
   syncBackHandling();
 });
+// Track replaces setup, keeping setup's unsaved choices. ‹, Escape and Android back return to setup; ✕ closes both.
+trackButton.addEventListener('click', () => {
+  commanderSwitch.checked = game.counters.commander;
+  poisonSwitch.checked = game.counters.poison;
+  trackDialog.returnValue = '';
+  setup.close();
+  trackDialog.showModal();
+  syncBackHandling();
+});
+trackDialog.querySelector('[data-back]').addEventListener('click', () => trackDialog.close('back'));
+trackDialog.querySelector('[data-close]').addEventListener('click', () => trackDialog.close('close'));
+trackDialog.addEventListener('close', () => {
+  if (trackDialog.returnValue === 'close') {
+    setupButton.focus();
+  } else {
+    renderSetup();
+    setup.showModal();
+    trackButton.focus();
+  }
+  syncBackHandling();
+});
 rotateSeatsButton.addEventListener('click', () => {
   setup.close();
   setBoardMode('rotate');
@@ -1150,15 +1307,7 @@ tileColoursButton.addEventListener('click', () => {
 });
 setupForm.addEventListener('submit', (event) => {
   event.preventDefault();
-  const startingLife = readStartingLife();
-  if (startingLife === null) {
-    lifeError.hidden = false;
-    startingLifeInput.setAttribute('aria-invalid', 'true');
-    startingLifeInput.setAttribute('aria-describedby', 'life-error');
-    startingLifeInput.focus();
-    return;
-  }
-  if (setupChangesGame()) startGame(selectedPlayerCount, startingLife);
+  if (setupChangesGame()) startGame(selectedPlayerCount, selectedLife);
   setup.close();
 });
 
@@ -1281,6 +1430,8 @@ window.screen.orientation?.addEventListener?.('change', syncBoardTurn);
 window.addEventListener('orientationchange', syncBoardTurn);
 window.addEventListener('resize', syncBoardTurn);
 portraitQuery.addEventListener('change', syncBoardTurn);
+// The board's size can also change without a resize event, such as when a browser's toolbar slides away.
+if (window.ResizeObserver) new ResizeObserver(measureBoard).observe(board);
 syncBoardTurn();
 renderBoard();
 syncPill();

@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, setSwitches, startGame, turnScreen } from './helpers.mjs';
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
-const count = (page, number, kind) => tile(page, number).locator(`.counter-value[data-kind="${kind}"] b`).textContent();
+const cell = (page, number, kind) => tile(page, number).locator(`.counter-cell[data-kind="${kind}"]`);
+const count = (page, number, kind) => cell(page, number, kind).locator('b').textContent();
+// The visually hidden button beside each cell takes one away for keyboards and screen readers.
+const removeOne = (page, name) => page.getByRole('button', { name, exact: true }).evaluate(remove => remove.click());
 const nearBadges = (page, number) => tile(page, number).locator('.badges.near')
   .evaluate(row => (row.hidden ? '' : [...row.children].map(chip => chip.textContent).join(' | ')));
 const mode = page => page.locator('#board').getAttribute('data-mode');
@@ -32,15 +35,6 @@ async function openPage(t, engine, options = {}) {
   return page;
 }
 
-async function setSwitches(page, wanted) {
-  await button(page, 'Game setup').tap();
-  for (const [name, on] of Object.entries(wanted)) {
-    const input = page.getByRole('switch', { name, exact: true });
-    if ((await input.isChecked()) !== on) await page.locator('#setup label', { has: input }).tap();
-  }
-  await button(page, 'Close setup').tap();
-}
-
 // Chromium writes page storage in the background, so give a write a moment to land before a reload.
 async function reload(page) {
   await page.waitForTimeout(500);
@@ -58,10 +52,12 @@ async function checkCountersMode(t, engine) {
   await reload(page);
   assert.ok(await button(page, 'Counters').isVisible(), 'the switch is saved');
 
-  // With only Poison on, each tile has a poison row and the colour button.
+  // With only Poison on, each tile has one circle: the poison count under its icon.
   await button(page, 'Counters').tap();
   assert.equal(await mode(page), 'counters');
-  assert.equal(await page.locator('.counter-row').count(), 4);
+  assert.equal(await page.locator('.counter-cell').count(), 4);
+  assert.equal(await cell(page, 1, 'poison').locator('.mana-icon[data-glyph="infect"]').count(), 1, 'the infect symbol over the count');
+  assert.equal(await cell(page, 1, 'poison').evaluate(node => getComputedStyle(node).borderRadius), '50%', 'cells are circles');
   assert.equal(await count(page, 1, 'poison'), '0');
   assert.ok(await button(page, 'Undo').isDisabled(), 'Undo is dimmed until something changes');
   assert.ok(!(await button(page, 'Roll dice').isVisible()) && !(await button(page, 'Game setup').isVisible()));
@@ -69,18 +65,21 @@ async function checkCountersMode(t, engine) {
   assert.equal(await mode(page), null, '✕ with no changes closes straight away');
   assert.ok(!(await isOpen(page, 'discard')));
 
-  // Commander adds a tax row. Tax + adds one cast, shown as 2 × casts.
+  // Commander adds a tax circle after poison. A tap on a cell adds one: one cast is +2 tax.
   await setSwitches(page, { Commander: true });
   await button(page, 'Counters').tap();
-  assert.equal(await page.locator('.counter-row').count(), 8);
-  await button(page, 'Add one poison counter to Player 3').tap();
-  await button(page, 'Add one poison counter to Player 3').tap();
-  await button(page, 'Add one commander cast for Player 1').tap();
-  await button(page, 'Add one commander cast for Player 1').tap();
+  assert.equal(await page.locator('.counter-cell').count(), 8);
+  assert.deepEqual(await tile(page, 1).locator('.counter-cell').evaluateAll(cells => cells.map(node => node.dataset.kind)), ['poison', 'casts']);
+  await cell(page, 3, 'poison').tap();
+  await cell(page, 3, 'poison').tap();
+  await cell(page, 1, 'casts').tap();
+  await cell(page, 1, 'casts').tap();
   assert.equal(await count(page, 3, 'poison'), '2');
   assert.equal(await count(page, 1, 'casts'), '+4');
-  // − at 0 does nothing and isn't a change.
-  await button(page, 'Remove one poison counter from Player 2').tap();
+  assert.equal(await cell(page, 3, 'poison').getAttribute('aria-label'), 'Player 3 poison, 2. Add one');
+  assert.equal(await cell(page, 1, 'casts').getAttribute('aria-label'), 'Player 1 commander tax, 4, 2 casts. Add one cast');
+  // Taking one away at 0 does nothing and isn't a change.
+  await removeOne(page, 'Remove one poison counter from Player 2');
   assert.equal(await count(page, 2, 'poison'), '0');
 
   // Undo steps back one change at a time.
@@ -108,15 +107,22 @@ async function checkCountersMode(t, engine) {
   await button(page, 'Counters').tap();
   assert.equal(await count(page, 3, 'poison'), '0', 'the discard is saved');
 
-  // Holding + repeats, like the life buttons.
-  const plus = await button(page, 'Add one poison counter to Player 4').boundingBox();
-  await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
+  // Holding a cell takes one away once the hold registers, then repeats; a hold never adds.
+  for (let tap = 0; tap < 9; tap++) await cell(page, 4, 'poison').tap();
+  assert.equal(await count(page, 4, 'poison'), '9');
+  const box = await cell(page, 4, 'poison').boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(250);
+  assert.equal(await count(page, 4, 'poison'), '9', 'nothing changes before the hold registers');
+  assert.ok(await cell(page, 4, 'poison').evaluate(node => node.hasAttribute('data-pressed')), 'a held cell looks pressed');
+  await page.waitForTimeout(650);
   await page.mouse.up();
   const held = Number(await count(page, 4, 'poison'));
-  assert.ok(held >= 4, `a hold repeats: ${held}`);
-  await button(page, 'Add one commander cast for Player 2').tap();
+  assert.ok(held <= 6 && held >= 1, `a hold takes one away and repeats: ${held}`);
+  await page.waitForTimeout(300);
+  assert.equal(Number(await count(page, 4, 'poison')), held, 'lifting ends the hold without adding');
+  await cell(page, 2, 'casts').tap();
 
   // The check mark saves. The near row shows poison and tax, only where they're above zero.
   await button(page, 'Save').tap();
@@ -159,14 +165,14 @@ async function checkIdentity(t, engine) {
   assert.equal(await page.locator('.player :is(.identity, .identity-button)').count(), 0, 'no identity without Commander');
   await button(page, 'Done choosing colours').tap();
   await button(page, 'Counters').tap();
-  assert.equal(await page.locator('.mode-layer button').count(), 8, 'only the poison steppers');
+  assert.equal(await page.locator('.mode-layer .counter-cell').count(), 4, 'only the poison cells');
   assert.equal(await page.locator('.palette-button, .mode-layer .swatch, .mode-layer .identity-toggle').count(), 0, 'no colour button in counters mode');
   await button(page, 'Cancel').tap();
 
   // With Commander on, a 4-player tile has room for the five toggles beside its swatches.
   await setSwitches(page, { Commander: true });
   await button(page, 'Counters').tap();
-  assert.equal(await page.locator('.mode-layer button').count(), 16, 'poison and tax steppers only');
+  assert.equal(await page.locator('.mode-layer .counter-cell').count(), 8, 'poison and tax cells only');
   await button(page, 'Cancel').tap();
   await openColours(page);
   const group = page.getByRole('group', { name: 'Colour identity for Player 3' });
@@ -242,7 +248,7 @@ async function checkIdentity(t, engine) {
 
   // A new game resets the counts and keeps the switches, colours and identities.
   await button(page, 'Counters').tap();
-  await button(page, 'Add one poison counter to Player 3').tap();
+  await cell(page, 3, 'poison').tap();
   await button(page, 'Save').tap();
   await button(page, 'Game setup').tap();
   await button(page, 'New game').tap();
@@ -309,7 +315,7 @@ test('chromium: counters mode fits six players on the smallest phone', { timeout
     const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
     return [...document.querySelectorAll('.player')].flatMap((player, index) => {
       const bounds = player.getBoundingClientRect();
-      return [...player.querySelectorAll('.mode-layer button')].map((target) => {
+      return [...player.querySelectorAll('.mode-layer .counter-cell')].map((target) => {
         const box = target.getBoundingClientRect();
         const issues = [];
         if (Math.min(box.width, box.height) < 43.5) issues.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
@@ -322,44 +328,15 @@ test('chromium: counters mode fits six players on the smallest phone', { timeout
     });
   });
   assert.deepEqual(problems, []);
-  assert.equal(await page.locator('.mode-layer button').count(), 24, 'two rows of steppers per tile');
+  assert.equal(await page.locator('.mode-layer .counter-cell').count(), 12, 'two cells per tile');
 
-  // Setup with the Counters group still fits the smallest landscape phone.
+  // Setup still fits the smallest landscape phone.
   await button(page, 'Cancel').tap();
   await turnScreen(page, 568, 320, 90);
   await button(page, 'Game setup').tap();
   const setupBox = await page.locator('#setup').boundingBox();
   assert.ok(setupBox.y >= 0 && setupBox.y + setupBox.height <= 320, `setup fits: ${JSON.stringify(setupBox)}`);
 });
-
-// Game setup fits landscape phones without scrolling, from the smallest to a Pixel 10 Pro, with both Counters
-// switches, New game and Done on screen.
-async function checkSetupFits(t, engine) {
-  const page = await openPage(t, engine);
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  for (const [width, height] of [[952, 427], [852, 393], [568, 320]]) {
-    await turnScreen(page, width, height, 90);
-    await button(page, 'Game setup').tap();
-    const problems = await page.locator('#setup').evaluate((dialog) => {
-      const found = [];
-      if (dialog.scrollHeight > dialog.clientHeight + 0.5) found.push(`scrolls ${dialog.scrollHeight} > ${dialog.clientHeight}`);
-      const sheet = dialog.getBoundingClientRect();
-      if (sheet.top < 0 || sheet.bottom > window.innerHeight) found.push(`sheet ${sheet.top}–${sheet.bottom}`);
-      for (const selector of ['label:has(#commander-switch)', 'label:has(#poison-switch)', '#restart-button', '#save-setup']) {
-        const box = dialog.querySelector(selector).getBoundingClientRect();
-        if (box.top < sheet.top || box.bottom > sheet.bottom || box.left < sheet.left || box.right > sheet.right) found.push(`${selector} off the sheet`);
-      }
-      return found;
-    });
-    assert.deepEqual(problems, [], `${width} × ${height}`);
-    await button(page, 'Close setup').tap();
-  }
-}
-
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: game setup fits landscape phones without scrolling`, { timeout: 60000 }, t => checkSetupFits(t, engine));
-}
 
 test('chromium: Android back cancels counters mode the way ✕ does', async (t) => {
   const page = await openPage(t, chromium);
@@ -385,7 +362,7 @@ test('chromium: Android back cancels counters mode the way ✕ does', async (t) 
   assert.equal(await handling(), false);
 
   await button(page, 'Counters').tap();
-  await button(page, 'Add one poison counter to Player 2').tap();
+  await cell(page, 2, 'poison').tap();
   assert.equal(await back(), true);
   assert.ok(await isOpen(page, 'discard'), 'back with changes asks first');
   assert.equal(await page.locator('#discard-title').textContent(), 'Discard 1 change?');

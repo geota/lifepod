@@ -39,3 +39,14 @@ export async function startGame(page, count) {
 export function scores(page) {
   return page.locator('.score').evaluateAll(outputs => outputs.map(output => Number(output.value.replace('−', '-'))));
 }
+
+// Sets tracker switches in Setup → Track, then closes setup. Each switch saves the moment it changes.
+export async function setSwitches(page, wanted) {
+  await button(page, 'Game setup').tap();
+  await button(page, 'Track').tap();
+  for (const [name, on] of Object.entries(wanted)) {
+    const input = page.getByRole('switch', { name, exact: true });
+    if ((await input.isChecked()) !== on) await page.locator('#track label', { has: input }).tap();
+  }
+  await button(page, 'Close setup').tap();
+}

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { chromium } from 'playwright-core';
+import { chromium, webkit } from 'playwright-core';
 import { app, button, fakeScreenOrientation, scores, turnScreen } from './helpers.mjs';
 
 // Chromium is the only engine Playwright can drive with several simultaneous touches.
@@ -158,9 +158,8 @@ test('chromium: a life total at 0 or below turns red', async (t) => {
   t.after(() => browser.close());
   const page = await browser.newPage({ isMobile: true, hasTouch: true });
   await page.goto(app);
-  await button(page, 'Game setup').tap();
-  await page.locator('#starting-life').fill('1');
-  await page.locator('#save-setup').tap();
+  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 1, scores: [1, 1, 1, 1] })));
+  await page.reload();
   const score = page.locator('.player:nth-child(1) .score');
   const color = () => score.evaluate(output => getComputedStyle(output).color);
   const normal = await color();
@@ -177,3 +176,35 @@ test('chromium: a life total at 0 or below turns red', async (t) => {
   assert.equal(await color(), normal, 'back above zero is the usual colour');
   assert.equal(await page.locator('.score[data-out]').count(), 0, 'no other total is red');
 });
+
+// Style B: the life halves have no button chrome. A press washes the pressed half in the seat colour, rounded on
+// its inner corners, and lights its glyph, only while the finger is down.
+async function checkWash(t, engine) {
+  const browser = await engine.launch();
+  t.after(() => browser.close());
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
+  await page.goto(app);
+  const look = (name) => button(page, name).evaluate((half) => {
+    const wash = getComputedStyle(half, '::after');
+    return {
+      chrome: `${getComputedStyle(half).borderTopWidth} ${getComputedStyle(half).backgroundColor}`,
+      wash: wash.backgroundColor, radius: wash.borderRadius, glyph: getComputedStyle(half).color,
+    };
+  });
+  const clear = 'rgba(0, 0, 0, 0)';
+  const add = await look('Add one life to Player 3');
+  assert.equal(add.chrome, `0px ${clear}`, 'no button chrome');
+  assert.equal(add.wash, clear, 'no wash at rest');
+  await button(page, 'Add one life to Player 3').dispatchEvent('pointerdown', { button: 0, pointerId: 7, isPrimary: true });
+  const pressed = await look('Add one life to Player 3');
+  assert.notEqual(pressed.wash, clear, 'pointerdown washes the half');
+  assert.equal(pressed.radius, '28px 0px 0px 28px', 'the + half is rounded on its inner corners');
+  assert.equal(pressed.glyph, 'rgb(243, 241, 229)', 'the glyph turns the text colour');
+  await button(page, 'Add one life to Player 3').dispatchEvent('pointerup', { button: 0, pointerId: 7, isPrimary: true });
+  assert.equal((await look('Add one life to Player 3')).wash, clear, 'the wash goes when the finger lifts');
+  await button(page, 'Subtract one life from Player 3').dispatchEvent('pointerdown', { button: 0, pointerId: 8, isPrimary: true });
+  assert.equal((await look('Subtract one life from Player 3')).radius, '0px 28px 28px 0px', 'the − half is rounded on its inner corners');
+}
+
+test('chromium: pressing a life half washes it in the seat colour', t => checkWash(t, chromium));
+test('webkit: pressing a life half washes it in the seat colour', t => checkWash(t, webkit));
