@@ -197,6 +197,7 @@ Each upload needs a higher build number than the last.
 ### Store listing
 
 - Screenshots: `store/app-store/` has 6.9-inch iPhone and 13-inch iPad sets.
+- Minimum: iOS and iPadOS 18.0. App Store Connect reads it from the build's deployment target (`ios/LifePod.xcodeproj`), so there's nothing to set in the listing.
 - Privacy policy: <https://github.com/geota/lifepod/blob/main/PRIVACY.md>. Privacy label: Data Not Collected.
 - Support URL: <https://github.com/geota/lifepod/issues>
 - Age rating: 4+. Price: free.

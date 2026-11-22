@@ -673,11 +673,6 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   background: color-mix(in oklab, var(--panel) 86%, var(--seat));
   box-shadow: inset 0 0 0 3px var(--seat);
 }
-/* WebViews from before color-mix() (iOS 16.0 and 16.1) get the nearest plain colours. */
-@supports not (color: color-mix(in oklab, red 50%, blue)) {
-  .player { --wash: var(--press-overlay); --cell-fill: var(--button); --cell-pressed: var(--surface-pressed); }
-  .board:not([data-mode]) .player[data-active] { background: var(--panel); }
-}
 
 /* One size per board (design/polish/SPEC.md §3.1): app.js sets --ui and --ub to the smallest tile face's width and
    height, and tile content is sized from u, a hundredth of --ui, instead of from each tile's own size. Every tile

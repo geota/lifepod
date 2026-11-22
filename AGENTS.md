@@ -8,7 +8,7 @@ Run `npm run check` before every commit. It runs ESLint, the compatibility lint,
 
 - **Offline, with no network.** The Android manifest has no `INTERNET` permission, and nothing may load from a URL. Bundle every file, including fonts and icons.
 - **The CSP is `default-src 'none'`** (the `<meta>` in `web/index.html`). There are no inline scripts, `style` attributes, `<style>` blocks or `on…` handlers. Styles go in `styles.css` or are set from script through `element.style`/CSSOM, and scripts are files.
-- **The floor is iOS 16.0 and Android 11.** WKWebView on iOS 16 is the binding limit, and the Android System WebView is treated as Chrome 111. CI's WebKit is current, so it doesn't catch newer features. `npm run lint:compat` does, through the `browserslist` in `package.json`. Feature-detect anything newer and give it a fallback. Don't raise the floor in passing.
+- **The floor is iOS 18.0 and Android 11.** WKWebView on iOS 18 (Safari 18.0) and the Android System WebView, treated as Chrome 111, are the binding limits; a feature needs both. CI's WebKit is current, so it doesn't catch newer features. `npm run lint:compat` does, through the `browserslist` in `package.json`. Feature-detect anything newer and give it a fallback. Don't raise the floor in passing.
 - **Old saves must keep loading.** `loadGame` in `web/app.js` validates every field of the saved game and falls back to a default when a field is missing or wrong. Keep that for every new field. When a field's meaning changes, add a version and migrate older saves (see `identitySettingsVersion`). Never make an old save throw or reset the game.
 - **Every touch target is at least 44px** (`--tap-min`), at every board size down to the 320 × 568 stress test. Shrink type before a target shrinks.
 
