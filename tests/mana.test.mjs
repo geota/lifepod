@@ -7,6 +7,9 @@ import { app, button, seedGame, setSwitches, stripProblems } from './helpers.mjs
 // Floating mana (design/polish/SPEC.md §9): the Mana pool switch, mana mode, the strip at rest (spend, clear, undo
 // clear) and emptying pools when the turn passes.
 
+// Where a test's paused clock starts.
+const clockStart = Date.parse('2026-01-01T12:00:00Z');
+
 function savedGame(count, extra = {}) {
   return {
     startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, ...extra,
@@ -23,7 +26,12 @@ async function openPage(t, engine, { game, android = false, clock = false, viewp
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  if (clock) await page.clock.install();
+  // Installed, Playwright's clock still runs on with real time until it's paused, so a slow runner could spend a
+  // reminder's 3 seconds or "Undo clear"'s 5 between two steps. Paused, only the test's runFor moves it.
+  if (clock) {
+    await page.clock.install({ time: clockStart });
+    await page.clock.pauseAt(clockStart + 60000);
+  }
   if (android) {
     await page.addInitScript(() => {
       window.backHandling = [];
