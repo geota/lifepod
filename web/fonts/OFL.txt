@@ -1,5 +1,8 @@
 Copyright (c) Andrew Gioia (https://github.com/andrewgioia/mana).
 
+mana.woff2 here is a Modified Version: a subset of Mana 1.18 that keeps only the symbols
+LifePod draws, made by scripts/subset-mana.mjs from the original release in design/fonts/.
+
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
 https://openfontlicense.org

@@ -10,16 +10,19 @@
     "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift",
     "check": "npm run lint:web && npm run lint:compat && npm run lint:kotlin && npm run lint:ios && npm test",
     "test": "node --test",
-    "store:images": "node store/render.mjs"
+    "store:images": "node store/render.mjs",
+    "font:subset": "node scripts/subset-mana.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "eslint": "9.39.5",
     "eslint-plugin-compat": "7.0.2",
+    "fontkit": "2.0.4",
     "globals": "14.0.0",
     "playwright-core": "1.65.0",
     "stylelint": "18.1.0",
-    "stylelint-no-unsupported-browser-features": "8.1.2"
+    "stylelint-no-unsupported-browser-features": "8.1.2",
+    "subset-font": "2.9.0"
   },
   "browserslist": [
     "iOS >= 16",

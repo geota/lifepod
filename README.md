@@ -120,4 +120,4 @@ LifePod's own code is under the [MIT License](LICENSE). That covers the code onl
 
 LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
 
-The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, bundled as `web/fonts/mana.woff2` under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)).
+The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, bundled under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)). `web/fonts/mana.woff2` is a subset of Mana 1.18 with only the symbols LifePod draws, made by [`scripts/subset-mana.mjs`](scripts/subset-mana.mjs) from the original release in `design/fonts/`.

@@ -20,6 +20,10 @@ The page loading a new file isn't enough. List it in all three places, or it wil
 2. the `zip` line of the "Bundle offline web app" step in `.github/workflows/ci.yml`;
 3. the expected file list in `tests/native.test.mjs`, whose contract test checks the other two.
 
+## The Mana font
+
+`web/fonts/mana.woff2` is a subset with only the symbols the page draws. After adding or removing a Mana code point in `styles.css` or the scripts, run `npm run font:subset`, which rebuilds it from the original in `design/fonts/`. `tests/font.test.mjs` fails until you do.
+
 ## Tests
 
 - Tests use `node:test` with Playwright. Start every test name with `chromium:` or `webkit:`. CI runs each engine in its own job with `--test-name-pattern`, so a test without the prefix never runs in CI.
