@@ -81,7 +81,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
   test(`${name}: the dice roll every die and fit small screens`, { timeout: 60000 }, t => checkDice(t, engine));
 }
 
-test('rolls come from the cryptographic generator without favouring any face', async (t) => {
+test('chromium: rolls come from the cryptographic generator without favouring any face', async (t) => {
   const page = await openPage(t, chromium);
   // Every face of every die turns up, and nothing falls outside it.
   const counts = await page.evaluate(() => {

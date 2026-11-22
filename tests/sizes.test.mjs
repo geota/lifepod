@@ -184,8 +184,8 @@ async function checkSizes(t, engine) {
   }
 }
 
-test('the board fits and scales on small phones, foldables and tablets in Chromium', t => checkSizes(t, chromium));
-test('the board fits and scales on small phones, foldables and tablets in WebKit', t => checkSizes(t, webkit));
+test('chromium: the board fits and scales on small phones, foldables and tablets', t => checkSizes(t, chromium));
+test('webkit: the board fits and scales on small phones, foldables and tablets', t => checkSizes(t, webkit));
 
 // Game setup fits without scrolling from a 952 × 427 phone down to the 568 × 320 stress test, where the header folds
 // into the Players row. Every control is on the sheet and at least 44px, with Custom life's stepper too, and so
