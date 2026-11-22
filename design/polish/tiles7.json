@@ -1,0 +1,942 @@
+{
+ "today": {
+  "name": "Today",
+  "note": "The twelve shipped palettes.",
+  "names": [
+   "Sage",
+   "Sky",
+   "Coral",
+   "Violet",
+   "Amber",
+   "Teal",
+   "Rose",
+   "Indigo",
+   "Slate",
+   "Copper",
+   "Olive",
+   "Orchid"
+  ],
+  "set": {
+   "sage": {
+    "top": {
+     "panel": "#2f432f",
+     "rim": "#556e4e",
+     "seat": "#d3eeaa",
+     "button": "#233324"
+    },
+    "bottom": {
+     "panel": "#253725",
+     "rim": "#476548",
+     "seat": "#bde7bd",
+     "button": "#19281a"
+    }
+   },
+   "sky": {
+    "top": {
+     "panel": "#2c4352",
+     "rim": "#517187",
+     "seat": "#b6e0f7",
+     "button": "#21323e"
+    },
+    "bottom": {
+     "panel": "#1d3544",
+     "rim": "#3c6179",
+     "seat": "#b4e1ff",
+     "button": "#132632"
+    }
+   },
+   "coral": {
+    "top": {
+     "panel": "#523734",
+     "rim": "#8a5e59",
+     "seat": "#ffd2cc",
+     "button": "#3e2926"
+    },
+    "bottom": {
+     "panel": "#432a27",
+     "rim": "#7b4f44",
+     "seat": "#ffc7b2",
+     "button": "#301d1a"
+    }
+   },
+   "violet": {
+    "top": {
+     "panel": "#433a51",
+     "rim": "#726387",
+     "seat": "#e5d5fe",
+     "button": "#322b3d"
+    },
+    "bottom": {
+     "panel": "#342b41",
+     "rim": "#655179",
+     "seat": "#e4cff7",
+     "button": "#271f32"
+    }
+   },
+   "amber": {
+    "top": {
+     "panel": "#4a4024",
+     "rim": "#7f6d49",
+     "seat": "#f6de96",
+     "button": "#362e16"
+    },
+    "bottom": {
+     "panel": "#3a3119",
+     "rim": "#695b35",
+     "seat": "#ecd8a3",
+     "button": "#2a2310"
+    }
+   },
+   "teal": {
+    "top": {
+     "panel": "#254642",
+     "rim": "#42766f",
+     "seat": "#a8eee3",
+     "button": "#1b3531"
+    },
+    "bottom": {
+     "panel": "#1d3a36",
+     "rim": "#3f675d",
+     "seat": "#b4eddd",
+     "button": "#142925"
+    }
+   },
+   "rose": {
+    "top": {
+     "panel": "#573147",
+     "rim": "#915477",
+     "seat": "#ffcde8",
+     "button": "#422435"
+    },
+    "bottom": {
+     "panel": "#482339",
+     "rim": "#804568",
+     "seat": "#fec7e5",
+     "button": "#351829"
+    }
+   },
+   "indigo": {
+    "top": {
+     "panel": "#343b65",
+     "rim": "#5a65a7",
+     "seat": "#d4dcfe",
+     "button": "#262c4d"
+    },
+    "bottom": {
+     "panel": "#282e56",
+     "rim": "#4c5696",
+     "seat": "#cfd8fe",
+     "button": "#1b2040"
+    }
+   },
+   "slate": {
+    "top": {
+     "panel": "#3b4045",
+     "rim": "#646c76",
+     "seat": "#d3e0ec",
+     "button": "#2b3034"
+    },
+    "bottom": {
+     "panel": "#2d3238",
+     "rim": "#555d66",
+     "seat": "#cfdbe8",
+     "button": "#202428"
+    }
+   },
+   "copper": {
+    "top": {
+     "panel": "#563721",
+     "rim": "#8f5e3b",
+     "seat": "#ffd4b8",
+     "button": "#412917"
+    },
+    "bottom": {
+     "panel": "#472a14",
+     "rim": "#7f4f2d",
+     "seat": "#ffcfaf",
+     "button": "#341d0c"
+    }
+   },
+   "olive": {
+    "top": {
+     "panel": "#3b441a",
+     "rim": "#647331",
+     "seat": "#d4ea91",
+     "button": "#2c3312"
+    },
+    "bottom": {
+     "panel": "#2e360c",
+     "rim": "#566420",
+     "seat": "#d0e58d",
+     "button": "#202706"
+    }
+   },
+   "orchid": {
+    "top": {
+     "panel": "#503257",
+     "rim": "#865691",
+     "seat": "#f6ceff",
+     "button": "#3c2542"
+    },
+    "bottom": {
+     "panel": "#422448",
+     "rim": "#764780",
+     "seat": "#f4c8fe",
+     "button": "#301935"
+    }
+   }
+  }
+ },
+ "soft": {
+  "name": "Soft",
+  "note": "Muted: low chroma (0.045), so the board recedes and the numbers carry it. Lower chroma brings colours closer, so the eleven hues are re-spaced evenly round the circle and alternate between two lightness steps to stay apart.",
+  "names": [
+   "Coral",
+   "Copper",
+   "Olive",
+   "Lime",
+   "Jade",
+   "Teal",
+   "Sky",
+   "Azure",
+   "Violet",
+   "Orchid",
+   "Plum",
+   "Slate"
+  ],
+  "set": {
+   "sage": {
+    "top": {
+     "panel": "#553635",
+     "rim": "#8d5c5b",
+     "seat": "#ffd1d0",
+     "button": "#402827"
+    },
+    "bottom": {
+     "panel": "#462828",
+     "rim": "#7d4d4d",
+     "seat": "#fecbca",
+     "button": "#331c1c"
+    }
+   },
+   "sky": {
+    "top": {
+     "panel": "#493020",
+     "rim": "#7f573e",
+     "seat": "#fac7a8",
+     "button": "#352215"
+    },
+    "bottom": {
+     "panel": "#3b2314",
+     "rim": "#704930",
+     "seat": "#f6c3a4",
+     "button": "#29170b"
+    }
+   },
+   "coral": {
+    "top": {
+     "panel": "#4a3d22",
+     "rim": "#7c693e",
+     "seat": "#f4dba8",
+     "button": "#372e19"
+    },
+    "bottom": {
+     "panel": "#3c3015",
+     "rim": "#6d592f",
+     "seat": "#efd7a3",
+     "button": "#2c220d"
+    }
+   },
+   "violet": {
+    "top": {
+     "panel": "#343a1e",
+     "rim": "#5e673b",
+     "seat": "#cedaa5",
+     "button": "#252914"
+    },
+    "bottom": {
+     "panel": "#272d11",
+     "rim": "#50582d",
+     "seat": "#cad6a1",
+     "button": "#1a1e09"
+    }
+   },
+   "amber": {
+    "top": {
+     "panel": "#2d4633",
+     "rim": "#4f7658",
+     "seat": "#bcecc6",
+     "button": "#213425"
+    },
+    "bottom": {
+     "panel": "#203826",
+     "rim": "#406749",
+     "seat": "#b8e8c2",
+     "button": "#16291a"
+    }
+   },
+   "teal": {
+    "top": {
+     "panel": "#173e39",
+     "rim": "#306e66",
+     "seat": "#9de3d8",
+     "button": "#0e2d29"
+    },
+    "bottom": {
+     "panel": "#07312c",
+     "rim": "#1f5f57",
+     "seat": "#99dfd4",
+     "button": "#03211e"
+    }
+   },
+   "rose": {
+    "top": {
+     "panel": "#20454f",
+     "rim": "#3a7584",
+     "seat": "#a7ebfd",
+     "button": "#17343b"
+    },
+    "bottom": {
+     "panel": "#123741",
+     "rim": "#2a6574",
+     "seat": "#a3e6f9",
+     "button": "#0a282f"
+    }
+   },
+   "indigo": {
+    "top": {
+     "panel": "#24394d",
+     "rim": "#446586",
+     "seat": "#b1d8ff",
+     "button": "#182838"
+    },
+    "bottom": {
+     "panel": "#172b3f",
+     "rim": "#355676",
+     "seat": "#abd4fd",
+     "button": "#0d1d2c"
+    }
+   },
+   "slate": {
+    "top": {
+     "panel": "#3b3c57",
+     "rim": "#656790",
+     "seat": "#d8dbfe",
+     "button": "#2c2d41"
+    },
+    "bottom": {
+     "panel": "#2e2f48",
+     "rim": "#565880",
+     "seat": "#d3d6ff",
+     "button": "#212135"
+    }
+   },
+   "copper": {
+    "top": {
+     "panel": "#3f3047",
+     "rim": "#70577c",
+     "seat": "#e5c6f5",
+     "button": "#2e2134"
+    },
+    "bottom": {
+     "panel": "#322339",
+     "rim": "#60486c",
+     "seat": "#e1c2f0",
+     "button": "#221628"
+    }
+   },
+   "olive": {
+    "top": {
+     "panel": "#513544",
+     "rim": "#885c72",
+     "seat": "#fecee6",
+     "button": "#3d2733"
+    },
+    "bottom": {
+     "panel": "#432836",
+     "rim": "#774d63",
+     "seat": "#ffc7e3",
+     "button": "#311c27"
+    }
+   },
+   "orchid": {
+    "top": {
+     "panel": "#373b40",
+     "rim": "#60676e",
+     "seat": "#d0d9e3",
+     "button": "#282b2f"
+    },
+    "bottom": {
+     "panel": "#2a2e32",
+     "rim": "#51585f",
+     "seat": "#ccd5de",
+     "button": "#1c2023"
+    }
+   }
+  }
+ },
+ "jewel": {
+  "name": "Jewel",
+  "note": "Rich: panel chroma ×1.7 and accent chroma ×1.35, panels 0.01 darker to keep the red of a life total at 0 readable, so colours read as colours from across the table.",
+  "names": [
+   "Sage",
+   "Sky",
+   "Coral",
+   "Violet",
+   "Amber",
+   "Teal",
+   "Rose",
+   "Indigo",
+   "Slate",
+   "Copper",
+   "Olive",
+   "Orchid"
+  ],
+  "set": {
+   "sage": {
+    "top": {
+     "panel": "#204421",
+     "rim": "#447038",
+     "seat": "#cef293",
+     "button": "#16331a"
+    },
+    "bottom": {
+     "panel": "#173818",
+     "rim": "#316835",
+     "seat": "#b2ebb2",
+     "button": "#0c2810"
+    }
+   },
+   "sky": {
+    "top": {
+     "panel": "#15425b",
+     "rim": "#347096",
+     "seat": "#ade2fe",
+     "button": "#103045"
+    },
+    "bottom": {
+     "panel": "#01344d",
+     "rim": "#0f6089",
+     "seat": "#b4e1ff",
+     "button": "#012437"
+    }
+   },
+   "coral": {
+    "top": {
+     "panel": "#5b2d29",
+     "rim": "#995049",
+     "seat": "#fed2cd",
+     "button": "#44211d"
+    },
+    "bottom": {
+     "panel": "#4b211d",
+     "rim": "#8a402e",
+     "seat": "#fec7b3",
+     "button": "#351511"
+    }
+   },
+   "violet": {
+    "top": {
+     "panel": "#43335a",
+     "rim": "#745997",
+     "seat": "#e5d5fe",
+     "button": "#322544"
+    },
+    "bottom": {
+     "panel": "#35244a",
+     "rim": "#69458a",
+     "seat": "#e7ccfe",
+     "button": "#271839"
+    }
+   },
+   "amber": {
+    "top": {
+     "panel": "#4d3c03",
+     "rim": "#87671f",
+     "seat": "#fedd76",
+     "button": "#372b00"
+    },
+    "bottom": {
+     "panel": "#3c2d00",
+     "rim": "#6e5602",
+     "seat": "#f3d78d",
+     "button": "#2b2000"
+    }
+   },
+   "teal": {
+    "top": {
+     "panel": "#034741",
+     "rim": "#00796f",
+     "seat": "#90f3e5",
+     "button": "#01352f"
+    },
+    "bottom": {
+     "panel": "#013a35",
+     "rim": "#136a5a",
+     "seat": "#a2f2dc",
+     "button": "#022923"
+    }
+   },
+   "rose": {
+    "top": {
+     "panel": "#622049",
+     "rim": "#a4397c",
+     "seat": "#ffcde8",
+     "button": "#4a1636"
+    },
+    "bottom": {
+     "panel": "#520f3b",
+     "rim": "#91286d",
+     "seat": "#ffc7e5",
+     "button": "#3c082a"
+    }
+   },
+   "indigo": {
+    "top": {
+     "panel": "#2c327b",
+     "rim": "#505bc2",
+     "seat": "#d4dcfe",
+     "button": "#1f245e"
+    },
+    "bottom": {
+     "panel": "#21246b",
+     "rim": "#434bb1",
+     "seat": "#cfd8fe",
+     "button": "#151750"
+    }
+   },
+   "slate": {
+    "top": {
+     "panel": "#353e46",
+     "rim": "#5c6a7b",
+     "seat": "#cfe1f1",
+     "button": "#252e35"
+    },
+    "bottom": {
+     "panel": "#27303a",
+     "rim": "#4d5b6a",
+     "seat": "#cbdced",
+     "button": "#1b2229"
+    }
+   },
+   "copper": {
+    "top": {
+     "panel": "#5e2e01",
+     "rim": "#9d5104",
+     "seat": "#ffd4b8",
+     "button": "#462201"
+    },
+    "bottom": {
+     "panel": "#4a2401",
+     "rim": "#894400",
+     "seat": "#fecfb0",
+     "button": "#361801"
+    }
+   },
+   "olive": {
+    "top": {
+     "panel": "#374202",
+     "rim": "#5f7205",
+     "seat": "#d1ed6e",
+     "button": "#293102"
+    },
+    "bottom": {
+     "panel": "#2b3401",
+     "rim": "#526204",
+     "seat": "#cde86a",
+     "button": "#1d2501"
+    }
+   },
+   "orchid": {
+    "top": {
+     "panel": "#572164",
+     "rim": "#8f43a0",
+     "seat": "#f6ceff",
+     "button": "#41174c"
+    },
+    "bottom": {
+     "panel": "#491054",
+     "rim": "#7f328f",
+     "seat": "#f5c7ff",
+     "button": "#35093e"
+    }
+   }
+  }
+ },
+ "deep": {
+  "name": "Deep rows",
+  "note": "Stronger rows: the bottom row 0.05 darker in OKLCH (panel, rim and button), so the two sides of the table differ more by lightness, which colour-blind players see.",
+  "names": [
+   "Sage",
+   "Sky",
+   "Coral",
+   "Violet",
+   "Amber",
+   "Teal",
+   "Rose",
+   "Indigo",
+   "Slate",
+   "Copper",
+   "Olive",
+   "Orchid"
+  ],
+  "set": {
+   "sage": {
+    "top": {
+     "panel": "#2f432f",
+     "rim": "#556e4e",
+     "seat": "#d3eeaa",
+     "button": "#233324"
+    },
+    "bottom": {
+     "panel": "#192a19",
+     "rim": "#39573b",
+     "seat": "#bde7bd",
+     "button": "#0d1c0f"
+    }
+   },
+   "sky": {
+    "top": {
+     "panel": "#2c4352",
+     "rim": "#517187",
+     "seat": "#b6e0f7",
+     "button": "#21323e"
+    },
+    "bottom": {
+     "panel": "#102837",
+     "rim": "#2e536a",
+     "seat": "#b4e1ff",
+     "button": "#071a25"
+    }
+   },
+   "coral": {
+    "top": {
+     "panel": "#523734",
+     "rim": "#8a5e59",
+     "seat": "#ffd2cc",
+     "button": "#3e2926"
+    },
+    "bottom": {
+     "panel": "#361e1b",
+     "rim": "#6c4137",
+     "seat": "#ffc7b2",
+     "button": "#23110f"
+    }
+   },
+   "violet": {
+    "top": {
+     "panel": "#433a51",
+     "rim": "#726387",
+     "seat": "#e5d5fe",
+     "button": "#322b3d"
+    },
+    "bottom": {
+     "panel": "#281f34",
+     "rim": "#57436a",
+     "seat": "#e4cff7",
+     "button": "#1b1325"
+    }
+   },
+   "amber": {
+    "top": {
+     "panel": "#4a4024",
+     "rim": "#7f6d49",
+     "seat": "#f6de96",
+     "button": "#362e16"
+    },
+    "bottom": {
+     "panel": "#2d250d",
+     "rim": "#5b4d27",
+     "seat": "#ecd8a3",
+     "button": "#1e1705"
+    }
+   },
+   "teal": {
+    "top": {
+     "panel": "#254642",
+     "rim": "#42766f",
+     "seat": "#a8eee3",
+     "button": "#1b3531"
+    },
+    "bottom": {
+     "panel": "#102d29",
+     "rim": "#31594f",
+     "seat": "#b4eddd",
+     "button": "#081d19"
+    }
+   },
+   "rose": {
+    "top": {
+     "panel": "#573147",
+     "rim": "#915477",
+     "seat": "#ffcde8",
+     "button": "#422435"
+    },
+    "bottom": {
+     "panel": "#3a172c",
+     "rim": "#71375a",
+     "seat": "#fec7e5",
+     "button": "#280c1d"
+    }
+   },
+   "indigo": {
+    "top": {
+     "panel": "#343b65",
+     "rim": "#5a65a7",
+     "seat": "#d4dcfe",
+     "button": "#262c4d"
+    },
+    "bottom": {
+     "panel": "#1c2148",
+     "rim": "#3f4886",
+     "seat": "#cfd8fe",
+     "button": "#101433"
+    }
+   },
+   "slate": {
+    "top": {
+     "panel": "#3b4045",
+     "rim": "#646c76",
+     "seat": "#d3e0ec",
+     "button": "#2b3034"
+    },
+    "bottom": {
+     "panel": "#21262b",
+     "rim": "#474f58",
+     "seat": "#cfdbe8",
+     "button": "#14181c"
+    }
+   },
+   "copper": {
+    "top": {
+     "panel": "#563721",
+     "rim": "#8f5e3b",
+     "seat": "#ffd4b8",
+     "button": "#412917"
+    },
+    "bottom": {
+     "panel": "#391e07",
+     "rim": "#70411f",
+     "seat": "#ffcfaf",
+     "button": "#271102"
+    }
+   },
+   "olive": {
+    "top": {
+     "panel": "#3b441a",
+     "rim": "#647331",
+     "seat": "#d4ea91",
+     "button": "#2c3312"
+    },
+    "bottom": {
+     "panel": "#222901",
+     "rim": "#49560e",
+     "seat": "#d0e58d",
+     "button": "#151b00"
+    }
+   },
+   "orchid": {
+    "top": {
+     "panel": "#503257",
+     "rim": "#865691",
+     "seat": "#f6ceff",
+     "button": "#3c2542"
+    },
+    "bottom": {
+     "panel": "#35173b",
+     "rim": "#673971",
+     "seat": "#f4c8fe",
+     "button": "#230d28"
+    }
+   }
+  }
+ },
+ "clear": {
+  "name": "Clear (colour-blind friendly)",
+  "note": "Hues, lightness and chroma chosen by search so every pair of tiles stays apart under deuteranope and protanope vision as well as normal vision. Fewer greens, more spread in lightness.",
+  "names": [
+   "Coral",
+   "Copper",
+   "Olive",
+   "Lime",
+   "Jade",
+   "Cyan",
+   "Sky",
+   "Indigo",
+   "Violet",
+   "Orchid",
+   "Pale plum",
+   "Deep plum"
+  ],
+  "set": {
+   "sage": {
+    "top": {
+     "panel": "#5f2524",
+     "rim": "#a14542",
+     "seat": "#ffc9c4",
+     "button": "#471a19"
+    },
+    "bottom": {
+     "panel": "#501717",
+     "rim": "#8f3534",
+     "seat": "#ffc3be",
+     "button": "#3a0e0e"
+    }
+   },
+   "sky": {
+    "top": {
+     "panel": "#572504",
+     "rim": "#964613",
+     "seat": "#fec2a4",
+     "button": "#401902"
+    },
+    "bottom": {
+     "panel": "#451a00",
+     "rim": "#833903",
+     "seat": "#ffbc9a",
+     "button": "#301000"
+    }
+   },
+   "coral": {
+    "top": {
+     "panel": "#4b3e01",
+     "rim": "#7e6a04",
+     "seat": "#f4de87",
+     "button": "#382e01"
+    },
+    "bottom": {
+     "panel": "#3c3100",
+     "rim": "#6d5b01",
+     "seat": "#efda83",
+     "button": "#2b2301"
+    }
+   },
+   "violet": {
+    "top": {
+     "panel": "#333824",
+     "rim": "#5c6544",
+     "seat": "#ccd8af",
+     "button": "#242818"
+    },
+    "bottom": {
+     "panel": "#262b17",
+     "rim": "#4e5636",
+     "seat": "#c8d3ab",
+     "button": "#191d0d"
+    }
+   },
+   "amber": {
+    "top": {
+     "panel": "#184939",
+     "rim": "#2d7b61",
+     "seat": "#9df3d2",
+     "button": "#11372a"
+    },
+    "bottom": {
+     "panel": "#063b2c",
+     "rim": "#196c53",
+     "seat": "#98efce",
+     "button": "#032b1f"
+    }
+   },
+   "teal": {
+    "top": {
+     "panel": "#033d44",
+     "rim": "#046d79",
+     "seat": "#6ee6f7",
+     "button": "#002c31"
+    },
+    "bottom": {
+     "panel": "#012f34",
+     "rim": "#065d67",
+     "seat": "#69e2f3",
+     "button": "#001f24"
+    }
+   },
+   "rose": {
+    "top": {
+     "panel": "#124054",
+     "rim": "#266e8f",
+     "seat": "#aae1ff",
+     "button": "#0b2f3f"
+    },
+    "bottom": {
+     "panel": "#013246",
+     "rim": "#115f7f",
+     "seat": "#9fdeff",
+     "button": "#012332"
+    }
+   },
+   "indigo": {
+    "top": {
+     "panel": "#2e2f60",
+     "rim": "#5456a4",
+     "seat": "#c8cefe",
+     "button": "#202047"
+    },
+    "bottom": {
+     "panel": "#222151",
+     "rim": "#464693",
+     "seat": "#c3c9fe",
+     "button": "#15153a"
+    }
+   },
+   "slate": {
+    "top": {
+     "panel": "#352556",
+     "rim": "#624997",
+     "seat": "#d0c0ff",
+     "button": "#24183e"
+    },
+    "bottom": {
+     "panel": "#281847",
+     "rim": "#543a87",
+     "seat": "#ccbbff",
+     "button": "#1a0c31"
+    }
+   },
+   "copper": {
+    "top": {
+     "panel": "#493263",
+     "rim": "#7b57a4",
+     "seat": "#e6d5fe",
+     "button": "#37254b"
+    },
+    "bottom": {
+     "panel": "#3b2554",
+     "rim": "#6c4794",
+     "seat": "#e3d0fe",
+     "button": "#2b193e"
+    }
+   },
+   "olive": {
+    "top": {
+     "panel": "#5a2c50",
+     "rim": "#964c86",
+     "seat": "#feccf1",
+     "button": "#44203c"
+    },
+    "bottom": {
+     "panel": "#4b1e42",
+     "rim": "#853d76",
+     "seat": "#ffc5f0",
+     "button": "#371430"
+    }
+   },
+   "orchid": {
+    "top": {
+     "panel": "#452338",
+     "rim": "#7d4667",
+     "seat": "#f9b2db",
+     "button": "#311727"
+    },
+    "bottom": {
+     "panel": "#37162b",
+     "rim": "#6d3758",
+     "seat": "#f4aed6",
+     "button": "#250c1b"
+    }
+   }
+  }
+ }
+}

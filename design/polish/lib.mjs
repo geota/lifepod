@@ -2,7 +2,10 @@
 // and JS, and compose labelled comparison strips. Nothing here changes web/.
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { app } from '../../tests/helpers.mjs';
+import { app as defaultApp } from '../../tests/helpers.mjs';
+
+// LIFEPOD_APP points the renders at another copy of web/, such as a clean checkout while web/ is mid-edit.
+const app = process.env.LIFEPOD_APP ? new URL(`file://${process.env.LIFEPOD_APP}`).href : defaultApp;
 
 export const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
 export const sizes = {

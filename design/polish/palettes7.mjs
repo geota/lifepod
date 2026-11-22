@@ -12,12 +12,12 @@ export const palettes = {
   graphite: {
     name: 'Graphite + lime: neutral surfaces, the brand lime kept',
     background: '#111213', surface: '#1b1c1e', raised: '#242528', 'surface-pressed': '#303236', border: '#393b40', 'control-border': '#8b8f97',
-    'switch-off': '#35373b', text: '#f2f2ef', 'text-soft': '#d8d9dc', muted: '#b3b6bc', accent: '#d9f08a', 'accent-pressed': '#c4dc76', ink: '#1d2608',
+    'switch-off': '#35373b', text: '#f2f2ef', 'text-soft': '#dedfe2', muted: '#b3b6bc', accent: '#d9f08a', 'accent-pressed': '#c4dc76', ink: '#1d2608',
   },
   amber: {
     name: 'Graphite + amber: neutral surfaces, a warm accent',
     background: '#111213', surface: '#1b1c1e', raised: '#242528', 'surface-pressed': '#303236', border: '#393b40', 'control-border': '#8b8f97',
-    'switch-off': '#35373b', text: '#f2f2ef', 'text-soft': '#d8d9dc', muted: '#b3b6bc', accent: '#f6c560', 'accent-pressed': '#e2b04b', ink: '#2b1d00',
+    'switch-off': '#35373b', text: '#f2f2ef', 'text-soft': '#dedfe2', muted: '#b3b6bc', accent: '#f6c560', 'accent-pressed': '#e2b04b', ink: '#2b1d00',
   },
   midnight: {
     name: 'Midnight + ice: blue-black surfaces, a cool accent',

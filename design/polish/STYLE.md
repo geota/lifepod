@@ -266,7 +266,7 @@ Measured with `node design/polish/palettes7.mjs`, WCAG 2.2.
 |---|---|---|---|---|
 | Text on surface (≥ 7:1) | 13.5 | 15.2 | 15.2 | 15.5 |
 | Text on background (≥ 7:1) | 15.7 | 16.7 | 16.7 | 17.0 |
-| Soft text on surface (≥ 7:1) | 11.4 | 12.1 | 12.1 | 12.5 |
+| Soft text on surface (≥ 7:1) | 11.4 | 12.8 | 12.8 | 12.5 |
 | Muted text on surface (≥ 4.5:1) | 8.7 | 8.4 | 8.4 | 8.4 |
 | Muted text on raised (≥ 4.5:1) | 7.8 | 7.5 | 7.5 | 7.5 |
 | Ink on accent (≥ 7:1) | 12.3 | 12.6 | 10.2 | 10.3 |
@@ -277,6 +277,7 @@ Measured with `node design/polish/palettes7.mjs`, WCAG 2.2.
 | Seam (background) vs the closest tile panel | 1.33 | 1.40 | 1.40 | 1.41 |
 
 - All four pass every check.
+- **Graphite's soft text is `#dedfe2`** (corrected 22 Nov from `#d8d9dc`). The darker value fell to 7.26:1 on the lightest tile panel, under the 7.6:1 the tiles need for small text. The new value gives 7.69:1. See [TILES.md](TILES.md).
 - **The seam row** isn't a WCAG check. It shows that the gap between tiles stands out slightly more on the neutral palettes.
 - **The decorative hairlines** (`--border`, about 1.5:1) are only used where a label already identifies the control (WCAG 1.4.11's exception).
 
