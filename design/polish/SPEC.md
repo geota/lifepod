@@ -3,7 +3,7 @@
 **Status:** ready to build, 21 November 2026. This turns the owner's answers to the 14 questions in [OPTIONS.md](OPTIONS.md) into decisions.
 
 - Where the owner said "decide", the decision is here with its reason. Where an answer left a gap, I filled it and said so.
-- Open questions are the short list at the end (§12).
+- The questions raised during the spec are all resolved (§12).
 - The mock-ups are `renders/spec-*.png`, drawn on the current `web/` (2f28705) by [spec.mjs](spec.mjs) (`node design/polish/spec.mjs`). Every spec frame uses the new button style and the one-size-per-board rule.
 
 **Target device: Pixel 11 Pro class, 952 × 427 CSS px in landscape.**
@@ -86,7 +86,7 @@ My reading: this is the faint mark behind the life total. It's a setting of its 
   - Symbol background plus a Symbol chip repeats the symbol. That's allowed, and the defaults avoid it.
   - Background off plus chip off is "identity off" without clearing anyone's picks.
 
-The owner may have meant something else; it's open question 1.
+This reading is confirmed (§12).
 
 ### 2.4 Symbols for all 31 identities
 
@@ -223,6 +223,28 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 
 `spec.mjs spec-autodrop` logs these numbers.
 
+**Where each step starts, by the smallest tile's width** (`ui`), at 6 players.
+
+- The badge type sits at its 12.5px floor on every phone at 6 players, so width is what decides.
+- These are the container sizes the sweep found (`node design/polish/spec.mjs spec-sweep`, widths 952 → 568).
+- The rule itself measures the rows, so other content moves these points.
+
+| Step | Typical game | Worst case |
+|---|---|---|
+| 1. Names (and "Turn") go | below `ui` ≈ 260px | at the target already (`ui` 316px) |
+| 2. Symbol goes (when the indicator shows) | — (not shown by default) | below `ui` ≈ 290px |
+| 4. Identity chip goes | below `ui` ≈ 195px | below `ui` ≈ 270px |
+| 6. Counters wrap to two lines | not reached at 568 × 320 | below `ui` ≈ 245px |
+
+For reference, `ui` is 316px on the target, 283px at 852 × 393, 213px at 640 × 360 and 188px at 568 × 320.
+
+**Why the symbol goes before the indicator** (the owner's example had name, then indicator, then symbol):
+
+- The indicator says the colours to everyone.
+- The symbol only says them to someone who knows the guild or family.
+- The default background already draws that same symbol behind the tile, so dropping it from the chip loses nothing.
+- If the background is Indicator or Off and the chip shows only the symbol, step 2 doesn't apply, and the symbol stays until step 4.
+
 **Fixed thresholds** (by board unit, so they also apply board-wide):
 
 | Item | Shown when |
@@ -291,7 +313,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 ## 5. Tile colours: twelve swatches
 
 - With identity moved out, Colours mode shows only the swatches, as a 4 × 3 grid: `clamp(44px, min((100% − 24px)/4, (100% − 40px)/3), 60 × grow)`. Every tile fits it at 44px or more, including 6 players at 640×360.
-- **Decision: add three hues** where the hue circle has gaps: about 55° (working name Copper), 120° (Olive) and 330° (Orchid).
+- **Decision: add three hues** where the hue circle has gaps: Copper (about 55°), Olive (120°) and Orchid (330°).
   - `palette.mjs` generates them with the existing contrast checks: life total ≥ 9:1, small text ≥ 7.6:1, and the life-out red ≥ 4.79:1.
   - The values in the mock-up are placeholders.
 - The rules stay as they are: no two players share a colour, and a taken swatch shows its owner ("P2").
@@ -499,7 +521,11 @@ Each milestone ships on its own and keeps `npm test` and lint green. The tests e
   - With auto-empty off, pools survive a pass.
   - Android back in each new mode.
 
-## 12. Open questions
+## 12. Questions resolved
 
-1. **"Indicator backgrounds".** Read as the watermark behind the total (§2.3: Symbol / Indicator / Off). If the owner meant tinting the tile with the identity's colours, that's a different feature.
-2. **The three new hue names** (Copper, Olive, Orchid are working names) are for the owner to approve once `palette.mjs` produces them.
+None are open.
+
+1. **Four-colour names:** full (Glint-Eye, Dune-Brood, Ink-Treader, Witch-Maw, Yore-Tiller). There is no short-form setting.
+2. **Five-colour name:** WUBRG.
+3. **"Indicator backgrounds":** the background setting behind the total (§2.3: Symbol / Indicator / Off). Confirmed.
+4. **New hue names:** Copper, Olive and Orchid, unless the owner renames them once `palette.mjs` produces the palettes.

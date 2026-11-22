@@ -741,6 +741,27 @@ strips['spec-autodrop'] = async () => {
   await compose('spec-autodrop', 'Auto-drop: the same busy game from the target phone down to the stress size', 'Worst-case settings: chip shows indicator + symbol + name, Turn by turn on (P1 active), every counter on with two-digit counts, commander damage from every opponent. Levels apply board-wide (SPEC §3.2).', rows);
 };
 
+// Logs, for each drop step, the smallest-tile size (ui × ub) at which it starts, for a typical and a worst-case 6-player
+// game across widths from the target down to the stress size. Not drawn: `node design/polish/spec.mjs spec-sweep`.
+strips['spec-sweep'] = async () => {
+  const n6 = [0, 1, 2, 3, 4, 5];
+  const typicalSeed = game(6, { identities: ['WURG', 'UBRG', 'WBR', 'WUBG', 'WUBRG', 'R'], poison: [3, 1, 7, 1, 0, 2], casts: [1, 2, 2, 0, 1, 0] });
+  const worstSeed = game(6, { identities: ['WURG', 'UBRG', 'WBR', 'WUBG', 'WUBRG', 'R'], poison: [9, 3, 7, 1, 0, 2], casts: [5, 2, 2, 0, 1, 0],
+    commanderDamage: n6.map(d => n6.map(a => (d === a ? 0 : [16, 12, 9, 7, 4][(d + a) % 5]))) });
+  const single = dropSeedJs.replace('[12, 2, 0, 8, 1, 3]', '[5, 2, 0, 8, 1, 3]').replace('[10, 0, 1, 0, 3, 1]', '[2, 0, 1, 0, 3, 1]').replace('[14, 0, 0, 2, 0, 6]', '[4, 0, 0, 2, 0, 6]').replace(/if \(index === 0\)[^;]*;[^}]*}/, '');
+  for (const [name, seed, js, show] of [['typical (indicator + name, single digits)', typicalSeed, single, { indicator: 1, name: 1 }], ['worst (all three, two digits, turn chip)', worstSeed, dropSeedJs, { indicator: 1, symbol: 1, name: 1 }]]) {
+    console.log('==', name);
+    for (const w of [952, 900, 852, 800, 760, 720, 680, 640, 600, 568]) {
+      const h = Math.round(w * (w >= 640 ? 427 / 952 : 320 / 568));
+      const p = await board({ width: w, height: Math.max(h, 320) }, seed, { css: dropCss, js: dropJs + chipModeJs(show) + js });
+      const r = await p.evaluate('mkDrop()');
+      const u = await p.evaluate(() => getComputedStyle(board).getPropertyValue('--ui') + ' × ' + getComputedStyle(board).getPropertyValue('--ub'));
+      console.log(`${w}×${Math.max(h, 320)} ui×ub ${u}: near ${r.near}; far ${r.far}`);
+      await p.close();
+    }
+  }
+};
+
 for (const [name, run] of Object.entries(strips)) {
   if (only.length && !only.includes(name)) continue;
   await run();
