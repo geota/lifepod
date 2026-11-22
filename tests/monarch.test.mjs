@@ -9,6 +9,8 @@ import { app, button, seedGame, setSwitches } from './helpers.mjs';
 // reminders, and Settings → Reminders.
 
 const engines = { chromium, webkit };
+// Where a test's paused clock starts.
+const clockStart = Date.parse('2026-01-01T12:00:00Z');
 const designations = { monarch: true, initiative: true };
 
 function savedGame(count, extra = {}) {
@@ -17,17 +19,22 @@ function savedGame(count, extra = {}) {
   };
 }
 
-async function openPage(t, engine, { game, clock = false, viewport = { width: 952, height: 427 } } = {}) {
+async function openPage(t, engine, { game, clock = false, motion = clock ? 'reduce' : 'no-preference', viewport = { width: 952, height: 427 } } = {}) {
   const browser = await engine.launch();
   t.after(() => browser.close());
   // Under Playwright's clock, nothing animates: an entrance animation (a turn reminder, "Undo clear") or a press
   // animation runs on real time while the timers wait for the test, so a tap could wait on an element that never
   // settles. Reduced motion turns them off, as it does for players who ask for it.
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport, ...(clock ? { reducedMotion: 'reduce' } : {}) });
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport, reducedMotion: motion });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  if (clock) await page.clock.install();
+  // Installed, Playwright's clock still runs on with real time until it's paused, so a slow runner could spend a
+  // reminder's 3 seconds or "Undo clear"'s 5 between two steps. Paused, only the test's runFor moves it.
+  if (clock) {
+    await page.clock.install({ time: clockStart });
+    await page.clock.pauseAt(clockStart + 60000);
+  }
   await page.goto(app);
   if (game) await seedGame(page, game);
   return page;
@@ -305,6 +312,8 @@ async function checkReminders(t, engine) {
   // Facing the player: inside their own turned tile face.
   assert.equal(await tile(page, 1).locator('.player-face .reminder-chip').count(), 1);
   await page.clock.runFor(2500);
+  // Real time doesn't count: a second of it here, as on a slow runner, leaves the clock's last 500ms untouched.
+  await new Promise(resolve => setTimeout(resolve, 1000));
   assert.deepEqual(await reminders(page), [['monarch'], ['initiative'], [], []], 'still there before 3 seconds');
   // A tap dismisses one.
   await tile(page, 1).locator('.reminder-chip').tap();
@@ -346,6 +355,62 @@ async function checkReminders(t, engine) {
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: turn reminders tell the monarch to draw and the initiative to venture, at the right moment`, { timeout: 60000 }, t => checkReminders(t, engine));
+}
+
+// A reminder that's showing stays put while it shows: the tiles redrawing for the next pass, the clock ticking and the
+// board being measured again neither rebuild its chip, which would pull it from under a finger, nor move it.
+async function checkSteadyReminders(t, engine) {
+  const page = await openPage(t, engine, {
+    clock: true,
+    game: savedGame(4, { counters: { commander: true, ...designations }, turns: 'turns', turn: { first: 0, active: 0, round: 1 }, monarch: 0, initiative: 1 }),
+  });
+  await tile(page, 1).locator('.active-chip').tap();
+  assert.deepEqual(await reminders(page), [['monarch'], ['initiative'], [], []]);
+  await page.evaluate(() => {
+    window.shownChips = [...document.querySelectorAll('.reminder-chip')];
+    window.chipsAdded = 0;
+    new MutationObserver((records) => {
+      for (const record of records) window.chipsAdded += [...record.addedNodes].filter(node => node.matches?.('.reminder-chip')).length;
+    }).observe(document.querySelector('#board'), { childList: true, subtree: true });
+  });
+  const places = () => page.locator('.player').evaluateAll(players => players.map(player => player.dataset.reminder ?? 'above'));
+  const steady = () => page.evaluate(() => ({
+    added: window.chipsAdded,
+    same: window.shownChips.every((chip, at) => chip.isConnected && document.querySelectorAll('.reminder-chip')[at] === chip),
+  }));
+  const placed = await places();
+  // Player 2 passes from the pill (their reminder has their near row), which redraws every tile and reminds nobody new.
+  await page.locator('#round-button').tap();
+  assert.equal((await saved(page)).turn.active, 3, 'Player 4’s turn');
+  assert.deepEqual(await reminders(page), [['monarch'], ['initiative'], [], []]);
+  for (let frame = 0; frame < 5; frame++) await page.clock.runFor(100);
+  await page.setViewportSize({ width: 960, height: 427 });
+  await page.clock.runFor(100);
+  assert.deepEqual(await reminders(page), [['monarch'], ['initiative'], [], []], 'still showing');
+  assert.deepEqual(await steady(), { added: 0, same: true }, 'the chips showing are the same elements');
+  assert.deepEqual(await places(), placed, 'and in the same place');
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a turn reminder stays the same element, in the same place, while it shows`, { timeout: 60000 }, t => checkSteadyReminders(t, engine));
+}
+
+// Where a reminder goes comes from where its chip comes to rest, not from where its entrance starts it, a little
+// lower and clear of a total it then rises into. With motion it goes where it goes without.
+async function checkRestingReminders(t, engine) {
+  const game = savedGame(4, {
+    counters: { commander: true, poison: true, ...designations }, poison: [1, 1, 1, 1], turns: 'turns', turn: { first: 0, active: 0, round: 1 }, monarch: 0, initiative: 1,
+  });
+  const placed = async (motion) => {
+    const page = await openPage(t, engine, { game, motion, viewport: { width: 1100, height: 500 } });
+    await tile(page, 1).locator('.active-chip').tap();
+    return page.locator('.player').evaluateAll(players => players.slice(0, 2).map(player => player.dataset.reminder ?? 'above'));
+  };
+  assert.deepEqual(await placed('no-preference'), await placed('reduce'));
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a turn reminder is placed where it comes to rest, not where its entrance starts`, { timeout: 60000 }, t => checkRestingReminders(t, engine));
 }
 
 // "Who goes first?" and a Start chip start a turn too, and a new holder by handoff ventures at once.

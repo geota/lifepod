@@ -1854,20 +1854,35 @@ function placeReminders(player) {
     .filter(blocker => blocker.offsetWidth).map(blocker => blocker.getBoundingClientRect());
   // With 4px to spare, so a reminder never sits hard against the total.
   const padded = (box) => ({ left: box.left - 4, right: box.right + 4, top: box.top - 4, bottom: box.bottom + 4 });
-  if ([...box.children].some(chip => blockers.some(blocker => overlaps(padded(chip.getBoundingClientRect()), blocker)))) player.dataset.reminder = 'over';
+  if ([...box.children].some(chip => blockers.some(blocker => overlaps(padded(restingBox(chip)), blocker)))) player.dataset.reminder = 'over';
 }
 
-// The reminders a tile shows, newest last: each a chip in the turn chip's style that a tap dismisses.
-function reminderChips(index) {
-  return [...(reminders.get(index)?.keys() ?? [])].map((kind) => {
-    const [label, words] = reminderText[kind].split(': ');
-    const chip = element('button', 'chip reminder-chip', designationIcon(kind), element('span', 'reminder-words', element('b', 'reminder-label', `${label}: `), words));
-    chip.type = 'button';
-    chip.dataset.designation = kind;
-    chip.setAttribute('aria-label', `${reminderText[kind]}. Dismiss`);
-    bindTap(chip, () => dismissReminder(index, kind));
-    return chip;
-  });
+// A chip's box where it comes to rest, not where its entrance animation has it now: the entrance starts it lower, which
+// can clear the total by a few pixels the chip then rises into. An important inline transform outranks the animation's
+// without restarting it.
+function restingBox(chip) {
+  chip.style.setProperty('transform', 'none', 'important');
+  const box = chip.getBoundingClientRect();
+  chip.style.removeProperty('transform');
+  return box;
+}
+
+// The reminders a tile shows, newest last: each a chip in the turn chip's style that a tap dismisses. A chip already
+// showing stays the same element, so a redraw of the tile neither replays its entrance nor pulls it from under a finger.
+function syncReminderChips(index, box) {
+  const showing = new Map([...box.children].map(chip => [chip.dataset.designation, chip]));
+  const chips = [...(reminders.get(index)?.keys() ?? [])].map(kind => showing.get(kind) ?? reminderChip(index, kind));
+  if (chips.length !== box.childElementCount || chips.some((chip, at) => box.children[at] !== chip)) box.replaceChildren(...chips);
+}
+
+function reminderChip(index, kind) {
+  const [label, words] = reminderText[kind].split(': ');
+  const chip = element('button', 'chip reminder-chip', designationIcon(kind), element('span', 'reminder-words', element('b', 'reminder-label', `${label}: `), words));
+  chip.type = 'button';
+  chip.dataset.designation = kind;
+  chip.setAttribute('aria-label', `${reminderText[kind]}. Dismiss`);
+  bindTap(chip, () => dismissReminder(index, kind));
+  return chip;
 }
 
 // One step back: the last step taken, with any pools it emptied, or after a relaunch the previous player in play
@@ -2235,7 +2250,7 @@ function renderBadges(index) {
   for (const designation of trackedDesignations()) {
     if (game[designation.kind] === index) chips.push(designationChip(designation, index));
   }
-  near.parentElement.querySelector('.reminders').replaceChildren(...reminderChips(index));
+  syncReminderChips(index, near.parentElement.querySelector('.reminders'));
   placeReminders(player);
   // The strip folded onto the near row, shown only when it can go nowhere else.
   if (foldedChip) chips.push(foldedChip);
