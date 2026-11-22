@@ -93,7 +93,7 @@
 		};
 		A23000000000000000000019 /* Project Debug */ = {
 			isa = XCBuildConfiguration;
-			buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; };
+			buildSettings = { SDKROOT = iphoneos; IPHONEOS_DEPLOYMENT_TARGET = 16.0; SWIFT_VERSION = 5.0; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; };
 			name = Debug;
 		};
 		A23000000000000000000020 /* Project Release */ = {

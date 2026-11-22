@@ -54,10 +54,22 @@ link() {
 "$kotlin_compiler" -kotlin-home "$kotlin_dir" -jvm-target 11 -no-reflect \
     -classpath "$android_jar:$kotlin_stdlib" -include-runtime \
     -d "$work/classes.jar" "$android_dir/src/dev/maceiras/lifepod/MainActivity.kt"
-"$build_tools/d8" --lib "$android_jar" --min-api 30 --output "$work/dex" "$work/classes.jar"
 
-# APK
-link -o "$work/unsigned.apk"
+# R8 drops the parts of the Kotlin runtime the app doesn't use. aapt2 writes the keep rules for the manifest's
+# activity; proguard-rules.pro keeps the JavaScript bridge, which only the page calls. check-bridge.sh fails the
+# build if the bridge methods went missing anyway, since R8 would strip them without an error.
+"$build_tools/aapt2" link -I "$android_jar" --manifest "$android_dir/AndroidManifest.xml" \
+    --proguard "$work/manifest-rules.pro" -o "$work/rules.apk" "$work/resources.zip"
+java -cp "$build_tools/lib/d8.jar" com.android.tools.r8.R8 --release --min-api 30 --lib "$android_jar" \
+    --pg-conf "$android_dir/proguard-rules.pro" --pg-conf "$work/manifest-rules.pro" \
+    --output "$work/dex" "$work/classes.jar"
+"$android_dir/check-bridge.sh" "$work/dex/classes.dex"
+
+# APK. One signed with the committed debug key is debuggable, which turns on WebView inspection in MainActivity.
+# One signed with a release key never is.
+apk_debug=--debug-mode
+[[ -z "${LIFE_POD_KEYSTORE:-}" ]] || apk_debug=
+link ${apk_debug:+"$apk_debug"} -o "$work/unsigned.apk"
 zip -q -j "$work/unsigned.apk" "$work/dex/"classes*.dex
 "$build_tools/zipalign" -f 4 "$work/unsigned.apk" "$work/aligned.apk"
 
@@ -80,7 +92,10 @@ echo "$apk"
 [[ -n "$bundletool" ]] || exit 0
 
 # App Bundle: bundletool expects a module zip with the manifest, dex, resources and assets in fixed folders.
-link --proto-format -o "$work/proto.apk"
+# Like the APK, it is debuggable unless it is signed with the upload key.
+aab_debug=--debug-mode
+[[ -z "${LIFE_POD_UPLOAD_KEYSTORE:-}" ]] || aab_debug=
+link ${aab_debug:+"$aab_debug"} --proto-format -o "$work/proto.apk"
 module="$work/module"
 mkdir -p "$module/manifest" "$module/dex"
 unzip -q "$work/proto.apk" -d "$module"

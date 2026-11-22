@@ -4,15 +4,26 @@
   "scripts": {
     "lint": "npm run lint:web && npm run lint:android && npm run lint:ios",
     "lint:web": "eslint web",
-    "lint:android": "ktlint 'android/src/**/*.kt' && ./android/lint.sh",
+    "lint:compat": "eslint -c eslint.compat.config.mjs web && stylelint 'web/**/*.css'",
+    "lint:kotlin": "if ktlint --version >/dev/null 2>&1; then ktlint 'android/src/**/*.kt'; else mise x ktlint@1.8.0 -- ktlint 'android/src/**/*.kt'; fi",
+    "lint:android": "npm run lint:kotlin && ./android/lint.sh",
     "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift",
+    "check": "npm run lint:web && npm run lint:compat && npm run lint:kotlin && npm run lint:ios && npm test",
     "test": "node --test",
     "store:images": "node store/render.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
     "eslint": "9.39.5",
+    "eslint-plugin-compat": "7.0.2",
     "globals": "14.0.0",
-    "playwright-core": "1.65.0"
-  }
+    "playwright-core": "1.65.0",
+    "stylelint": "18.1.0",
+    "stylelint-no-unsupported-browser-features": "8.1.2"
+  },
+  "browserslist": [
+    "iOS >= 16",
+    "Android >= 11",
+    "Chrome >= 111"
+  ]
 }
