@@ -410,6 +410,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   width: 1px;
   height: 1px;
   overflow: hidden;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() or none on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
   clip-path: inset(50%);
   white-space: nowrap;
 }
@@ -501,6 +502,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   height: var(--setup-button);
   padding: 0;
   overflow: visible;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() or none on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
   clip-path: none;
   border: 0;
   border-radius: var(--radius-full);
@@ -1094,6 +1096,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .board[data-cell-grid="4"] .counter-cells:not(.mana-cells) {
   --cell: clamp(var(--tap-min), min((var(--ui, 400px) - 42px) / 4, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
   --cell-gap: clamp(2px, (var(--ui, 400px) - 12px - 4 * var(--cell)) / 3, 10px);
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the flex gap, not multi-column layout, which the partial note is about. */
   column-gap: var(--wide-gap, var(--cell-gap));
   width: calc(var(--wide-columns, 4) * var(--cell) + (var(--wide-columns, 4) - 1) * var(--wide-gap, var(--cell-gap)));
 }
@@ -1696,6 +1699,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
 .fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
+/* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() or none on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
 .fs-pending[data-empty] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
 .fs .privacy-text { max-width: none; font-size: var(--type-small); }
 /* A fade along the bottom of the body while there's more below. */
@@ -1851,6 +1855,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
     grid-template-columns: auto minmax(212px, 260px);
     grid-template-rows: auto 1fr auto;
     grid-template-areas: "stage header" "stage picker" "stage roll";
+    /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the grid gap, not multi-column layout, which the partial note is about. */
     column-gap: var(--space-4);
     padding: var(--space-3);
   }

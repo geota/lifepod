@@ -30,8 +30,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run lint:web
-      # Checks web/ against the iOS 16 and Android WebView floor in package.json's browserslist. Some findings are
-      # still warnings; eslint.compat.config.mjs and stylelint.config.mjs list them.
+      # Checks web/ against the iOS 16 and Android WebView floor in package.json's browserslist. Every finding is an
+      # error; a feature-detected line or a partial-support note that doesn't apply says why in a disable comment.
       - run: npm run lint:compat
       # The board's type is system-ui, which is Roboto on Android. Ubuntu falls back to the much wider DejaVu
       # Sans, which would make badge-fit and auto-drop tests measure text no phone shows.

@@ -268,6 +268,7 @@ function normalizeAngle(angle) {
 
 // The angle the OS has turned the screen clockwise from the device's natural orientation.
 function readScreen() {
+  // eslint-disable-next-line compat/compat -- Safari 16.4+; the check below falls back to window.orientation.
   const orientation = window.screen.orientation;
   if (orientation && Number.isFinite(orientation.angle) && typeof orientation.type === 'string') {
     return { angle: normalizeAngle(orientation.angle), landscape: orientation.type.startsWith('landscape') };
@@ -838,6 +839,7 @@ async function syncWakeLock() {
   if (lock || requestingLock || !navigator.wakeLock) return;
   try {
     requestingLock = true;
+    // eslint-disable-next-line compat/compat -- Safari 16.4+; checked just above, and a refusal is caught.
     const acquired = await navigator.wakeLock.request('screen');
     if (game.keepAwake && !document.hidden) {
       lock = acquired;
@@ -3064,6 +3066,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();
   else if (!android && !ios) syncWakeLock();
 });
+// eslint-disable-next-line compat/compat -- Safari 16.4+, so optional; orientationchange and resize cover iOS 16.0.
 window.screen.orientation?.addEventListener?.('change', syncBoardTurn);
 window.addEventListener('orientationchange', syncBoardTurn);
 window.addEventListener('resize', syncBoardTurn);

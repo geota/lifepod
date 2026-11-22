@@ -1,11 +1,8 @@
 // Browser compatibility for web/ against the browserslist floor in package.json: iOS 16 for WKWebView, and the
 // Android System WebView as Chrome 111 and later. `npm run lint:compat` runs it, separately from eslint.config.mjs.
 //
-// TODO: compat/compat is report-only until these findings are fixed, then make it an error. Each is
-// feature-detected already; mark it `// eslint-disable-next-line compat/compat -- <the guard>` or restructure:
-//   web/app.js:245   screen.orientation (Safari 16.4+), read behind `if (orientation && ...)`
-//   web/app.js:783   navigator.wakeLock (Safari 16.4+), behind `!navigator.wakeLock`
-//   web/app.js:2676  screen.orientation, behind `?.`
+// compat/compat is an error. A line that uses a newer API behind a feature check says so in a
+// `// eslint-disable-next-line compat/compat -- <the guard>` comment.
 import compat from 'eslint-plugin-compat';
 import globals from 'globals';
 
@@ -36,7 +33,7 @@ export default [
       globals: globals.browser,
     },
     rules: {
-      'compat/compat': 'warn',
+      'compat/compat': 'error',
       'no-restricted-properties': ['error', ...newerStatics.map(([object, property, version]) => (
         { object, property, message: `Needs Safari ${version}; LifePod supports iOS 16.0.` }))],
       'no-restricted-globals': ['error',
