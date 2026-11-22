@@ -1267,6 +1267,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .reminder-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: max(100%, var(--tap-min)); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
 .reminder-chip:active { background: var(--cell-pressed); }
 .reminder-chip:focus-visible { outline-offset: 2px; }
+/* A keyframe entrance rather than @starting-style: restingBox in app.js measures the chip with an important inline
+   transform, which outranks an animation but not a transition. */
 @keyframes reminder-in { from { opacity: 0; transform: translateY(.4em); } }
 /* Floating mana at rest (design/polish/FINAL-REVIEW.md #3): while a pool has mana, a strip shows each colour it holds
    and its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a
@@ -1440,6 +1442,11 @@ dialog {
   overscroll-behavior: contain;
 }
 dialog::backdrop { background: var(--scrim); }
+/* Dialogs and their scrim fade in as they open, and close at once. Only opacity moves, so nothing is measured mid-way. */
+dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--ease); }
+@starting-style {
+  dialog[open], dialog[open]::backdrop { opacity: 0; }
+}
 .sheet { display: grid; gap: var(--space-5); padding: var(--space-5); }
 .sheet-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .sheet-header h2 { font-size: var(--type-title); letter-spacing: -.022em; }
@@ -1933,7 +1940,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
    pressed controls keep their size too. */
 @media (prefers-reduced-motion: reduce) {
   :root { --press-scale: 1; }
-  *, *::before, *::after { transition: none !important; }
+  *, *::before, *::after, ::backdrop { transition: none !important; }
   .chip.reminder-chip { animation: none; }
 }
 @media (max-height: 420px), (max-width: 420px) {
