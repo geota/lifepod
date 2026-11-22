@@ -1,30 +1,24 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, startGame, turnScreen, useClassicTiles } from './helpers.mjs';
+import { chromium } from 'playwright-core';
+import {
+  backHandling, button, engines, eventually, openPage, reload, saved, savedGame, seedGame, startGame, test, tileProblems, token, turnScreen,
+} from './helpers.mjs';
 
+// A swatch's palette as styles.css sets it for the page's tile set: players 1, 2 and 5 sit in the top row and use
+// its lighter version, and players 3, 4 and 6 the darker bottom-row one.
+const palette = (page, colour, row, part = 'panel') => token(page, `--${colour}-${row}-${part}`);
 // Today's six seat panels, which stay the defaults: Sage, Sky, Coral, Violet, Amber and Teal.
-const defaultPanels = ['rgb(47, 67, 47)', 'rgb(44, 67, 82)', 'rgb(67, 42, 39)', 'rgb(52, 43, 65)', 'rgb(74, 64, 36)', 'rgb(29, 58, 54)'];
-const rosePanels = { top: 'rgb(87, 49, 71)', bottom: 'rgb(72, 35, 57)' };
-const orchidTopPanel = 'rgb(80, 50, 87)';
+const defaultPanels = page => Promise.all([['sage', 'top'], ['sky', 'top'], ['coral', 'bottom'], ['violet', 'bottom'], ['amber', 'top'], ['teal', 'bottom']]
+  .map(([colour, row]) => palette(page, colour, row)));
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const swatch = (page, number, name) => tile(page, number).getByRole('button', { name, exact: true });
 const panels = page => page.locator('.player').evaluateAll(players => players.map(player => getComputedStyle(player).backgroundColor));
 const colours = page => page.locator('.player').evaluateAll(players => players.map(player => player.dataset.colour));
 
-async function openPage(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  await fakeScreenOrientation(page);
-  await page.goto(app);
+function openClassic(t, engine, options = {}) {
   // These checks are written against Classic's palettes and names.
-  await useClassicTiles(page);
-  return page;
+  return openPage(t, engine, { orientation: true, tiles: 'classic', ...options });
 }
 
 async function openColours(page) {
@@ -32,17 +26,11 @@ async function openColours(page) {
   await button(page, 'Choose tile colours on the board').tap();
 }
 
-// Chromium writes page storage in the background, so give a write a moment to land before a reload.
-async function reload(page) {
-  await page.waitForTimeout(500);
-  await page.reload();
-}
-
 async function checkColours(t, engine) {
-  const page = await openPage(t, engine);
+  const page = await openClassic(t, engine);
   await turnScreen(page, 852, 393, 90);
   await startGame(page, 6);
-  assert.deepEqual(await panels(page), defaultPanels, 'the six seat palettes are the defaults');
+  assert.deepEqual(await panels(page), await defaultPanels(page), 'the six seat palettes are the defaults');
 
   // Every tile shows the twelve swatches facing its player, and Colours holds nothing else. Another player's colour
   // is taken.
@@ -68,15 +56,15 @@ async function checkColours(t, engine) {
     };
   });
   assert.deepEqual(await looks('Sage, taken by Player 1'), {
-    text: 'P1', opacity: '1', background: 'rgb(47, 67, 47)', dot: 'none', strike: 'none',
-    tag: { color: 'rgb(211, 238, 170)', opacity: '1', hidden: 'true' },
+    text: 'P1', opacity: '1', background: await palette(page, 'sage', 'top'), dot: 'none', strike: 'none',
+    tag: { color: await palette(page, 'sage', 'top', 'seat'), opacity: '1', hidden: 'true' },
   });
-  assert.deepEqual(await looks('Rose'), { text: '', opacity: '1', background: rosePanels.top, dot: '""', strike: 'none', tag: null });
+  assert.deepEqual(await looks('Rose'), { text: '', opacity: '1', background: await palette(page, 'rose', 'top'), dot: '""', strike: 'none', tag: null });
   assert.ok(!(await tile(page, 1).locator('.subtract').isVisible()), 'the life controls make way for the swatches');
 
   // Player 1 picks Rose. Sage frees up and Rose is taken for everyone else.
   await swatch(page, 1, 'Rose').tap();
-  assert.equal((await panels(page))[0], rosePanels.top);
+  assert.equal((await panels(page))[0], await palette(page, 'rose', 'top'));
   assert.equal(await swatch(page, 1, 'Rose').getAttribute('aria-pressed'), 'true');
   assert.ok(await swatch(page, 4, 'Rose, taken by Player 1').isDisabled());
   assert.ok(!(await swatch(page, 4, 'Sage').isDisabled()), 'sage is free again');
@@ -92,11 +80,11 @@ async function checkColours(t, engine) {
 
   // Player 3, in the bottom row, takes Sage in its darker version.
   await swatch(page, 3, 'Sage').tap();
-  assert.equal((await panels(page))[2], 'rgb(37, 55, 37)');
+  assert.equal((await panels(page))[2], await palette(page, 'sage', 'bottom'));
 
   // The new hues work like the rest: Orchid is taken for everyone else while Player 5 has it.
   await swatch(page, 5, 'Orchid').tap();
-  assert.equal((await panels(page))[4], orchidTopPanel);
+  assert.equal((await panels(page))[4], await palette(page, 'orchid', 'top'));
   assert.ok(await swatch(page, 6, 'Orchid, taken by Player 5').isDisabled());
   assert.equal(await tile(page, 6).locator('.swatch:not(:disabled)').count(), 7, 'seven of twelve are free with six players');
   await swatch(page, 5, 'Amber').tap();
@@ -104,26 +92,8 @@ async function checkColours(t, engine) {
 
   // The swatches fit the smallest phone at six players: whole 44px targets inside each tile, clear of the check mark.
   await turnScreen(page, 320, 568, 0);
-  const fit = await page.evaluate(() => {
-    const controls = document.querySelector('#board-controls').getBoundingClientRect();
-    // The visible disc is inset 6px inside the 48px button.
-    const disc = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-    const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-      const bounds = player.getBoundingClientRect();
-      return [...player.querySelectorAll('.swatch')].map(button => {
-        const box = button.getBoundingClientRect();
-        const problems = [];
-        if (Math.min(box.width, box.height) < 43.5) problems.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
-        if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) {
-          problems.push('outside its tile');
-        }
-        if (overlaps(box, disc)) problems.push('under the check mark');
-        return problems.length ? `P${index + 1} ${button.getAttribute('aria-label')}: ${problems.join(', ')}` : '';
-      }).filter(Boolean);
-    });
-  });
-  assert.deepEqual(fit, [], 'every swatch fits at 320 × 568');
+  assert.equal(await page.locator('.player .swatch:visible').count(), 72, 'every swatch still shows');
+  assert.deepEqual(await tileProblems(page, { targets: '.swatch' }), [], 'every swatch fits at 320 × 568');
 
   // The check mark ends the mode, and the choices are saved.
   await button(page, 'Done choosing colours').tap();
@@ -137,9 +107,8 @@ async function checkColours(t, engine) {
   await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
-  // The restart dialog's close event, which starts the game, runs after the tap.
-  await page.waitForFunction(() => !document.querySelector('#restart').open);
-  await page.waitForTimeout(100);
+  // The restart dialog's close event, which starts the game and then closes settings, runs after the tap.
+  await eventually(() => page.evaluate(() => document.querySelector('dialog[open]')?.id ?? null), null, 'the new game starts');
   assert.deepEqual(await colours(page), ['rose', 'sky', 'sage', 'violet', 'amber', 'teal'], 'a new game keeps the colours');
 
   // Fewer players keep their colours. When a seat comes back and its default is taken, it gets the first free one.
@@ -152,21 +121,17 @@ async function checkColours(t, engine) {
   assert.deepEqual(await colours(page), ['teal', 'sky', 'sage', 'violet', 'amber', 'coral']);
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: each player picks a tile colour no one else has`, { timeout: 60000 }, t => checkColours(t, engine));
 }
 
 test('chromium: saved colours are checked when a game loads', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage();
-  const load = async (saved) => {
-    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), saved);
-    await page.reload();
+  const page = await openPage(t, chromium);
+  const load = async (game) => {
+    await seedGame(page, game);
     return colours(page);
   };
-  await page.goto(app);
-  const game = { startingLife: 40, scores: [40, 40, 40, 40], rotations: [0, 0, 0, 0], keepAwake: true, landscapeAngle: 90 };
+  const game = savedGame(4);
   assert.deepEqual(await load(game), ['sage', 'sky', 'coral', 'violet'], 'a save from before colours loads the defaults');
   assert.deepEqual(await load({ ...game, colors: [5, 5, 'x', 99] }), ['teal', 'sky', 'coral', 'violet'],
     'duplicates and unknown values fall back to a free colour');
@@ -180,109 +145,64 @@ test('chromium: saved colours are checked when a game loads', async (t) => {
 // Every swatch is a whole 44px target inside its tile and clear of the check mark, at every player count from the
 // target phone to the stress size.
 test('chromium: Colours fits every player count', { timeout: 60000 }, async (t) => {
-  const page = await openPage(t, chromium);
+  const page = await openClassic(t, chromium);
   for (const [width, height, angle] of [[952, 427, 90], [852, 393, 90], [640, 360, 90], [568, 320, 90], [320, 568, 0]]) {
     await turnScreen(page, width, height, angle);
     for (const players of [2, 3, 4, 5, 6]) {
       await startGame(page, players);
       await openColours(page);
-      const problems = await page.evaluate(() => {
-        const controls = document.querySelector('#board-controls').getBoundingClientRect();
-        const disc = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-        const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-        return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-          const bounds = player.getBoundingClientRect();
-          const targets = [...player.querySelectorAll('.mode-layer button')].filter(target => target.offsetParent);
-          const issues = [...targets, player.querySelector('.layer-hint')].filter(node => node?.offsetParent).map((node) => {
-            const box = node.getBoundingClientRect();
-            const found = [];
-            if (node.matches('button') && Math.min(box.width, box.height) < 43.5) found.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
-            if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) found.push('outside its tile');
-            if (overlaps(box, disc)) found.push('under the check mark');
-            return found.length ? `P${index + 1} ${node.getAttribute('aria-label') ?? node.textContent}: ${found.join(', ')}` : '';
-          }).filter(Boolean);
-          if (targets.length !== 12) issues.push(`P${index + 1} has ${targets.length} targets`);
-          return issues;
-        });
-      });
-      assert.deepEqual(problems, [], `${players} players, ${width} × ${height}`);
+      const view = `${players} players, ${width} × ${height}`;
+      const targets = await page.locator('.player').evaluateAll(tiles => tiles.map(player =>
+        [...player.querySelectorAll('.mode-layer button')].filter(target => target.offsetParent).length));
+      assert.deepEqual(targets, Array(players).fill(12), `${view}: twelve targets on every tile`);
+      assert.deepEqual(await tileProblems(page, { targets: '.mode-layer button', parts: '.layer-hint' }), [], view);
       await button(page, 'Done choosing colours').tap();
     }
   }
 });
 
 test('chromium: Android back closes the colours mode', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 852, height: 393 } });
-  // A stand-in for the Android app's bridge. It keeps the game in session storage and records back handling.
-  await page.addInitScript(() => {
-    window.backHandling = [];
-    window.LifePodAndroid = {
-      readGame: () => sessionStorage.getItem('game'),
-      writeGame: (game) => sessionStorage.setItem('game', game),
-      keepAwake() {},
-      haptic() {},
-      setBackHandling: (enabled) => window.backHandling.push(enabled),
-    };
-  });
-  await page.goto(app);
-  await useClassicTiles(page, 'sessionStorage');
+  const page = await openClassic(t, chromium, { viewport: { width: 852, height: 393 }, orientation: false, native: 'android' });
   const back = () => page.evaluate(() => window.closeOpenDialog());
-  const handling = () => page.evaluate(() => window.backHandling.at(-1));
-  assert.equal(await handling(), false, 'back leaves the app at rest');
+  assert.deepEqual(await backHandling(page), [false], 'back leaves the app at rest');
   await openColours(page);
-  assert.equal(await handling(), true, 'back is handled while the mode is open');
+  // Opening settings turns back handling on, and so do the mode and then settings' close event, which runs after the tap.
+  await eventually(() => backHandling(page), [false, true], 'back is handled while settings and then the mode are open');
   await swatch(page, 2, 'Slate').tap();
   assert.equal(await back(), true);
   assert.equal(await page.locator('#board').getAttribute('data-mode'), null, 'back closes the mode');
-  assert.equal(await handling(), false);
+  assert.deepEqual(await backHandling(page), [false, true, false]);
   assert.equal(await back(), false, 'back at rest leaves the app');
-  assert.equal(JSON.parse(await page.evaluate(() => sessionStorage.getItem('game'))).colors[1], 8, 'the choice is kept');
+  assert.equal((await saved(page)).colors[1], 8, 'the choice is kept');
 });
 
 // Rotated seats on short phones (design/polish/FINAL-REVIEW.md #5): a sideways face narrower than four swatches lays
 // them out 3 wide × 4 tall, and every swatch and owner label stays inside its tile, clear of the check mark.
 async function checkRotatedColours(t, engine) {
-  const page = await openPage(t, engine);
+  const page = await openClassic(t, engine);
   for (const [width, height, angle] of [[640, 360, 90], [568, 320, 90], [320, 568, 0]]) {
     await turnScreen(page, width, height, angle);
     for (const players of [3, 4, 5, 6]) {
       for (const rotations of [[1, 2, 3, 0, 1, 3], [1, 1, 1, 1, 1, 1], [3, 3, 3, 3, 3, 3]]) {
         const view = `${players} players, ${width} × ${height}, seats ${rotations.slice(0, players).join('')}`;
-        await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify({
+        await seedGame(page, {
           startingLife: 40, scores: Array(players).fill(40), rotations: rotations.slice(0, players), landscapeAngle: 90,
-        }));
-        await page.reload();
-        await openColours(page);
-        const found = await page.evaluate(() => {
-          const controls = document.querySelector('#board-controls').getBoundingClientRect();
-          const disc = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-          const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-          return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-            const bounds = player.getBoundingClientRect();
-            const face = player.querySelector('.player-face');
-            const grid = player.querySelector('.swatches');
-            const columns = getComputedStyle(grid).gridTemplateColumns.split(' ').length;
-            const issues = [...player.querySelectorAll('.swatch, .swatch .owner')].map((node) => {
-              const box = node.getBoundingClientRect();
-              const problems = [];
-              if (node.matches('.swatch') && Math.min(box.width, box.height) < 43.5) problems.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
-              if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) problems.push('outside its tile');
-              if (overlaps(box, disc)) problems.push('under the check mark');
-              return problems.length ? `P${index + 1} ${node.getAttribute('aria-label') ?? node.textContent}: ${problems.join(', ')}` : '';
-            }).filter(Boolean);
-            if (face.offsetWidth < 4 * 44 + 3 * 3 + 2 && columns !== 3) issues.push(`P${index + 1}'s face is ${face.offsetWidth}px wide but its swatches are ${columns} wide`);
-            return issues;
-          });
         });
-        assert.deepEqual(found, [], view);
+        await openColours(page);
+        assert.equal(await page.locator('.player .swatch:visible').count(), players * 12, `${view}: every swatch shows`);
+        assert.deepEqual(await tileProblems(page, { targets: '.swatch', parts: '.swatch .owner' }), [], view);
+        const columns = await page.locator('.player').evaluateAll(tiles => tiles.flatMap((player, index) => {
+          const face = player.querySelector('.player-face');
+          const columns = getComputedStyle(player.querySelector('.swatches')).gridTemplateColumns.split(' ').length;
+          return face.offsetWidth < 4 * 44 + 3 * 3 + 2 && columns !== 3 ? [`P${index + 1}'s face is ${face.offsetWidth}px wide but its swatches are ${columns} wide`] : [];
+        }));
+        assert.deepEqual(columns, [], view);
         await button(page, 'Done choosing colours').tap();
       }
     }
   }
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: Colours fits rotated seats on short phones`, { timeout: 120000 }, t => checkRotatedColours(t, engine));
 }

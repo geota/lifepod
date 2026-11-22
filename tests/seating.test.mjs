@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
+import { button, engines, openPage, reload, startGame, test, turnScreen } from './helpers.mjs';
 
 const layouts = {
   2: ['1← 2→'],
@@ -77,11 +75,7 @@ async function checkBoard(page, layout, turn, view) {
 }
 
 async function checkLayouts(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true });
-  await fakeScreenOrientation(page);
-  await page.goto(app);
+  const page = await openPage(t, engine, { orientation: true });
 
   // A new game takes the current landscape as upright. In a portrait window it turns the board clockwise.
   for (const [short, long] of [[320, 568], [393, 852], [768, 1024]]) {
@@ -111,15 +105,11 @@ async function checkLayouts(t, engine) {
   await turnScreen(page, 393, 852, 180);
   await checkBoard(page, rotated, 270, 'portrait, turned the other way');
 
-  // The seats stay fixed to the device after a reload.
+  // The seats stay fixed to the device after a reload, which keeps the screen's angle as a real phone does. The
+  // board's upright angle must come from the saved game.
   await button(page, 'Add one life to Player 6').tap();
-  // Chromium writes page storage in the background. On a busy CI machine a reload straight after a write
-  // can read the old values, so give the writes a moment to land first.
-  await page.waitForTimeout(500);
-  await page.reload();
-  // A real phone reports its angle on every load. The test's stand-in keeps it in session storage, which a
-  // reload occasionally loses on CI, so report it again. The board's upright angle must come from the saved game.
-  await turnScreen(page, 393, 852, 180);
+  await reload(page);
+  assert.equal(await page.evaluate(() => screen.orientation.angle), 180, 'the screen is still at 180°');
   const tiles = await checkBoard(page, rotated, 270, 'portrait after reload');
   assert.equal(tiles[5].score, '41');
 
@@ -137,6 +127,6 @@ async function checkLayouts(t, engine) {
   await button(page, 'Close settings').tap();
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the landscape seats stay fixed to the device as the screen turns`, { timeout: 90000 }, t => checkLayouts(t, engine));
 }

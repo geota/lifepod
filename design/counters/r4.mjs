@@ -3,7 +3,7 @@
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { app } from '../../tests/helpers.mjs';
+import { appFile as app } from '../../tests/helpers.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
 const only = process.argv.slice(2);

@@ -1,26 +1,20 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, webkit } from 'playwright-core';
-import { app, button } from './helpers.mjs';
+import { chromium } from 'playwright-core';
+import { animationsDone, button, engines, openPage, test } from './helpers.mjs';
 
 const faceCounts = { 4: 4, 6: 5, 8: 4, 10: 5, 12: 6, 20: 10 };
-
-async function openPage(t, engine, options = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ viewport: { width: 852, height: 393 }, ...options });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  await page.goto(app);
-  return page;
-}
+// A roll's timers in web/dice.js. With reduced motion the result shows after the old number's 90ms fade, and the roll
+// is done at 250ms. With motion the die lands at 78% of its 720ms tumble.
+const fadeOut = 90;
+const reducedRoll = 250;
+const tumble = 720;
+const landsAt = Math.ceil(tumble * 0.78);
 
 const result = page => page.locator('#dice-result').textContent();
 const shownNumber = page => page.locator('.die-number').textContent();
 
 async function checkDice(t, engine) {
-  const page = await openPage(t, engine, { reducedMotion: 'reduce' });
+  const page = await openPage(t, engine, { viewport: { width: 852, height: 393 }, clock: true });
 
   // One tap on the board opens the dice, ready to roll from the keyboard.
   await button(page, 'Roll dice').click();
@@ -32,23 +26,38 @@ async function checkDice(t, engine) {
   for (const [sides, faces] of Object.entries(faceCounts)) {
     await button(page, `d${sides}`).click();
     assert.equal(await page.locator('#dice-stage .die-face').count(), faces, `d${sides} draws its faces`);
-    fronts.add(await page.locator('#dice-stage .tone-0').evaluate(face => getComputedStyle(face).fill));
+    // The front face is filled with that die's own --die-front.
+    const [fill, front] = await page.locator('#dice-stage .die-body').evaluate((die) => {
+      const probe = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      probe.style.color = 'var(--die-front)';
+      die.append(probe);
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return [getComputedStyle(die.querySelector('.tone-0')).fill, colour];
+    });
+    assert.equal(fill, front, `d${sides}'s front is its --die-front`);
+    fronts.add(fill);
     assert.equal(await shownNumber(page), `d${sides}`, `d${sides} names itself before a roll`);
     for (let roll = 0; roll < 3; roll++) {
       await button(page, `Roll d${sides}`).click();
-      await page.waitForFunction(() => document.querySelector('#dice-result').textContent !== '');
+      await page.clock.runFor(fadeOut - 1);
+      assert.equal(await result(page), '', 'no result while the old number fades');
+      await page.clock.runFor(1);
       const [, value, die] = (await result(page)).match(/^Rolled (\d+) on a d(\d+)$/);
       assert.equal(die, sides);
       assert.ok(Number(value) >= 1 && Number(value) <= Number(sides), `d${sides} rolled ${value}`);
-      await page.waitForTimeout(200);
       assert.equal(await shownNumber(page), value, 'the die shows the announced result');
+      // Once the roll is done, the next tap rolls again.
+      await page.clock.runFor(reducedRoll - fadeOut);
+      assert.equal(await shownNumber(page), value, 'the die still shows it when the roll is done');
     }
   }
   assert.equal(fronts.size, 6, `every die has its own colour: ${[...fronts]}`);
 
   // Tapping the die rolls it too.
   await page.locator('#dice-stage').click();
-  await page.waitForFunction(() => document.querySelector('#dice-result').textContent !== '');
+  await page.clock.runFor(fadeOut);
+  assert.match(await result(page), /^Rolled \d+ on a d20$/);
 
   // Closing clears the result, and the chosen die stays for next time.
   await page.keyboard.press('Escape');
@@ -77,12 +86,12 @@ async function checkDice(t, engine) {
   assert.ok(await button(page, 'Roll dice').isVisible());
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: the dice roll every die and fit small screens`, { timeout: 60000 }, t => checkDice(t, engine));
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the dice roll every die and fit small screens`, t => checkDice(t, engine));
 }
 
 test('chromium: rolls come from the cryptographic generator without favouring any face', async (t) => {
-  const page = await openPage(t, chromium);
+  const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 } });
   // Every face of every die turns up, and nothing falls outside it.
   const counts = await page.evaluate(() => {
     const seen = {};
@@ -113,20 +122,34 @@ test('chromium: rolls come from the cryptographic generator without favouring an
 });
 
 test('chromium: the roll animates, then settles on one result', async (t) => {
-  const page = await openPage(t, chromium);
+  // The tumble is a Web Animation, which runs on real time rather than the page's clock, so on a slow machine it can be
+  // over before the test looks. Each element.animate call is recorded instead.
+  const recordAnimations = page => page.addInitScript(() => {
+    const animate = Element.prototype.animate;
+    window.testAnimated = [];
+    Element.prototype.animate = function (...args) {
+      window.testAnimated.push(this.className.baseVal ?? this.className);
+      return animate.apply(this, args);
+    };
+  });
+  const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 }, clock: true, motion: 'no-preference', before: recordAnimations });
   await button(page, 'Roll dice').click();
   await button(page, 'Roll d20').click();
+  assert.ok(await page.evaluate(() => window.testAnimated.some(name => name.split(' ').includes('die-body'))), 'the die tumbles');
   // Taps while the die is in the air don't start another roll.
-  await page.waitForTimeout(100);
-  assert.ok(await page.locator('.die-body').evaluate(die => die.getAnimations().length > 0), 'the die tumbles');
+  await page.clock.runFor(100);
   await button(page, 'Roll d20').click();
   await page.locator('#dice-stage').click();
   await button(page, 'd6').click();
   assert.equal(await page.locator('#dice-picker [aria-pressed="true"]').textContent(), 'd20', 'the die stays while rolling');
-  await page.waitForTimeout(900);
+  await page.clock.runFor(landsAt - 1 - 100);
+  assert.equal(await result(page), '', 'no result while the die is in the air');
+  await page.clock.runFor(1);
   const [, value] = (await result(page)).match(/^Rolled (\d+) on a d20$/);
   assert.equal(await shownNumber(page), value);
+  await page.clock.runFor(tumble - landsAt);
+  await animationsDone(page.locator('#dice-stage'));
   assert.equal(await page.locator('.die-body').evaluate(die => die.getAnimations().length), 0, 'the die has settled');
-  await page.waitForTimeout(300);
+  await page.clock.runFor(300);
   assert.equal(await shownNumber(page), value, 'nothing changes the result after it lands');
 });

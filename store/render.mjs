@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { app, button, fakeScreenOrientation } from '../tests/helpers.mjs';
+import { appFile as app, button, fakeScreenOrientation } from '../tests/helpers.mjs';
 
 const out = new URL('./', import.meta.url).pathname;
 

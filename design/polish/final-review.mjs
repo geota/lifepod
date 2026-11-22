@@ -14,7 +14,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright-core';
-import { app, fakeScreenOrientation, turnScreen } from '../../tests/helpers.mjs';
+import { appFile as app, fakeScreenOrientation, turnScreen } from '../../tests/helpers.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/final/', import.meta.url));
 const args = new Set(process.argv.slice(2));

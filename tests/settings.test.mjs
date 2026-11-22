@@ -1,47 +1,10 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, scores, turnScreen } from './helpers.mjs';
+import { chromium } from 'playwright-core';
+import { backHandling, button, engines, eventually, openPage, reload, saved, scores, seedGame, test, turnScreen } from './helpers.mjs';
 
 // The full-screen settings page (design/polish/SETTINGS-SPEC.md) and its controls (design/polish/STYLE.md): layout B,
 // the notched players and life sliders, the inline life editor, the pending new game (P1), the flip (O1), board
 // actions, the instant switches and the inline About.
-
-const engines = { chromium, webkit };
-
-async function openPage(t, engine, { android = false, viewport = { width: 952, height: 427 } } = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  if (android) {
-    await page.addInitScript(() => {
-      window.backHandling = [];
-      window.LifePodAndroid = {
-        readGame: () => sessionStorage.getItem('game'),
-        writeGame: (game) => sessionStorage.setItem('game', game),
-        keepAwake() {},
-        haptic() {},
-        setBackHandling: (enabled) => window.backHandling.push(enabled),
-      };
-    });
-  }
-  return page;
-}
-
-// A dialog's close event runs after the click that closes it, so results that follow it are polled.
-async function eventually(read, expected, message) {
-  const deadline = Date.now() + 2000;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
 
 const openDialogs = page => page.evaluate(() => [...document.querySelectorAll('dialog[open]')].map(dialog => dialog.id));
 const boardMode = page => page.evaluate(() => document.querySelector('#board').dataset.mode ?? null);
@@ -106,14 +69,10 @@ const layoutSizes = [[952, 427, 90], [852, 393, 90], [640, 360, 90], [620, 360, 
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: settings opens full screen, two columns from 620px wide and one below, with 44px targets and nothing sideways`, { timeout: 60000 }, async (t) => {
-    const page = await openPage(t, engine);
-    await fakeScreenOrientation(page);
-    await page.goto(app);
     // With Mana pool on and Turns not Off, every row shows, auto-empty's included.
-    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-      startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', turn: { first: 0, active: 0, round: 1 },
-    })));
-    await page.reload();
+    const page = await openPage(t, engine, {
+      orientation: true, game: { startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', turn: { first: 0, active: 0, round: 1 } },
+    });
     for (const [width, height, angle] of layoutSizes) {
       const view = `${width} × ${height}`;
       await turnScreen(page, width, height, angle);
@@ -140,7 +99,6 @@ for (const [name, engine] of Object.entries(engines)) {
 
 test('chromium: settings keeps clear of the safe-area insets', async (t) => {
   const page = await openPage(t, chromium);
-  await page.goto(app);
   // Stand-ins for a notch and a home indicator: the insets come in through CSS variables.
   await page.evaluate(() => {
     for (const [side, size] of [['top', 30], ['right', 44], ['bottom', 20], ['left', 48]]) document.documentElement.style.setProperty(`--safe-${side}`, `${size}px`);
@@ -159,7 +117,6 @@ test('chromium: settings keeps clear of the safe-area insets', async (t) => {
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the players slider works by tapping a number, tapping the track, dragging and the arrow keys`, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
     await button(page, 'Settings').tap();
     assert.deepEqual(await sliderState(page, 'players'), { now: 4, text: '4 players', at: 0.5, pinned: '' });
 
@@ -205,7 +162,6 @@ for (const [name, engine] of Object.entries(engines)) {
 
 test('chromium: a touch drag along the players slider picks a value', async (t) => {
   const page = await openPage(t, chromium);
-  await page.goto(app);
   await button(page, 'Settings').tap();
   const cdp = await page.context().newCDPSession(page);
   const from = await pointFor(page, 'players', 4, [2, 6]);
@@ -223,7 +179,6 @@ test('chromium: a touch drag along the players slider picks a value', async (t) 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the life slider has stops at 20, 30 and 40, snaps to fives and steps by keys`, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
     await button(page, 'Settings').tap();
     assert.deepEqual(await sliderState(page, 'life'), { now: 40, text: 'Starting life 40', at: 0.6, pinned: '' });
     assert.deepEqual(await page.locator('#life-presets .k-stop').allTextContents(), ['20', '30', '40']);
@@ -268,7 +223,6 @@ for (const [name, engine] of Object.entries(engines)) {
 
   test(`${name}: the life number opens an inline field for valid, invalid and out-of-range values`, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
     await button(page, 'Settings').tap();
     const field = page.locator('#life-input');
     const edit = async (text, key) => {
@@ -316,8 +270,7 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(await scores(page), [123, 123, 123, 123], 'the new game starts at the typed life');
 
     // An old save off the track opens with its life shown and the handle pinned.
-    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 5, scores: [5, 3, 5, 5] })));
-    await page.reload();
+    await seedGame(page, { startingLife: 5, scores: [5, 3, 5, 5] });
     await button(page, 'Settings').tap();
     assert.deepEqual(await sliderState(page, 'life'), { now: 5, text: 'Starting life 5', at: 0, pinned: 'low' });
     assert.equal(await doneLabel(page), 'Done', 'nothing has changed yet');
@@ -327,10 +280,7 @@ for (const [name, engine] of Object.entries(engines)) {
 // In both styles: Glass's header floats over the body (design/polish/STYLE.md, direction B).
 for (const style of ['material', 'glass']) {
   test(`chromium: the life field scrolls clear of the keyboard and the header (${style})`, async (t) => {
-    const page = await openPage(t, chromium);
-    await page.goto(app);
-    await page.evaluate(saved => localStorage.setItem('lifepod-game', JSON.stringify(saved)), { startingLife: 40, scores: [40, 40, 40, 40], style });
-    await page.reload();
+    const page = await openPage(t, chromium, { style });
     await button(page, 'Settings').tap();
     // Scrolled so the life row is near the bottom of the screen, then the keyboard takes 46% of the height (Android's
     // WebView shrinks the page for it).
@@ -367,7 +317,6 @@ for (const style of ['material', 'glass']) {
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: a players or life change is pending until Done, and ✕ drops it`, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
     await button(page, 'Settings').tap();
     assert.equal(await doneLabel(page), 'Done');
     assert.equal(await pendingText(page), '');
@@ -415,8 +364,7 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 
   test(`${name}: New game asks over settings; cancelling returns, confirming starts it and closes both`, async (t) => {
-    const page = await openPage(t, engine, { android: engine === chromium });
-    await page.goto(app);
+    const page = await openPage(t, engine, { native: engine === chromium ? 'android' : undefined });
     await page.locator('.player').first().locator('.add').tap();
     await button(page, 'Settings').tap();
     await button(page, 'New game').tap();
@@ -442,7 +390,6 @@ for (const [name, engine] of Object.entries(engines)) {
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: Colours, Rotate seats and Choose identities close settings, starting a pending game first`, { timeout: 60000 }, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
     const actions = [
       ['Choose tile colours on the board', 'colours', 'Done choosing colours'],
       ['Rotate seats on the board', 'rotate', 'Done rotating seats'],
@@ -480,7 +427,6 @@ for (const [name, engine] of Object.entries(engines)) {
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the flip turns settings to face the other side and resets on reopening`, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
     await button(page, 'Settings').tap();
     const flip = button(page, 'Turn settings to face the other side');
     const turned = () => page.locator('#settings').evaluate(dialog => [dialog.hasAttribute('data-flipped'), getComputedStyle(dialog).transform]);
@@ -515,18 +461,17 @@ for (const [name, engine] of Object.entries(engines)) {
 // ---- Android back -------------------------------------------------------------------------------------------------
 
 test('chromium: Android back closes settings and drops a pending change', async (t) => {
-  const page = await openPage(t, chromium, { android: true });
-  await page.goto(app);
+  const page = await openPage(t, chromium, { native: 'android' });
   const back = () => page.evaluate(() => window.closeOpenDialog());
   await button(page, 'Settings').tap();
-  await eventually(() => page.evaluate(() => window.backHandling.at(-1)), true, 'the page handles back while settings is open');
+  await eventually(() => backHandling(page), [false, true], 'the page handles back while settings is open');
   await button(page, '6 players').tap();
   // With the life field open, back closes settings too (the keyboard is the system's to close first).
   await page.locator('#life-edit').tap();
   assert.equal(await back(), true);
   await eventually(() => openDialogs(page), [], 'back closes settings');
   assert.equal((await scores(page)).length, 4, 'the pending change is dropped');
-  await eventually(() => page.evaluate(() => window.backHandling.at(-1)), false, 'back goes to the system at rest');
+  await eventually(() => backHandling(page), [false, true, false], 'back goes to the system at rest');
   assert.equal(await back(), false);
 });
 
@@ -534,9 +479,7 @@ test('chromium: Android back closes settings and drops a pending change', async 
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: Track, Identity and Keep awake save the moment they change and survive a reload`, { timeout: 60000 }, async (t) => {
-    const page = await openPage(t, engine, { android: engine === chromium });
-    await page.goto(app);
-    const saved = () => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
+    const page = await openPage(t, engine, { native: engine === chromium ? 'android' : undefined });
     const toggle = name => page.locator('#settings label', { has: page.getByRole('switch', { name, exact: true }) }).tap();
     await button(page, 'Settings').tap();
     // The switches come in the order Commander, Poison, Energy, Experience, Rad, Mana pool, Monarch, Initiative;
@@ -545,7 +488,7 @@ for (const [name, engine] of Object.entries(engines)) {
       ['Commander', 'Poison', 'Energy', 'Experience', 'Rad', 'Mana pool', 'Monarch', 'Initiative', 'Empty mana pools when the turn passes']);
     assert.ok(await page.locator('#auto-empty-row').isHidden(), 'auto-empty is hidden with Mana pool off');
     await toggle('Poison');
-    assert.equal((await saved()).counters.poison, true, 'Poison is saved while settings is open');
+    assert.equal((await saved(page)).counters.poison, true, 'Poison is saved while settings is open');
     assert.ok(!(await page.locator('#counters-button').evaluate(node => node.hidden)), 'the counters button shows at once');
     for (const name of ['Commander', 'Rad', 'Initiative']) await toggle(name);
     await toggle('Mana pool');
@@ -554,12 +497,12 @@ for (const [name, engine] of Object.entries(engines)) {
     await toggle('Name');
     await button(page, 'Off').last().tap();
     await toggle('Keep awake');
-    assert.deepEqual((await saved()).counters, { commander: true, poison: true, energy: false, experience: false, rad: true, monarch: false, initiative: true });
-    const game = await saved();
+    assert.deepEqual((await saved(page)).counters, { commander: true, poison: true, energy: false, experience: false, rad: true, monarch: false, initiative: true });
+    const game = await saved(page);
     assert.deepEqual([game.manaPool, game.turns, game.identity.show.name, game.identity.background, game.keepAwake], [true, 'rounds', false, 'off', false]);
     // ✕ drops nothing that saved at once.
     await button(page, 'Close settings').tap();
-    await page.reload();
+    await reload(page);
     await button(page, 'Settings').tap();
     const checked = await page.locator('#settings [role="switch"]').evaluateAll(inputs => Object.fromEntries(inputs.map(input => [input.closest('label').textContent.trim(), input.checked])));
     assert.deepEqual(checked, {
@@ -574,9 +517,7 @@ for (const [name, engine] of Object.entries(engines)) {
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the body scrolls to the end with no scroll trap, and the fade shows while there's more`, async (t) => {
-    const page = await openPage(t, engine, { viewport: { width: 568, height: 320 } });
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await page.goto(app);
+    const page = await openPage(t, engine, { viewport: { width: 568, height: 320 }, motion: 'reduce' });
     await button(page, 'Settings').tap();
     const body = page.locator('#settings-body');
     const cue = () => page.locator('#settings .scroll-cue').evaluate(node => node.hasAttribute('data-more'));
@@ -616,15 +557,11 @@ for (const [name, engine] of Object.entries(engines)) {
 // Either way, the swipe never changes the slider. On macOS the real scroll is required.
 test('chromium: a vertical touch swipe that starts on a slider scrolls the page and leaves the value', async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
-  await page.goto(app);
   await button(page, 'Settings').tap();
   const cdp = await page.context().newCDPSession(page);
   const scrolled = () => page.locator('#settings-body').evaluate(node => node.scrollTop > 40);
-  const settle = async () => {
-    const deadline = Date.now() + 1500;
-    while (!(await scrolled()) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 50));
-    return scrolled();
-  };
+  // Whether the body scrolls within 1.5s of the gesture.
+  const settle = () => eventually(scrolled, true, 'the body scrolls', 1500).then(() => true, () => false);
   const start = await pointFor(page, 'players', 5, [2, 6]);
   const x = Math.round(start.x);
   const y = Math.round(start.y);
@@ -632,12 +569,14 @@ test('chromium: a vertical touch swipe that starts on a slider scrolls the page 
   let scrolls = await settle();
   assert.equal((await sliderState(page, 'players')).now, 4, 'the gesture leaves the slider’s value');
   if (!scrolls) {
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    // The moves are a frame (16ms) apart by their timestamps, so the browser sees a swipe at a steady speed without the
+    // test waiting between them.
+    const began = Date.now() / 1000;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }], timestamp: began });
     for (let step = 1; step <= 20; step++) {
-      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - step * 10 }] });
-      await new Promise(resolve => setTimeout(resolve, 16));
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - step * 10 }], timestamp: began + step * 0.016 });
     }
-    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [], timestamp: began + 21 * 0.016 });
     scrolls = await settle();
   }
   assert.equal((await sliderState(page, 'players')).now, 4, 'the swipe leaves the slider’s value');
@@ -666,10 +605,9 @@ test('chromium: a vertical touch swipe that starts on a slider scrolls the page 
 
 for (const style of ['material', 'glass']) {
   test(`chromium: the fixed header never covers the focused control (${style})`, async (t) => {
-    const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
-    await page.goto(app);
-    await page.evaluate(saved => localStorage.setItem('lifepod-game', JSON.stringify(saved)), { startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', style });
-    await page.reload();
+    const page = await openPage(t, chromium, {
+      viewport: { width: 568, height: 320 }, game: { startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', style },
+    });
     await button(page, 'Settings').tap();
     const seen = new Set();
     for (let step = 0; step < 60; step++) {
@@ -700,16 +638,13 @@ for (const style of ['material', 'glass']) {
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: Tile colours switches sets, keeping every player's colour and no two alike, and saves at once`, async (t) => {
     const page = await openPage(t, engine);
-    await page.goto(app);
-    const saved = () => page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')));
     const tiles = () => page.evaluate(() => ({
       set: document.documentElement.dataset.tiles,
       colours: [...document.querySelectorAll('.player')].map(player => player.dataset.colour),
       panels: [...document.querySelectorAll('.player')].map(player => getComputedStyle(player).backgroundColor),
     }));
     // A save from before the setting gets Clear.
-    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40, 40, 40, 40, 40], colors: [6, 1, 2, 3, 4, 5] })));
-    await page.reload();
+    await seedGame(page, { startingLife: 40, scores: [40, 40, 40, 40, 40, 40], colors: [6, 1, 2, 3, 4, 5] });
     const start = await tiles();
     assert.equal(start.set, 'clear', 'an old save gets Clear');
     assert.deepEqual(start.colours, ['rose', 'sky', 'coral', 'violet', 'amber', 'teal']);
@@ -722,7 +657,7 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Classic').tap();
     const classic = await tiles();
     assert.equal(classic.set, 'classic');
-    assert.equal((await saved()).tileColours, 'classic', 'saved the moment it changes');
+    assert.equal((await saved(page)).tileColours, 'classic', 'saved the moment it changes');
     for (const [key, set] of [['ArrowRight', 'soft'], ['ArrowRight', 'jewel']]) {
       await page.locator('#tiles-track').focus();
       await page.keyboard.press(key);
@@ -741,11 +676,10 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Choose tile colours on the board').tap();
     assert.equal(await page.locator('.player:nth-child(1) .swatch').first().getAttribute('aria-label'), 'Coral', 'Clear names its first swatch Coral');
     await button(page, 'Done choosing colours').tap();
-    await page.reload();
+    await reload(page);
     assert.equal((await tiles()).set, 'clear', 'the set survives a reload');
     // An unknown set falls back to Clear.
-    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40], tileColours: 'neon' })));
-    await page.reload();
+    await seedGame(page, { startingLife: 40, scores: [40, 40], tileColours: 'neon' });
     assert.equal((await tiles()).set, 'clear', 'an unknown set gets Clear');
   });
 }

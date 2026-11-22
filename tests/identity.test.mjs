@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, startGame, turnScreen } from './helpers.mjs';
+import { chromium } from 'playwright-core';
+import {
+  backHandling, button, engines, eventually, hold, openPage, reload, saved, savedGame, seedGame, startGame, test, tileProblems, token,
+  turnScreen,
+} from './helpers.mjs';
 
 // Colour identity (design/polish/SPEC.md §2): its own section in settings, a chip on each tile showing any of the colour
 // indicator, the symbol and the name, a background behind the total (the symbol, the rings or nothing), and identity
@@ -45,41 +46,7 @@ const switchedOn = page => page.locator('#identity-show [role="switch"]').evalua
 const showSwitch = (page, name) => page.locator('#identity-show label', { has: page.getByRole('switch', { name, exact: true }) });
 // The save format of the identity settings: without it, a saved background is from before Default (see the load test).
 const settingsVersion = 2;
-const saved = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
-
-// A dialog's close event runs after the click that closes it, so results that follow it are polled.
-async function eventually(read, expected, message) {
-  const deadline = Date.now() + 2000;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
-
-async function openPage(t, engine, { android = false, viewport = { width: 952, height: 427 } } = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  if (android) {
-    // A stand-in for the Android app's bridge. It keeps the game in session storage and records back handling.
-    await page.addInitScript(() => {
-      window.backHandling = [];
-      window.LifePodAndroid = {
-        readGame: () => sessionStorage.getItem('game'),
-        writeGame: (game) => sessionStorage.setItem('game', game),
-        keepAwake() {},
-        haptic() {},
-        setBackHandling: (enabled) => window.backHandling.push(enabled),
-      };
-    });
-  }
-  return page;
-}
+// A dialog's close event runs after the click that closes it, so results that follow it are polled (eventually).
 
 // What each tile shows of its identity: the chip's parts in order, what a screen reader hears, and the background:
 // the symbol at its opacity, the rings, or "plain" for neither.
@@ -111,19 +78,12 @@ function readTiles(page) {
 // behind a set identity and the rings elsewhere, Default is the rings everywhere, and Off is a plain tile.
 test('chromium: every identity shows its indicator, symbol and name in every combination and background', { timeout: 120000 }, async (t) => {
   const page = await openPage(t, chromium);
-  await page.goto(app);
-  await page.evaluate(() => document.fonts.load('16px Mana', ''));
   const backgrounds = ['symbol', 'default', 'off'];
   for (const [index, show] of combinations.entries()) {
     const background = backgrounds[index % 3];
     for (let start = 0; start < identities.length; start += 6) {
       const batch = Array.from({ length: 6 }, (_, seat) => identities[start + seat] ?? '');
-      await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), {
-        startingLife: 40, scores: Array(6).fill(40), rotations: Array(6).fill(0), keepAwake: true, landscapeAngle: 90,
-        identities: batch, identity: { show, background, version: settingsVersion },
-      });
-      await page.reload();
-      await page.evaluate(() => document.fonts.ready);
+      await seedGame(page, savedGame(6, { identities: batch, identity: { show, background, version: settingsVersion } }));
       const view = `${JSON.stringify(show)}, ${background}`;
       const expected = batch.map((identity) => {
         if (!identity) return { chip: null, spoken: null, background: background === 'off' ? 'plain' : 'rings' };
@@ -145,17 +105,14 @@ test('chromium: every identity shows its indicator, symbol and name in every com
 // A chip with only the indicator or only the symbol is round; with the name it's a capsule.
 test('chromium: a lone indicator or symbol is a round chip, and a name makes a capsule', async (t) => {
   const page = await openPage(t, chromium);
-  await page.goto(app);
   const shapes = {};
   for (const [label, show] of Object.entries({
     indicator: { indicator: true, symbol: false, name: false }, symbol: { indicator: false, symbol: true, name: false },
     name: { indicator: false, symbol: false, name: true }, both: { indicator: true, symbol: true, name: false },
   })) {
-    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), {
+    await seedGame(page, {
       startingLife: 40, scores: [40, 40, 40, 40], identities: ['WUB', 'R', 'UG', 'WBRG'], identity: { show, background: 'symbol' },
     });
-    await page.reload();
-    await page.evaluate(() => document.fonts.ready);
     shapes[label] = await page.locator('.badges.near .ci-chip').evaluateAll(chips => chips.map(chip => Math.round(chip.offsetWidth / chip.offsetHeight * 10) / 10));
   }
   for (const label of ['indicator', 'symbol']) {
@@ -169,14 +126,9 @@ test('chromium: a lone indicator or symbol is a round chip, and a name makes a c
 // back close settings and keep what was saved.
 async function checkSheet(t, engine) {
   const android = engine === chromium;
-  const page = await openPage(t, engine, { android });
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-    startingLife: 40, scores: [40, 40, 40, 40], identities: ['WUB', '', 'UG', 'UBRG'],
-  })));
-  if (android) await page.evaluate(() => sessionStorage.setItem('game', localStorage.getItem('lifepod-game')));
-  await page.reload();
-  await page.evaluate(() => document.fonts.ready);
+  const page = await openPage(t, engine, {
+    native: android ? 'android' : undefined, game: { startingLife: 40, scores: [40, 40, 40, 40], identities: ['WUB', '', 'UG', 'UBRG'] },
+  });
 
   // Identity shows without Commander, as the indicator and the name by default, with the symbol behind the total.
   assert.deepEqual((await readTiles(page)).map(read => read.chip), [['indicator WUB', 'name Esper'], null, ['indicator UG', 'name Simic'], ['indicator UBRG', 'name Glint-Eye']]);
@@ -233,18 +185,18 @@ async function checkSheet(t, engine) {
     await eventually(() => openDialogs(page), ['settings']);
     assert.equal(await back(), true);
     await eventually(() => openDialogs(page), []);
-    await eventually(() => page.evaluate(() => window.backHandling.at(-1)), false, 'back goes to the system at rest');
+    // Each time settings open back is handled, and each time their close event runs it goes to the system again.
+    await eventually(() => backHandling(page), [false, true, false, true, false], 'back goes to the system at rest');
   } else {
     // The settings survive a reload.
-    await page.waitForTimeout(500);
-    await page.reload();
+    await reload(page);
     await button(page, 'Settings').tap();
     assert.deepEqual([await switchedOn(page), await pressed(page, '#identity-background')], [[], ['Off']]);
     assert.deepEqual((await readTiles(page)).map(read => read.background), ['plain', 'plain', 'plain', 'plain'], 'Off survives a reload');
   }
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: Identity in settings sets what tiles show and saves at once`, { timeout: 60000 }, t => checkSheet(t, engine));
 }
 
@@ -252,11 +204,7 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
 // player. Each change saves at once, and the check mark, Escape or Android back end the mode.
 async function checkMode(t, engine) {
   const android = engine === chromium;
-  const page = await openPage(t, engine, { android, viewport: { width: 852, height: 393 } });
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  await turnScreen(page, 852, 393, 90);
-  await page.evaluate(() => document.fonts.ready);
+  const page = await openPage(t, engine, { viewport: { width: 852, height: 393 }, orientation: 90, native: android ? 'android' : undefined });
   const toggles = number => page.getByRole('group', { name: `Colour identity for Player ${number}` });
   const on = number => toggles(number).locator('[aria-pressed="true"]').evaluateAll(nodes => nodes.map(node => node.value).join(''));
   const preview = number => tile(page, number).locator('.identity-preview').evaluate(node => {
@@ -274,7 +222,8 @@ async function checkMode(t, engine) {
   assert.equal(await mode(page), 'identity');
   assert.ok(await button(page, 'Done choosing identities').isVisible());
   assert.ok(!(await button(page, 'Roll dice').isVisible()), 'only the check mark stays in the centre');
-  if (android) assert.equal(await page.evaluate(() => window.backHandling.at(-1)), true, 'back is handled while the mode is open');
+  // Settings, the mode and then settings' close event each hand back to the page.
+  if (android) await eventually(() => backHandling(page), [false, true], 'back is handled while the mode is open');
   assert.ok(!(await tile(page, 1).locator('.subtract').isVisible()), 'the life controls make way for the toggles');
   assert.equal(await page.locator('.mode-layer .swatch').count(), 0, 'no swatches in identity mode');
   assert.deepEqual(await toggles(3).getByRole('button').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label'))),
@@ -284,8 +233,8 @@ async function checkMode(t, engine) {
     const glyph = getComputedStyle(pip, '::before');
     return `${glyph.fontFamily} ${glyph.content.codePointAt(1).toString(16)} ${getComputedStyle(pip).backgroundColor}`;
   }));
-  assert.deepEqual(pips, ['Mana e600 rgb(253, 251, 206)', 'Mana e601 rgb(188, 218, 247)', 'Mana e602 rgb(167, 153, 158)',
-    'Mana e603 rgb(241, 155, 121)', 'Mana e604 rgb(159, 203, 166)']);
+  const printed = await Promise.all(colours.map(async colour => `Mana ${mana[colour]} ${await token(page, `--pip-${colour.toLowerCase()}`)}`));
+  assert.deepEqual(pips, printed);
   assert.deepEqual(await preview(1), ['No identity'], 'an empty identity previews as No identity');
   // Each tile's toggles face its player.
   const facing = await page.locator('.player .identity').evaluateAll(groups => groups.map(node => Math.round(new DOMMatrixReadOnly(getComputedStyle(node.closest('.player-face')).transform).a)));
@@ -325,7 +274,8 @@ async function checkMode(t, engine) {
     await toggles(4).getByRole('button', { name: 'Blue' }).tap();
     assert.equal(await page.evaluate(() => window.closeOpenDialog()), true);
     assert.equal(await mode(page), null, 'back ends identity mode');
-    assert.equal(await page.evaluate(() => window.backHandling.at(-1)), false);
+    // Opened and closed three times: by the check mark, Escape and now back.
+    assert.deepEqual(await backHandling(page), [false, true, false, true, false, true, false]);
     assert.equal((await saved(page)).identities[3], 'U', 'and keeps the change');
   }
 
@@ -333,11 +283,12 @@ async function checkMode(t, engine) {
   await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
-  await page.waitForFunction(() => !document.querySelector('#restart').open);
+  // The restart dialog's close event starts the game, then closes settings.
+  await eventually(() => openDialogs(page), [], 'the new game starts');
   await eventually(async () => (await saved(page)).identities, ['UBRG', 'R', 'WG', android ? 'U' : ''], 'a new game keeps the identities');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: identity mode sets each player's identity and saves at once`, { timeout: 60000 }, t => checkMode(t, engine));
 }
 
@@ -345,13 +296,9 @@ for (const [name, engine] of Object.entries({ chromium, webkit })) {
 // player count from the target phone to the stress size. Five toggles make one row where every tile has room (ui ≥
 // 264), otherwise three over two.
 test('chromium: identity mode fits every player count', { timeout: 120000 }, async (t) => {
-  const page = await openPage(t, chromium);
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-    startingLife: 40, scores: [40, 40, 40, 40], identities: ['WURG', 'UBRG', 'WBR', 'WUBG'],
-  })));
-  await page.reload();
+  const page = await openPage(t, chromium, {
+    orientation: true, game: { startingLife: 40, scores: [40, 40, 40, 40], identities: ['WURG', 'UBRG', 'WBR', 'WUBG'] },
+  });
   for (const [width, height, angle] of [[952, 427, 90], [852, 393, 90], [640, 360, 90], [568, 320, 90], [320, 568, 0]]) {
     await turnScreen(page, width, height, angle);
     for (const players of [2, 3, 4, 5, 6]) {
@@ -359,22 +306,14 @@ test('chromium: identity mode fits every player count', { timeout: 120000 }, asy
       await button(page, 'Settings').tap();
       await button(page, 'Choose identities on the board').tap();
       await eventually(() => mode(page), 'identity');
+      const view = `${players} players, ${width} × ${height}`;
+      assert.deepEqual(await tileProblems(page, { targets: '.identity-toggle', parts: '.identity-preview .chip' }), [], view);
       const problems = await page.evaluate(() => {
-        const controls = document.querySelector('#board-controls').getBoundingClientRect();
-        const disc = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-        const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
         const wide = document.querySelector('#board').hasAttribute('data-wide');
         return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-          const bounds = player.getBoundingClientRect();
-          const toggles = [...player.querySelectorAll('.identity-toggle')];
-          const issues = [...toggles, player.querySelector('.identity-preview .chip')].map((node) => {
-            const box = node.getBoundingClientRect();
-            const found = [];
-            if (node.matches('button') && Math.min(box.width, box.height) < 43.5) found.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
-            if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) found.push('outside its tile');
-            if (overlaps(box, disc)) found.push('under the check mark');
-            return found.length ? `P${index + 1} ${node.getAttribute('aria-label') ?? node.textContent}: ${found.join(', ')}` : '';
-          }).filter(Boolean);
+          const issues = [];
+          const toggles = [...player.querySelectorAll('.identity-toggle')].filter(node => node.checkVisibility());
+          if (!player.querySelector('.identity-preview .chip')?.checkVisibility()) issues.push(`P${index + 1} has no preview`);
           // Rows along the player's reading direction: the toggles' faces share their tile's turn.
           const rows = new Set(toggles.map(node => node.offsetTop)).size;
           if (toggles.length !== 5) issues.push(`P${index + 1} has ${toggles.length} toggles`);
@@ -382,7 +321,7 @@ test('chromium: identity mode fits every player count', { timeout: 120000 }, asy
           return issues;
         });
       });
-      assert.deepEqual(problems, [], `${players} players, ${width} × ${height}`);
+      assert.deepEqual(problems, [], view);
       await button(page, 'Done choosing identities').tap();
     }
   }
@@ -393,12 +332,10 @@ test('chromium: identity mode fits every player count', { timeout: 120000 }, asy
 // Indicator as Symbol. Only a save that carries the settings version can be the new Off.
 test('chromium: saved identity settings are checked when a game loads', async (t) => {
   const page = await openPage(t, chromium);
-  await page.goto(app);
   const load = async (identity) => {
-    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), {
+    await seedGame(page, {
       startingLife: 40, scores: [40, 40, 40, 40], identities: ['WU', 'BRG', '', 'R'], ...(identity === undefined ? {} : { identity }),
     });
-    await page.reload();
     await button(page, 'Settings').tap();
     const settings = [await switchedOn(page), await pressed(page, '#identity-background')];
     await button(page, 'Close settings').tap();
@@ -439,12 +376,9 @@ test('chromium: saved identity settings are checked when a game loads', async (t
 // symbol is muted and an on one has a check, under the hint "Tap your colours". Each "Show on tiles" switch row has the
 // mark it adds (the colour disc, the symbol, "Aa") and a switch that's on or off, and the note says what tiles show.
 async function checkExplains(t, engine) {
-  const page = await openPage(t, engine);
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-    startingLife: 40, scores: [40, 40, 40, 40, 40, 40], identities: ['WUBG', 'UB', '', 'G', 'WUBRG', 'R'], landscapeAngle: 90,
-  })));
-  await page.reload();
+  const page = await openPage(t, engine, {
+    game: { startingLife: 40, scores: [40, 40, 40, 40, 40, 40], identities: ['WUBG', 'UB', '', 'G', 'WUBRG', 'R'], landscapeAngle: 90 },
+  });
   await button(page, 'Settings').tap();
   const sheet = () => page.locator('#identity-show').evaluate(group => ({
     toggles: [...group.children].map(row => ({
@@ -484,15 +418,16 @@ async function checkExplains(t, engine) {
   assert.equal(await tile(page, 1).locator('.identity-toggle[value="R"] .toggle-check').isVisible(), true, 'turning red on adds its check');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: identity toggles and the Identity sheet say what's on`, { timeout: 60000 }, t => checkExplains(t, engine));
 }
 
 // A colour toggle counts once per press, however long the press: the click after a long press is skipped
-// (docs/review/ARCHITECTURE.md B4). A mouse in both engines, and a real touch through CDP in Chromium.
+// (docs/review/ARCHITECTURE.md B4). A mouse in both engines, and a real touch through CDP in Chromium. The page's clock
+// is paused, so each press lasts exactly 1s: longer than the 800ms click-skip window its pointerdown opens, so only the
+// window its pointerup opens can skip the click.
 async function checkLongPressToggle(t, engine) {
-  const page = await openPage(t, engine);
-  await page.goto(app);
+  const page = await openPage(t, engine, { clock: true });
   await button(page, 'Settings').tap();
   await button(page, 'Choose identities on the board').tap();
   await eventually(() => mode(page), 'identity');
@@ -503,21 +438,17 @@ async function checkLongPressToggle(t, engine) {
     return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
   };
 
-  const white = await centre('White');
-  await page.mouse.move(white.x, white.y);
-  await page.mouse.down();
-  await page.waitForTimeout(1000);
-  await page.mouse.up();
-  await page.waitForTimeout(100);
+  await hold(page, toggle('White'), 1000);
+  await page.clock.runFor(100);
   assert.equal((await identities())[2], 'W', 'a 1s mouse press turns White on, once');
 
   if (engine === chromium) {
     const cdp = await page.context().newCDPSession(page);
     const blue = await centre('Blue');
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ id: 1, ...blue }] });
-    await page.waitForTimeout(1000);
+    await page.clock.runFor(1000);
     await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
-    await page.waitForTimeout(100);
+    await page.clock.runFor(100);
     assert.equal((await identities())[2], 'WU', 'a 1s touch turns Blue on, once');
   }
   // A short tap still toggles, and the keyboard still works.
@@ -528,6 +459,6 @@ async function checkLongPressToggle(t, engine) {
   assert.equal((await identities())[2].includes('W'), true, 'Enter turns White on');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: a long press on a colour toggle counts once`, { timeout: 60000 }, t => checkLongPressToggle(t, engine));
 }

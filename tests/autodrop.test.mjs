@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, seedGame } from './helpers.mjs';
+import { button, engines, openPage, saved, test } from './helpers.mjs';
 
 // Auto-drop (design/polish/SPEC.md §3.2): when a badge row runs out of room, parts give way in a fixed order on
 // every tile at once, and no count is ever hidden. Today's rows hold the colour identity chip, poison, tax, energy,
@@ -30,18 +28,9 @@ function worstGame(count, { damage = () => 19, show = allParts, poison = () => 1
   };
 }
 
-async function openBoard(t, engine, game, { width, height }) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  await page.goto(app);
-  await seedGame(page, game);
-  // Identity symbols are Mana glyphs, and the rows are fitted again once the font has loaded.
-  await page.evaluate(() => document.fonts.ready);
-  return page;
+// A page of its own for each board, in the file's browser. A test closes each board when it's done with it.
+function openBoard(t, engine, game, { width, height }) {
+  return openPage(t, engine, { viewport: { width, height }, game });
 }
 
 // Resizes the window and waits until the board has measured its new size, which also fits the badge rows.
@@ -114,6 +103,7 @@ async function checkWorstCase(t, engine) {
       if (far) assert.deepEqual([drops.drop.includes('sword'), drops.far], [false, ''], `${view}: the far row is at full size`);
       assert.ok(nearStep(drops) <= nearLimit, `${view}: near row at step ${nearStep(drops)}, at most ${nearLimit} (${drops.drop} ${drops.near})`);
     }
+    await page.close();
     // With the flag on the active tile too, that row is one chip longer: at 6 players the target also drops the symbol
     // (step 2), and nothing is hidden or clipped.
     const together = await openBoard(t, engine, worstGame(count, { turns: true, first: 0 }), { width: 952, height: 427 });
@@ -121,6 +111,7 @@ async function checkWorstCase(t, engine) {
     const busiest = await readDrops(together);
     assert.deepEqual(busiest.problems, [], `${count} players, flag and turn chip together: every count shows inside its tile`);
     assert.ok(nearStep(busiest) <= 2, `${count} players, flag and turn chip together: near row at step ${nearStep(busiest)}, at most 2`);
+    await together.close();
     const twoCounters = await openBoard(t, engine, worstGame(count, { everyCounter: false }), { width: 952, height: 427 });
     for (const [width, height] of [[952, 427], [640, 360]]) {
       await resize(twoCounters, width, height);
@@ -128,6 +119,7 @@ async function checkWorstCase(t, engine) {
       assert.deepEqual([drops.drop, drops.near, drops.far, drops.problems], ['', '', '', []],
         `${count} players, ${width} × ${height}, poison and tax only: full size, nothing dropped`);
     }
+    await twoCounters.close();
   }
 }
 
@@ -189,13 +181,14 @@ async function checkSteps(t, engine) {
   await button(page, 'Save').tap();
   assert.equal((await readDrops(page)).drop, 'sword', 'a count of 9 doesn’t bring the sword back');
   // A board opened fresh at this size with the same counts has room for it, so it was kept away on purpose.
-  const saved = await page.evaluate(() => localStorage.getItem('lifepod-game'));
-  const fresh = await openBoard(t, engine, JSON.parse(saved), { width, height: Math.round(width * 0.5625) });
+  const fresh = await openBoard(t, engine, await saved(page), { width, height: Math.round(width * 0.5625) });
   await resize(fresh, width);
   assert.equal((await readDrops(fresh)).drop, '', 'a fresh board at the same size shows the sword');
+  await fresh.close();
   // With plenty of room, it comes back.
   await resize(page, 952);
   assert.equal((await readDrops(page)).drop, '', 'room to spare brings the sword back');
+  await page.close();
 
   // With every count at 19, narrower windows take every far step: the sword goes, the type shrinks, never under
   // 9px, then the row wraps at full size. The near row shrinks its type before the identity chip goes. Every tile
@@ -267,6 +260,7 @@ async function checkNearSteps(t, engine) {
     assert.ok(seen.has(1), `${label}: the names go on their own first`);
     if (show.indicator) assert.ok(seen.has(2), `${label}: then the symbol`);
     assert.ok(reached >= 4, `${label}: the identity chip goes on the narrowest windows (reached step ${reached})`);
+    await page.close();
   }
 }
 
@@ -291,10 +285,10 @@ async function checkNameHysteresis(t, engine) {
     .evaluate(remove => remove.click());
   await button(page, 'Save').tap();
   assert.equal((await readDrops(page)).drop, 'name', 'a count of 9 doesn’t bring the names back');
-  const saved = await page.evaluate(() => localStorage.getItem('lifepod-game'));
-  const fresh = await openBoard(t, engine, JSON.parse(saved), { width, height: Math.round(width * 0.5625) });
+  const fresh = await openBoard(t, engine, await saved(page), { width, height: Math.round(width * 0.5625) });
   await resize(fresh, width);
   assert.equal((await readDrops(fresh)).drop, '', 'a fresh board at the same size shows the names');
+  await fresh.close();
   await resize(page, 952);
   assert.equal((await readDrops(page)).drop, '', 'room to spare brings the names back');
 }
@@ -317,7 +311,7 @@ async function checkTurnWord(t, engine) {
   assert.equal(await page.locator('.turn-chip .turn-round').evaluate(round => getComputedStyle(round, '::before').content), '"T"');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the word "Turn" goes first, with or without identity names`, { timeout: 60000 }, t => checkTurnWord(t, engine));
   test(`${name}: the busiest board today stays within the drop table on phones`, { timeout: 60000 }, t => checkWorstCase(t, engine));
   test(`${name}: badge rows give way in order, board-wide, without blinking`, { timeout: 120000 }, t => checkSteps(t, engine));

@@ -10,7 +10,7 @@
     "lint:android": "npm run lint:kotlin && ./android/lint.sh",
     "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift",
     "check": "npm run lint:web && npm run lint:compat && npm run typecheck && npm run lint:kotlin && npm run lint:ios && npm test",
-    "test": "node --test",
+    "test": "node --test --test-global-setup=tests/server.mjs",
     "store:images": "node store/render.mjs",
     "font:subset": "node scripts/subset-mana.mjs"
   },

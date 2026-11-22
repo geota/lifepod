@@ -1,7 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, seedGame, stripProblems, turnScreen } from './helpers.mjs';
+import { button, engines, openPage, seedGame, stripProblems, test, tileProblems } from './helpers.mjs';
 
 // The size checks, run once per style (the Style setting, design/polish/STYLE.md): sizes.test.mjs runs them in Material
 // and sizes-glass.test.mjs in Glass, as two files so the two run side by side. Each check seeds its games with the style.
@@ -50,38 +48,16 @@ function busyGame(count, style) {
   };
 }
 
-async function openBoard(browser, [width, height], count, portrait, style) {
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: portrait ? { width: height, height: width } : { width, height } });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  await seedGame(page, busyGame(count, style));
-  await turnScreen(page, page.viewportSize().width, page.viewportSize().height, portrait ? 0 : 90);
-  return { page, errors };
-}
-
-// Every visible control, count and chip sits inside its own tile, and every target is at least 44px.
-function readTiles(page, targets, content) {
-  return page.locator('.player').evaluateAll((players, [targets, content]) => players.map(player => {
-    const tile = player.getBoundingClientRect();
-    const visible = element => element.checkVisibility({ visibilityProperty: true }) && element.offsetWidth > 0;
-    const outside = [...player.querySelectorAll(`${targets}, ${content}`)].filter(visible).filter(element => {
-      const box = element.getBoundingClientRect();
-      return box.left < tile.left - 0.5 || box.top < tile.top - 0.5 || box.right > tile.right + 0.5 || box.bottom > tile.bottom + 0.5;
-    }).map(element => element.className || element.tagName);
-    const small = [...player.querySelectorAll(targets)].filter(visible)
-      .filter(element => element.offsetWidth < 43.5 || element.offsetHeight < 43.5)
-      .map(element => `${element.className} ${element.offsetWidth}×${element.offsetHeight}`);
-    return { outside, small };
-  }), [targets, content]);
-}
-
-function checkTiles(tiles, view) {
-  tiles.forEach(({ outside, small }, index) => {
-    assert.deepEqual(outside, [], `${view}, player ${index + 1}: nothing is clipped by the tile`);
-    assert.deepEqual(small, [], `${view}, player ${index + 1}: every target is at least 44px`);
+async function openBoard(t, engine, [width, height], count, portrait, style) {
+  return openPage(t, engine, {
+    viewport: portrait ? { width: height, height: width } : { width, height }, orientation: portrait ? 0 : 90, game: busyGame(count, style),
   });
+}
+
+// Every visible control, count and chip sits inside its own tile, and every target is a whole 44px target
+// (tileProblems). The pill is checked on its own below.
+async function checkTiles(page, targets, content, view) {
+  assert.deepEqual(await tileProblems(page, { targets, parts: content, pill: false }), [], `${view}: every target is a whole 44px target and nothing is clipped by its tile`);
 }
 
 // What every tile draws: its total, its − and + glyphs, and the type of each badge row.
@@ -124,8 +100,6 @@ function readModeScale(page, selector) {
 }
 
 async function checkSizes(t, engine, style) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
   const life = '.controls button, .controls .score';
   const scale = {};
 
@@ -134,9 +108,8 @@ async function checkSizes(t, engine, style) {
       // The board turns to landscape either way, so the odd player counts are only checked in landscape.
       for (const count of portrait ? [2, 4, 6] : [2, 3, 4, 5, 6]) {
         const view = `${count} players, ${name}, ${portrait ? 'portrait' : 'landscape'}`;
-        const { page, errors } = await openBoard(browser, size, count, portrait, style);
-        const tiles = await readTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`);
-        checkTiles(tiles, view);
+        const page = await openBoard(t, engine, size, count, portrait, style);
+        await checkTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`, view);
         // The mana strip never covers a life total or its glyphs.
         assert.deepEqual(await stripProblems(page), [], `${view}: the mana strip is clear of the total and glyphs`);
         // One size per board: every tile draws its total, glyphs and badges at the same size.
@@ -146,14 +119,7 @@ async function checkSizes(t, engine, style) {
           .filter(button => button.offsetWidth < 43.5 || button.offsetHeight < 43.5).map(button => button.getAttribute('aria-label')));
         assert.deepEqual(pill, [], `${view}: every pill button is at least 44px`);
         // No badge hides under the centre controls.
-        const covered = await page.evaluate(() => {
-          const pill = document.querySelector('#board-controls').getBoundingClientRect();
-          return [...document.querySelectorAll('.badges .chip')].filter(chip => chip.offsetWidth).filter(chip => {
-            const box = chip.getBoundingClientRect();
-            return box.left < pill.right && box.right > pill.left && box.top < pill.bottom && box.bottom > pill.top;
-          }).map(chip => chip.textContent);
-        });
-        assert.deepEqual(covered, [], `${view}: no badge under the centre controls`);
+        assert.deepEqual(await tileProblems(page, { parts: '.badges .chip' }), [], `${view}: no badge under the centre controls`);
         if (Math.min(...size) >= smallestRealPhone) {
           const drops = await page.locator('#board').evaluate(node => [node.dataset.drop ?? '',
             node.style.getPropertyValue('--near-badge-size'), node.style.getPropertyValue('--far-badge-size')]);
@@ -166,32 +132,31 @@ async function checkSizes(t, engine, style) {
 
         if (count === 4) {
           await button(page, 'Commander damage').tap();
-          checkTiles(await readTiles(page, '.map-cell[data-attacker]', '.map-cell'), `${view}, commander damage`);
+          await checkTiles(page, '.map-cell[data-attacker]', '.map-cell', `${view}, commander damage`);
           if (!portrait) scale[name].mapCell = await readModeScale(page, '.map-cell[data-attacker]');
           await button(page, 'Cancel').tap();
 
           await button(page, 'Counters').tap();
-          checkTiles(await readTiles(page, '.counter-cell', '.counter-cell'), `${view}, counters`);
+          await checkTiles(page, '.counter-cell', '.counter-cell', `${view}, counters`);
           if (!portrait) scale[name].counterCell = await readModeScale(page, '.counter-cell');
           await button(page, 'Cancel').tap();
 
           await button(page, 'Mana pool').tap();
-          checkTiles(await readTiles(page, '.mana-cell', '.mana-cell'), `${view}, mana`);
+          await checkTiles(page, '.mana-cell', '.mana-cell', `${view}, mana`);
           await button(page, 'Cancel').tap();
 
           await button(page, 'Settings').tap();
           await button(page, 'Choose tile colours on the board').tap();
-          checkTiles(await readTiles(page, '.swatch', '.layer-hint'), `${view}, colours`);
+          await checkTiles(page, '.swatch', '.layer-hint', `${view}, colours`);
           if (!portrait) scale[name].swatch = await readModeScale(page, '.swatch');
           await button(page, 'Done choosing colours').tap();
 
           await button(page, 'Settings').tap();
           await button(page, 'Choose identities on the board').tap();
-          checkTiles(await readTiles(page, '.identity-toggle', '.identity-preview .chip'), `${view}, identity`);
+          await checkTiles(page, '.identity-toggle', '.identity-preview .chip', `${view}, identity`);
           if (!portrait) scale[name].identityToggle = await readModeScale(page, '.identity-toggle');
         }
         await page.close();
-        assert.deepEqual(errors, [], `${view}: no script errors`);
       }
     }
   }
@@ -212,12 +177,10 @@ async function checkSizes(t, engine, style) {
 // header stays in view while the body scrolls, nothing is wider than the window, and every control is at least 44px
 // and whole. Two columns from 620px wide, one below.
 async function checkSettings(t, engine, style) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
   for (const [name, size] of Object.entries(screens)) {
     for (const portrait of [false, true]) {
       const view = `${name}, ${portrait ? 'portrait' : 'landscape'}`;
-      const { page, errors } = await openBoard(browser, size, 4, portrait, style);
+      const page = await openBoard(t, engine, size, 4, portrait, style);
       await button(page, 'Settings').tap();
       // A pending new game adds its line, the widest the page gets.
       await button(page, '6 players').tap();
@@ -251,7 +214,6 @@ async function checkSettings(t, engine, style) {
         assert.deepEqual((await read()).found, [], `${view}: settings fits, scrolled to the end`);
       }
       await page.close();
-      assert.deepEqual(errors, [], `${view}: no script errors`);
     }
   }
 }
@@ -264,30 +226,12 @@ async function checkSettings(t, engine, style) {
 const pillScreens = [[952, 427], [852, 393], [640, 360], [568, 320], [320, 568], [375, 667], [841, 701], [1366, 1024]];
 const pillRotations = [null, [1, 2, 3, 0, 1, 3], [2, 2, 2, 2, 2, 2], [3, 1, 2, 3, 3, 1], [1, 1, 1, 1, 1, 1]];
 
-// What a tile shows that sits under the pill, or outside its tile. Display parts are checked against the pill's whole
-// box; the strip's and the modes' targets against the pill they can see, inside its 1/8 inset.
+// What a tile shows that sits under the pill, or outside its tile (tileProblems): display parts against the pill's whole
+// box, and the strip's and the modes' targets against the pill as drawn.
 function underPill(page) {
-  return page.evaluate(() => {
-    const controls = document.querySelector('#board-controls').getBoundingClientRect();
-    const inset = Math.min(controls.width, controls.height) / 8;
-    const seen = { left: controls.left + inset, right: controls.right - inset, top: controls.top + inset, bottom: controls.bottom - inset };
-    const overlaps = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
-    const shown = element => element.checkVisibility({ visibilityProperty: true }) && element.offsetWidth > 0;
-    return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-      const tile = player.getBoundingClientRect();
-      const found = [];
-      const check = (selector, pill) => {
-        for (const element of [...player.querySelectorAll(selector)].filter(shown)) {
-          const box = element.getBoundingClientRect();
-          const name = `P${index + 1} ${element.className.baseVal ?? element.className}`;
-          if (overlaps(box, pill)) found.push(`${name} under the pill`);
-          if (box.left < tile.left - 0.5 || box.right > tile.right + 0.5 || box.top < tile.top - 0.5 || box.bottom > tile.bottom + 0.5) found.push(`${name} outside its tile`);
-        }
-      };
-      check('.score, .out-tag, .controls button .icon, .badges .chip, .rotate-badge', controls);
-      check('.mana-strip button, .mode-layer button:not(.visually-hidden), .mode-layer .identity-preview > *', seen);
-      return found;
-    });
+  return tileProblems(page, {
+    targets: '.mana-strip button, .mode-layer button:not(.visually-hidden)',
+    parts: '.score, .out-tag, .controls button .icon, .badges .chip, .rotate-badge, .mode-layer .identity-preview > *',
   });
 }
 
@@ -296,21 +240,12 @@ function pillGame(count, rotations, style) {
 }
 
 async function checkPill(t, engine, style) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
   for (const [width, height] of pillScreens) {
-    const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
-    const errors = [];
-    page.on('pageerror', error => errors.push(error.message));
-    await fakeScreenOrientation(page);
-    await page.goto(app);
-    await turnScreen(page, width, height, height > width ? 0 : 90);
+    const page = await openPage(t, engine, { viewport: { width, height }, orientation: height > width ? 0 : 90 });
     for (const count of [2, 3, 4, 5, 6]) {
       for (const rotations of pillRotations) {
         const view = `${width} × ${height}, ${count} players, seats ${rotations ? rotations.slice(0, count).join('') : 'as dealt'}`;
-        await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify(pillGame(count, rotations, style)));
-        await page.reload();
-        await page.evaluate(() => document.fonts.ready);
+        await seedGame(page, pillGame(count, rotations, style));
         assert.equal(await page.locator('#board-controls .pill-button:not([hidden])').count(), 6, `${view}: the pill is at its widest`);
         assert.deepEqual(await underPill(page), [], `${view}: nothing is under the pill`);
         // The board modes, at the target and the stress size.
@@ -329,7 +264,6 @@ async function checkPill(t, engine, style) {
         }
       }
     }
-    assert.deepEqual(errors, [], `${width} × ${height}: no script errors`);
     await page.close();
   }
 }
@@ -339,19 +273,11 @@ async function checkPill(t, engine, style) {
 // the pill stands along the middle seam. Player 1 turned upside down faces it with the start of its face (its − glyph),
 // and Player 2 turned twice with its near row (its identity chip); both stay in full view beside the pill.
 async function checkRotatedClearance(t, engine, style) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  await turnScreen(page, 952, 427, 90);
   const game = {
     ...busyGame(2, style), rotations: [1, 2], counters: { commander: true }, turns: 'rounds', turn: { first: 0, active: 0, round: 9 },
     manaPool: false, identities: ['WR', 'UBRG'], identity: { show: { name: true }, background: 'default', version: 2 },
   };
-  await page.evaluate(saved => localStorage.setItem('lifepod-game', saved), JSON.stringify(game));
-  await page.reload();
-  await page.evaluate(() => document.fonts.ready);
+  const page = await openPage(t, engine, { orientation: 90, game });
   const state = await page.evaluate(() => {
     const pill = document.querySelector('#board-controls');
     const box = pill.getBoundingClientRect();
@@ -377,8 +303,8 @@ async function checkRotatedClearance(t, engine, style) {
 // Registers every size check for one style, in Chromium and WebKit, named for the style.
 export function sizeTests(style) {
   const name = { material: 'Material', glass: 'Glass' }[style];
-  for (const [engineName, engine] of [['chromium', chromium], ['webkit', webkit]]) {
-    test(`${engineName}: the board fits and scales on small phones, foldables and tablets (${name})`, t => checkSizes(t, engine, style));
+  for (const [engineName, engine] of Object.entries(engines)) {
+    test(`${engineName}: the board fits and scales on small phones, foldables and tablets (${name})`, { timeout: 120000 }, t => checkSizes(t, engine, style));
     test(`${engineName}: settings fills every screen with no sideways overflow and the header in view (${name})`, { timeout: 120000 }, t => checkSettings(t, engine, style));
     test(`${engineName}: the centre pill never covers a total, a glyph or a badge, at any size, count or rotation (${name})`, { timeout: 300000 }, t => checkPill(t, engine, style));
     test(`${engineName}: a rotated seat keeps the edge it turns toward the pill clear (${name})`, t => checkRotatedClearance(t, engine, style));

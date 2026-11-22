@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, scores, setSwitches, startGame, turnScreen, useClassicTiles } from './helpers.mjs';
+import {
+  backHandling, button, engines, eventually, hold, openPage, reload, saved, scores, seedGame, setSwitches, startGame, test, tileProblems,
+  token, turnScreen,
+} from './helpers.mjs';
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 // The seat for an attacker on a defender's map.
@@ -40,41 +41,18 @@ const mode = page => page.locator('#board').getAttribute('data-mode');
 const damageTo = (page, number) => page.locator('.player').nth(number - 1).locator('.map-cell[data-attacker]')
   .evaluateAll(cells => cells.reduce((sum, cell) => sum + Number(cell.textContent), 0));
 
-async function eventually(read, expected, message) {
-  const deadline = Date.now() + 2000;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
-
-async function openPage(t, engine, options = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 852, height: 393 }, ...options });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  return page;
-}
+// Most checks here run on an 852 × 393 phone.
+const phone = { width: 852, height: 393 };
 
 async function turnOnCommander(page) {
   await setSwitches(page, { Commander: true });
 }
 
-// Chromium writes page storage in the background, so give a write a moment to land before a reload.
-async function reload(page) {
-  await page.waitForTimeout(500);
-  await page.reload();
-}
-
 async function checkDamage(t, engine) {
-  const page = await openPage(t, engine);
-  await page.goto(app);
-  // The colour checks below are written against Classic's palettes.
-  await useClassicTiles(page);
+  // The colour checks below are written against Classic's palettes. The page's clock is paused, so holds and
+  // announcements happen at exact times.
+  const page = await openPage(t, engine, { viewport: phone, tiles: 'classic', clock: true });
+  const text = await token(page, '--text');
   assert.ok(!(await button(page, 'Commander damage').isVisible()), 'no sword with Commander off');
   await turnOnCommander(page);
 
@@ -114,37 +92,39 @@ async function checkDamage(t, engine) {
   const hit = (await seatLooks(page, 3)).find(looks => looks.attacker === 2);
   assert.equal(hit.background, hit.tile, 'a seat with damage is still the colour of the attacker’s tile');
   assert.ok(hit.shadow.startsWith(`${hex(hit.seat)} 0px 0px 0px 2px inset, `), `the damage ring: ${hit.shadow}`);
-  assert.match(hit.shadow, /rgb\(242, 242, 239\) 0px 0px 0px 4px/, 'the changed ring');
+  assert.ok(hit.shadow.includes(`${text} 0px 0px 0px 4px`), `the changed ring: ${hit.shadow}`);
   assert.deepEqual([hit.opacity, hit.opaque, hit.solid], ['1', 1, 1], 'no transparency');
   assert.ok(hit.contrast >= 4.5, `the 6 at ${hit.contrast.toFixed(2)}:1`);
   assert.deepEqual(await ownSeat(page, 3), ['34', '−6'], 'your own seat shows your life and the change');
   assert.equal((await scores(page))[2], 34);
-  await eventually(() => page.locator('#announcer').textContent(), "Player 2's commander, 6 damage to Player 3. Player 3, 34 life");
+  // The announcement settles 700ms after the last change.
+  const announced = () => page.locator('#announcer').textContent();
+  const quiet = await announced();
+  await page.clock.runFor(699);
+  assert.equal(await announced(), quiet, 'nothing is announced before the changes settle');
+  await page.clock.runFor(1);
+  assert.equal(await announced(), "Player 2's commander, 6 damage to Player 3. Player 3, 34 life");
 
   // Undo steps back one change.
   await button(page, 'Undo').tap();
   assert.equal(await seat(page, 3, 2).textContent(), '5');
   assert.deepEqual(await ownSeat(page, 3), ['35', '−5']);
 
-  // Holding a seat takes 1 away once the hold registers, then repeats. It never adds.
+  // Holding a seat takes 1 away once the hold registers, then repeats. It never adds. The hold registers at 500ms
+  // and repeats every 100ms (the map seats' binder in app.js), so a 750ms hold takes away 3: at 500, 600 and 700ms.
   const box = await seat(page, 3, 2).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.waitForTimeout(350);
+  await page.clock.runFor(350);
   assert.equal(await seat(page, 3, 2).textContent(), '5', 'nothing changes before the hold registers');
-  await page.waitForTimeout(400);
+  await page.clock.runFor(400);
   await page.mouse.up();
-  const afterHold = Number(await seat(page, 3, 2).textContent());
-  assert.ok(afterHold <= 4, `the hold took damage away: ${afterHold}`);
+  assert.equal(await seat(page, 3, 2).textContent(), '2', 'the hold took damage away');
   assert.equal((await scores(page))[2] + (await damageTo(page, 3)), 40, 'damage and life move together');
-  await page.waitForTimeout(300);
-  assert.equal(Number(await seat(page, 3, 2).textContent()), afterHold, 'releasing a hold adds nothing');
+  await page.clock.runFor(300);
+  assert.equal(await seat(page, 3, 2).textContent(), '2', 'releasing a hold adds nothing');
   // A hold at 0 does nothing.
-  const zero = await seat(page, 3, 4).boundingBox();
-  await page.mouse.move(zero.x + zero.width / 2, zero.y + zero.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(700);
-  await page.mouse.up();
+  await hold(page, seat(page, 3, 4), 700);
   assert.equal(await seat(page, 3, 4).textContent(), '0');
 
   // Keyboards and screen readers: the seat adds one, and a labelled button beside it removes one.
@@ -159,17 +139,18 @@ async function checkDamage(t, engine) {
   const back = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
   assert.equal(back.background, back.tile);
   assert.ok(back.shadow.startsWith(`${hex(back.rim)} 0px 0px 0px 1px inset, `), `zero ring kept: ${back.shadow}`);
-  assert.match(back.shadow, /rgb\(242, 242, 239\) 0px 0px 0px 4px$/, 'changed ring kept');
+  assert.ok(back.shadow.endsWith(`${text} 0px 0px 0px 4px`), `changed ring kept: ${back.shadow}`);
   // A held seat at 0 thickens its ring, and keeps the changed ring.
   await seat(page, 3, 4).evaluate(cell => { cell.dataset.pressed = ''; });
   const held = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
   assert.ok(held.shadow.startsWith(`${hex(held.seat)} 0px 0px 0px 3px inset, `), `held ring: ${held.shadow}`);
-  assert.match(held.shadow, /rgb\(242, 242, 239\) 0px 0px 0px 4px$/);
+  assert.ok(held.shadow.endsWith(`${text} 0px 0px 0px 4px`), `changed ring kept while held: ${held.shadow}`);
   await seat(page, 3, 4).evaluate(cell => { delete cell.dataset.pressed; });
 
   // ✕ asks before discarding, then puts damage and life back as they were.
   await button(page, 'Cancel').tap();
-  assert.match(await page.locator('#discard-title').textContent(), /^Discard \d+ changes\?$/);
+  // Ten changes: six taps, the undo of one, the hold's three and the keyboard's two.
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 10 changes?');
   await button(page, 'Discard').tap();
   await eventually(() => mode(page), null);
   assert.deepEqual(await scores(page), [40, 40, 40, 40]);
@@ -198,7 +179,7 @@ async function checkDamage(t, engine) {
     return { background: style.backgroundColor, color: style.color };
   });
   const tileColour = number => tile(page, number).evaluate(node => getComputedStyle(node).backgroundColor);
-  assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: 'rgb(182, 224, 247)' },
+  assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: await token(page, '--sky-top-seat') },
     'the chip is the colour of the attacker’s tile');
   assert.equal(await farBadges(page, 2), '');
   await reload(page);
@@ -210,8 +191,8 @@ async function checkDamage(t, engine) {
   await button(page, 'Choose tile colours on the board').tap();
   await tile(page, 2).getByRole('button', { name: 'Rose', exact: true }).tap();
   await button(page, 'Done choosing colours').tap();
-  assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: 'rgb(255, 205, 232)' });
-  assert.equal(await tileColour(2), 'rgb(87, 49, 71)', 'Rose');
+  assert.deepEqual(await chipLooks(), { background: await tileColour(2), color: await token(page, '--rose-top-seat') });
+  assert.equal(await tileColour(2), await token(page, '--rose-top-panel'), 'Rose');
 
   // A new game resets commander damage.
   await button(page, 'Settings').tap();
@@ -220,15 +201,13 @@ async function checkDamage(t, engine) {
   await eventually(() => farBadges(page, 3), '', 'a new game clears commander damage');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: commander damage is entered on a table map and linked to life`, { timeout: 60000 }, t => checkDamage(t, engine));
 }
 
 // Every map matches the table: seats that sit apart on the board sit apart the same way on screen.
 async function checkMaps(t, engine) {
-  const page = await openPage(t, engine);
-  await fakeScreenOrientation(page);
-  await page.goto(app);
+  const page = await openPage(t, engine, { viewport: phone, orientation: true });
   await turnOnCommander(page);
   const check = async (view) => {
     await button(page, 'Commander damage').tap();
@@ -277,17 +256,15 @@ async function checkMaps(t, engine) {
   await check('6 players with rotated seats');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: each map shows the table in board coordinates`, { timeout: 90000 }, t => checkMaps(t, engine));
 }
 
 test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10', async (t) => {
-  const page = await openPage(t, chromium);
-  await page.goto(app);
-  const load = async (saved) => {
-    // In Classic's colours, which the expected chips are written against.
-    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), { ...saved, tileColours: 'classic' });
-    await page.reload();
+  // In Classic's colours, which the expected chips are written against.
+  const page = await openPage(t, chromium, { viewport: phone, tiles: 'classic' });
+  const load = async (game) => {
+    await seedGame(page, { ...game, tileColours: 'classic' });
     return page.evaluate(() => [...document.querySelectorAll('.player')].map(player => ({
       out: player.querySelector('.score').hasAttribute('data-out'),
       chips: [...player.querySelectorAll('.badges:not([hidden]) .chip[role="listitem"]')].map(chip => {
@@ -297,16 +274,16 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
       }),
     })));
   };
-  const amber = 'rgb(242, 196, 109)';
-  const red = 'rgb(244, 153, 147)';
-  const text = 'rgb(242, 242, 239)';
+  const amber = await token(page, '--warn');
+  const red = await token(page, '--life-out');
+  const text = await token(page, '--text');
   const game = {
     startingLife: 40, scores: [31, 15, 28, 12], rotations: [0, 0, 0, 0], keepAwake: true, landscapeAngle: 90,
     counters: { commander: true, poison: true }, poison: [0, 6, 7, 10],
     commanderDamage: [[0, 14, 0, 0], [0, 0, 0, 21], [15, 0, 0, 0], [0, 20, 0, 0]],
   };
   // Damage chips are in the attacker's tile colour with a ring: their rim colour, or the warning colour.
-  const sky = { seat: 'rgb(182, 224, 247)', rim: 'rgb(81, 113, 135)' };
+  const sky = { seat: await token(page, '--sky-top-seat'), rim: await token(page, '--sky-top-rim') };
   assert.deepEqual(await load(game), [
     { out: false, chips: [`14 commander damage from Player 2 plain ${sky.seat} ${sky.rim} ring`] },
     { out: true, chips: [`21 commander damage from Player 4 out ${red} ${red} ring`, `6 poison plain ${text} no ring`] },
@@ -325,22 +302,18 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
 });
 
 test('chromium: commander damage and the busiest badges fit six players on the smallest phone', { timeout: 60000 }, async (t) => {
-  const page = await openPage(t, chromium);
-  await fakeScreenOrientation(page);
-  await page.goto(app);
   // The worst case from the design: damage from all five opponents, poison 9, a five-colour identity and tax +10.
   const busy = { damage: [0, 18, 12, 9, 7, 4], poison: 9, identity: 'WUBRG', casts: 5 };
   const twoDigits = [0, 14, 13, 12, 11, 10];
-  await page.evaluate(({ busy, twoDigits }) => {
-    const row = (player, amounts) => amounts.map((_, attacker) => (attacker === player ? 0 : amounts[(attacker - player + 6) % 6]));
-    localStorage.setItem('lifepod-game', JSON.stringify({
+  const row = (player, amounts) => amounts.map((_, attacker) => (attacker === player ? 0 : amounts[(attacker - player + 6) % 6]));
+  const page = await openPage(t, chromium, {
+    viewport: phone, orientation: true, game: {
       startingLife: 40, scores: [11, 38, 33, 9, 30, 35], rotations: [0, 0, 0, 0, 0, 0], keepAwake: true, landscapeAngle: 90,
       counters: { commander: true, poison: true }, poison: [busy.poison, 0, 0, busy.poison, 0, 0],
       casts: [busy.casts, 0, 0, busy.casts, 0, 0], identities: [busy.identity, '', '', busy.identity, '', ''],
       commanderDamage: [row(0, busy.damage), row(1, twoDigits), [0, 0, 0, 0, 0, 0], row(3, busy.damage), row(4, twoDigits), [0, 0, 0, 0, 0, 0]],
-    }));
-  }, { busy, twoDigits });
-  await page.reload();
+    },
+  });
   await turnScreen(page, 320, 568, 0);
   const findBadgeProblems = () => page.evaluate(() => {
     const found = [];
@@ -375,7 +348,8 @@ test('chromium: commander damage and the busiest badges fit six players on the s
   assert.ok(Math.min(...sizes.map(([, size]) => size)) >= 10, `two-digit rows stay readable: ${sizes}`);
 
   // The guarantee holds whatever the font: give every row a much wider face, as some Linux and Android
-  // system fonts are, and the rows still fit on one line with every amount shown.
+  // system fonts are, and the rows still fit on one line with every amount shown. The rows' own font overrides the
+  // pinned test font.
   await page.evaluate(() => {
     for (const row of document.querySelectorAll('.badges')) {
       row.style.fontFamily = 'monospace';
@@ -391,43 +365,18 @@ test('chromium: commander damage and the busiest badges fit six players on the s
 
   // Commander damage mode keeps every seat a whole 44px target, inside its tile and clear of the centre controls.
   await button(page, 'Commander damage').tap();
-  const problems = await page.evaluate(() => {
-    const controls = document.querySelector('#board-controls').getBoundingClientRect();
-    const pill = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-    const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-      const bounds = player.getBoundingClientRect();
-      return [...player.querySelectorAll('.map-cell')].map((cell) => {
-        const box = cell.getBoundingClientRect();
-        const issues = [];
-        if (Math.min(box.width, box.height) < 43.5) issues.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
-        if (box.left < bounds.left || box.right > bounds.right || box.top < bounds.top || box.bottom > bounds.bottom) issues.push('outside its tile');
-        if (overlaps(box, pill)) issues.push('under the centre controls');
-        return issues.length ? `P${index + 1} ${cell.getAttribute('aria-label') ?? 'own seat'}: ${issues.join(', ')}` : '';
-      }).filter(Boolean);
-    });
-  });
-  assert.deepEqual(problems, []);
-  assert.equal(await page.locator('.map-cell').count(), 36);
+  assert.deepEqual(await tileProblems(page, { targets: '.map-cell' }), []);
+  assert.equal(await page.locator('.map-cell:visible').count(), 36);
 });
 
 test('chromium: Android back cancels commander damage the way ✕ does', async (t) => {
-  const page = await openPage(t, chromium);
-  await page.addInitScript(() => {
-    window.backHandling = [];
-    window.LifePodAndroid = {
-      readGame: () => sessionStorage.getItem('game'),
-      writeGame: (game) => sessionStorage.setItem('game', game),
-      keepAwake() {},
-      haptic() {},
-      setBackHandling: (enabled) => window.backHandling.push(enabled),
-    };
-  });
-  await page.goto(app);
+  const page = await openPage(t, chromium, { viewport: phone, native: 'android' });
   const back = () => page.evaluate(() => window.closeOpenDialog());
   await turnOnCommander(page);
+  // Settings turn back handling on, and their close event, which runs after the tap, turns it off.
+  await eventually(() => backHandling(page), [false, true, false]);
   await button(page, 'Commander damage').tap();
-  assert.equal(await page.evaluate(() => window.backHandling.at(-1)), true);
+  assert.deepEqual(await backHandling(page), [false, true, false, true], 'back is handled while the mode is open');
   await seat(page, 2, 1).tap();
   await seat(page, 2, 1).tap();
   assert.equal(await back(), true);
@@ -435,10 +384,13 @@ test('chromium: Android back cancels commander damage the way ✕ does', async (
   assert.equal(await back(), true, 'back closes the question and keeps editing');
   await eventually(() => page.locator('#discard').evaluate(dialog => dialog.open), false);
   assert.equal(await mode(page), 'damage');
+  // The question keeps back handled, and so does its close event, since the mode is still open.
+  await eventually(() => backHandling(page), [false, true, false, true]);
   await button(page, 'Save').tap();
-  const saved = JSON.parse(await page.evaluate(() => sessionStorage.getItem('game')));
-  assert.deepEqual(saved.commanderDamage[1], [2, 0, 0, 0]);
-  assert.equal(saved.scores[1], 38);
+  const game = await saved(page);
+  assert.deepEqual(game.commanderDamage[1], [2, 0, 0, 0]);
+  assert.equal(game.scores[1], 38);
+  assert.deepEqual(await backHandling(page), [false, true, false, true, false], 'saving hands back to the system');
   assert.equal(await back(), false, 'back at rest leaves the app');
 });
 
@@ -446,42 +398,28 @@ test('chromium: Android back cancels commander damage the way ✕ does', async (
 // 5-player end seat, drawn sideways, gets seats as big as everyone else's, and so do rotated seats. Every seat stays
 // inside its tile and clear of the pill.
 async function checkSeatSizes(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
   for (const [width, height] of [[952, 427], [640, 360], [568, 320], [1366, 1024]]) {
-    const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
-    await page.goto(app);
+    const page = await openPage(t, engine, { viewport: { width, height } });
     for (const [count, rotations] of [[5, [0, 0, 0, 0, 0]], [5, [1, 2, 3, 0, 1]], [6, [1, 2, 3, 0, 1, 3]], [2, [1, 2]], [3, [0, 1, 0]]]) {
       const view = `${width} × ${height}, ${count} players, seats ${rotations.join('')}`;
-      await page.evaluate(game => localStorage.setItem('lifepod-game', game), JSON.stringify({
+      await seedGame(page, {
         startingLife: 40, scores: Array(count).fill(40), rotations, landscapeAngle: 90, counters: { commander: true },
-      }));
-      await page.reload();
+      });
       await button(page, 'Commander damage').tap();
-      const seats = await page.evaluate(() => {
-        const controls = document.querySelector('#board-controls').getBoundingClientRect();
-        const pill = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-        const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-        const problems = [];
-        const sizes = [...document.querySelectorAll('.player')].map((player, index) => {
-          const tile = player.getBoundingClientRect();
+      assert.equal(await page.locator('.map-cell[data-attacker]:visible').count(), count * (count - 1), `${view}: every seat shows`);
+      assert.deepEqual(await tileProblems(page, { targets: '.map-cell[data-attacker]' }), [], view);
+      const sizes = await page.evaluate(() => {
+        const sizes = [...document.querySelectorAll('.player')].map((player) => {
           const cells = [...player.querySelectorAll('.map-cell[data-attacker]')];
-          for (const cell of cells) {
-            const box = cell.getBoundingClientRect();
-            if (box.left < tile.left - 0.5 || box.right > tile.right + 0.5 || box.top < tile.top - 0.5 || box.bottom > tile.bottom + 0.5) problems.push(`P${index + 1} seat outside its tile`);
-            if (overlaps(box, pill)) problems.push(`P${index + 1} seat under the pill`);
-            if (Math.min(cell.offsetWidth, cell.offsetHeight) < 43.5) problems.push(`P${index + 1} seat under 44px`);
-          }
           // A seat that spans one cell, by its short side and its long side in the face's own frame.
           const single = cells.find(cell => cell.style.gridRow.split('/').map(Number).reduce((a, b) => b - a) === 1
             && cell.style.gridColumn.split('/').map(Number).reduce((a, b) => b - a) === 1);
           return single ? [Math.min(single.offsetWidth, single.offsetHeight), Math.max(single.offsetWidth, single.offsetHeight)] : null;
         });
-        return { problems, sizes: sizes.filter(Boolean) };
+        return sizes.filter(Boolean);
       });
-      assert.deepEqual(seats.problems, [], view);
       for (const side of [0, 1]) {
-        const values = seats.sizes.map(size => size[side]);
+        const values = sizes.map(size => size[side]);
         assert.ok(Math.max(...values) - Math.min(...values) <= 0.5, `${view}: every seat is the same size (${values.join(' / ')})`);
       }
       await button(page, 'Cancel').tap();

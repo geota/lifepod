@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { test } from 'node:test';
 import { chromium } from 'playwright-core';
 import { contrast } from '../design/counters/oklch.mjs';
-import { app } from './helpers.mjs';
+import { openPage, seedGame, test, token } from './helpers.mjs';
 
 // The twelve tile palettes (design/polish/SPEC.md §5) are the ones design/counters/palette.mjs generated and checked,
 // and every panel the app ships keeps the contrast minimums: the life total 9:1, small text 7.6:1 and the red of a
@@ -12,10 +11,7 @@ const generated = JSON.parse(readFileSync(new URL('../design/counters/palette.js
   .replace(/^[\s\S]*?export default /, '').replace(/;\s*$/, ''));
 
 test('chromium: every tile palette is palette.mjs’s and passes its contrast checks', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage();
-  await page.goto(app);
+  const page = await openPage(t, chromium);
   const ids = generated.r3.swatches.map(swatch => swatch.name.toLowerCase());
   assert.deepEqual(ids, ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid']);
   // Classic, the Tile colours setting's first set, is the twelve palette.mjs made.
@@ -48,10 +44,7 @@ test('chromium: every tile palette is palette.mjs’s and passes its contrast ch
 // The colour indicator's one-colour discs for black, green and blue are close to the dark chip they sit on, so each disc
 // has a light rim (design/polish/FINAL-REVIEW.md #6). The rim clears 3:1 against the chip on every tile colour.
 test('chromium: the colour indicator has a rim that clears 3:1 on every chip', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage();
-  await page.goto(app);
+  const page = await openPage(t, chromium);
   const tokens = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
     return { rim: style.getPropertyValue('--ci-rim').trim(), chip: style.getPropertyValue('--chip-background').trim() };
@@ -72,11 +65,11 @@ test('chromium: the colour indicator has a rim that clears 3:1 on every chip', a
     }
   }
   // Every indicator in a chip draws that rim around its disc.
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40], identities: ['B', 'UG'] })));
-  await page.reload();
+  await seedGame(page, { startingLife: 40, scores: [40, 40], identities: ['B', 'UG'] });
+  const rim = await token(page, '--ci-rim');
   const shadows = await page.locator('.badges .ci').evaluateAll(discs => discs.map(disc => getComputedStyle(disc).boxShadow));
   assert.equal(shadows.length, 2);
-  for (const shadow of shadows) assert.match(shadow, /rgba\(242, 242, 239, 0\.65\d*\) 0px 0px 0px 1\.5px/);
+  for (const shadow of shadows) assert.equal(shadow, `${rim} 0px 0px 0px 1.5px`);
 });
 
 // The Tile colours setting's four sets (design/polish/TILES.md): each is tiles7.mjs's set exactly (Classic is its
@@ -85,10 +78,7 @@ test('chromium: the colour indicator has a rim that clears 3:1 on every chip', a
 const sets = JSON.parse(readFileSync(new URL('../design/polish/tiles7.json', import.meta.url), 'utf8'));
 
 test('chromium: every tile colour set is tiles7.mjs’s and passes the contrast minimums', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage();
-  await page.goto(app);
+  const page = await openPage(t, chromium);
   const ids = Object.keys(sets.today.set);
   for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
     const read = await page.evaluate(([setting, ids]) => {

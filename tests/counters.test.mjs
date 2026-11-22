@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, scores, turnScreen } from './helpers.mjs';
+import { button, hold, openPage, scores, test, token } from './helpers.mjs';
+
+// Life holds count once when the finger lands, wait 500ms, then repeat every 100ms (bindCounter in app.js). The page's
+// clock is paused, so a hold of a given length gives an exact count.
+const repeats = ms => (ms < 500 ? 0 : Math.floor((ms - 500) / 100) + 1);
 
 // Chromium is the only engine Playwright can drive with several simultaneous touches.
-test('chromium: several players can tap and hold their totals at the same time', { timeout: 60000 }, async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true });
-  await fakeScreenOrientation(page);
-  await page.goto(app);
-  await turnScreen(page, 852, 393, 90);
+test('chromium: several players can tap and hold their totals at the same time', async (t) => {
+  const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 }, orientation: 90, clock: true });
   const cdp = await page.context().newCDPSession(page);
   const fingers = new Map();
   async function touch(type) {
@@ -34,11 +32,14 @@ test('chromium: several players can tap and hold their totals at the same time',
     fingers.clear();
     await touch('touchEnd');
   }
-  const wait = ms => page.waitForTimeout(ms);
+  const wait = ms => page.clock.runFor(ms);
   const changes = async (before) => (await scores(page)).map((score, i) => score - before[i]);
+  const announced = () => page.locator('#announcer').textContent();
 
-  // Three players hold buttons together. Each total keeps changing in its own direction.
+  // Three players hold buttons together. Each total keeps changing in its own direction, by one on landing and one
+  // per repeat: Player 1 holds for 1280ms, Player 2 for 1240ms and Player 3 for 1200ms.
   let before = await scores(page);
+  const quiet = await announced();
   await press(1, 'Subtract one life from Player 1');
   await wait(40);
   await press(2, 'Add one life to Player 2');
@@ -46,10 +47,10 @@ test('chromium: several players can tap and hold their totals at the same time',
   await press(3, 'Subtract one life from Player 3');
   await wait(1200);
   await liftAll();
+  assert.deepEqual(await changes(before), [-1 - repeats(1280), 1 + repeats(1240), -1 - repeats(1200), 0], 'three simultaneous holds all repeat');
+  // Screen readers hear nothing while the totals move.
+  assert.equal(await announced(), quiet, 'nothing is announced during the holds');
   await wait(200);
-  let [p1, p2, p3, p4] = await changes(before);
-  assert.ok(p1 <= -4 && p2 >= 4 && p3 <= -4, `three simultaneous holds all repeat: ${[p1, p2, p3]}`);
-  assert.equal(p4, 0);
 
   // Three players tap together. Each tap counts as soon as the finger lands, exactly once.
   before = await scores(page);
@@ -82,9 +83,7 @@ test('chromium: several players can tap and hold their totals at the same time',
   await wait(300);
   await lift(1);
   await wait(200);
-  [p1, , , p4] = await changes(before);
-  assert.ok(p1 <= -3, `the hold kept repeating: ${p1}`);
-  assert.equal(p4, 1, 'the tap during a hold counts once');
+  assert.deepEqual(await changes(before), [-1 - repeats(1060), 0, 0, 1], 'the hold kept repeating, and the tap during it counted once');
 
   // Each half of a tile is a target: − on the reader's left, + on the right, including over the total.
   const minus = await center('Subtract one life from Player 2');
@@ -121,7 +120,7 @@ test('chromium: several players can tap and hold their totals at the same time',
   const afterSlide = await changes(before);
   await wait(500);
   await liftAll();
-  assert.ok(afterSlide[0] >= 2, `the hold repeated before sliding off: ${afterSlide[0]}`);
+  assert.deepEqual(afterSlide, [1 + repeats(700), 0, 0, 0], 'the hold repeated before sliding off');
   assert.deepEqual(await changes(before), afterSlide, 'the hold stopped once the finger left the tile');
 
   // If Android loses a finger's pointerup, the next tap on that button still counts and ends the old press.
@@ -136,6 +135,7 @@ test('chromium: several players can tap and hold their totals at the same time',
 
   // A single tap, a mouse click, and the keyboard each count exactly once.
   await wait(800);
+  const settled = await announced();
   before = await scores(page);
   await button(page, 'Add one life to Player 2').tap();
   await button(page, 'Add one life to Player 2').click();
@@ -145,32 +145,31 @@ test('chromium: several players can tap and hold their totals at the same time',
   await wait(200);
   assert.deepEqual(await changes(before), [0, 4, 0, 0], 'tap, click, Enter and Space');
 
-  // Screen readers hear the settled totals once, not every step of a hold.
-  await wait(800);
-  assert.equal(await page.locator('#announcer').textContent(), `Player 2, ${(await scores(page))[1]} life`);
+  // Screen readers hear the settled totals once, 700ms after the last change, not every step of a hold.
+  await wait(400);
+  assert.equal(await announced(), settled, 'nothing is announced before the totals settle');
+  await wait(100);
+  assert.equal(await announced(), `Player 2, ${(await scores(page))[1]} life`);
 
   // Pinch and double-tap zoom are off across the board.
   assert.equal(await page.locator('.app').evaluate(element => getComputedStyle(element).touchAction), 'none');
 });
 
 test('chromium: a life total at 0 or below turns red', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true });
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 1, scores: [1, 1, 1, 1] })));
-  await page.reload();
+  const page = await openPage(t, chromium, { game: { startingLife: 1, scores: [1, 1, 1, 1] } });
+  const red = await token(page, '--life-out');
   const score = page.locator('.player:nth-child(1) .score');
   const color = () => score.evaluate(output => getComputedStyle(output).color);
   const normal = await color();
+  assert.notEqual(normal, red, 'a total above 0 is not red');
   const subtract = button(page, 'Subtract one life from Player 1');
   const add = button(page, 'Add one life to Player 1');
   await subtract.click();
   assert.equal(await score.evaluate(output => output.value), '0');
-  assert.equal(await color(), 'rgb(244, 153, 147)', 'zero is red');
+  assert.equal(await color(), red, 'zero is red');
   await subtract.click();
   assert.equal(await score.evaluate(output => output.value), '−1');
-  assert.equal(await color(), 'rgb(244, 153, 147)', 'below zero is red');
+  assert.equal(await color(), red, 'below zero is red');
   await add.click();
   await add.click();
   assert.equal(await color(), normal, 'back above zero is the usual colour');
@@ -180,10 +179,7 @@ test('chromium: a life total at 0 or below turns red', async (t) => {
 // Style B: the life halves have no button chrome. A press washes the pressed half in the seat colour, rounded on
 // its inner corners, and lights its glyph, only while the finger is down.
 async function checkWash(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
-  await page.goto(app);
+  const page = await openPage(t, engine);
   const look = (name) => button(page, name).evaluate((half) => {
     const wash = getComputedStyle(half, '::after');
     return {
@@ -191,7 +187,7 @@ async function checkWash(t, engine) {
       wash: wash.backgroundColor, radius: wash.borderRadius, glyph: getComputedStyle(half).color,
     };
   });
-  const clear = 'rgba(0, 0, 0, 0)';
+  const clear = await token(page, 'transparent');
   const add = await look('Add one life to Player 3');
   assert.equal(add.chrome, `0px ${clear}`, 'no button chrome');
   assert.equal(add.wash, clear, 'no wash at rest');
@@ -199,7 +195,7 @@ async function checkWash(t, engine) {
   const pressed = await look('Add one life to Player 3');
   assert.notEqual(pressed.wash, clear, 'pointerdown washes the half');
   assert.equal(pressed.radius, '28px 0px 0px 28px', 'the + half is rounded on its inner corners');
-  assert.equal(pressed.glyph, 'rgb(242, 242, 239)', 'the glyph turns the text colour');
+  assert.equal(pressed.glyph, await token(page, '--text'), 'the glyph turns the text colour');
   await button(page, 'Add one life to Player 3').dispatchEvent('pointerup', { button: 0, pointerId: 7, isPrimary: true });
   assert.equal((await look('Add one life to Player 3')).wash, clear, 'the wash goes when the finger lifts');
   await button(page, 'Subtract one life from Player 3').dispatchEvent('pointerdown', { button: 0, pointerId: 8, isPrimary: true });
@@ -212,15 +208,12 @@ test('webkit: pressing a life half washes it in the seat colour', t => checkWash
 // A player who is out says so (design/polish/FINAL-REVIEW.md #11): an "Out" tag under the total, a label that says why,
 // and dimmed badges, except the lethal chip that put them out.
 async function checkOut(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-    startingLife: 40, scores: [-3, 27, 40, 40], counters: { commander: true, poison: true }, poison: [0, 10, 0, 2], casts: [0, 1, 0, 0],
-    commanderDamage: [[0, 0, 0, 0], [0, 0, 0, 0], [21, 0, 0, 0], [0, 0, 0, 0]],
-  })));
-  await page.reload();
+  const page = await openPage(t, engine, {
+    game: {
+      startingLife: 40, scores: [-3, 27, 40, 40], counters: { commander: true, poison: true }, poison: [0, 10, 0, 2], casts: [0, 1, 0, 0],
+      commanderDamage: [[0, 0, 0, 0], [0, 0, 0, 0], [21, 0, 0, 0], [0, 0, 0, 0]],
+    },
+  });
   const state = await page.locator('.player').evaluateAll(players => players.map((player) => {
     const score = player.querySelector('.score');
     const tag = player.querySelector('.out-tag');
@@ -252,30 +245,39 @@ test('webkit: a player who is out says so under the total and in its label', t =
 // A life hold stops when the finger leaves the tile, and lifting the finger there adds nothing: the click that
 // follows a press is skipped however the press ended.
 async function checkHoldLeavesTile(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  await page.goto(app);
+  const page = await openPage(t, engine, { clock: true });
   const life = async () => (await scores(page))[3];
   const box = await button(page, 'Add one life to Player 4').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  const deadline = Date.now() + 5000;
-  while ((await life()) < 42 && Date.now() < deadline) await page.waitForTimeout(20);
-  assert.ok((await life()) >= 42, 'the hold repeats');
+  await page.clock.runFor(600);
+  assert.equal(await life(), 40 + 1 + repeats(600), 'the hold repeats');
   const elsewhere = await page.locator('.player:nth-child(1)').boundingBox();
   await page.mouse.move(elsewhere.x + elsewhere.width / 2, elsewhere.y + elsewhere.height / 2);
   const left = await life();
   // Long enough after the press began that the shared 800ms window has run out.
-  await page.waitForTimeout(900);
+  await page.clock.runFor(900);
   assert.equal(await life(), left, 'the hold stops once the finger leaves the tile');
   await page.mouse.up();
-  await page.waitForTimeout(100);
+  await page.clock.runFor(100);
   assert.equal(await life(), left, 'lifting off the tile adds nothing');
 }
 
 test('chromium: a life hold stops when the finger leaves the tile and adds nothing on release', t => checkHoldLeavesTile(t, chromium));
 test('webkit: a life hold stops when the finger leaves the tile and adds nothing on release', t => checkHoldLeavesTile(t, webkit));
+
+// A hold of a known length counts exactly: one on landing, then one every 100ms after the first 500ms. A slower or
+// faster repeat changes the count.
+async function checkHoldRate(t, engine) {
+  const page = await openPage(t, engine, { clock: true });
+  const add = button(page, 'Add one life to Player 2');
+  for (const ms of [400, 500, 1200]) {
+    const before = (await scores(page))[1];
+    await hold(page, add, ms);
+    assert.equal((await scores(page))[1] - before, 1 + repeats(ms), `a ${ms}ms hold`);
+    await page.clock.runFor(1000);
+  }
+}
+
+test('chromium: a life hold counts once, then every 100ms after half a second', t => checkHoldRate(t, chromium));
+test('webkit: a life hold counts once, then every 100ms after half a second', t => checkHoldRate(t, webkit));

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, setSwitches, startGame, turnScreen } from './helpers.mjs';
+import { chromium } from 'playwright-core';
+import {
+  backHandling, button, engines, eventually, openPage, reload, saved, seedGame, setSwitches, startGame, test, tileProblems, turnScreen,
+} from './helpers.mjs';
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const cell = (page, number, kind) => tile(page, number).locator(`.counter-cell[data-kind="${kind}"]`);
@@ -13,37 +13,15 @@ const nearBadges = (page, number) => tile(page, number).locator('.badges.near')
   .evaluate(row => (row.hidden ? '' : [...row.children].map(chip => chip.textContent).join(' | ')));
 const mode = page => page.locator('#board').getAttribute('data-mode');
 
-// A dialog's close event runs after the click that closes it, so results that follow it are polled.
-async function eventually(read, expected, message) {
-  const deadline = Date.now() + 2000;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
 const isOpen = (page, id) => page.locator(`#${id}`).evaluate(dialog => dialog.open);
-
-async function openPage(t, engine, options = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 852, height: 393 }, ...options });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  return page;
-}
-
-// Chromium writes page storage in the background, so give a write a moment to land before a reload.
-async function reload(page) {
-  await page.waitForTimeout(500);
-  await page.reload();
-}
+// These tests use the target phone in landscape.
+const phone = { width: 852, height: 393 };
+// A cell held for `ms` takes one away at 500ms, then one every 100ms (bindSeat in app.js). The page's clock is paused,
+// so a hold of a given length takes an exact number away.
+const removals = ms => (ms < 500 ? 0 : Math.floor((ms - 500) / 100) + 1);
 
 async function checkCountersMode(t, engine) {
-  const page = await openPage(t, engine);
-  await page.goto(app);
+  const page = await openPage(t, engine, { viewport: phone, clock: true });
 
   // Nothing new shows until a counter is switched on. The switches are saved.
   assert.ok(!(await button(page, 'Counters').isVisible()), 'no counters button with both switches off');
@@ -113,15 +91,14 @@ async function checkCountersMode(t, engine) {
   const box = await cell(page, 4, 'poison').boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await page.waitForTimeout(250);
+  await page.clock.runFor(250);
   assert.equal(await count(page, 4, 'poison'), '9', 'nothing changes before the hold registers');
   assert.ok(await cell(page, 4, 'poison').evaluate(node => node.hasAttribute('data-pressed')), 'a held cell looks pressed');
-  await page.waitForTimeout(650);
+  await page.clock.runFor(650);
   await page.mouse.up();
   const held = Number(await count(page, 4, 'poison'));
-  // A slow machine can run the hold long enough to reach 0, which is fine: counts stop there.
-  assert.ok(held <= 7, `a hold takes one away and repeats: ${held}`);
-  await page.waitForTimeout(300);
+  assert.equal(held, 9 - removals(900), 'a hold takes one away and repeats');
+  await page.clock.runFor(300);
   assert.equal(Number(await count(page, 4, 'poison')), held, 'lifting ends the hold without adding');
   await cell(page, 2, 'casts').tap();
 
@@ -142,19 +119,16 @@ async function checkCountersMode(t, engine) {
   assert.equal(await nearBadges(page, 4), `${held} poison`);
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: counters mode edits poison and tax with undo, save and discard`, { timeout: 60000 }, t => checkCountersMode(t, engine));
 }
 
 // A hold on a cell stops when the finger leaves the player's tile, and a finger that moves never throws
 // (docs/review/ARCHITECTURE.md B1: cells are bound before they join their tile).
 async function checkHoldLeavesTile(t, engine) {
-  const page = await openPage(t, engine);
-  await page.goto(app);
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-    startingLife: 40, scores: [40, 40, 40, 40], counters: { poison: true }, poison: [0, 0, 0, 30],
-  })));
-  await page.reload();
+  const page = await openPage(t, engine, {
+    viewport: phone, clock: true, game: { startingLife: 40, scores: [40, 40, 40, 40], counters: { poison: true }, poison: [0, 0, 0, 30] },
+  });
   await button(page, 'Counters').tap();
   const box = await cell(page, 4, 'poison').boundingBox();
   const x = box.x + box.width / 2;
@@ -163,32 +137,32 @@ async function checkHoldLeavesTile(t, engine) {
   await page.mouse.down();
   // A finger jitters while it holds. Within the tile, the hold goes on.
   await page.mouse.move(x + 2, y + 1);
-  await eventually(async () => Number(await count(page, 4, 'poison')) < 30, true, 'the hold registers');
+  await page.clock.runFor(600);
+  assert.equal(Number(await count(page, 4, 'poison')), 30 - removals(600), 'the hold registers and repeats');
   // Off the tile, onto another player's, the hold stops at once.
   const elsewhere = await tile(page, 1).boundingBox();
   await page.mouse.move(elsewhere.x + elsewhere.width / 2, elsewhere.y + elsewhere.height / 2);
   const left = Number(await count(page, 4, 'poison'));
-  await page.waitForTimeout(600);
+  assert.equal(left, 30 - removals(600), 'leaving the tile takes nothing away');
+  await page.clock.runFor(600);
   assert.equal(Number(await count(page, 4, 'poison')), left, 'nothing more is taken away once the finger leaves the tile');
   await page.mouse.up();
-  await page.waitForTimeout(100);
+  await page.clock.runFor(100);
   assert.equal(Number(await count(page, 4, 'poison')), left, 'lifting off the tile adds nothing');
   assert.ok(!(await cell(page, 4, 'poison').evaluate(node => node.hasAttribute('data-pressed'))), 'the cell no longer looks pressed');
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: a hold on a cell stops when the finger leaves the tile`, { timeout: 60000 }, t => checkHoldLeavesTile(t, engine));
 }
 
 const kinds = (page, number) => tile(page, number).locator('.counter-cell').evaluateAll(cells => cells.map(node => node.dataset.kind));
-const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')));
 const everyTracker = { Commander: true, Poison: true, Energy: true, Experience: true, Rad: true };
 
 // Energy, experience and rad (design/polish/SPEC.md §6 and §7): each has its own Track switch, a circle in counters
 // mode and a badge at rest, always in the order poison, tax, energy, experience, rad.
 async function checkNewCounters(t, engine) {
-  const page = await openPage(t, engine);
-  await page.goto(app);
+  const page = await openPage(t, engine, { viewport: phone });
 
   // Each new tracker on its own shows the counters button and only its own circle, with its icon.
   const icons = { energy: '.mana-icon[data-glyph="energy"]', experience: 'svg[data-icon="graduation-cap"]', rad: '.mana-icon[data-glyph="rad"]' };
@@ -294,38 +268,20 @@ async function checkNewCounters(t, engine) {
   assert.ok(await button(page, 'Counters').isVisible());
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
+for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: energy, experience and rad have switches, circles and badges in order`, { timeout: 90000 }, t => checkNewCounters(t, engine));
 }
 
 test('chromium: counters mode fits six players with every counter on the smallest phone', { timeout: 60000 }, async (t) => {
-  const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 } });
-  await fakeScreenOrientation(page);
-  await page.goto(app);
+  const page = await openPage(t, chromium, { viewport: phone, orientation: true });
   await setSwitches(page, { Commander: true, Poison: true, Energy: true, Experience: true, Rad: true });
   await turnScreen(page, 320, 568, 0);
   await startGame(page, 6);
   await button(page, 'Counters').tap();
-  const problems = await page.evaluate(() => {
-    const controls = document.querySelector('#board-controls').getBoundingClientRect();
-    const pill = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-    const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-      const bounds = player.getBoundingClientRect();
-      return [...player.querySelectorAll('.mode-layer .counter-cell')].map((target) => {
-        const box = target.getBoundingClientRect();
-        const issues = [];
-        if (Math.min(box.width, box.height) < 43.5) issues.push(`${Math.round(box.width)}×${Math.round(box.height)}`);
-        if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) {
-          issues.push('outside its tile');
-        }
-        if (overlaps(box, pill)) issues.push('under the centre controls');
-        return issues.length ? `P${index + 1} ${target.getAttribute('aria-label')}: ${issues.join(', ')}` : '';
-      }).filter(Boolean);
-    });
-  });
-  assert.deepEqual(problems, []);
+  // Every cell a whole 44px target inside its tile and clear of the pill, and all 30 of them shown.
+  assert.deepEqual(await tileProblems(page, { targets: '.mode-layer .counter-cell' }), []);
   assert.equal(await page.locator('.mode-layer .counter-cell').count(), 30, 'five cells per tile');
+  assert.equal(await page.locator('.mode-layer .counter-cell:visible').count(), 30, 'and every one of them shows');
 
   // Settings still fills the smallest landscape phone.
   await button(page, 'Cancel').tap();
@@ -336,27 +292,17 @@ test('chromium: counters mode fits six players with every counter on the smalles
 });
 
 test('chromium: Android back cancels counters mode the way ✕ does', async (t) => {
-  const page = await openPage(t, chromium);
-  await page.addInitScript(() => {
-    window.backHandling = [];
-    window.LifePodAndroid = {
-      readGame: () => sessionStorage.getItem('game'),
-      writeGame: (game) => sessionStorage.setItem('game', game),
-      keepAwake() {},
-      haptic() {},
-      setBackHandling: (enabled) => window.backHandling.push(enabled),
-    };
-  });
-  await page.goto(app);
+  const page = await openPage(t, chromium, { viewport: phone, native: 'android' });
   const back = () => page.evaluate(() => window.closeOpenDialog());
-  const handling = () => page.evaluate(() => window.backHandling.at(-1));
   await setSwitches(page, { Poison: true });
 
+  // Settings took back handling while it was open, then gave it up.
+  await eventually(() => backHandling(page), [false, true, false], 'back leaves the app at rest');
   await button(page, 'Counters').tap();
-  assert.equal(await handling(), true);
+  await eventually(() => backHandling(page), [false, true, false, true], 'counters mode takes back');
   assert.equal(await back(), true);
   assert.equal(await mode(page), null, 'back with no changes closes the mode');
-  assert.equal(await handling(), false);
+  await eventually(() => backHandling(page), [false, true, false, true, false], 'and gives it up');
 
   await button(page, 'Counters').tap();
   await cell(page, 2, 'poison').tap();
@@ -367,19 +313,18 @@ test('chromium: Android back cancels counters mode the way ✕ does', async (t) 
   assert.ok(!(await isOpen(page, 'discard')), 'back again keeps editing');
   assert.equal(await mode(page), 'counters');
   assert.equal(await count(page, 2, 'poison'), '1');
-  assert.equal(await handling(), true);
+  await eventually(() => backHandling(page), [false, true, false, true, false, true], 'the prompt keeps back while the mode is open');
   await back();
   await button(page, 'Discard').tap();
   await eventually(() => mode(page), null);
-  assert.equal(JSON.parse(await page.evaluate(() => sessionStorage.getItem('game'))).poison[1], 0, 'the discard is saved');
+  await eventually(() => backHandling(page), [false, true, false, true, false, true, false], 'discarding gives back up');
+  assert.equal((await saved(page)).poison[1], 0, 'the discard is saved');
 });
 
 test('chromium: saved counters are checked when a game loads', async (t) => {
-  const page = await openPage(t, chromium);
-  await page.goto(app);
-  const load = async (saved) => {
-    await page.evaluate(game => localStorage.setItem('lifepod-game', JSON.stringify(game)), saved);
-    await page.reload();
+  const page = await openPage(t, chromium, { viewport: phone });
+  const load = async (game) => {
+    await seedGame(page, game);
     return page.evaluate(() => {
       // What a screen reader hears from each chip: its text, leaving out the parts hidden from it.
       const spoken = node => [...node.childNodes].map(child => (child.nodeType === Node.TEXT_NODE ? child.textContent
@@ -409,16 +354,11 @@ test('chromium: saved counters are checked when a game loads', async (t) => {
 // Counter icons stay legible on small boards (design/polish/FINAL-REVIEW.md #16): the icon is 0.42 of the cell and the
 // count 0.3, at 568 × 320 with six players as on the target.
 test('chromium: counter cells draw their icon at 0.42 of the cell and the count at 0.3', async (t) => {
-  const browser = await chromium.launch();
-  t.after(() => browser.close());
   for (const viewport of [{ width: 568, height: 320 }, { width: 952, height: 427 }]) {
-    const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport });
-    await page.goto(app);
-    await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({
-      startingLife: 40, scores: Array(6).fill(40), landscapeAngle: 90,
-      counters: { commander: true, poison: true, energy: true, experience: true, rad: true },
-    })));
-    await page.reload();
+    const page = await openPage(t, chromium, {
+      viewport,
+      game: { startingLife: 40, scores: Array(6).fill(40), landscapeAngle: 90, counters: { commander: true, poison: true, energy: true, experience: true, rad: true } },
+    });
     await button(page, 'Counters').tap();
     const ratios = await page.locator('.player:nth-child(1) .counter-cell').evaluateAll(cells => cells.map((cell) => {
       const size = cell.offsetWidth;

@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { androidMethods, app, button, iosCalls, iosGlobals, iosMessages, mockAndroid, mockIos, mockWakeLock, scores } from './helpers.mjs';
+import {
+  androidMethods, backHandling, button, eventually, iosCalls, iosGlobals, iosMessages, mockWakeLock, openPage, reload, scores, test,
+} from './helpers.mjs';
 
 // The contract between the page and the native wrappers (docs/review/TESTING.md, recommendation 1): what the Android
 // app serves and CI bundles, the bridge names on both sides, and what the page sends over each bridge. The source
-// checks need no browser; they're named for Chromium so the web CI job runs them.
+// checks need no browser, so they're Node-only tests.
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const kotlin = read('android/src/dev/maceiras/lifepod/MainActivity.kt');
@@ -38,7 +38,7 @@ function loadedFiles() {
   return sorted(found);
 }
 
-test('chromium: every file the page loads is served by the Android and iOS apps and bundled by CI', () => {
+test('node: every file the page loads is served by the Android and iOS apps and bundled by CI', () => {
   // Both apps serve any file under web/ whose extension is in their type table, and the two tables match.
   const table = (source, start, pattern) => Object.fromEntries(
     [...source.slice(source.indexOf(start)).split(/^\s*[)\]]$/m)[0].matchAll(pattern)].map(([, extension, type]) => [extension, type]));
@@ -69,7 +69,7 @@ test('chromium: every file the page loads is served by the Android and iOS apps 
   assert.match(read('.github/workflows/ci.yml'), /name: Bundle offline web app\n\s+working-directory: web\n\s+run: zip -r -X "\$RUNNER_TEMP\/lifepod-web\.zip" \.\n/);
 });
 
-test('chromium: the bridge names match the Android and iOS wrappers', () => {
+test('node: the bridge names match the Android and iOS wrappers', () => {
   // Android: the interface's name, its methods, and the methods the page calls.
   assert.match(kotlin, /addJavascriptInterface\(GameBridge\(\), "LifePodAndroid"\)/);
   assert.match(appJs, /const android = window\.LifePodAndroid;/);
@@ -104,28 +104,6 @@ test('chromium: the bridge names match the Android and iOS wrappers', () => {
 
 const closeDialog = kotlin.match(/const val CLOSE_DIALOG = "(.+)"/)[1];
 
-async function openPage(t, engine, mock) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width: 952, height: 427 } });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  await mock(page);
-  await page.goto(app);
-  return page;
-}
-
-async function eventually(read, expected, message) {
-  const deadline = Date.now() + 5000;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
-
 const calls = (page, name) => page.evaluate(wanted => window.bridgeCalls.filter(([call]) => call === wanted).map(([, ...args]) => args), name);
 
 async function toggleKeepAwake(page) {
@@ -135,7 +113,7 @@ async function toggleKeepAwake(page) {
 }
 
 test('chromium: the Android bridge saves and loads, keeps the screen awake, ticks and takes back', async (t) => {
-  const page = await openPage(t, chromium, mockAndroid);
+  const page = await openPage(t, chromium, { native: 'android' });
   assert.deepEqual(await calls(page, 'keepAwake'), [[true]], 'keep awake on at launch');
   assert.deepEqual(await calls(page, 'setBackHandling'), [[false]], 'back goes to the system at rest');
   assert.equal(await page.evaluate(() => localStorage.length), 0, 'nothing goes to browser storage');
@@ -148,7 +126,7 @@ test('chromium: the Android bridge saves and loads, keeps the screen awake, tick
   const written = await calls(page, 'writeGame');
   assert.equal(typeof written.at(-1)[0], 'string');
   assert.equal(JSON.parse(written.at(-1)[0]).scores[0], 41, 'writeGame gets the game as JSON');
-  await page.reload();
+  await reload(page);
   assert.equal((await scores(page))[0], 41, 'readGame loads it');
   assert.deepEqual(await calls(page, 'readGame'), [[]]);
 
@@ -164,19 +142,19 @@ test('chromium: the Android bridge saves and loads, keeps the screen awake, tick
   await eventually(() => page.locator('#board').getAttribute('data-mode'), 'rotate');
   assert.equal(await page.evaluate(`JSON.stringify(${closeDialog})`), 'true', 'back leaves Rotate seats');
   assert.equal(await page.locator('#board').getAttribute('data-mode'), null);
-  await eventually(async () => (await calls(page, 'setBackHandling')).at(-1), [false], 'then back is the system’s again');
+  await eventually(() => backHandling(page), [false, true, false, true, false], 'then back is the system’s again');
 
   // The switch turns keep awake off, and it stays off on the next launch.
   await toggleKeepAwake(page);
   assert.deepEqual((await calls(page, 'keepAwake')).at(-1), [false], 'the switch turns keep awake off');
-  await page.reload();
+  await reload(page);
   assert.deepEqual(await calls(page, 'keepAwake'), [[false]], 'and it stays off on the next launch');
   await toggleKeepAwake(page);
   assert.deepEqual((await calls(page, 'keepAwake')).at(-1), [true]);
 });
 
 test('webkit: the iOS bridge saves and loads, keeps the screen awake and ticks', async (t) => {
-  const page = await openPage(t, webkit, mockIos);
+  const page = await openPage(t, webkit, { native: 'ios' });
   assert.deepEqual(await calls(page, 'keepAwake'), [[true]], 'keep awake on at launch, as a Bool');
 
   const ticks = (await calls(page, 'haptic')).length;
@@ -187,12 +165,12 @@ test('webkit: the iOS bridge saves and loads, keeps the screen awake and ticks',
   assert.equal(typeof posted.at(-1)[0], 'string', 'LifePodApp only stores a String');
   assert.equal(JSON.parse(posted.at(-1)[0]).scores[1], 41, 'the game message carries the game as JSON');
   assert.equal(await page.evaluate(() => localStorage.length), 0, 'nothing goes to browser storage');
-  await page.reload();
+  await reload(page);
   assert.equal((await scores(page))[1], 41, 'window.initialGame loads it');
 
   await toggleKeepAwake(page);
   assert.deepEqual((await calls(page, 'keepAwake')).at(-1), [false], 'the switch turns keep awake off');
-  await page.reload();
+  await reload(page);
   assert.deepEqual(await calls(page, 'keepAwake'), [[false]], 'and it stays off on the next launch');
 });
 
@@ -210,20 +188,20 @@ const glassChrome = page => page.evaluate(() => {
 });
 
 test('webkit: the iOS bridge passes Reduce Transparency to Glass, at load and when it changes', async (t) => {
-  const page = await openPage(t, webkit, p => mockIos(p, { reduceTransparency: true }));
+  const page = await openPage(t, webkit, { native: 'ios', nativeOptions: { reduceTransparency: true } });
   assert.deepEqual(await glassChrome(page), { style: 'glass', reduce: true, filter: 'none', opaque: true }, 'on at load: solid');
   await page.evaluate(reduceScript(false));
   assert.deepEqual(await glassChrome(page), { style: 'glass', reduce: false, filter: 'blur(18px) saturate(1.3)', opaque: false }, 'turned off: glass');
   await page.evaluate(reduceScript(true));
   assert.deepEqual(await glassChrome(page), { style: 'glass', reduce: true, filter: 'none', opaque: true }, 'turned on again: solid');
-  await page.reload();
+  await reload(page);
   assert.equal((await glassChrome(page)).reduce, true, 'a reload takes the injected value');
 });
 
 // In a browser, the Screen Wake Lock API keeps the screen on while the switch is on and the page is showing. The
 // browser releases the lock in the background, and the page asks for it again on return.
 async function checkWakeLock(t, engine) {
-  const page = await openPage(t, engine, mockWakeLock);
+  const page = await openPage(t, engine, { before: mockWakeLock });
   const lockCalls = () => page.evaluate(() => window.wakeLockCalls);
   await eventually(lockCalls, ['request screen'], 'a wake lock at launch');
   await toggleKeepAwake(page);
@@ -235,10 +213,11 @@ async function checkWakeLock(t, engine) {
   await page.evaluate(() => window.setTestHidden(false));
   await eventually(lockCalls, ['request screen', 'release', 'request screen', 'release', 'request screen'], 'requested again on return');
 
+  // The page asks for its lock as it starts, before the load event, so the reload has shown whether it asked.
+  await reload(page);
+  assert.deepEqual(await lockCalls(), ['request screen'], 'a wake lock at launch with the switch on');
   await toggleKeepAwake(page);
-  await page.waitForTimeout(500);
-  await page.reload();
-  await page.waitForTimeout(300);
+  await reload(page);
   assert.deepEqual(await lockCalls(), [], 'no wake lock at launch with the switch off');
 }
 
@@ -246,7 +225,7 @@ test('chromium: the browser holds a wake lock while keep awake is on and the pag
 test('webkit: the browser holds a wake lock while keep awake is on and the page shows', t => checkWakeLock(t, webkit));
 
 test('chromium: a declined wake lock is harmless and asked for again', async (t) => {
-  const page = await openPage(t, chromium, p => mockWakeLock(p, { decline: true }));
+  const page = await openPage(t, chromium, { before: p => mockWakeLock(p, { decline: true }) });
   const lockCalls = () => page.evaluate(() => window.wakeLockCalls);
   await eventually(lockCalls, ['request screen']);
   await page.evaluate(() => window.setTestHidden(true));

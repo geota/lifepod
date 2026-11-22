@@ -1,56 +1,17 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, seedGame, setSwitches } from './helpers.mjs';
+import { button, engines, eventually, openPage, reload, saved, savedGame, seedGame, setSwitches, test } from './helpers.mjs';
 
 // The monarch (CR 726) and the initiative (CR 727): their Track switches, counters mode's cells, the holder's chip at rest,
 // commander damage passing them on, handing them on when the holder leaves the game, the "Pass it on" hint, the turn
 // reminders, and Settings → Reminders.
 
-const engines = { chromium, webkit };
-// Where a test's paused clock starts.
-const clockStart = Date.parse('2026-01-01T12:00:00Z');
 const designations = { monarch: true, initiative: true };
+// Timers in web/app.js: a turn reminder shows for reminderTime, and the announcer speaks announceDelay after the last
+// change. Tests that tap the life halves, map cells or turn chips pause the page's clock, so no tap lasts long enough
+// to become a hold and these happen only when the test runs the clock.
+const reminderTime = 3000;
+const announceDelay = 700;
 
-function savedGame(count, extra = {}) {
-  return {
-    startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, ...extra,
-  };
-}
-
-async function openPage(t, engine, { game, clock = false, motion = clock ? 'reduce' : 'no-preference', viewport = { width: 952, height: 427 } } = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  // Under Playwright's clock, nothing animates: an entrance animation (a turn reminder, "Undo clear") or a press
-  // animation runs on real time while the timers wait for the test, so a tap could wait on an element that never
-  // settles. Reduced motion turns them off, as it does for players who ask for it.
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport, reducedMotion: motion });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  // Installed, Playwright's clock still runs on with real time until it's paused, so a slow runner could spend a
-  // reminder's 3 seconds or "Undo clear"'s 5 between two steps. Paused, only the test's runFor moves it.
-  if (clock) {
-    await page.clock.install({ time: clockStart });
-    await page.clock.pauseAt(clockStart + 60000);
-  }
-  await page.goto(app);
-  if (game) await seedGame(page, game);
-  return page;
-}
-
-async function eventually(read, expected, message, timeout = 3000) {
-  const deadline = Date.now() + timeout;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
-
-const saved = page => page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')));
 const holders = async (page) => {
   const game = await saved(page);
   return { monarch: game.monarch, initiative: game.initiative };
@@ -144,13 +105,14 @@ async function checkGiveAndClear(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: counters mode gives and clears the monarch and the initiative, one holder at a time, with Undo`, { timeout: 60000 }, t => checkGiveAndClear(t, engine));
+  test(`${name}: counters mode gives and clears the monarch and the initiative, one holder at a time, with Undo`, t => checkGiveAndClear(t, engine));
 }
 
 // ---- Commander damage ---------------------------------------------------------------------------------------------
 
 async function checkDamageTransfer(t, engine) {
   const page = await openPage(t, engine, {
+    clock: true,
     game: savedGame(4, { counters: { commander: true, ...designations }, monarch: 1, initiative: 1 }),
   });
   const seat = (defender, attacker) => tile(page, defender).locator(`.map-cell[data-attacker="${attacker - 1}"]`);
@@ -159,7 +121,10 @@ async function checkDamageTransfer(t, engine) {
   await seat(2, 3).tap();
   assert.deepEqual(await holders(page), { monarch: 2, initiative: 2 }, 'combat damage to the holder passes both to the attacker');
   assert.equal((await saved(page)).scores[1], 39);
-  await eventually(async () => (await announced(page)).includes('Player 3 is the monarch. Player 3 has the initiative'), true, 'the change is announced');
+  await page.clock.runFor(announceDelay - 1);
+  assert.equal((await announced(page)).includes('Player 3 is the monarch'), false, 'not announced before it settles');
+  await page.clock.runFor(1);
+  assert.ok((await announced(page)).includes('Player 3 is the monarch. Player 3 has the initiative'), 'the change is announced');
   // Undo takes back the damage and the transfer together.
   await button(page, 'Undo').tap();
   assert.deepEqual(await holders(page), { monarch: 1, initiative: 1 }, 'Undo gives them back');
@@ -188,7 +153,7 @@ async function checkDamageTransfer(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: commander damage to the holder passes the monarch and the initiative to the attacker, undone with it`, { timeout: 60000 }, t => checkDamageTransfer(t, engine));
+  test(`${name}: commander damage to the holder passes the monarch and the initiative to the attacker, undone with it`, t => checkDamageTransfer(t, engine));
 }
 
 // ---- Leaving the game ---------------------------------------------------------------------------------------------
@@ -198,13 +163,15 @@ for (const [name, engine] of Object.entries(engines)) {
 async function checkHandoff(t, engine) {
   const turnByTurn = (extra) => savedGame(6, { counters: { ...designations }, turns: 'turns', ...extra });
   const page = await openPage(t, engine, {
+    clock: true,
     game: turnByTurn({ scores: [40, 40, 40, 1, 40, 40], turn: { first: 0, active: 1, round: 2 }, monarch: 3, initiative: 3 }),
   });
   // The holder leaves on someone else's turn: the active player takes both.
   await lose(page, 4);
   assert.deepEqual(await holders(page), { monarch: 1, initiative: 1 }, 'the active player takes both');
   assert.deepEqual(await chips(page), [[], ['monarch', 'initiative'], [], [], [], []]);
-  await eventually(async () => (await announced(page)).includes('Player 2 is the monarch. Player 2 has the initiative'), true, 'announced');
+  await page.clock.runFor(announceDelay);
+  assert.ok((await announced(page)).includes('Player 2 is the monarch. Player 2 has the initiative'), 'announced');
   // Coming back from 0 doesn't take it back.
   await gain(page, 4);
   assert.deepEqual(await holders(page), { monarch: 1, initiative: 1 });
@@ -251,13 +218,14 @@ async function checkHandoff(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: a holder who leaves the game hands on the monarch and the initiative, turn by turn`, { timeout: 60000 }, t => checkHandoff(t, engine));
+  test(`${name}: a holder who leaves the game hands on the monarch and the initiative, turn by turn`, t => checkHandoff(t, engine));
 }
 
 // Without Turn by turn there's no active player to start from: an out holder's tile asks to pass it on until someone takes
 // it in counters mode, and the hint has its own switch.
 async function checkPassHint(t, engine) {
   const page = await openPage(t, engine, {
+    clock: true,
     game: savedGame(4, { counters: { ...designations }, scores: [40, 1, 40, 40], monarch: 1, initiative: null }),
   });
   await lose(page, 2);
@@ -269,7 +237,7 @@ async function checkPassHint(t, engine) {
   const box = await hint.evaluate(node => [node.offsetWidth, node.offsetHeight, getComputedStyle(node, '::after').height]);
   assert.equal(box[2], '44px', 'a 44px target');
   // It stays while nobody takes it, even across a reload and a step of the turn in Rounds.
-  await page.reload();
+  await reload(page);
   assert.deepEqual(await chips(page), [[], ['pass monarch'], [], []]);
   // The hint switch hides it, and shows only while the monarch or the initiative is tracked.
   await button(page, 'Settings').tap();
@@ -290,7 +258,7 @@ async function checkPassHint(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: without turns, an out holder’s tile shows a Pass it on hint until someone takes it`, { timeout: 60000 }, t => checkPassHint(t, engine));
+  test(`${name}: without turns, an out holder’s tile shows a Pass it on hint until someone takes it`, t => checkPassHint(t, engine));
 }
 
 // ---- Turn reminders -----------------------------------------------------------------------------------------------
@@ -311,14 +279,12 @@ async function checkReminders(t, engine) {
   assert.equal(await tile(page, 2).locator('.reminder-chip').getAttribute('aria-label'), 'Initiative: venture into Undercity. Dismiss');
   // Facing the player: inside their own turned tile face.
   assert.equal(await tile(page, 1).locator('.player-face .reminder-chip').count(), 1);
-  await page.clock.runFor(2500);
-  // Real time doesn't count: a second of it here, as on a slow runner, leaves the clock's last 500ms untouched.
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await page.clock.runFor(reminderTime - 1);
   assert.deepEqual(await reminders(page), [['monarch'], ['initiative'], [], []], 'still there before 3 seconds');
   // A tap dismisses one.
   await tile(page, 1).locator('.reminder-chip').tap();
   assert.deepEqual(await reminders(page), [[], ['initiative'], [], []]);
-  await page.clock.runFor(600);
+  await page.clock.runFor(1);
   assert.deepEqual(await reminders(page), [[], [], [], []], 'gone after 3 seconds');
 
   // Nobody's reminded on a pass that isn't theirs, or on a step back.
@@ -333,7 +299,8 @@ async function checkReminders(t, engine) {
   assert.deepEqual(await reminders(page), [[], [], [], []], 'not while the mode is open');
   await button(page, 'Save').tap();
   assert.deepEqual(await reminders(page), [[], [], [], ['initiative']], 'Player 4 took the initiative, so they venture');
-  await page.clock.runFor(3100);
+  await page.clock.runFor(reminderTime);
+  assert.deepEqual(await reminders(page), [[], [], [], []]);
 
   // Turn reminders off: no reminders at all.
   await setSwitches(page, { 'Turn reminders': false });
@@ -354,7 +321,7 @@ async function checkReminders(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: turn reminders tell the monarch to draw and the initiative to venture, at the right moment`, { timeout: 60000 }, t => checkReminders(t, engine));
+  test(`${name}: turn reminders tell the monarch to draw and the initiative to venture, at the right moment`, t => checkReminders(t, engine));
 }
 
 // A reminder that's showing stays put while it shows: the tiles redrawing for the next pass, the clock ticking and the
@@ -392,7 +359,7 @@ async function checkSteadyReminders(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: a turn reminder stays the same element, in the same place, while it shows`, { timeout: 60000 }, t => checkSteadyReminders(t, engine));
+  test(`${name}: a turn reminder stays the same element, in the same place, while it shows`, t => checkSteadyReminders(t, engine));
 }
 
 // Where a reminder goes comes from where its chip comes to rest, not from where its entrance starts it, a little
@@ -402,7 +369,7 @@ async function checkRestingReminders(t, engine) {
     counters: { commander: true, poison: true, ...designations }, poison: [1, 1, 1, 1], turns: 'turns', turn: { first: 0, active: 0, round: 1 }, monarch: 0, initiative: 1,
   });
   const placed = async (motion) => {
-    const page = await openPage(t, engine, { game, motion, viewport: { width: 1100, height: 500 } });
+    const page = await openPage(t, engine, { game, clock: true, motion, viewport: { width: 1100, height: 500 } });
     await tile(page, 1).locator('.active-chip').tap();
     return page.locator('.player').evaluateAll(players => players.slice(0, 2).map(player => player.dataset.reminder ?? 'above'));
   };
@@ -410,7 +377,7 @@ async function checkRestingReminders(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: a turn reminder is placed where it comes to rest, not where its entrance starts`, { timeout: 60000 }, t => checkRestingReminders(t, engine));
+  test(`${name}: a turn reminder is placed where it comes to rest, not where its entrance starts`, t => checkRestingReminders(t, engine));
 }
 
 // "Who goes first?" and a Start chip start a turn too, and a new holder by handoff ventures at once.
@@ -421,7 +388,8 @@ async function checkStartReminders(t, engine) {
   });
   await tile(page, 3).locator('.start-chip').tap();
   assert.deepEqual(await reminders(page), [[], [], ['initiative'], []], 'a Start chip starts their turn');
-  await page.clock.runFor(3100);
+  await page.clock.runFor(reminderTime);
+  assert.deepEqual(await reminders(page), [[], [], [], []]);
 
   await seedGame(page, savedGame(4, { counters: { ...designations }, scores: [40, 40, 1, 40], turns: 'turns', turn: { first: 0, active: 0, round: 1 }, initiative: 2 }));
   await lose(page, 3);
@@ -430,7 +398,7 @@ async function checkStartReminders(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: starting a turn or taking the initiative by handoff reminds them to venture`, { timeout: 60000 }, t => checkStartReminders(t, engine));
+  test(`${name}: starting a turn or taking the initiative by handoff reminds them to venture`, t => checkStartReminders(t, engine));
 }
 
 // ---- Settings → Reminders and gesture hints -----------------------------------------------------------------------
@@ -471,13 +439,13 @@ async function checkGestureHints(t, engine) {
   assert.equal((await saved(page)).reminders.gestures, false);
   assert.deepEqual(await modes(), { counters: [], damage: [], mana: [], identity: [], colours: Array(4).fill('Your tile colour') },
     'the gesture lines go; the colours label is a label, not a gesture');
-  await page.reload();
+  await reload(page);
   await button(page, 'Settings').tap();
   assert.equal(await page.getByRole('switch', { name: 'Gesture hints', exact: true }).isChecked(), false, 'saved');
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: the Gesture hints switch hides the tap and hold lines in every mode`, { timeout: 60000 }, t => checkGestureHints(t, engine));
+  test(`${name}: the Gesture hints switch hides the tap and hold lines in every mode`, t => checkGestureHints(t, engine));
 }
 
 // The Reminders section sits after Table in the left column (layout B), and after Table in one column.

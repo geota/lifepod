@@ -1,65 +1,18 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
-import { chromium, webkit } from 'playwright-core';
-import { app, button, seedGame, setSwitches, stripProblems } from './helpers.mjs';
+import { chromium } from 'playwright-core';
+import {
+  backHandling, button, engines, eventually, hold, openPage, saved, savedGame, seedGame, setSwitches, stripProblems, test, tileProblems,
+} from './helpers.mjs';
 
 // Floating mana (design/polish/SPEC.md §9): the Mana pool switch, mana mode, the strip at rest (spend, clear, undo
 // clear) and emptying pools when the turn passes.
 
-// Where a test's paused clock starts.
-const clockStart = Date.parse('2026-01-01T12:00:00Z');
+// Timers in web/app.js. A mana cell held for holdDelay takes one away, then one more every 100ms; a turn chip or the
+// round button held for holdDelay steps back once. "Undo clear" lasts undoClearTime. Tests that tap or
+// hold these pause the page's clock, so a tap can't become a hold and each happens only when the test runs the clock.
+const holdDelay = 500;
+const undoClearTime = 5000;
 
-function savedGame(count, extra = {}) {
-  return {
-    startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90, ...extra,
-  };
-}
-
-async function openPage(t, engine, { game, android = false, clock = false, viewport = { width: 952, height: 427 } } = {}) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
-  // Under Playwright's clock, nothing animates: an entrance animation (a turn reminder, "Undo clear") or a press
-  // animation runs on real time while the timers wait for the test, so a tap could wait on an element that never
-  // settles. Reduced motion turns them off, as it does for players who ask for it.
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport, ...(clock ? { reducedMotion: 'reduce' } : {}) });
-  const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
-  t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  // Installed, Playwright's clock still runs on with real time until it's paused, so a slow runner could spend a
-  // reminder's 3 seconds or "Undo clear"'s 5 between two steps. Paused, only the test's runFor moves it.
-  if (clock) {
-    await page.clock.install({ time: clockStart });
-    await page.clock.pauseAt(clockStart + 60000);
-  }
-  if (android) {
-    await page.addInitScript(() => {
-      window.backHandling = [];
-      window.LifePodAndroid = {
-        readGame: () => sessionStorage.getItem('game'),
-        writeGame: (game) => sessionStorage.setItem('game', game),
-        keepAwake() {},
-        haptic() {},
-        setBackHandling: (enabled) => window.backHandling.push(enabled),
-      };
-    });
-  }
-  await page.goto(app);
-  if (game) await seedGame(page, game, { android });
-  return page;
-}
-
-async function eventually(read, expected, message, timeout = 3000) {
-  const deadline = Date.now() + timeout;
-  let value = await read();
-  while (!isDeepStrictEqual(value, expected) && Date.now() < deadline) {
-    await new Promise(resolve => setTimeout(resolve, 20));
-    value = await read();
-  }
-  assert.deepEqual(value, expected, message);
-}
-
-const saved = page => page.evaluate(() => JSON.parse(sessionStorage.getItem('game') ?? localStorage.getItem('lifepod-game')));
 const mode = page => page.locator('#board').getAttribute('data-mode');
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const cell = (page, number, colour) => tile(page, number).locator(`.mana-cell[data-colour="${colour}"]`);
@@ -77,7 +30,7 @@ const floating = page => page.locator('#mana-button').evaluate(node => node.hasA
 // Mana mode: six circles per tile, W U B R G and colourless, each a mana symbol over its amount. Tap +1, hold −1, and
 // Undo, ✓ and ✕ as in counters mode.
 async function checkManaMode(t, engine) {
-  const page = await openPage(t, engine);
+  const page = await openPage(t, engine, { clock: true });
   assert.ok(await page.locator('#mana-button').isHidden(), 'no mana button with Mana pool off');
   await setSwitches(page, { 'Mana pool': true });
   assert.ok(await button(page, 'Mana pool').isVisible(), 'Mana pool shows the tap symbol in the pill');
@@ -99,13 +52,9 @@ async function checkManaMode(t, engine) {
   for (const [number, colour] of [[1, 'W'], [1, 'W'], [1, 'U'], [3, 'R'], [3, 'R'], [3, 'R'], [3, 'C']]) await cell(page, number, colour).tap();
   assert.deepEqual([await amount(page, 1, 'W'), await amount(page, 1, 'U'), await amount(page, 3, 'R'), await amount(page, 3, 'C')], ['2', '1', '3', '1']);
   assert.equal(await cell(page, 3, 'R').getAttribute('aria-label'), 'Player 3 red mana, 3. Add one');
-  // A hold takes one away; the hidden button does too.
-  const box = await cell(page, 3, 'R').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(560);
-  await page.mouse.up();
-  assert.ok(Number(await amount(page, 3, 'R')) < 3, 'a hold takes red away');
+  // A hold takes one away; the hidden button does too. A 560ms hold takes one at 500ms and stops before the next.
+  await hold(page, cell(page, 3, 'R'), holdDelay + 60);
+  assert.equal(await amount(page, 3, 'R'), '2', 'a hold takes red away');
   await page.getByRole('button', { name: 'Remove one colourless mana from Player 3', exact: true }).evaluate(remove => remove.click());
   assert.equal(await amount(page, 3, 'C'), '0');
   // Undo steps back, so P3 has its colourless again.
@@ -136,16 +85,8 @@ async function checkManaMode(t, engine) {
   assert.deepEqual(await nearShown(page), [false, true, true, false], 'Player 3’s poison stays beside its strip');
   assert.equal(await floating(page), true, 'the pill’s tap symbol has a dot');
   assert.deepEqual((await saved(page)).pools, [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 3, 0, 1], [0, 0, 0, 0, 0, 0]]);
-  // Every strip item is a 44px target inside its tile.
-  const targets = await page.locator('.player').evaluateAll(players => players.flatMap((player, index) => {
-    const bounds = player.getBoundingClientRect();
-    return [...player.querySelectorAll('.mana-strip button')].filter(item => item.checkVisibility()).map((item) => {
-      const box = item.getBoundingClientRect();
-      const inside = box.left >= bounds.left - 0.5 && box.right <= bounds.right + 0.5 && box.top >= bounds.top - 0.5 && box.bottom <= bounds.bottom + 0.5;
-      return box.width >= 43.5 && box.height >= 43.5 && inside ? '' : `P${index + 1} ${item.getAttribute('aria-label')} ${box.width}×${box.height}`;
-    }).filter(Boolean);
-  }));
-  assert.deepEqual(targets, []);
+  // Every strip item is a 44px target inside its tile, clear of the pill.
+  assert.deepEqual(await tileProblems(page, { targets: '.mana-strip button' }), []);
 
   // Turning Mana pool off hides the strips and the button, and keeps the pools.
   await setSwitches(page, { 'Mana pool': false });
@@ -181,16 +122,17 @@ async function checkStrip(t, engine) {
   assert.deepEqual(await strips(page), ['', '', 'undo', '']);
   assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 0, 0, 0], 'the clear saves at once');
   assert.equal(await floating(page), false, 'no dot once every pool is empty');
-  await page.clock.runFor(4000);
+  // A second before it ends.
+  await page.clock.runFor(undoClearTime - 1000);
   await tile(page, 3).locator('.strip-undo').tap();
   assert.deepEqual(await strips(page), ['', '', 'R3 C1 clear', '']);
   assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 3, 0, 1], 'Undo clear restores the pool');
 
   // "Undo clear" lasts 5 seconds, then the strip goes and the pool stays empty.
   await tile(page, 3).locator('.strip-clear').tap();
-  await page.clock.runFor(4900);
+  await page.clock.runFor(undoClearTime - 1);
   assert.deepEqual(await strips(page), ['', '', 'undo', ''], 'still there just before 5 seconds');
-  await page.clock.runFor(200);
+  await page.clock.runFor(1);
   assert.deepEqual(await strips(page), ['', '', '', ''], 'gone after 5 seconds');
   assert.deepEqual(await nearShown(page), [true, true, true, true]);
   assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 0, 0, 0]);
@@ -200,7 +142,7 @@ async function checkStrip(t, engine) {
 // restores what it emptied. With auto-empty off, pools survive a pass.
 async function checkAutoEmpty(t, engine) {
   const pools = [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 3, 0, 1], [0, 0, 0, 0, 0, 0]];
-  const page = await openPage(t, engine, { game: savedGame(4, { manaPool: true, pools, turns: 'turns', turn: { first: 0, active: 0, round: 1 } }) });
+  const page = await openPage(t, engine, { clock: true, game: savedGame(4, { manaPool: true, pools, turns: 'turns', turn: { first: 0, active: 0, round: 1 } }) });
   // The active player's turn chip stays in their near row beside the strip, since it never gives way.
   assert.equal(await tile(page, 1).locator('.badges.near .turn-chip.active-chip').count(), 1, 'the turn chip stays in the near row');
   assert.ok(await tile(page, 1).locator('.badges.near .turn-chip.active-chip').isVisible(), 'and shows');
@@ -214,11 +156,7 @@ async function checkAutoEmpty(t, engine) {
   await cell(page, 2, 'G').tap();
   await cell(page, 3, 'R').tap();
   await button(page, 'Save').tap();
-  const box = await page.locator('#round-button').boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(900);
-  await page.mouse.up();
+  await hold(page, page.locator('#round-button'), holdDelay);
   assert.deepEqual((await saved(page)).turn, { first: 0, active: 0, round: 1 }, 'the hold steps back to P1');
   assert.deepEqual((await saved(page)).pools, [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 0, 4, 0, 1], [0, 0, 0, 0, 0, 0]], 'and restores what the pass emptied');
   assert.deepEqual(await strips(page), ['W2 U1 clear', 'G1 clear', 'R4 C1 clear', '']);
@@ -258,13 +196,8 @@ async function checkAutoEmpty(t, engine) {
   await button(page, 'Close settings').tap();
   await tile(page, 1).locator('.round-chip').tap();
   assert.deepEqual(await strips(page), ['', '', '', ''], 'a round step empties every pool');
-  await page.waitForTimeout(400);
   const before = (await saved(page)).turn.round;
-  const flag = await tile(page, 1).locator('.round-chip').boundingBox();
-  await page.mouse.move(flag.x + flag.width / 2, flag.y + flag.height / 2);
-  await page.mouse.down();
-  await page.waitForTimeout(900);
-  await page.mouse.up();
+  await hold(page, tile(page, 1).locator('.round-chip'), holdDelay);
   assert.equal((await saved(page)).turn.round, before - 1);
   assert.deepEqual(await strips(page), ['', '', '', 'B1 clear'], 'holding back the round restores the pool');
 
@@ -278,34 +211,17 @@ async function checkAutoEmpty(t, engine) {
   assert.deepEqual([fresh.pools, fresh.manaPool, fresh.autoEmpty, fresh.turns], [Array(4).fill([0, 0, 0, 0, 0, 0]), true, true, 'rounds']);
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: mana mode adds mana with undo, save and discard`, { timeout: 90000 }, t => checkManaMode(t, engine));
-  test(`${name}: the mana strip spends, clears and undoes a clear for 5 seconds`, { timeout: 60000 }, t => checkStrip(t, engine));
-  test(`${name}: passing the turn empties pools, and stepping back restores them`, { timeout: 90000 }, t => checkAutoEmpty(t, engine));
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: mana mode adds mana with undo, save and discard`, t => checkManaMode(t, engine));
+  test(`${name}: the mana strip spends, clears and undoes a clear for 5 seconds`, t => checkStrip(t, engine));
+  test(`${name}: passing the turn empties pools, and stepping back restores them`, t => checkAutoEmpty(t, engine));
 }
 
 test('chromium: mana mode fits six players on the smallest phone', async (t) => {
   const pools = Array.from({ length: 6 }, () => [1, 2, 3, 4, 5, 6]);
   const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 }, game: savedGame(6, { manaPool: true, pools }) });
-  const problems = () => page.evaluate(() => {
-    const controls = document.querySelector('#board-controls').getBoundingClientRect();
-    const pill = { left: controls.left + 6, right: controls.right - 6, top: controls.top + 6, bottom: controls.bottom - 6 };
-    const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-    return [...document.querySelectorAll('.player')].flatMap((player, index) => {
-      const bounds = player.getBoundingClientRect();
-      return [...player.querySelectorAll('.mode-layer .mana-cell, .mana-strip button')].filter(node => node.offsetWidth).map((target) => {
-        const box = target.getBoundingClientRect();
-        const issues = [];
-        // A folded strip's chip is a target through its 64 × 44 touch area, like the turn chip.
-        const touch = getComputedStyle(target, '::after');
-        const size = target.matches('.chip') ? [parseFloat(touch.width), parseFloat(touch.height)] : [box.width, box.height];
-        if (Math.min(...size) < 43.5) issues.push(`${Math.round(size[0])}×${Math.round(size[1])}`);
-        if (box.left < bounds.left - 0.5 || box.right > bounds.right + 0.5 || box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5) issues.push('outside its tile');
-        if (overlaps(box, pill)) issues.push('under the centre controls');
-        return issues.length ? `P${index + 1} ${target.getAttribute('aria-label')}: ${issues.join(', ')}` : '';
-      }).filter(Boolean);
-    });
-  });
+  // A folded strip's chip is a target through its 64 × 44 touch area, like the turn chip.
+  const problems = () => tileProblems(page, { targets: '.mode-layer .mana-cell, .mana-strip button' });
   // Every colour held: each strip folds into its chip, which stays inside the tile.
   assert.deepEqual(await problems(), [], 'the strips fit');
   await button(page, 'Mana pool').tap();
@@ -319,8 +235,6 @@ test('chromium: mana mode fits six players on the smallest phone', async (t) => 
 // row, or at the end of the near row's line, and one that can't fit either folds into a chip with a caret that opens
 // mana mode, on its own line or at the end of the near row. The turn chip never leaves the near row.
 async function checkStripClear(t, engine) {
-  const browser = await engine.launch();
-  t.after(() => browser.close());
   const three = [0, 2, 0, 3, 0, 1];
   const six = [2, 1, 3, 4, 5, 6];
   for (const [width, height] of [[952, 427], [640, 360], [568, 320]]) {
@@ -328,17 +242,11 @@ async function checkStripClear(t, engine) {
       for (const [colours, pool] of [['three colours', three], ['six colours', six]]) {
         for (const turn of [false, true]) {
           const view = `${width} × ${height}, ${count} players, ${colours}${turn ? ', turn chip' : ''}`;
-          const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport: { width, height } });
-          const errors = [];
-          page.on('pageerror', error => errors.push(error.message));
           const game = savedGame(count, {
             manaPool: true, pools: Array(count).fill(pool), counters: { commander: true, poison: true }, poison: Array(count).fill(9),
             ...(turn ? { turns: 'turns', turn: { first: 0, active: 0, round: 12 } } : {}),
           });
-          await page.addInitScript(saved => localStorage.setItem('lifepod-game', saved), JSON.stringify(game));
-          await page.goto(app);
-          await page.evaluate(() => document.fonts.ready);
-          await page.waitForTimeout(100);
+          const page = await openPage(t, engine, { viewport: { width, height }, game });
           assert.deepEqual(await stripProblems(page), [], `${view}: every strip is clear of the totals, glyphs and near rows`);
           const state = await page.evaluate(() => {
             const shown = node => node.checkVisibility() && node.offsetWidth > 0;
@@ -374,7 +282,6 @@ async function checkStripClear(t, engine) {
             const folds = state.places.flatMap((place, index) => (place.startsWith('fold') && !(turn && index === 0) ? [`P${index + 1}`] : []));
             assert.deepEqual(folds, [], `${view}: on the target only the tile with the turn chip may fold`);
           }
-          assert.deepEqual(errors, [], `${view}: no script errors`);
           await page.close();
         }
       }
@@ -382,17 +289,18 @@ async function checkStripClear(t, engine) {
   }
 }
 
-for (const [name, engine] of Object.entries({ chromium, webkit })) {
-  test(`${name}: the mana strip never covers a life total or its glyphs`, { timeout: 120000 }, t => checkStripClear(t, engine));
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the mana strip never covers a life total or its glyphs`, t => checkStripClear(t, engine));
 }
 
 test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {
-  const page = await openPage(t, chromium, { android: true, game: savedGame(4, { manaPool: true }) });
+  const page = await openPage(t, chromium, { native: 'android', clock: true, game: savedGame(4, { manaPool: true }) });
   const back = () => page.evaluate(() => window.closeOpenDialog());
   await button(page, 'Mana pool').tap();
-  assert.equal(await page.evaluate(() => window.backHandling.at(-1)), true);
+  assert.deepEqual(await backHandling(page), [false, true], 'off on load, then on for mana mode');
   assert.equal(await back(), true);
   assert.equal(await mode(page), null, 'back with no changes closes the mode');
+  assert.deepEqual(await backHandling(page), [false, true, false], 'then back goes to the system');
   await button(page, 'Mana pool').tap();
   await cell(page, 2, 'G').tap();
   assert.equal(await back(), true);
@@ -403,14 +311,15 @@ test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {
   await button(page, 'Discard').tap();
   await eventually(() => mode(page), null);
   assert.deepEqual((await saved(page)).pools[1], [0, 0, 0, 0, 0, 0], 'the discard is saved');
-  assert.equal(await page.evaluate(() => window.backHandling.at(-1)), false);
+  // On for mana mode, the discard question, editing again and the question again; on as the question closes, then off
+  // once the discard ends the mode.
+  assert.deepEqual(await backHandling(page), [false, true, false, true, false], 'back goes to the system once the mode ends');
 });
 
 test('chromium: saved pools are checked when a game loads', async (t) => {
   const page = await openPage(t, chromium);
   const load = async (game) => {
-    await page.evaluate(next => localStorage.setItem('lifepod-game', JSON.stringify(next)), game);
-    await page.reload();
+    await seedGame(page, game);
     return { strips: await strips(page), button: await page.locator('#mana-button').isVisible() };
   };
   const base = savedGame(4);
@@ -420,8 +329,7 @@ test('chromium: saved pools are checked when a game loads', async (t) => {
   assert.deepEqual(await load({ ...base, manaPool: true, pools: [[1, -1, 2.5, 100, 'x', 99], 'pool', [0, 0, 0, 0, 0, 3, 7], null] }),
     { strips: ['W1 C99 clear', '', 'C3 clear', ''], button: true }, 'bad amounts are 0, and each pool has six colours');
   // Auto-empty is on unless saved as false.
-  await page.evaluate(() => localStorage.setItem('lifepod-game', JSON.stringify({ startingLife: 40, scores: [40, 40], manaPool: true, turns: 'rounds', autoEmpty: 0 })));
-  await page.reload();
+  await seedGame(page, { startingLife: 40, scores: [40, 40], manaPool: true, turns: 'rounds', autoEmpty: 0 });
   await button(page, 'Settings').tap();
   assert.equal(await page.getByRole('switch', { name: 'Empty mana pools when the turn passes', exact: true }).isChecked(), true);
 });
