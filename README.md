@@ -84,6 +84,10 @@ Open `web/index.html` to try the tracker on your computer. The preview uses brow
 
 ## Lint
 
+Run `npm run check` before committing. It runs, in order: `lint:web` (ESLint), `lint:compat`, `lint:kotlin` (ktlint, through mise when it isn't on the path), `lint:ios` (swift-format) and `npm test`, and needs the tools below plus the Playwright browsers. It leaves out Android Lint, which needs the Android SDK; run `npm run lint:android` for that.
+
+`npm run lint:compat` checks `web/` against the oldest browsers LifePod supports, listed in `browserslist` in `package.json`: iOS 16 (WKWebView) and the Android System WebView, as Chrome 111 and later. `eslint.compat.config.mjs` uses `eslint-plugin-compat` and a list of newer JavaScript APIs the plugin misses. `stylelint.config.mjs` uses `stylelint-no-unsupported-browser-features`. Both list the findings that are only warnings for now.
+
 Install ktlint, Kotlin (`kotlinc`), Android SDK Command-line Tools 23.0 (for Android Lint), and full Xcode for `swift-format`. Then run `npm ci` and `npm run lint` from the project root. Android Lint runs without Gradle through `android/lint.sh`, which describes the app in a lint project file; `android/lint.xml` lists the checks LifePod deliberately ignores and why. Run `npm run lint:web`, `npm run lint:android`, or `npm run lint:ios` to check one platform.
 
 Run `npx playwright-core install chromium webkit` and `npm test` to check seat placement and facing as the screen turns each way, simultaneous taps and holds by several players, and that the board fits and scales from a 320 × 568 phone through foldables to a 13-inch iPad. The smallest real phone the design targets is 360 × 640; 320 × 568 is kept as a stress test.
