@@ -6,6 +6,7 @@ import { app } from '../../tests/helpers.mjs';
 
 export const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
 export const sizes = {
+  target: { width: 952, height: 427, label: 'Pixel 11 Pro · 952 × 427' },
   phone: { width: 852, height: 393, label: 'Phone · 852 × 393' },
   small: { width: 640, height: 360, label: 'Smallest real phone · 640 × 360' },
   tablet: { width: 1366, height: 1024, label: 'Tablet · 1366 × 1024' },

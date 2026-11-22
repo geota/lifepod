@@ -1,0 +1,505 @@
+# Polish round: build spec
+
+**Status:** ready to build, 21 November 2026. This turns the owner's answers to the 14 questions in [OPTIONS.md](OPTIONS.md) into decisions.
+
+- Where the owner said "decide", the decision is here with its reason. Where an answer left a gap, I filled it and said so.
+- Open questions are the short list at the end (§12).
+- The mock-ups are `renders/spec-*.png`, drawn on the current `web/` (2f28705) by [spec.mjs](spec.mjs) (`node design/polish/spec.mjs`). Every spec frame uses the new button style and the one-size-per-board rule.
+
+**Target device: Pixel 11 Pro class, 952 × 427 CSS px in landscape.**
+
+- The Pixel 11 Pro has the same panel as the Pixel 10 Pro: 6.3", 2856 × 1280 at 495 ppi ([whatismyscreensize.com: 11 Pro](https://www.whatismyscreensize.com/device/pixel-11-pro), [10 Pro](https://www.whatismyscreensize.com/device/pixel-10-pro)). At the default 3× density, that's the 952 × 427 already in `tests/sizes.test.mjs`. No published source gives the 11 Pro's CSS viewport, so check it on a device.
+- **Design and render at 952 × 427 first.** Every mock-up's lead frame uses this size.
+- 640 × 360 (the smallest real phone) and 568 × 320 (the stress test) must keep working:
+  - life totals, the −/+ halves and every 44px target always work;
+  - secondary information gives way by the drop rules in §3.2.
+- Tablets scale up through `--grow`.
+
+**What this spec covers:**
+
+1. Button style
+2. Colour identity: its own page, display modes, symbols and names
+3. One size per board, and what drops when space runs out
+4. Setup with a fixed set of controls
+5. Tile colours: twelve swatches
+6. Player counters
+7. Badge row
+8. Turns
+9. Floating mana
+10. Data model and settings
+11. Build plan
+12. Open questions
+
+---
+
+## 1. Button style (Q7: B)
+
+![Counters cells](renders/spec-counters.png)
+
+- **Life halves:**
+  - No button chrome.
+  - The − and + glyphs sit near the tile's outer edges: inset `5 × u` from each edge (`u` is defined in §3).
+  - Each half is still the whole touch area.
+  - A press washes the pressed half in `color-mix(in oklab, var(--seat) 17%, transparent)`, with a 28px radius on the inner corners. The glyph turns `--text`.
+  - The wash shows only while a finger is down, so it doesn't conflict with "no transparency" for colours at rest.
+- **Counter and mana cells are circles** (decided). Reasons:
+  - Physical counters (dice, tokens, beads) are round.
+  - The pill's pressed state is a disc.
+  - The commander damage map keeps its rounded-rectangle seats, so "seat" and "counter" stay visually different.
+  - Each cell is filled `color-mix(in oklab, var(--button) 55%, var(--panel))`, with no border. A press fills it with `color-mix(in oklab, var(--seat) 26%, var(--panel))`.
+- **The pill keeps its shape.** Its pressed disc is unchanged.
+- **Map seats are unchanged.**
+
+## 2. Colour identity (Q1: N3, plus the owner's additions)
+
+![Every display mode](renders/spec-identity-modes.png)
+![On the board](renders/spec-identity-board.png)
+![Identity page and twelve swatches](renders/spec-identity-page.png)
+
+### 2.1 Identity has its own page, and no longer depends on Commander
+
+- **Setup → Identity ›** opens the Identity sheet (§4). Its button **Choose identities** starts the identity board mode.
+- **The Colours mode becomes tile colour only.** That frees the room for twelve swatches (§5).
+- **Decision: identity is no longer tied to the Commander switch.** It has its own settings, and turning every display option off removes it from the board. Reason: identity is useful for tile meaning and names in any multiplayer game. The owner asked for a full off setting instead.
+
+### 2.2 What a tile shows: the chip
+
+- **Show on tiles** is any combination of Indicator, Symbol and Name.
+  - None selected means the chip is off.
+  - **Default: Indicator + Name**, the owner's N3 pick.
+- **Order in the chip:** indicator, symbol, name.
+  - A chip with only the indicator or only the symbol is the round 1.7em chip.
+  - A chip with a name is a capsule.
+- **Every identity has a symbol** (§2.4), so a Symbol-only chip never comes up empty. An unset identity shows no chip at all.
+- **The chip leads the near badge row** (§7).
+- **Names come from the identity automatically** (§2.5).
+
+### 2.3 The background ("indicator backgrounds")
+
+My reading: this is the faint mark behind the life total. It's a setting of its own, independent of the chip.
+
+- **Symbol (default):** the identity's symbol as the watermark, as shipped in fcf2a89. It now covers the shards and four-colour identities too.
+- **Indicator:** the colour indicator disc, faint (10% opacity), in place of the symbol.
+- **Off:** the rings, as for a tile with no identity.
+- An unset identity always shows the rings.
+- **Combining with the chip:**
+  - Symbol background plus a Symbol chip repeats the symbol. That's allowed, and the defaults avoid it.
+  - Background off plus chip off is "identity off" without clearing anyone's picks.
+
+The owner may have meant something else; it's open question 1.
+
+### 2.4 Symbols for all 31 identities
+
+| Identities | Symbol | Mana code points |
+|---|---|---|
+| Mono (5) | The colour's mana symbol | `\e600`–`\e604` |
+| Pairs (10) | Ravnica guild | `\e90c`–`\e915` (as shipped) |
+| Wedges (5) | Khans clan | `\e916`–`\e91a` (as shipped) |
+| Shards (5) | **Streets of New Capenna family**: Brokers = Bant (WUG) `\ea0d`, Cabaretti = Naya (WRG) `\ea0e`, Maestros = Grixis (UBR) `\ea0f`, Obscura = Esper (WUB) `\ea10`, Riveteers = Jund (BRG) `\ea11` | new |
+| Four-colour (5) | **The colour pie with the missing colour as a ghost:** five mono symbols on a pentagon (W top, then clockwise U, B, R, G), the missing one at 25% of the symbol's opacity | composed from `\e600`–`\e604` |
+| WUBRG | Colour pie | `\e9f0` (as shipped) |
+
+- **The shard mapping is verified.** In a Scryfall search of each family's watermark, the most common colour identity among its cards is the shard's: Brokers 14 WUG, Cabaretti 14 WRG, Maestros 14 UBR, Obscura 14 WUB, Riveteers 15 BRG.
+- **Research for four-colour identities:**
+  - I scanned all 76 watermarks in Scryfall's catalog (`api.scryfall.com/catalog/watermarks`). None belongs to a four-colour faction.
+  - The only four- or five-colour cards with any watermark are one-offs in Unfinity, Echoverse and the Avatar sets.
+  - The *Nephilim* (Guildpact) and the Commander 2016 decks never had symbols.
+  - So there's no official symbol, and the "pie minus one" is the closest honest one: it reuses an official mark and says exactly which colour is missing.
+- **Not used:** Strixhaven colleges (they cover only the five enemy pairs) and Tarkir dragonlords. Guilds and clans cover every pair and wedge, and they're what ships.
+- **The 25% ghost** keeps the pentagon readable at chip size. In the watermark (7% opacity) the ghost is effectively invisible, which is fine.
+
+### 2.5 Names (Q1 and Q2)
+
+One fixed table, with no setting. The owner confirmed the full four-colour names and "WUBRG" for five colours.
+
+| Identity | Name |
+|---|---|
+| W / U / B / R / G | Mono-white / Mono-blue / Mono-black / Mono-red / Mono-green |
+| WU UB BR RG WG WB UR BG WR UG | Azorius, Dimir, Rakdos, Gruul, Selesnya, Orzhov, Izzet, Golgari, Boros, Simic |
+| WUG WUB UBR BRG WRG | Bant, Esper, Grixis, Jund, Naya |
+| WBG WUR UBG WBR URG | Abzan, Jeskai, Sultai, Mardu, Temur |
+| UBRG (no white) | Glint-Eye |
+| WBRG (no blue) | Dune-Brood |
+| WURG (no black) | Ink-Treader |
+| WUBG (no red) | Witch-Maw |
+| WUBR (no green) | Yore-Tiller |
+| WUBRG | WUBRG |
+
+### 2.6 Choosing identities: the identity board mode
+
+- Like Colours mode, it ends with the single ✓, and Android back ends it too. Changes save instantly.
+- **Each tile shows:**
+  - a preview chip with *all three* (indicator, symbol and name), whatever the tiles are set to display (the owner: "show name / indicator / symbol when choosing");
+  - the five mana-symbol toggles.
+- **Toggles:** `clamp(44px, 12u, 72 × grow)`, one row where five fit, otherwise 3 + 2 (6 players on phones).
+- An empty identity previews as "No identity".
+
+## 3. One size per board, and what drops when space runs out (Q8: yes; Q9: no)
+
+### 3.1 One size per board
+
+![Uniform size](renders/spec-uniform.png)
+
+**Confirming the lead's reading:**
+
+- Within a game, every tile draws its content at the same size: the life total, the − and + glyphs, the badges, counter cells, map seats and mode layers.
+- That size is the largest that fits the **smallest** tile.
+- Content still scales with the device through `--grow`, and so does the pill: 48px on phones, up to 64px on tablets.
+- Tall tiles get **no** extra growth (Q9: No).
+
+**How:**
+
+- `layoutBoard()` measures every `.player-face` and sets three properties on `#board`:
+  - `--ui`: the smallest face width;
+  - `--ub`: the smallest face height;
+  - `--board-digits`: the most digits in any total, minimum 2.
+- It runs again on resize, rotation, a player-count change, a seat rotation, and any total whose digit count changes.
+- Tile CSS uses `u = var(--ui) / 100` in place of `cqi`: `--control-size: clamp(44px, 18u, 74 × grow)`, glyphs `clamp(1.75rem, 12u, …)`, badges `clamp(.78rem, 3.6u, …)` and so on.
+- The total's size is `min(clamp(2rem, 19vmin, max(7rem, 112 × grow)), (ui − 2·control − 2·gap − 8px) × 1.5 / board-digits)`.
+
+**What changes:**
+
+- Totals are already equal on phones, because of the 19vmin cap.
+- The differences today are in the glyphs (the 5-player end seat's ± is 46px against 34px elsewhere on a phone) and on tablets (the end seat's total is 195px against 191px).
+- **A three-digit total shrinks every total together** (decided). Uniformity is the owner's rule, and totals of 100 or more are rare. On phones, three digits still fit at full size, so nothing changes.
+
+**Board units by size**, measured on the current app: `ui` × `ub` is the smallest tile face, then the life total and the badge type.
+
+| Screen | Players | `ui` × `ub` | Life | Badges |
+|---|---|---|---|---|
+| **952 × 427 (target)** | 2 | 427 × 475 | 81px | 15.4px |
+| | 3–4 | 427–475 × 213 | 81px | 16px |
+| | 5–6 | 316 × 213 | 81px | 12.5px |
+| 640 × 360 | 6 | 213 × 179 | 68px | 12.5px |
+| 568 × 320 (stress) | 6 | 188 × 159 | 61px | 12.5px |
+
+### 3.2 Auto-drop: what gives way when a row runs out of room
+
+![Auto-drop](renders/spec-autodrop.png)
+
+**Never dropped, at any size including 568 × 320:**
+
+- the life total;
+- both −/+ halves;
+- every count: poison, tax, energy, experience, rad and each commander damage chip;
+- every control: the turn chip, the mana strip, map seats, counter cells, the pill.
+
+All of these keep 44px targets. Counts shrink their type before they ever leave.
+
+**Drop order, first to go first.** Each step is taken only if the previous one didn't make the row fit.
+
+| # | Near row (identity and counters) | Far row (commander damage) |
+|---|---|---|
+| 1 | Words: the identity **name**, and "Turn" in the turn chip (leaving the untap symbol and the number) | The **sword** label chip |
+| 2 | The identity **symbol**, when the indicator also shows (one colour mark is enough) | Shrink the type to the 11px floor |
+| 3 | Shrink the type to the 11px floor | Shrink the type to the 9px hard floor |
+| 4 | The **identity chip** entirely (the watermark still shows identity) | Wrap onto a second line |
+| 5 | Shrink the type to the 9px hard floor | |
+| 6 | Wrap the counters onto a second line, growing toward the total | |
+
+**How the rule runs:**
+
+- `fitBadgeRows()` runs after every badge change and every layout change. It measures each row at full type with the current drops, then takes the next step until every row fits.
+- **Levels are board-wide.** The busiest tile decides for every tile, so the board stays uniform. That's the same principle as §3.1, and it stops names flickering on one tile while staying on another.
+- **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game. Counters ticking up and down by one can't make names blink.
+- The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `identity`, `sword`, `wrap`); CSS hides the matching parts.
+
+**What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent):
+
+| Screen | Near row | Far row |
+|---|---|---|
+| 952 × 427, 4 or 6 players | Step 1 (names and "Turn" go) | Full size |
+| 640 × 360, 6 players | Steps 1–4, then 6 (two lines, no identity chip) | Full size |
+| 568 × 320, 4 players | Steps 1–2 | Full size |
+| 568 × 320, 6 players | Steps 1–4, then 6 | Full size |
+
+**A typical 6-player game** (default chip, so indicator + name, long names like Ink-Treader, single-digit counts):
+
+| Screen | Every counter on | Only Poison and tax |
+|---|---|---|
+| 952 × 427 (target) | Full size | Full size |
+| 640 × 360 | Step 1: names go | Full size |
+| 568 × 320 | Steps 1–4: names, then the identity chip go | Full size |
+
+`spec.mjs spec-autodrop` logs these numbers.
+
+**Fixed thresholds** (by board unit, so they also apply board-wide):
+
+| Item | Shown when |
+|---|---|
+| Mode hints ("Tap +1 · hold −1", "Your tile colour") | `ub ≥ 200` and `ui ≥ 240`, as today. Shown on the target; hidden at 640 × 360 and below with 6 players. |
+| Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2. |
+| Mana strip | One line when it fits; otherwise it wraps to two. It's never dropped. |
+| Setup header | Its own row when the viewport is at least 360px tall. Below that, the title goes and About · ✕ move to the end of the Players row (282px sheet at 568 × 320). |
+| Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. |
+
+## 4. Setup with a fixed set of controls (Q4: S2, plus the owner's restyle)
+
+![Setup](renders/spec-setup.png)
+
+### 4.1 The six control types
+
+Every control in setup, the Track sheet and the Identity sheet is one of these.
+
+| Type | Use | Spec |
+|---|---|---|
+| **Segmented choice** | Players, starting life, Turns, Background; the *multi* variant for Show on tiles | Equal segments in a 48px group (2px padding, 12px radius, `--background` fill, `--border` ring). Each segment is 44px tall. The selected one is filled `--accent` with `--ink` text. Optional 16px icon. |
+| **Stepper** | Custom starting life | − value + inside the selected segment's accent fill, 44px buttons. Range 1–999. Hold repeats at 10 per second, then in steps of 5 after 1s. **No keyboard.** |
+| **Navigation row** | Track, Identity, Colours, Rotate seats | 44px row: accent icon, label, optional summary icons, caret. Opens a sheet or a board mode. |
+| **Switch row** | Keep awake, each tracker, auto-empty | 44px row: icon, label, switch on the right. The whole row is the target. |
+| **Button** | New game (secondary), Done / Start new game / Choose identities (primary) | 48px, 12px radius. |
+| **Header button** | ✕ (close), ‹ (back), About (text) | 44px. |
+
+### 4.2 Game setup
+
+The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the target (952 × 427) and 640 × 360 without scrolling. Below 360px tall the header folds into the Players row, giving 282px at 568 × 320 (§3.2).
+
+| Row | Content |
+|---|---|
+| Header | "Game setup" · About · ✕ |
+| Players | Segmented 2 3 4 5 6 |
+| Starting life | Segmented 20 30 40 Custom. Choosing Custom turns that segment into the stepper, starting at the current value. Any other life (an old save with 25) opens with Custom selected. |
+| Navigation | Track (summary: the icons of the trackers that are on) · Identity · Colours |
+| Navigation and switch | Rotate seats · Keep awake switch |
+| Actions | New game · Done. Done becomes "Start new game" when the player count or life changes, as today. |
+
+### 4.3 Track sheet
+
+284px tall.
+
+- **Header:** ‹ · "Track" · ✕.
+- **Switch rows, three per line:** Commander, Poison, Energy, Experience, Rad, Mana pool.
+- **Turns:** segmented Off · Rounds · Turn by turn.
+- **"Empty mana pools when the turn passes":** a switch row, shown only while Mana pool is on and Turns isn't Off.
+
+### 4.4 Identity sheet
+
+285px tall.
+
+- **Header:** ‹ · "Identity" · ✕.
+- **Show on tiles:** multi-segment Indicator · Symbol · Name.
+- **Background:** segmented Symbol · Indicator · Off.
+- A one-line note.
+- **Choose identities:** primary button. It closes the sheets and starts the identity mode.
+
+**Navigation:**
+
+- ‹ and Android back go from a sub-sheet to setup.
+- ✕ closes everything.
+- Settings save the moment they change, as the switches do today.
+
+## 5. Tile colours: twelve swatches
+
+- With identity moved out, Colours mode shows only the swatches, as a 4 × 3 grid: `clamp(44px, min((100% − 24px)/4, (100% − 40px)/3), 60 × grow)`. Every tile fits it at 44px or more, including 6 players at 640×360.
+- **Decision: add three hues** where the hue circle has gaps: about 55° (working name Copper), 120° (Olive) and 330° (Orchid).
+  - `palette.mjs` generates them with the existing contrast checks: life total ≥ 9:1, small text ≥ 7.6:1, and the life-out red ≥ 4.79:1.
+  - The values in the mock-up are placeholders.
+- The rules stay as they are: no two players share a colour, and a taken swatch shows its owner ("P2").
+- Seats 1–6 keep their defaults.
+
+## 6. Player counters (Q3: K3; Q5: Cap)
+
+- **Trackers:** Poison, Energy, Experience and Rad, each a switch in the Track sheet, all off by default.
+  - Commander tax comes with the Commander switch, as today.
+  - Player counters only, never permanent counters.
+- **Counters mode:**
+  - One circle per enabled counter, in this order: poison, tax, energy, experience, rad.
+  - Three per row, last row centred.
+  - Each circle shows the icon over the count. Tap +1; hold −1 with repeat (500ms, then every 100ms), the map's rule. The hint is "Tap +1 · hold −1", hidden on short tiles.
+  - Cell size: `clamp(44px, min((ui − 20px)/3, (ub − 58px)/2), 92 × grow)`. That's 78px on the target at 4 or 6 players, 61px at 640 × 360 and 50px at 568 × 320 (6 players).
+  - Undo, ✓ and ✕ work as today. Counts are 0–99, and tax shows +2n.
+- **Icons:** poison is Mana infect `\ea73` (shipped), tax the Phosphor crown, energy Mana `\e907`, rad Mana `\ea50`, experience the **Phosphor graduation cap (fill)**.
+
+![Experience](renders/spec-experience.png)
+
+**Why the cap and not the official icon:**
+
+- The owner picked Cap.
+- The official MTGO experience icon (a split, shield-like chevron) isn't in the Mana font. Using it would mean bundling a fan-traced Wizards graphic from a wiki.
+- At 12px it reads as a "V".
+- The cap is the closest Phosphor shape and stays legible at badge size.
+
+## 7. Badge row (Q6: B1)
+
+![Badges](renders/spec-badges.png)
+
+- **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero.
+- It stays on one line at full size on the target. On smaller phones the auto-drop rules (§3.2) take the name, then the identity chip, before any count shrinks below 11px.
+- **Decision: not the right side.** I mocked it with and without the identity chip. Reasons:
+  - A column needs the + glyph to move in by 34px, which collides with the total at 6 players.
+  - The name can't fit a column.
+  - Six chips are taller than a 6-player tile's middle band.
+  - Splitting identity (near edge) from counters (right side) means two places to look.
+- Commander damage stays on the far row, at 26px (2f28705).
+
+## 8. Turns (Q10: B, with both models; Q11: Auto)
+
+![Turns](renders/spec-turns.png)
+
+- **Setting:** Track → Turns: **Off** (default) · **Rounds** · **Turn by turn**.
+- **Who goes first?** opens automatically:
+  - on every new game while Turns isn't Off;
+  - when Turns changes from Off to on (decided: the game needs a first player).
+  - Each tile offers "Me first". The pill holds a shuffle button (a random pick from `crypto.getRandomValues`, highlighting tiles in turn for about 0.8s) and ✕ to skip.
+  - Skipping leaves no first player: no flag, round 1, and in Turn by turn no active tile until someone taps a tile's turn chip.
+- **Play order is clockwise on screen, which is passing to the left:**
+
+  | Players | Order |
+  |---|---|
+  | 2 | P1, P2 |
+  | 3 | P1, P3, P2 |
+  | 4 | P1, P2, P4, P3 |
+  | 5 | P1, P2, P5, P4, P3 |
+  | 6 | P1, P2, P5, P6, P4, P3 |
+
+  Seat rotation doesn't change it.
+- **Rounds:**
+  - The first player's near row leads with a flag chip showing the round (⚑ 3). It's a button with a 64 × 44 hit area.
+  - Tap: next round. Hold: back one (minimum 1).
+- **Turn by turn:**
+  - The active tile's panel lifts 14% toward its seat colour, with a 3px inset ring in `--seat`.
+  - Its near row leads with **[untap symbol] Turn 3**, a button with a 64 × 44 hit area. Tap: pass to the next player in order, skipping anyone who is out (`isOut`). The round goes up when play reaches the first player again. Hold: step back one turn.
+  - The first player keeps a small flag chip.
+  - **The icon is Mana's untap symbol `\e61b`** (decided): every turn begins by untapping, it's one glyph, and it reads instantly to players.
+- **Both modes:**
+  - The pill leads with a round button, the number printed twice like a card index so both sides can read it. Tap does the same as the chip, so anyone can act; hold steps back.
+  - Turn steps save at once and aren't in any mode's Undo.
+  - **Off** hides everything about turns but keeps the state, so switching back on mid-game resumes. Only the Off → on change asks "Who goes first?" again, for a game with no first player.
+
+## 9. Floating mana (Q12: M1 + M2 hybrid; Q13: Manual + turns, switchable)
+
+![Mana](renders/spec-mana.png)
+
+- **Setting:** Track → Mana pool, off by default. When it's on, the pill shows the tap symbol `\e61a`, with a dot while any pool has mana.
+- **Adding: the mana mode.**
+  - Each tile shows six circles: W U B R G and colourless (`\e904`), mana symbols in cost style, sized like the counter cells. The `.pip` class needs a C entry.
+  - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode (edit kind `mana`).
+- **At rest:**
+  - A tile shows a strip **only while its pool has mana**, and only the colours it holds: for example (R)3 (C)1 [eraser].
+  - The strip takes the near badge row's place, which returns when the pool empties.
+  - Strip items are 44px tall:
+    - **Tap a symbol to spend 1** of that colour. It saves at once, and the strip shrinks as colours reach 0.
+    - **The eraser clears the pool** and leaves "Undo clear" in the strip's place for 5 seconds; a tap restores the pool.
+- **Automatic emptying:**
+  - Setting: "Empty mana pools when the turn passes", default on. It's shown while Mana pool is on and Turns isn't Off.
+  - Each round step (Rounds) or turn pass (Turn by turn) empties every pool.
+  - The step stores what it emptied, and holding back that same step restores it.
+- Steps and phases aren't tracked, so mid-turn emptying is manual: one tap per pool.
+
+## 10. Data model and settings
+
+### 10.1 Saved game (additions to `loadGame`/`saveGame`)
+
+| Field | Type | Default | Validation (anything else falls back to the default) |
+|---|---|---|---|
+| `counters` | `{ commander, poison, energy, experience, rad }` booleans | all false | strict `=== true` |
+| `energy`, `experience`, `rad` | int[players], 0–99 | zeros | `fitCounts` |
+| `pools` | int[players][6] (W U B R G C), 0–99 | zeros | new `fitPools` |
+| `manaPool` | boolean | false | |
+| `autoEmpty` | boolean | true | `!== false` |
+| `turns` | `'off' \| 'rounds' \| 'turns'` | `'off'` | enum |
+| `turn` | `{ first: int\|null, active: int\|null, round: int ≥1 }` | `{ null, null, 1 }` | indices must be valid seats |
+| `identity` | `{ show: { indicator, symbol, name }, background: 'symbol'\|'indicator'\|'off' }` | `{ show: {true, false, true}, 'symbol' }` | |
+| `colors` | as today, swatch index 0–11 | seats 1–6 defaults | `fitColors` with 12 swatches |
+
+- Unchanged: `scores`, `startingLife`, `rotations`, `keepAwake`, `landscapeAngle`, `poison`, `casts`, `identities`, `commanderDamage`.
+- Changing the player count resizes every array and resets `turn`.
+- Not saved: the mode edit stacks, the "Undo clear" buffer and the hold-back buffer of a turn step.
+
+### 10.2 New game
+
+- **Resets:** scores, poison, casts, energy, experience, rad, commander damage, pools, and `turn` (round 1, no first or active player).
+- **Opens** "Who goes first?" if Turns isn't Off.
+- **Keeps:** every setting, colours, identities and rotations (rotations only when the player count is unchanged).
+
+### 10.3 Android back, in order
+
+1. A sub-sheet (Track, Identity) goes back to setup. Setup, the dice and other dialogs close.
+2. Rotate, colours and identity modes end, keeping their changes.
+3. Counters, damage and mana modes behave like ✕: they ask when there are edits.
+4. "Who goes first?" is skipped.
+5. At rest, back goes to the system.
+
+### 10.4 Undo summary
+
+| Where | How |
+|---|---|
+| Counters, commander damage, mana mode | The edit stack: Undo / ✓ / ✕, as today |
+| Turn steps | Hold the chip or pill to step back. That also restores auto-emptied pools. |
+| Spending from the strip | No undo. Add it back in mana mode. |
+| Clearing a pool | "Undo clear" for 5 seconds |
+| Identity, colours, settings | Instant. Toggle back. |
+
+## 11. Build plan
+
+Each milestone ships on its own and keeps `npm test` and lint green. The tests extend the existing `tests/*.test.mjs` suites, which use Playwright against `web/index.html`.
+
+**M1. Look and size: style B, one size per board, pill growth, unified setup, circle cells.**
+
+- The new button style for the life halves.
+- Circle cells for the existing poison and tax.
+- `--ui`, `--ub` and `--board-digits`.
+- The pill scaling with `--grow`.
+- The six control types, the new setup layout with the stepper, and the Track sheet holding Commander and Poison.
+- Tests:
+  - `sizes.test`, with 952 × 427 as the first screen:
+    - on every screen in its list, every tile's total, ± glyph and badge size are equal within 0.5px at 3 and 5 players;
+    - every target is still at least 44px, including at 568 × 320;
+    - setup fits 427, 393, 360 and 320 tall without scrolling (the folded header at 320).
+  - New `autodrop.test`: with a seeded worst-case game at 952 × 427, 640 × 360 and 568 × 320:
+    - the `data-drop` tokens match the §3.2 table;
+    - no count chip is ever hidden;
+    - no row overflows its tile;
+    - a name dropped at one count of 10 doesn't come back at 9 (hysteresis);
+    - a new game restores full size.
+  - `counters-mode.test`: cells tap +1 and hold −1 with repeat; Undo and discard still work.
+  - New `setup.test`: the stepper (no text input), Custom selected for an old save at 25, Track ‹ and Android back return to setup, and switches save at once.
+  - Pointerdown on a half sets the wash.
+
+**M2. Identity.**
+
+- The Identity sheet and identity mode.
+- The `identity` settings.
+- Shard and four-colour symbols, with ghosts.
+- The name table (full names).
+- The background setting.
+- Colours mode with 12 swatches and the 3 new palettes from `palette.mjs`.
+- Tests:
+  - For all 31 identities × the 7 display combinations, the chip's contents and order.
+  - The watermark glyph per identity for each background.
+  - `loadGame` defaults and migration (old saves get the defaults; colours 0–8 stay valid).
+  - Identity mode saves instantly, and back ends it.
+  - Colour uniqueness with 12 swatches at 6 players.
+  - Contrast checks for the new palettes in `palette.mjs`.
+
+**M3. Energy, experience and rad.**
+
+- The switches, data, cells and badges.
+- Tests:
+  - Only enabled counters appear, in order.
+  - The badge order, and the fit at 6 players on 640×360 with two-digit counts.
+  - A new game resets them, and switches persist.
+  - Undo and discard cover the new kinds.
+
+**M4. Turns and floating mana.**
+
+- The Turns setting and "Who goes first?" (pick, shuffle, skip).
+- Rounds and Turn by turn, with the play order and skipping players who are out.
+- The pill round button.
+- Mana mode, the at-rest strip (spend, clear, undo clear) and auto-empty with restore on hold-back.
+- Tests:
+  - The play order for 2–6 players.
+  - The round goes up only on wrapping to the first player.
+  - An eliminated player is skipped.
+  - Hold steps back the round or turn.
+  - "Who goes first?" opens on a new game and on Off → on, but not on Rounds ↔ Turn by turn.
+  - The strip shows only non-zero colours and only on tiles with mana.
+  - Spend, clear, and undo clear (it expires after 5s).
+  - Auto-empty on a pass, and the restore on hold-back.
+  - With auto-empty off, pools survive a pass.
+  - Android back in each new mode.
+
+## 12. Open questions
+
+1. **"Indicator backgrounds".** Read as the watermark behind the total (§2.3: Symbol / Indicator / Off). If the owner meant tinting the tile with the identity's colours, that's a different feature.
+2. **The three new hue names** (Copper, Olive, Orchid are working names) are for the owner to approve once `palette.mjs` produces them.
