@@ -2197,23 +2197,33 @@ function notchedSlider({ root, min, max, snap, step, page, lowest, highest, get,
     ticks.append(tick);
   }
   // A press only picks a value once it lifts without moving (a tap) or moves sideways (a drag). A vertical swipe is
-  // left to the page, which scrolls (touch-action: pan-y), so the slider never traps a scroll. A tap on a stop is
-  // left to the stop's own click.
+  // left to the page, which scrolls (touch-action: pan-y), so the slider never traps a scroll; and where the browser
+  // doesn't take the swipe over, it still isn't a tap. A tap on a stop is left to the stop's own click.
   let pointer;
   let startX = 0;
+  let startY = 0;
   let dragging = false;
+  let swiping = false;
   let onStop = false;
   root.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || pointer !== undefined) return;
     pointer = event.pointerId;
     startX = event.clientX;
+    startY = event.clientY;
     dragging = false;
+    swiping = false;
     onStop = event.target.closest('.k-stop') !== null;
   });
   root.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== pointer) return;
-    if (!dragging && Math.abs(event.clientX - startX) < 6) return;
+    if (event.pointerId !== pointer || swiping) return;
+    const across = Math.abs(event.clientX - startX);
+    const down = Math.abs(event.clientY - startY);
     if (!dragging) {
+      if (across < 6 && down < 6) return;
+      if (down > across) {
+        swiping = true;
+        return;
+      }
       dragging = true;
       root.setPointerCapture?.(event.pointerId);
     }
@@ -2221,7 +2231,7 @@ function notchedSlider({ root, min, max, snap, step, page, lowest, highest, get,
   });
   const end = (event, lifted) => {
     if (event.pointerId !== pointer) return;
-    if (lifted && !dragging && !onStop) change(valueAt(event.clientX));
+    if (lifted && !dragging && !swiping && !onStop) change(valueAt(event.clientX));
     pointer = undefined;
   };
   root.addEventListener('pointerup', event => end(event, true));

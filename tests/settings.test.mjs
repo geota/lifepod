@@ -180,6 +180,13 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal((await sliderState(page, 'players')).now, 5, 'the value follows the drag');
     await page.mouse.up();
     assert.deepEqual(await sliderState(page, 'players'), { now: 5, text: '5 players', at: 0.75, pinned: '' });
+    // A press that moves up or down is a swipe, not a tap or a drag, even where nothing scrolls: the value stays.
+    const swipe = await pointFor(page, 'players', 3, [2, 6]);
+    await page.mouse.move(swipe.x, swipe.y);
+    await page.mouse.down();
+    await page.mouse.move(swipe.x + 2, swipe.y - 40, { steps: 6 });
+    await page.mouse.up();
+    assert.equal((await sliderState(page, 'players')).now, 5, 'a vertical swipe leaves the value');
     // Keys step it and stop at the ends.
     await page.locator('#players-track').focus();
     await page.keyboard.press('ArrowLeft');
