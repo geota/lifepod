@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button } from './helpers.mjs';
+import { app, button, seedGame } from './helpers.mjs';
 
 // Turns (design/polish/SPEC.md §8): Off, Rounds or Turn by turn in Setup → Track, "Who goes first?", the play order,
 // the turn chip and the pill's round button.
@@ -34,15 +34,6 @@ async function openPage(t, engine, { game, android = false, random, viewport = {
       };
     });
   }
-  if (game) {
-    await page.addInitScript(([saved, key]) => {
-      if (!sessionStorage.getItem('test-seeded')) {
-        if (key === 'game') sessionStorage.setItem('game', saved);
-        else localStorage.setItem('lifepod-game', saved);
-        sessionStorage.setItem('test-seeded', '1');
-      }
-    }, [JSON.stringify(game), android ? 'game' : 'local']);
-  }
   if (random !== undefined) {
     // Every random draw returns this value, and each draw is counted, so the pick is known.
     await page.addInitScript((value) => {
@@ -55,6 +46,7 @@ async function openPage(t, engine, { game, android = false, random, viewport = {
     }, random);
   }
   await page.goto(app);
+  if (game) await seedGame(page, game, { android });
   return page;
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
-import { app, button } from './helpers.mjs';
+import { app, button, seedGame } from './helpers.mjs';
 
 // Auto-drop (design/polish/SPEC.md §3.2): when a badge row runs out of room, parts give way in a fixed order on
 // every tile at once, and no count is ever hidden. Today's rows hold the colour identity chip, poison, tax, energy,
@@ -37,13 +37,8 @@ async function openBoard(t, engine, game, { width, height }) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, [], 'no script errors'));
-  await page.addInitScript((saved) => {
-    if (!sessionStorage.getItem('test-seeded')) {
-      localStorage.setItem('lifepod-game', saved);
-      sessionStorage.setItem('test-seeded', '1');
-    }
-  }, JSON.stringify(game));
   await page.goto(app);
+  await seedGame(page, game);
   // Identity symbols are Mana glyphs, and the rows are fitted again once the font has loaded.
   await page.evaluate(() => document.fonts.ready);
   return page;

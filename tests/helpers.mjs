@@ -36,11 +36,22 @@ export async function startGame(page, count) {
   await page.locator('#save-setup').tap();
 }
 
+// Loads a saved game: writes it where the app reads it (local storage, or the Android stand-in's session storage) and
+// reloads. Call it after page.goto. An init script that seeds only once can't do this reliably: on a slow machine its
+// "already seeded" flag in session storage isn't always readable yet when the script runs on a reload, so it seeds
+// again over whatever the test changed since.
+export async function seedGame(page, game, { android = false } = {}) {
+  await page.evaluate(([saved, android]) => {
+    if (android) sessionStorage.setItem('game', saved);
+    else localStorage.setItem('lifepod-game', saved);
+  }, [JSON.stringify(game), android]);
+  await page.reload();
+}
+
 // A fresh game in the Classic tile colours, for checks written against Classic's palettes and swatch names. Clear is
 // the default set.
-export async function useClassicTiles(page, storage = 'localStorage', key = 'lifepod-game') {
-  await page.evaluate(([storage, key]) => window[storage].setItem(key, JSON.stringify({ startingLife: 40, scores: [40, 40, 40, 40], tileColours: 'classic' })), [storage, key]);
-  await page.reload();
+export async function useClassicTiles(page, storage = 'localStorage') {
+  await seedGame(page, { startingLife: 40, scores: [40, 40, 40, 40], tileColours: 'classic' }, { android: storage === 'sessionStorage' });
 }
 
 export function scores(page) {

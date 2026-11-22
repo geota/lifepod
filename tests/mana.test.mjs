@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, setSwitches, stripProblems } from './helpers.mjs';
+import { app, button, seedGame, setSwitches, stripProblems } from './helpers.mjs';
 
 // Floating mana (design/polish/SPEC.md §9): the Mana pool switch, mana mode, the strip at rest (spend, clear, undo
 // clear) and emptying pools when the turn passes.
@@ -33,16 +33,8 @@ async function openPage(t, engine, { game, android = false, clock = false, viewp
       };
     });
   }
-  if (game) {
-    await page.addInitScript(([saved, key]) => {
-      if (!sessionStorage.getItem('test-seeded')) {
-        if (key === 'game') sessionStorage.setItem('game', saved);
-        else localStorage.setItem('lifepod-game', saved);
-        sessionStorage.setItem('test-seeded', '1');
-      }
-    }, [JSON.stringify(game), android ? 'game' : 'local']);
-  }
   await page.goto(app);
+  if (game) await seedGame(page, game, { android });
   return page;
 }
 

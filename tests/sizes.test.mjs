@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { chromium, webkit } from 'playwright-core';
-import { app, button, fakeScreenOrientation, stripProblems, turnScreen } from './helpers.mjs';
+import { app, button, fakeScreenOrientation, seedGame, stripProblems, turnScreen } from './helpers.mjs';
 
 // Screens the board is checked on, by CSS size in landscape. The design target is a Pixel 11 Pro class phone at
 // 952 × 427. 320 × 568 is a stress test: no phone people still use is that small, but if it fits there it fits
@@ -48,13 +48,8 @@ async function openBoard(browser, [width, height], count, portrait) {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await fakeScreenOrientation(page);
-  await page.addInitScript(game => {
-    if (!sessionStorage.getItem('test-seeded')) {
-      localStorage.setItem('lifepod-game', game);
-      sessionStorage.setItem('test-seeded', '1');
-    }
-  }, JSON.stringify(busyGame(count)));
   await page.goto(app);
+  await seedGame(page, busyGame(count));
   await turnScreen(page, page.viewportSize().width, page.viewportSize().height, portrait ? 0 : 90);
   return { page, errors };
 }

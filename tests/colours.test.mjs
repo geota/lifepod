@@ -227,7 +227,7 @@ test('chromium: Android back closes the colours mode', async (t) => {
     };
   });
   await page.goto(app);
-  await useClassicTiles(page, 'sessionStorage', 'game');
+  await useClassicTiles(page, 'sessionStorage');
   const back = () => page.evaluate(() => window.closeOpenDialog());
   const handling = () => page.evaluate(() => window.backHandling.at(-1));
   assert.equal(await handling(), false, 'back leaves the app at rest');
