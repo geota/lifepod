@@ -78,3 +78,82 @@ export function stripProblems(page) {
     });
   });
 }
+
+// The methods of GameBridge in android/src/dev/maceiras/lifepod/MainActivity.kt and the message handlers in
+// ios/LifePodApp.swift. tests/native.test.mjs checks both lists against those sources, and the mocks below are built
+// from them, so the mocks can't drift from the wrappers.
+export const androidMethods = ['readGame', 'writeGame', 'keepAwake', 'haptic', 'setBackHandling'];
+export const iosMessages = ['game', 'keepAwake', 'haptic'];
+
+// A stand-in for the Android bridge that records every call in window.bridgeCalls as [method, ...arguments]. The game
+// is kept in session storage, as SharedPreferences keeps it, so it survives a reload.
+export async function mockAndroid(page) {
+  await page.addInitScript((methods) => {
+    window.bridgeCalls = [];
+    const behaviour = {
+      readGame: () => sessionStorage.getItem('android-game'),
+      writeGame: game => sessionStorage.setItem('android-game', game),
+    };
+    window.LifePodAndroid = Object.fromEntries(methods.map(name => [name, (...args) => {
+      window.bridgeCalls.push([name, ...args]);
+      return behaviour[name]?.(...args);
+    }]));
+  }, androidMethods);
+}
+
+// A stand-in for the iOS app's window.webkit.messageHandlers that records every message in window.bridgeCalls as
+// [name, body]. Like LifePodApp.swift, it keeps the last game message and injects it as window.initialGame before
+// the page loads.
+export async function mockIos(page) {
+  await page.addInitScript((messages) => {
+    window.bridgeCalls = [];
+    const saved = sessionStorage.getItem('ios-game');
+    if (saved !== null) window.initialGame = saved;
+    const messageHandlers = Object.fromEntries(messages.map(name => [name, {
+      postMessage(body) {
+        window.bridgeCalls.push([name, body]);
+        if (name === 'game') sessionStorage.setItem('ios-game', body);
+      },
+    }]));
+    Object.defineProperty(window, 'webkit', { configurable: true, value: { messageHandlers } });
+  }, iosMessages);
+}
+
+// A stand-in for the Screen Wake Lock API that records 'request screen' and 'release' in window.wakeLockCalls, or
+// declines every request. window.setTestHidden(true or false) sends the page to the background and back; as in a
+// browser, going to the background releases every lock.
+export async function mockWakeLock(page, { decline = false } = {}) {
+  await page.addInitScript((declines) => {
+    window.wakeLockCalls = [];
+    const held = new Set();
+    let hidden = false;
+    Object.defineProperty(Document.prototype, 'hidden', { configurable: true, get: () => hidden });
+    Object.defineProperty(Document.prototype, 'visibilityState', { configurable: true, get: () => (hidden ? 'hidden' : 'visible') });
+    window.setTestHidden = async (next) => {
+      hidden = next;
+      if (hidden) for (const sentinel of held) await sentinel.release();
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    const wakeLock = {
+      async request(type) {
+        window.wakeLockCalls.push(`request ${type}`);
+        if (declines) throw new DOMException('Wake lock declined', 'NotAllowedError');
+        const sentinel = new EventTarget();
+        Object.assign(sentinel, {
+          type,
+          released: false,
+          async release() {
+            if (sentinel.released) return;
+            sentinel.released = true;
+            held.delete(sentinel);
+            window.wakeLockCalls.push('release');
+            sentinel.dispatchEvent(new Event('release'));
+          },
+        });
+        held.add(sentinel);
+        return sentinel;
+      },
+    };
+    Object.defineProperty(Navigator.prototype, 'wakeLock', { configurable: true, get: () => wakeLock });
+  }, decline);
+}
