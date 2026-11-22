@@ -124,7 +124,7 @@ async function checkCountersMode(t, engine) {
   assert.equal(await nearBadges(page, 4), `${held} poison`);
   assert.equal(await nearBadges(page, 2), 'Commander tax +2');
   assert.equal(await nearBadges(page, 1), '');
-  assert.equal(await tile(page, 4).locator('.badges.near .icon').count(), 1, 'poison shows the flask');
+  assert.equal(await tile(page, 4).locator('.badges.near .mana-icon[data-glyph="infect"]').count(), 1, 'poison shows the infect symbol');
   await reload(page);
   assert.equal(await nearBadges(page, 4), `${held} poison`, 'saved counts survive a reload');
 
@@ -178,9 +178,11 @@ async function checkIdentity(t, engine) {
   await page.evaluate(() => document.fonts.ready);
   const pips = await group.locator('.pip').evaluateAll(nodes => nodes.map(pip => {
     const symbol = getComputedStyle(pip, '::before');
-    return `${getComputedStyle(pip).opacity} ${symbol.fontFamily} ${symbol.content.codePointAt(1).toString(16)}`;
+    return `${getComputedStyle(pip).opacity} ${symbol.fontFamily} ${symbol.content.codePointAt(1).toString(16)} ${getComputedStyle(pip).backgroundColor}`;
   }));
-  assert.deepEqual(pips, ['1 Mana e600', '1 Mana e601', '1 Mana e602', '1 Mana e603', '1 Mana e604'], `pips: ${pips}`);
+  // Each symbol sits on the colour it's printed with.
+  assert.deepEqual(pips, ['1 Mana e600 rgb(253, 251, 206)', '1 Mana e601 rgb(188, 218, 247)', '1 Mana e602 rgb(167, 153, 158)',
+    '1 Mana e603 rgb(241, 155, 121)', '1 Mana e604 rgb(159, 203, 166)'], `pips: ${pips}`);
   assert.ok(await page.evaluate(() => document.fonts.check('16px Mana', '\ue600')), 'the Mana font loads from the app');
   // Each tile's toggles face its player, like the swatches.
   const facing = await page.locator('.player .identity').evaluateAll(groups => groups.map(node => Math.round(new DOMMatrixReadOnly(getComputedStyle(node.closest('.player-face')).transform).a)));
@@ -194,8 +196,9 @@ async function checkIdentity(t, engine) {
   await reload(page);
   await turnScreen(page, 852, 393, 90);
   assert.equal(await nearBadges(page, 3), 'colour identity white, green', 'saved, and shown in W U B R G order');
-  const nearPips = await tile(page, 3).locator('.badges.near .pip').evaluateAll(nodes => nodes.map(pip => getComputedStyle(pip).backgroundColor));
-  assert.deepEqual(nearPips, ['rgb(253, 251, 206)', 'rgb(159, 203, 166)'], 'the colours mana symbols are printed with');
+  // At rest the identity is the colour indicator printed on cards, split two ways.
+  assert.deepEqual(await tile(page, 3).locator('.badges.near .chip.identity .ci').evaluate(node => [node.dataset.ci, getComputedStyle(node, '::before').content]),
+    ['WG', '"\ue98b"']);
 
   // Six players on the smallest phone: the tiles are too small for the toggles, so a 44px identity button beside
   // the swatches opens the player sheet, facing that player, with identity only.

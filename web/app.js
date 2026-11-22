@@ -81,7 +81,6 @@ const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
 const iconPaths = {
   minus: 'M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z',
   plus: 'M228,128a12,12,0,0,1-12,12H140v76a12,12,0,0,1-24,0V140H40a12,12,0,0,1,0-24h76V40a12,12,0,0,1,24,0v76h76A12,12,0,0,1,228,128Z',
-  flask: 'M225.15,197.71,164,95.81V44h4a12,12,0,0,0,0-24H88a12,12,0,0,0,0,24h4V95.81L30.85,197.71A20,20,0,0,0,48,228H208a20,20,0,0,0,17.15-30.29ZM140,44V99.14a12,12,0,0,0,1.71,6.17l35.13,58.54c-10.79.86-25.15-1.31-43.42-10.56-14-7.08-27.46-11.33-40.27-12.76l21.14-35.22A12,12,0,0,0,116,99.14V44ZM55.06,204,79,164.19c13-1.11,27.62,2.42,43.62,10.52,19.61,9.92,36.25,13.31,49.85,13.31A75.44,75.44,0,0,0,190.11,186l10.83,18Z',
   crown: 'M232.63,70a19.82,19.82,0,0,0-23.55,4.71l-29.52,31.82L146.22,31.76l-.06-.14a20,20,0,0,0-36.32,0l-.06.14L76.44,106.52,46.92,74.7a20,20,0,0,0-34.6,16.81c0,.16.06.31.09.47L35.07,195.76A20,20,0,0,0,54.71,212H201.29a20,20,0,0,0,19.64-16.24L243.59,92c0-.16.07-.31.09-.47A19.82,19.82,0,0,0,232.63,70ZM198.06,188H57.94L39.06,101.51,71.2,136.16A12,12,0,0,0,91,132.89l37-83.07,37,83.07a12,12,0,0,0,19.76,3.27l32.14-34.65Z',
   sword: 'M216,28H152a12,12,0,0,0-9.33,4.45L79.5,110.51l-4.66-4.65a20,20,0,0,0-28.29,0L29.86,122.55a20,20,0,0,0,0,28.29h0L45,166,23.86,187.17a20,20,0,0,0,0,28.28l16.69,16.69a20,20,0,0,0,28.28,0L90,211l15.17,15.16a20,20,0,0,0,28.29,0l16.69-16.69a20,20,0,0,0,0-28.3l-4.65-4.65,78.06-63.17A12,12,0,0,0,228,104V40A12,12,0,0,0,216,28ZM54.69,212.34l-11-11L62,183l11,11Zm64.61-6L49.65,136.7l11.05-11,69.65,69.65ZM204,98.27l-75.58,61.17L121,152l47.51-47.5a12,12,0,0,0-17-17L104,135l-7.45-7.44L157.73,52H204Z',
 };
@@ -394,6 +393,14 @@ function icon(name) {
   path.setAttribute('d', iconPaths[name]);
   svg.append(path);
   return svg;
+}
+
+// A symbol from the bundled Mana font, sized and coloured like the Phosphor icons.
+function manaIcon(name) {
+  const glyph = element('span', 'icon mana-icon');
+  glyph.dataset.glyph = name;
+  glyph.setAttribute('aria-hidden', 'true');
+  return glyph;
 }
 
 function element(tag, className, ...children) {
@@ -774,7 +781,7 @@ function buildCounterRow(kind, index) {
     button.type = 'button';
     return button;
   });
-  const value = element('output', 'counter-value', icon(kind === 'poison' ? 'flask' : 'crown'), element('b'));
+  const value = element('output', 'counter-value', kind === 'poison' ? manaIcon('infect') : icon('crown'), element('b'));
   value.dataset.kind = kind;
   const row = element('div', 'counter-row', subtract, value, add);
   if (kind === 'poison') {
@@ -868,15 +875,15 @@ function renderBadges(index) {
   const chips = [];
   const identity = game.counters.commander ? game.identities[index] : '';
   if (identity) {
-    const pips = [...identity].map((id) => {
-      const pip = element('span', 'pip');
-      pip.dataset.pip = id;
-      return pip;
-    });
-    chips.push(element('span', 'chip pips', ...pips, visuallyHidden(identityText(identity))));
+    // At rest the identity is the colour indicator printed on cards; the mana symbols are for setting it.
+    const indicator = element('span', 'ci');
+    indicator.dataset.ci = identity;
+    indicator.dataset.count = identity.length;
+    indicator.setAttribute('aria-hidden', 'true');
+    chips.push(element('span', 'chip identity', indicator, visuallyHidden(identityText(identity))));
   }
   if (game.counters.poison && game.poison[index] > 0) {
-    const chip = element('span', 'chip', icon('flask'), String(game.poison[index]), visuallyHidden(' poison'));
+    const chip = element('span', 'chip', manaIcon('infect'), String(game.poison[index]), visuallyHidden(' poison'));
     const level = dangerLevel(game.poison[index], poisonWarning, poisonLethal);
     if (level) chip.dataset.level = level;
     chips.push(chip);

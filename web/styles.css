@@ -116,6 +116,11 @@ button, .player { -webkit-user-select: none; user-select: none; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
+/* Game symbols from the Mana font: the d20 for dice, infect for poison. */
+.mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
+.mana-icon::before { content: var(--glyph); speak: never; }
+.mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
+.mana-icon[data-glyph="infect"] { --glyph: '\ea73'; }
 
 /* app.js turns the board so seats stay fixed to the device as the screen rotates. */
 .app {
@@ -590,7 +595,9 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 /* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
 .chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
 .chip.damage[data-level="out"] { background: var(--panel); }
-.chip.pips { gap: .12em; }
+/* Colour identity at rest: the colour indicator in a round chip, like the sword. */
+.chip.identity { width: 1.7em; padding: 0; justify-content: center; }
+.chip.identity .ci { font-size: 1.12em; }
 /* Colour identity: each colour's mana symbol on its disc, like a mana cost. --pip-size sets the disc; the symbol
    is 77% of it, as Mana's own cost style draws it. */
 .pip {
