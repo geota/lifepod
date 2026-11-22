@@ -16,7 +16,10 @@ function savedGame(count, extra = {}) {
 async function openPage(t, engine, { game, android = false, clock = false, viewport = { width: 952, height: 427 } } = {}) {
   const browser = await engine.launch();
   t.after(() => browser.close());
-  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport });
+  // Under Playwright's clock, nothing animates: an entrance animation (a turn reminder, "Undo clear") or a press
+  // animation runs on real time while the timers wait for the test, so a tap could wait on an element that never
+  // settles. Reduced motion turns them off, as it does for players who ask for it.
+  const page = await browser.newPage({ isMobile: true, hasTouch: true, viewport, ...(clock ? { reducedMotion: 'reduce' } : {}) });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   t.after(() => assert.deepEqual(errors, [], 'no script errors'));
