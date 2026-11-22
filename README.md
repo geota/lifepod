@@ -94,6 +94,10 @@ A version tag such as `v0.1.0-alpha.1` publishes a GitHub prerelease with the si
 
 LifePod collects no data. See the [privacy policy](PRIVACY.md).
 
+## License
+
+LifePod's own code is under the [MIT License](LICENSE). That covers the code only: the Mana font keeps its own SIL Open Font License ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)), and the mana, colour indicator, guild and clan symbols belong to Wizards of the Coast.
+
 ## Credits
 
 LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
