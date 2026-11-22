@@ -112,7 +112,7 @@ async function checkDamage(t, engine) {
   const hit = (await seatLooks(page, 3)).find(looks => looks.attacker === 2);
   assert.equal(hit.background, hit.tile, 'a seat with damage is still the colour of the attacker’s tile');
   assert.ok(hit.shadow.startsWith(`${hex(hit.seat)} 0px 0px 0px 2px inset, `), `the damage ring: ${hit.shadow}`);
-  assert.match(hit.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px/, 'the changed ring');
+  assert.match(hit.shadow, /rgb\(242, 242, 239\) 0px 0px 0px 4px/, 'the changed ring');
   assert.deepEqual([hit.opacity, hit.opaque, hit.solid], ['1', 1, 1], 'no transparency');
   assert.ok(hit.contrast >= 4.5, `the 6 at ${hit.contrast.toFixed(2)}:1`);
   assert.deepEqual(await ownSeat(page, 3), ['34', '−6'], 'your own seat shows your life and the change');
@@ -157,12 +157,12 @@ async function checkDamage(t, engine) {
   const back = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
   assert.equal(back.background, back.tile);
   assert.ok(back.shadow.startsWith(`${hex(back.rim)} 0px 0px 0px 1px inset, `), `zero ring kept: ${back.shadow}`);
-  assert.match(back.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px$/, 'changed ring kept');
+  assert.match(back.shadow, /rgb\(242, 242, 239\) 0px 0px 0px 4px$/, 'changed ring kept');
   // A held seat at 0 thickens its ring, and keeps the changed ring.
   await seat(page, 3, 4).evaluate(cell => { cell.dataset.pressed = ''; });
   const held = (await seatLooks(page, 3)).find(looks => looks.attacker === 4);
   assert.ok(held.shadow.startsWith(`${hex(held.seat)} 0px 0px 0px 3px inset, `), `held ring: ${held.shadow}`);
-  assert.match(held.shadow, /rgb\(243, 241, 229\) 0px 0px 0px 4px$/);
+  assert.match(held.shadow, /rgb\(242, 242, 239\) 0px 0px 0px 4px$/);
   await seat(page, 3, 4).evaluate(cell => { delete cell.dataset.pressed; });
 
   // ✕ asks before discarding, then puts damage and life back as they were.
@@ -296,7 +296,7 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
   };
   const amber = 'rgb(242, 196, 109)';
   const red = 'rgb(244, 153, 147)';
-  const text = 'rgb(243, 241, 229)';
+  const text = 'rgb(242, 242, 239)';
   const game = {
     startingLife: 40, scores: [31, 15, 28, 12], rotations: [0, 0, 0, 0], keepAwake: true, landscapeAngle: 90,
     counters: { commander: true, poison: true }, poison: [0, 6, 7, 10],

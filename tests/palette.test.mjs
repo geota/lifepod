@@ -26,8 +26,7 @@ test('chromium: every tile palette is palette.mjs’s and passes its contrast ch
   }, ids);
   const tokens = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
-    // The tiles' own text tokens: the chrome's palette (Graphite + lime) doesn't change the tiles.
-    return Object.fromEntries(['--tile-text', '--tile-text-soft', '--life-out'].map(name => [name, style.getPropertyValue(name).trim()]));
+    return Object.fromEntries(['--text', '--text-soft', '--life-out'].map(name => [name, style.getPropertyValue(name).trim()]));
   });
   const { minimums } = generated.r3;
   assert.deepEqual(minimums, { life: 9, small: 7.6, lifeOut: 4.79 });
@@ -36,7 +35,7 @@ test('chromium: every tile palette is palette.mjs’s and passes its contrast ch
     for (const row of ['top', 'bottom']) {
       assert.deepEqual(shipped[id][row], swatch[row], `${swatch.name} ${row}: styles.css matches palette.mjs`);
       const { panel } = shipped[id][row];
-      const checks = { life: contrast(tokens['--tile-text'], panel), small: contrast(tokens['--tile-text-soft'], panel), lifeOut: contrast(tokens['--life-out'], panel) };
+      const checks = { life: contrast(tokens['--text'], panel), small: contrast(tokens['--text-soft'], panel), lifeOut: contrast(tokens['--life-out'], panel) };
       for (const [check, minimum] of Object.entries(minimums)) {
         assert.ok(checks[check] >= minimum, `${swatch.name} ${row}: ${check} ${checks[check].toFixed(2)}:1 is at least ${minimum}:1`);
       }
@@ -71,5 +70,5 @@ test('chromium: the colour indicator has a rim that clears 3:1 on every chip', a
   await page.reload();
   const shadows = await page.locator('.badges .ci').evaluateAll(discs => discs.map(disc => getComputedStyle(disc).boxShadow));
   assert.equal(shadows.length, 2);
-  for (const shadow of shadows) assert.match(shadow, /rgba\(243, 241, 229, 0\.65\d*\) 0px 0px 0px 1\.5px/);
+  for (const shadow of shadows) assert.match(shadow, /rgba\(242, 242, 239, 0\.65\d*\) 0px 0px 0px 1\.5px/);
 });

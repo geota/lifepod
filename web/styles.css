@@ -10,26 +10,6 @@
 :root {
   color-scheme: dark;
 
-  /* Surfaces and text: Graphite + lime (design/polish/STYLE.md §5). Neutral graphite surfaces, so the tiles carry all
-     the colour, and the brand lime as the one accent. --raised is a control one tonal step above its card. */
-  --background: #111213;
-  --surface: #1b1c1e;
-  --raised: #242528;
-  --surface-pressed: #303236;
-  --border: #393b40;
-  --control-border: #8b8f97;
-  --switch-off: #35373b;
-  --text: #f2f2ef;
-  --text-soft: #d8d9dc;
-  --muted: #b3b6bc;
-  --accent: #d9f08a;
-  --accent-pressed: #c4dc76;
-  --ink: #1d2608;
-  /* Text on the tiles keeps the colours the twelve tile palettes were generated and checked against
-     (design/counters/palette.mjs: the life total 9:1, small text 7.6:1); .board uses them in place of the chrome's. */
-  --tile-text: #f3f1e5;
-  --tile-text-soft: #d6e1d5;
-  --tile-muted: #bcc7b8;
   --danger-text: #ffc7b2;
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
@@ -45,24 +25,13 @@
   --pip-w: #fdfbce; --pip-u: #bcdaf7; --pip-b: #a7999e; --pip-r: #f19b79; --pip-g: #9fcba6; --pip-c: #cdc8c4;
   --pip-ink: #111;
   /* The colour indicator's rim: the text colour at 65%. */
-  --ci-rim: #f3f1e5a6;
+  --ci-rim: #f2f2efa6;
 
   /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
   --die-shadow: #070808;
   --dice-stage-pressed: #191a1c;
   --press-overlay: #f2f2ef1a;
-  --scrim: #111213d9;
-  --shadow-dialog: 0 24px 80px #0b0c0dd9;
 
-  /* Controls: direction A, tonal (design/polish/STYLE.md §3A). Controls are filled one tone above their card, with no
-     outlines; pressed lays a 10% --text state layer over the fill; selected is the accent with --ink. */
-  --state-pressed: #f2f2ef1a;
-  --state-hover: #f2f2ef14;
-  --ease: cubic-bezier(.2, 0, 0, 1);
-  --motion: .2s;
-  /* The centre pill: solid, with the only shadow on the board. Its fill is one token so a glass pill can replace it. */
-  --pill-background: var(--raised);
-  --pill-shadow: 0 1px 3px #0009, 0 6px 18px #0007;
   /* The safe-area insets, as variables so a test can stand in for a notch. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -114,15 +83,6 @@
   --type-label: .875rem;
   --type-small: .8125rem;
 
-  /* Shape: one corner scale (Material's 8, 16, 22, 24 and 28px, then full capsules). Buttons, switches and the chosen
-     segment are capsules; segments are a connected group with 8px inner corners; rows, map seats and swatches 16px;
-     cards 24px; dialogs 28px; cells circles. */
-  --radius-sm: 8px;
-  --radius-md: 16px;
-  --radius-group: 22px;
-  --radius-card: 24px;
-  --radius-lg: 28px;
-  --radius-full: 999px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -144,13 +104,106 @@
   -webkit-text-size-adjust: 100%;
 }
 
+/* The control style (design/polish/STYLE.md §3): direction A, tonal (Material 3 Expressive), with the Graphite + lime
+   chrome (§5). Every value the style decides is a token here, under one selector, so another style
+   ([data-style="glass"], say) can override the tokens without touching a component rule. The tile palettes above
+   belong to the players, not the style. */
+:root, [data-style="material"] {
+  /* Colour. Neutral graphite surfaces, so the tiles carry all the colour, and the brand lime as the one accent.
+     --raised is a control one tonal step above its card. Text is at least 7:1 on every surface and, with soft text,
+     clears the tile palettes' minimums (life total 9:1, small text 7.6:1; design/polish/TILES.md). */
+  --background: #111213;
+  --surface: #1b1c1e;
+  --raised: #242528;
+  --surface-pressed: #303236;
+  --border: #393b40;
+  --control-border: #8b8f97;
+  --switch-off: #35373b;
+  --text: #f2f2ef;
+  --text-soft: #dedfe2;
+  --muted: #b3b6bc;
+  --accent: #d9f08a;
+  --accent-pressed: #c4dc76;
+  --ink: #1d2608;
+  --scrim: #111213d9;
+
+  /* Fills and edges: controls are filled, not outlined; the chosen one is the accent. */
+  --control-fill: var(--raised);
+  --control-edge: 0px;
+  --chosen-fill: var(--accent);
+  --chosen-ink: var(--ink);
+  --card-fill: var(--surface);
+  --card-edge: 0px;
+  --head-fill: var(--surface);
+  --dialog-fill: var(--surface);
+  --dialog-edge: 0px;
+
+  /* State layers, at Material's opacities: pressed and focus 10%, hover 8%, disabled 38%. */
+  --state-pressed: #f2f2ef1a;
+  --state-hover: #f2f2ef14;
+  --disabled-opacity: .38;
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+
+  /* Motion: 200ms emphasised easing; none under reduced motion. */
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --motion: .2s;
+
+  /* Shape: one corner scale (Material's 8, 16, 22, 24 and 28px, then full capsules). Buttons, switches and the chosen
+     segment are capsules; segments are a connected group with 8px inner corners; rows, map seats and swatches 16px;
+     cards 24px; dialogs 28px; cells circles. */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-group: 22px;
+  --radius-card: 24px;
+  --radius-lg: 28px;
+  --radius-full: 999px;
+  --button-radius: var(--radius-full);
+  --row-radius: var(--radius-md);
+  --segment-inner: var(--radius-sm);
+  --segment-outer: var(--radius-group);
+  --segment-chosen: var(--radius-group);
+  --seat-radius: var(--radius-md);
+  --swatch-radius: var(--radius-md);
+  --card-radius: var(--radius-card);
+  --dialog-radius: var(--radius-lg);
+
+  /* Elevation: none in content. Dialogs lift off the scrim, and the centre pill has the only shadow on the board.
+     The pill's fill is one token so a glass pill can replace it. */
+  --shadow-dialog: 0 24px 80px #0b0c0dd9;
+  --pill-background: var(--raised);
+  --pill-edge: 0px;
+  --pill-shadow: 0 1px 3px #0009, 0 6px 18px #0007;
+
+  /* Switch: off is an outlined track with a small thumb; on is the accent with a larger ink thumb. */
+  --switch-width: 36px;
+  --switch-height: 20px;
+  --switch-edge: 2px;
+  --switch-off-fill: transparent;
+  --switch-off-thumb: var(--control-border);
+  --switch-off-size: 12px;
+  --switch-on-fill: var(--accent);
+  --switch-on-thumb: var(--ink);
+  --switch-on-size: 14px;
+
+  /* Slider: a 16px track with an accent fill, and a 4px bar handle ringed in the card's colour. */
+  --slider-track: 16px;
+  --slider-track-fill: var(--raised);
+  --slider-fill: var(--accent);
+  --slider-thumb-width: 4px;
+  --slider-thumb-height: 36px;
+  --slider-thumb-radius: 2px;
+  --slider-thumb-fill: var(--accent);
+  --slider-thumb-ring: 0 0 0 4px var(--surface);
+}
+
 *, *::before, *::after { box-sizing: border-box; }
 body, h1, h2, h3, p { margin: 0; }
 body { overflow: hidden; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 button, .player { -webkit-user-select: none; user-select: none; }
-button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
 /* Game symbols from the Mana font: the d20 for dice, infect for poison, energy, rad, the colour pie for identity, the
@@ -222,6 +275,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   position: absolute;
   inset: calc(var(--setup-button) / 8);
   content: '';
+  border: var(--pill-edge) solid var(--control-border);
   border-radius: var(--radius-full);
   background: var(--pill-background);
   box-shadow: var(--pill-shadow);
@@ -261,12 +315,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
 /* While rotating seats or choosing colours or identities, only the Done disc stays. */
-.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--accent); }
-.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--ink); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--chosen-fill); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--chosen-ink); }
 .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button::before { content: none; }
 /* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
-.save-button { color: var(--ink); }
-.save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--accent); }
+.save-button { color: var(--chosen-ink); }
+.save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--chosen-fill); }
 .save-button:active::before { background: var(--accent-pressed); }
 #board-controls .save-button::after, #board-controls .save-button:not([hidden]) + .pill-button::after { content: none; }
 .pill-button:disabled { opacity: .38; cursor: default; }
@@ -379,9 +433,6 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
    total. The board flags are board-wide thresholds: data-narrow (ui < 240), data-short (ub < 200) and data-wide
    (ui ≥ 264). */
 .board {
-  --text: var(--tile-text);
-  --text-soft: var(--tile-text-soft);
-  --muted: var(--tile-muted);
   --u: calc(var(--ui, 400px) / 100);
   --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
 }
@@ -613,7 +664,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   place-items: center;
   padding: 0;
   border: 1px solid var(--rim);
-  border-radius: var(--radius-md);
+  border-radius: var(--swatch-radius);
   background: var(--panel);
 }
 .swatch::before { width: 36%; aspect-ratio: 1; border-radius: 50%; background: var(--seat); content: ''; }
@@ -662,9 +713,9 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   width: var(--toggle);
   height: var(--toggle);
   padding: 0;
-  border: 0;
+  border: var(--control-edge) solid var(--control-border);
   border-radius: var(--radius-full);
-  background: var(--raised);
+  background: var(--control-fill);
   transition: box-shadow var(--motion) var(--ease);
 }
 .identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
@@ -672,7 +723,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px accent
    ring, with a check, so the state never rests on colour alone. */
 .identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
-.identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--accent); }
+.identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--chosen-fill); }
 .toggle-check {
   position: absolute;
   top: -3px;
@@ -711,7 +762,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   min-width: 0;
   padding: 0;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--seat-radius);
   background: var(--panel);
   color: var(--seat);
   font-size: clamp(1.0625rem, calc(6 * var(--u)), max(1.625rem, 26 * var(--grow)));
@@ -729,7 +780,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Seats changed since the mode opened get a ring outside, and a held seat looks pressed. */
 .map-cell[data-pressed] { --seat-ring: var(--pressed-ring); }
 .map-cell[data-changed] { box-shadow: var(--seat-ring), 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
-.map-cell:has(+ .map-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+.map-cell:has(+ .map-remove:focus-visible) { outline: var(--focus-ring); outline-offset: 3px; }
 .map-cell.self {
   align-content: center;
   gap: 0;
@@ -777,7 +828,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .counter-cell :is(.icon, .mana-icon) { color: var(--seat); font-size: 1.4em; }
 .counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
 .counter-cell:is(:active, [data-pressed]) { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
-.counter-cell:has(+ .counter-remove:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
+.counter-cell:has(+ .counter-remove:focus-visible) { outline: var(--focus-ring); outline-offset: 3px; }
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
@@ -1056,9 +1107,9 @@ dialog {
   width: min(420px, calc(100% - 32px));
   max-height: calc(100% - 12px);
   padding: 0;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--surface);
+  border: var(--dialog-edge) solid var(--border);
+  border-radius: var(--dialog-radius);
+  background: var(--dialog-fill);
   color: var(--text);
   box-shadow: var(--shadow-dialog);
   overscroll-behavior: contain;
@@ -1078,20 +1129,20 @@ dialog::backdrop { background: var(--scrim); }
    accent fill in its view. Pressed lays the 10% state layer over the fill; disabled is 38%. */
 .close, .primary, .secondary {
   min-height: var(--tap-min);
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--raised);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
   color: var(--text);
   font-weight: var(--weight-semibold);
 }
 .close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: 1.125rem; }
 .primary, .secondary { padding: 0 var(--space-5); }
-.primary { background: var(--accent); color: var(--ink); }
+.primary { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); }
 .primary:active { background: var(--accent-pressed); }
 :is(.close, .secondary, .nav-row, .switch-row, .segmented > button, .dice-picker button:not([aria-pressed="true"]), .k-value):active {
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
 }
-:is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: .38; }
+:is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: var(--disabled-opacity); }
 
 /* Rows: a board action or a switch, filled one tone above the card, 16px corners. In a switch row the whole row toggles
    the switch. */
@@ -1103,9 +1154,9 @@ dialog::backdrop { background: var(--scrim); }
   min-width: 0;
   min-height: var(--tap-min);
   padding: 0 10px 0 12px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--raised);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--row-radius);
+  background: var(--control-fill);
   color: var(--text);
   font-size: var(--type-label);
   font-weight: var(--weight-semibold);
@@ -1118,7 +1169,7 @@ dialog::backdrop { background: var(--scrim); }
 .switch-row[hidden] { display: none; }
 /* The input covers its row, so scrolling it into view on focus shows the whole row. */
 .switch-row input { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0; opacity: 0; cursor: pointer; }
-.switch-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-row:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* A long switch label, such as auto-empty's, wraps rather than being cut short. */
 .wide-switch .nav-label { white-space: normal; line-height: 1.2; }
 .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: var(--space-1); }
@@ -1140,9 +1191,9 @@ dialog::backdrop { background: var(--scrim); }
   min-width: 0;
   min-height: var(--tap-min);
   padding: 0 6px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--raised);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--segment-inner);
+  background: var(--control-fill);
   color: var(--text-soft);
   font-size: .9375rem;
   font-weight: var(--weight-semibold);
@@ -1150,36 +1201,44 @@ dialog::backdrop { background: var(--scrim); }
   text-align: center;
   transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease);
 }
-.segmented > button:first-child { border-radius: var(--radius-group) var(--radius-sm) var(--radius-sm) var(--radius-group); }
-.segmented > button:last-child { border-radius: var(--radius-sm) var(--radius-group) var(--radius-group) var(--radius-sm); }
-.segmented > button[aria-pressed="true"] { border-radius: var(--radius-group); background: var(--accent); color: var(--ink); }
+.segmented > button:first-child { border-radius: var(--segment-outer) var(--segment-inner) var(--segment-inner) var(--segment-outer); }
+.segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
+.segmented > button[aria-pressed="true"] { border-color: var(--chosen-fill); border-radius: var(--segment-chosen); background: var(--chosen-fill); color: var(--chosen-ink); }
 .segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
 
 /* Switch: 36 × 20. Off is an outlined track with a small thumb; on is the accent with a larger ink thumb, so the shape
    changes as well as the colour. */
 .switch {
+  --inner-width: calc(var(--switch-width) - 2 * var(--switch-edge));
+  --inner-height: calc(var(--switch-height) - 2 * var(--switch-edge));
   position: relative;
   flex: none;
-  width: 36px;
-  height: 20px;
-  border: 2px solid var(--control-border);
+  width: var(--switch-width);
+  height: var(--switch-height);
+  border: var(--switch-edge) solid var(--control-border);
   border-radius: var(--radius-full);
-  background: transparent;
+  background: var(--switch-off-fill);
   transition: background-color var(--motion) var(--ease), border-color var(--motion) var(--ease);
 }
 .switch::after {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 12px;
-  height: 12px;
+  top: calc((var(--inner-height) - var(--switch-off-size)) / 2);
+  left: calc((var(--inner-height) - var(--switch-off-size)) / 2);
+  width: var(--switch-off-size);
+  height: var(--switch-off-size);
   border-radius: 50%;
-  background: var(--control-border);
+  background: var(--switch-off-thumb);
   content: '';
-  transition: transform var(--motion) var(--ease), width var(--motion) var(--ease), height var(--motion) var(--ease), top var(--motion) var(--ease);
+  transition: left var(--motion) var(--ease), width var(--motion) var(--ease), height var(--motion) var(--ease), top var(--motion) var(--ease);
 }
-input:checked + .switch { border-color: var(--accent); background: var(--accent); }
-input:checked + .switch::after { top: 1px; width: 14px; height: 14px; transform: translateX(15px); background: var(--ink); }
+input:checked + .switch { border-color: var(--switch-on-fill); background: var(--switch-on-fill); }
+input:checked + .switch::after {
+  top: calc((var(--inner-height) - var(--switch-on-size)) / 2);
+  left: calc(var(--inner-width) - var(--switch-on-size) - (var(--inner-height) - var(--switch-on-size)) / 2);
+  width: var(--switch-on-size);
+  height: var(--switch-on-size);
+  background: var(--switch-on-thumb);
+}
 
 /* Compact switch rows (Track's six and Identity's Show on tiles): each a whole 44px target with its mark, its label and
    a switch. Where a row has too little room, such as on portrait phones or in a narrow column, the label goes over the
@@ -1231,7 +1290,7 @@ dialog.fs {
 dialog.fs::backdrop { background: var(--background); }
 dialog.fs[data-flipped] { transform: rotate(180deg); }
 .fs-frame { display: grid; grid-template-rows: auto minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); height: 100%; }
-.fs-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--surface); }
+.fs-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-4); background: var(--head-fill); }
 .fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: 1.25rem; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .fs-head .close .icon { width: 18px; height: 18px; }
 .fs-done { flex: none; font-size: 1rem; font-weight: var(--weight-heavy); white-space: nowrap; }
@@ -1252,7 +1311,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-col { display: grid; gap: var(--space-3); min-width: 0; }
 .fs-col:empty { display: none; }
 /* Sections are cards (direction A): the surface on the page background, no border, 24px corners. */
-.fs-sec { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border-radius: var(--radius-card); background: var(--surface); container: settings-section / inline-size; }
+.fs-sec { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: var(--card-edge) solid var(--border); border-radius: var(--card-radius); background: var(--card-fill); container: settings-section / inline-size; }
 .fs-sec > h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 2px; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
 .fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--accent); }
 /* One column: a label sits beside its control when the card has room (480px), otherwise above it. In two columns each
@@ -1269,7 +1328,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-newgame[hidden] { display: none; }
 .fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; margin-inline-start: auto; }
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
-.fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--radius-md); background: color-mix(in oklab, var(--accent) 14%, var(--surface)); color: var(--text); font-size: var(--type-label); }
+.fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
 .fs-pending[data-empty] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
 .fs .privacy-text { max-width: none; font-size: var(--type-small); }
@@ -1308,7 +1367,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .k-row > .setting-label { grid-area: label; }
 .k-row > .k-slider { grid-area: slider; }
 .k-row > .k-val { grid-area: value; justify-self: end; }
-.k-slider { --track-top: 44px; --thumb: 36px; position: relative; height: 80px; margin: 0 22px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.k-slider { --track-top: 44px; position: relative; height: 80px; margin: 0 22px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
 .k-stops { position: absolute; inset: 0 0 auto; height: 44px; }
 .k-stop {
   position: absolute;
@@ -1329,14 +1388,14 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .k-stop:active { background: var(--state-pressed); }
 .k-track { position: absolute; inset: var(--track-top) 0 0; border-radius: var(--radius-sm); }
 .k-track:focus-visible { outline-offset: 4px; }
-.k-track::before, .k-fill { position: absolute; top: 50%; height: 16px; transform: translateY(-50%); border-radius: var(--radius-full); content: ''; }
-.k-track::before { left: -8px; right: -8px; background: var(--raised); }
-.k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--accent); }
+.k-track::before, .k-fill { position: absolute; top: 50%; height: var(--slider-track); transform: translateY(-50%); border-radius: var(--radius-full); content: ''; }
+.k-track::before { left: -8px; right: -8px; background: var(--slider-track-fill); }
+.k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--slider-fill); }
 .k-ticks { position: absolute; inset: 0; }
 .k-tick { position: absolute; top: 50%; width: 2px; height: 2px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--muted); }
 .k-tick[data-stop] { width: 4px; height: 4px; }
 .k-tick[data-filled] { background: var(--ink); opacity: .55; }
-.k-thumb { position: absolute; top: 50%; left: var(--p, 0%); width: 4px; height: var(--thumb); transform: translate(-50%, -50%); border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 4px var(--surface); }
+.k-thumb { position: absolute; top: 50%; left: var(--p, 0%); width: var(--slider-thumb-width); height: var(--slider-thumb-height); transform: translate(-50%, -50%); border-radius: var(--slider-thumb-radius); background: var(--slider-thumb-fill); box-shadow: var(--slider-thumb-ring); }
 /* A value off the track (a starting life under 10 or over 60) pins the handle to that end, with an arrow beyond it. */
 .k-track[data-pinned] .k-thumb::after { position: absolute; top: 50%; width: 0; height: 0; border-block: 6px solid transparent; transform: translateY(-50%); content: ''; }
 .k-track[data-pinned="high"] .k-thumb::after { left: 8px; border-inline-start: 7px solid var(--accent); }
@@ -1350,9 +1409,9 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   min-width: 76px;
   min-height: var(--tap-min);
   padding: 0 12px 0 16px;
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--raised);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
   color: var(--text);
   font-size: 1.125rem;
   font-weight: 800;
@@ -1361,14 +1420,14 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .k-value[hidden] { display: none; }
 .k-edit { display: grid; color: var(--muted); }
 .k-edit .icon { width: 14px; height: 14px; }
-.k-editor { padding: 0; box-shadow: inset 0 0 0 2px var(--accent); }
+.k-editor { padding: 0; border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
 .k-editor input { width: 3.4em; min-height: var(--tap-min); padding: 0 4px 0 14px; border: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent); }
 .k-editor input:focus-visible { outline: 0; }
 .k-commit { display: grid; place-items: center; flex: none; width: var(--tap-min); height: var(--tap-min); padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: var(--ink); }
 .k-commit:active { background: var(--accent-pressed); }
 .k-commit .icon { width: 18px; height: 18px; }
 @media (max-height: 359.98px) {
-  .k-slider { --thumb: 28px; height: 72px; }
+  .k-slider { --slider-thumb-height: 28px; height: 72px; }
 }
 
 /* Dice sheet: the die on a stage, the sides picker and Roll. Landscape puts the stage on the left.
@@ -1385,7 +1444,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   display: grid;
   place-items: center;
   block-size: clamp(176px, calc(100dvh - 340px), 340px);
-  border-radius: var(--radius-card);
+  border-radius: var(--card-radius);
   background: var(--background);
   container-type: size;
   overflow: hidden;
@@ -1404,15 +1463,15 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   gap: 6px;
   min-height: 48px;
   padding: 0 var(--space-1);
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--raised);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
   color: var(--text-soft);
   font-size: var(--type-label);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-.dice-picker button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
+.dice-picker button[aria-pressed="true"] { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); }
 .dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
 .dice-roll { grid-area: roll; min-height: 48px; font-size: 1.0625rem; }
 @media (orientation: landscape) {

@@ -199,7 +199,7 @@ async function checkWash(t, engine) {
   const pressed = await look('Add one life to Player 3');
   assert.notEqual(pressed.wash, clear, 'pointerdown washes the half');
   assert.equal(pressed.radius, '28px 0px 0px 28px', 'the + half is rounded on its inner corners');
-  assert.equal(pressed.glyph, 'rgb(243, 241, 229)', 'the glyph turns the text colour');
+  assert.equal(pressed.glyph, 'rgb(242, 242, 239)', 'the glyph turns the text colour');
   await button(page, 'Add one life to Player 3').dispatchEvent('pointerup', { button: 0, pointerId: 7, isPrimary: true });
   assert.equal((await look('Add one life to Player 3')).wash, clear, 'the wash goes when the finger lifts');
   await button(page, 'Subtract one life from Player 3').dispatchEvent('pointerdown', { button: 0, pointerId: 8, isPrimary: true });

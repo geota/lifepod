@@ -177,6 +177,8 @@ Each is a row with its icon, its label and an out-to-the-board arrow. The row's 
 
 Built with [STYLE.md](STYLE.md)'s picks: direction A (tonal) on every control type, Graphite + lime for the chrome, the notched players and life sliders with the inline life field, and a solid pill whose fill is one token (`--pill-background`) so a glass pill can replace it. The tiles, the life halves and the twelve tile palettes are unchanged. Tests: `tests/settings.test.mjs` replaces `setup.test.mjs`; `sizes.test.mjs` checks the page on every screen it lists.
 
+**Theme tokens.** Direction A's colours, fills and edges, state layers, focus ring, motion, corner radii, elevation, switch and slider geometry are custom properties in one block, `:root, [data-style="material"]` at the top of `web/styles.css` (`<html data-style="material">`). Component rules read only those tokens, so a second style, such as STYLE.md's direction B, can be a block of overrides under `[data-style="glass"]` without touching a component rule. Text is the Graphite chrome's (`#f2f2ef`, soft `#dedfe2`) on the tiles as well, which TILES.md checked against every tile set.
+
 Where the build differs from the spec above, and why:
 
 | Spec | As built | Why |
