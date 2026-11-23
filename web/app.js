@@ -1,4 +1,4 @@
-import { layoutBoard, measureBoard, syncBoardDigits, syncBoardTurn } from './js/layout/board.js';
+import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { placeReminders, requestFit, resetDrops } from './js/layout/fit.js';
 import {
   compactGroups, fitCompactSwitches, keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody,
@@ -6,19 +6,22 @@ import {
 } from './js/layout/settings.js';
 import {
   badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, designationKinds,
-  designations, discardMessages, doneLabels, editingModes, faceAngles, firstBeat, identityColours, identityNames,
-  manaColours, maxCount, maxRound, maxStartingLife, outLabels, playerCounts, poisonLethal, poisonWarning, reminderText,
-  reminderTime, shuffleTick, shuffleTicks, swatches, tileSetOrder, tileSets, trackers, undoClearTime,
+  designations, discardMessages, doneLabels, editingModes, faceAngles, firstBeat, identityColours, manaColours,
+  maxCount, maxRound, maxStartingLife, playerCounts, poisonLethal, poisonWarning, reminderText, reminderTime,
+  shuffleTick, shuffleTicks, swatches, tileSetOrder, tileSets, trackers, undoClearTime,
 } from './js/logic/data.js';
 import {
-  applyEdit, dangerLevel, editPlayers, hasCountersMode, hasMana, identityText, isOut, leavingTransfers, needsPassing,
-  nextTurn, outPlayers, outReason, playOrder, poolText, previousTurn, randomBelow, restPillButtons, seatGrid, seatRow,
-  shownCounters, toFace, trackedDesignations,
+  applyEdit, dangerLevel, editPlayers, hasCountersMode, hasMana, isOut, leavingTransfers, needsPassing, nextTurn,
+  outPlayers, playOrder, poolText, previousTurn, randomBelow, restPillButtons, seatGrid, seatRow, shownCounters, toFace,
+  trackedDesignations,
 } from './js/logic/rules.js';
 import {
   fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, normalizeIdentity,
 } from './js/logic/save.js';
 import { announce, announceDesignation, announceLife, announcePool, clearAnnouncements } from './js/render/announce.js';
+import {
+  counterIcon, designationIcon, identityChip, inColourOf, paintColours, renderScore, renderWatermark,
+} from './js/render/tile.js';
 import {
   android, currentLandscapeAngle, defaultStyle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency,
   syncWakeLock,
@@ -39,8 +42,6 @@ import { bindCounter, bindSeat, bindStep, bindTap, cancelPresses } from './js/ui
 /** @typedef {import('./js/logic/data.js').DesignationKind} DesignationKind */
 /** @typedef {import('./js/logic/rules.js').Edit} Edit */
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
-/** @typedef {import('./js/logic/save.js').IdentitySettings} IdentitySettings */
-/** @typedef {import('./js/ui/dom.js').ManaGlyph} ManaGlyph */
 /** @typedef {import('./js/logic/data.js').Reminders} Reminders */
 /** @typedef {import('./js/logic/data.js').Style} Style */
 /** @typedef {import('./js/logic/data.js').TurnMode} TurnMode */
@@ -83,26 +84,6 @@ let stopRoll;
 // "Who goes first?" waits until settings has closed, then opens.
 let askFirst = false;
 let shuffleTimer;
-
-function paintColours() {
-  [...board.children].forEach((player, index) => {
-    player.dataset.colour = swatches[game.colors[index]].id;
-    player.dataset.row = seatRow(index);
-  });
-  // Map seats and badge dots in another player's colour.
-  for (const node of board.querySelectorAll('[data-player-colour]')) {
-    const player = Number(node.dataset.playerColour);
-    node.dataset.colour = swatches[game.colors[player]].id;
-    node.dataset.row = seatRow(player);
-  }
-}
-
-function inColourOf(node, player) {
-  node.dataset.playerColour = player;
-  node.dataset.colour = swatches[game.colors[player]].id;
-  node.dataset.row = seatRow(player);
-  return node;
-}
 
 // Commander damage mode: a map of the table on every tile, in board coordinates. Each opponent's seat shows
 // the damage their commander has dealt this player; the player's own seat shows their life and its change.
@@ -246,54 +227,6 @@ function buildIdentity(index) {
   return group;
 }
 
-// The colour indicator printed on cards: one disc split into the identity's colours.
-function colourIndicator(identity) {
-  const indicator = element('span', 'ci');
-  indicator.dataset.ci = identity;
-  indicator.dataset.count = identity.length;
-  indicator.setAttribute('aria-hidden', 'true');
-  return indicator;
-}
-
-// The identity's symbol. styles.css picks the glyph from data-symbol. Four colours are the colour pie drawn from
-// the five mana symbols, with the missing colour as a ghost.
-function identitySymbol(identity) {
-  const symbol = element('span', 'id-symbol');
-  symbol.dataset.symbol = identity;
-  symbol.setAttribute('aria-hidden', 'true');
-  if (identity.length === 4) {
-    symbol.classList.add('pie');
-    for (const { id } of identityColours) {
-      const part = element('span');
-      part.dataset.at = id;
-      if (!identity.includes(id)) part.dataset.ghost = '';
-      symbol.append(part);
-    }
-  }
-  return symbol;
-}
-
-// An identity chip: any of the indicator, the symbol and the name, in that order. With only the indicator or only
-// the symbol it's round; with the name it's a capsule. No identity, or nothing to show, is no chip.
-/**
- * @param {string} identity
- * @param {IdentitySettings['show']} show
- * @returns {HTMLElement | null}
- */
-function identityChip(identity, show) {
-  if (!identity) return null;
-  const parts = [];
-  if (show.indicator) parts.push(colourIndicator(identity));
-  if (show.symbol) parts.push(identitySymbol(identity));
-  if (show.name) {
-    const name = element('span', 'id-name', identityNames[identity]);
-    name.setAttribute('aria-hidden', 'true');
-    parts.push(name);
-  }
-  if (!parts.length) return null;
-  return element('span', 'chip ci-chip', ...parts, visuallyHidden(identityText(identity)));
-}
-
 // Identity mode: each tile previews everything its identity can show, whatever the tiles are set to display.
 function buildIdentityPreview(index) {
   const preview = element('div', 'identity-preview');
@@ -313,19 +246,6 @@ function syncIdentity() {
     const identity = game.identities[Number(preview.dataset.player)];
     preview.replaceChildren(identityChip(identity, { indicator: true, symbol: true, name: true }) ?? element('span', 'chip', 'No identity'));
   }
-}
-
-// The background behind a tile's total (design/polish/SPEC.md §2.3). Symbol puts a set identity's symbol there,
-// faintly, like a card's watermark, and other tiles keep the rings. Default is the rings on every tile, and Off is
-// a plain tile. data-background is set whenever the rings are gone.
-function renderWatermark(index) {
-  const player = board.children[index];
-  const identity = game.identities[index];
-  const { background } = game.identity;
-  const shown = background === 'off' || (background === 'symbol' && identity) ? background : null;
-  if (shown) player.dataset.background = shown;
-  else delete player.dataset.background;
-  player.querySelector('.watermark').replaceChildren(...(shown === 'symbol' ? [identitySymbol(identity)] : []));
 }
 
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
@@ -403,23 +323,6 @@ function toggleDesignation(kind, index) {
 function stepCount(kind, index, delta) {
   const next = game[kind][index] + delta;
   if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
-}
-
-// Each counter's icon: Mana's infect, commander, energy and rad symbols, and Phosphor's graduation cap for experience.
-/**
- * @param {CountKind} kind
- */
-function counterIcon(kind) {
-  if (kind === 'experience') return icon('graduation-cap');
-  return manaIcon(/** @type {ManaGlyph} */ ({ poison: 'infect', casts: 'commander' }[kind] ?? kind));
-}
-
-// The monarch's crown and the initiative's castle turret, both Phosphor.
-/**
- * @param {DesignationKind} kind
- */
-function designationIcon(kind) {
-  return icon(kind === 'monarch' ? 'crown' : 'castle-turret');
 }
 
 // Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, announces
@@ -1108,18 +1011,6 @@ function discardEdits() {
 function leaveBoardMode() {
   if (editingModes.includes(boardMode)) cancelEditing();
   else setBoardMode(null);
-}
-
-function renderScore(index) {
-  const score = /** @type {HTMLOutputElement} */ (board.children[index].querySelector('.score'));
-  const value = String(game.scores[index]).replace('-', '−');
-  score.value = value;
-  // A player who is out says so under the total, and their other badges dim.
-  const out = outReason(game, index);
-  score.setAttribute('aria-label', `${game.scores[index]} life${out ? `, ${outLabels[out]}` : ''}`);
-  syncBoardDigits();
-  score.toggleAttribute('data-out', out !== null);
-  board.children[index].toggleAttribute('data-out', out !== null);
 }
 
 function renderBoard() {
