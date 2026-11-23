@@ -7,9 +7,9 @@ import {
 // Floating mana (design/polish/SPEC.md §9): the Mana pool switch, mana mode, the strip at rest (spend, clear, undo
 // clear) and emptying pools when the turn passes.
 
-// Timers in web/app.js. A mana cell held for holdDelay takes one away, then one more every 100ms; a turn chip or the
-// round button held for holdDelay steps back once. "Undo clear" lasts undoClearTime. Tests that tap or
-// hold these pause the page's clock, so a tap can't become a hold and each happens only when the test runs the clock.
+// Timers in web/js/logic/data.js. A mana cell held for holdDelay takes one away, then one more every 100ms; a turn chip
+// or the round button held for holdDelay steps back once. "Undo clear" lasts undoClearTime. Tests that tap or hold
+// these pause the page's clock, so a tap can't become a hold and each happens only when the test runs the clock.
 const holdDelay = 500;
 const undoClearTime = 5000;
 

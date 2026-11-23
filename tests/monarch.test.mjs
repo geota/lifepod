@@ -6,9 +6,9 @@ import { button, engines, eventually, openPage, reload, saved, savedGame, seedGa
 // reminders, and Settings → Reminders.
 
 const designations = { monarch: true, initiative: true };
-// Timers in web/app.js: a turn reminder shows for reminderTime, and the announcer speaks announceDelay after the last
-// change. Tests that tap the life halves, map cells or turn chips pause the page's clock, so no tap lasts long enough
-// to become a hold and these happen only when the test runs the clock.
+// Timers in web/js/logic/data.js: a turn reminder shows for reminderTime, and the announcer speaks announceDelay after
+// the last change. Tests that tap the life halves, map cells or turn chips pause the page's clock, so no tap lasts long
+// enough to become a hold and these happen only when the test runs the clock.
 const reminderTime = 3000;
 const announceDelay = 700;
 

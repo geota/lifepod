@@ -7,9 +7,9 @@ import { backHandling, button, engines, eventually, hold, openPage, reload, save
 
 const playOrders = { 2: [1, 2], 3: [1, 3, 2], 4: [1, 2, 4, 3], 5: [1, 2, 5, 4, 3], 6: [1, 2, 5, 6, 4, 3] };
 
-// Timers in web/app.js. A turn chip or the pill's round button steps back once a press has lasted holdDelay. The shuffle
-// lights a tile every shuffleTick, landing on its pick on the ninth (shuffleTicks), and the board comes back firstBeat
-// after a pick. With the page's clock paused, these happen only when a test runs the clock past them.
+// Timers in web/js/logic/data.js. A turn chip or the pill's round button steps back once a press has lasted holdDelay.
+// The shuffle lights a tile every shuffleTick, landing on its pick on the ninth (shuffleTicks), and the board comes
+// back firstBeat after a pick. With the page's clock paused, these happen only when a test runs the clock past them.
 const holdDelay = 500;
 const shuffleTick = 90;
 const shuffleTicks = 9;

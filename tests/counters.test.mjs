@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { chromium, webkit } from 'playwright-core';
 import { button, hold, openPage, scores, test, token } from './helpers.mjs';
 
-// Life holds count once when the finger lands, wait 500ms, then repeat every 100ms (bindCounter in app.js). The page's
-// clock is paused, so a hold of a given length gives an exact count.
+// Life holds count once when the finger lands, wait 500ms, then repeat every 100ms (bindCounter in web/js/ui/press.js).
+// The page's clock is paused, so a hold of a given length gives an exact count.
 const repeats = ms => (ms < 500 ? 0 : Math.floor((ms - 500) / 100) + 1);
 
 // Chromium is the only engine Playwright can drive with several simultaneous touches.

@@ -100,7 +100,7 @@ Run `npx playwright-core install chromium webkit` and `npm test` to check seat p
 
 ## Shared code
 
-`web/` contains the interface, seat layouts, rotations, scoring, and saved-game format. Android and iOS bundle the whole folder and serve it to their web view from inside the app: Android at `https://appassets.androidplatform.net/` and iOS at `lifepod://app/`, with no network access. Either app serves any file in `web/` with an allowed extension (html, css, js or mjs, json, png, svg, woff2 or txt), so a new file needs no native change. Their Kotlin and Swift wrappers handle native screen-awake behavior, local storage, and fullscreen presentation. Browser preview uses the equivalent browser APIs. App icons, build settings, and package metadata live in the platform projects.
+`web/` contains the interface, seat layouts, rotations, scoring, and saved-game format, as native ES modules with no build step: `app.js` is the entry and `web/js/` holds the modules, layered as AGENTS.md describes. Android and iOS bundle the whole folder and serve it to their web view from inside the app: Android at `https://appassets.androidplatform.net/` and iOS at `lifepod://app/`, with no network access. Either app serves any file in `web/` with an allowed extension (html, css, js or mjs, json, png, svg, woff2 or txt), so a new file needs no native change. Their Kotlin and Swift wrappers handle native screen-awake behavior, local storage, and fullscreen presentation. Browser preview uses the equivalent browser APIs. App icons, build settings, and package metadata live in the platform projects.
 
 ## GitHub Actions
 

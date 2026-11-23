@@ -16,8 +16,8 @@ const mode = page => page.locator('#board').getAttribute('data-mode');
 const isOpen = (page, id) => page.locator(`#${id}`).evaluate(dialog => dialog.open);
 // These tests use the target phone in landscape.
 const phone = { width: 852, height: 393 };
-// A cell held for `ms` takes one away at 500ms, then one every 100ms (bindSeat in app.js). The page's clock is paused,
-// so a hold of a given length takes an exact number away.
+// A cell held for `ms` takes one away at 500ms, then one every 100ms (bindSeat in web/js/ui/press.js). The page's clock
+// is paused, so a hold of a given length takes an exact number away.
 const removals = ms => (ms < 500 ? 0 : Math.floor((ms - 500) / 100) + 1);
 
 async function checkCountersMode(t, engine) {

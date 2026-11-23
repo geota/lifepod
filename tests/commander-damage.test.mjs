@@ -111,7 +111,7 @@ async function checkDamage(t, engine) {
   assert.deepEqual(await ownSeat(page, 3), ['35', '−5']);
 
   // Holding a seat takes 1 away once the hold registers, then repeats. It never adds. The hold registers at 500ms
-  // and repeats every 100ms (the map seats' binder in app.js), so a 750ms hold takes away 3: at 500, 600 and 700ms.
+  // and repeats every 100ms (bindSeat in web/js/ui/press.js), so a 750ms hold takes away 3: at 500, 600 and 700ms.
   const box = await seat(page, 3, 2).boundingBox();
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
