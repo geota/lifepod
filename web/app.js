@@ -16,7 +16,6 @@ import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
-import { compactGroups, fitCompactSwitches } from './js/layout/settings.js';
 import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
 import { setBadgeActions } from './js/render/badges.js';
@@ -32,7 +31,7 @@ import {
 } from './js/ui/dom.js';
 import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
-import './js/sheets/options.js';
+import { fitAllCompactSwitches } from './js/sheets/options.js';
 import './js/sheets/settings.js';
 import './js/sheets/dice.js';
 
@@ -46,7 +45,7 @@ window.setTextScale = (scale) => {
   setTextScale(scale);
   resetDrops();
   syncBoardTurn();
-  compactGroups.forEach(fitCompactSwitches);
+  fitAllCompactSwitches();
 };
 
 // The pill's buttons (the setup button is settings.js's, and the dice button dice.js's).
@@ -126,7 +125,7 @@ document.fonts?.addEventListener?.('loadingdone', () => {
   resetDrops();
   syncBoardTurn();
   requestFit();
-  compactGroups.forEach(fitCompactSwitches);
+  fitAllCompactSwitches();
 });
 // WebKit can fire `loading` and never `loadingdone`, so each load also fits the board again once document.fonts.ready
 // settles, keeping the drops it has (the hysteresis decides): a face that arrives late can't leave a mana strip or a
@@ -135,7 +134,7 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
   if (!fontsArrived()) return;
   syncBoardTurn();
   requestFit();
-  compactGroups.forEach(fitCompactSwitches);
+  fitAllCompactSwitches();
 }));
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.

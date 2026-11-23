@@ -1,6 +1,7 @@
 // Settings' sections that save the moment they change (design/polish/SETTINGS-SPEC.md): Track's switches, Turns and
 // mana, Reminders, Identity, and Table's keep awake, tile colours and their shuffle, badge size and style, with what each
-// redraws on the board. Importing this module wires them; settings.js renders them as settings opens.
+// redraws on the board. Importing this module wires them; settings.js draws them all with renderOptions as settings
+// opens.
 
 import { handOnLeavers } from '../actions/board.js';
 import { endUndoClears } from '../actions/mana.js';
@@ -24,7 +25,7 @@ import { notchedSlider } from './slider.js';
 /** @typedef {import('../logic/data.js').Style} Style */
 /** @typedef {import('../logic/data.js').TurnMode} TurnMode */
 
-export const wakeInput = /** @type {HTMLInputElement} */ (document.querySelector('#keep-awake'));
+const wakeInput = /** @type {HTMLInputElement} */ (document.querySelector('#keep-awake'));
 const manaSwitch = /** @type {HTMLInputElement} */ (document.querySelector('#mana-switch'));
 const autoEmptySwitch = /** @type {HTMLInputElement} */ (document.querySelector('#auto-empty-switch'));
 const autoEmptyRow = /** @type {HTMLLabelElement} */ (document.querySelector('#auto-empty-row'));
@@ -33,8 +34,19 @@ const identityNote = /** @type {HTMLParagraphElement} */ (document.querySelector
 const identityShowSwitches = /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#identity-show input'));
 const identityBackgroundChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#identity-background'));
 
+// Every section here as the game has it, as settings opens.
+export function renderOptions() {
+  wakeInput.checked = game.keepAwake;
+  renderTrackSheet();
+  renderRemindersSection();
+  renderIdentitySheet();
+  renderTileSetting();
+  renderBadgeSizeSetting();
+  renderStyleSetting();
+}
+
 // Track's own state: the switches, the Turns choice, and the auto-empty switch, which only shows while it applies.
-export function renderTrackSheet() {
+function renderTrackSheet() {
   for (const tracker of trackers) /** @type {HTMLInputElement} */ (document.querySelector(`#${tracker}-switch`)).checked = game.counters[tracker];
   manaSwitch.checked = game.manaPool;
   autoEmptySwitch.checked = game.autoEmpty;
@@ -70,7 +82,7 @@ shuffleColoursSwitch.addEventListener('change', () => {
   game.shuffleColours = shuffleColoursSwitch.checked;
   saveGame();
 });
-export function renderTileSetting() {
+function renderTileSetting() {
   for (const choice of tileSetChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.set === game.tileColours));
   shuffleColoursSwitch.checked = game.shuffleColours;
 }
@@ -93,16 +105,20 @@ const badgeSizeSlider = notchedSlider({
   describe: at => `${badgeSizes[badgeSizeOrder[at]]} badges`,
 });
 for (const choice of badgeSizeChoices.children) choice.addEventListener('click', () => setBadgeSize(choice.dataset.size));
-export function renderBadgeSizeSetting() {
+function renderBadgeSizeSetting() {
   for (const choice of badgeSizeChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.size === game.badgeSize));
   badgeSizeSlider.render();
 }
-// The compact switch groups are checked whenever the settings body changes size (fitCompactSwitches).
-new ResizeObserver(() => compactGroups.forEach(fitCompactSwitches)).observe(settingsBody);
+// Every compact switch group, checked again whenever the settings body changes size, the fonts arrive, the text size
+// or the style changes (fitCompactSwitches in layout/settings.js).
+export function fitAllCompactSwitches() {
+  compactGroups.forEach(fitCompactSwitches);
+}
+new ResizeObserver(fitAllCompactSwitches).observe(settingsBody);
 
 // Style: saved the moment it's picked, after which it wins over the platform's default.
 const styleChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#style-choices'));
-export function renderStyleSetting() {
+function renderStyleSetting() {
   for (const choice of styleChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.choice === currentStyle()));
 }
 for (const choice of styleChoices.children) {
@@ -112,7 +128,7 @@ for (const choice of styleChoices.children) {
     saveGame();
     applyStyle();
     renderStyleSetting();
-    compactGroups.forEach(fitCompactSwitches);
+    fitAllCompactSwitches();
   });
 }
 
@@ -151,7 +167,7 @@ autoEmptySwitch.addEventListener('change', () => {
 // Reminders: each switch saves the moment it changes. Turn reminders shows only while the monarch or the initiative is on
 // and Turns is Turn by turn, and Pass-it-on hints while either is on; Gesture hints always shows.
 const reminderSwitches = /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#settings-reminders input[data-reminder]'));
-export function renderRemindersSection() {
+function renderRemindersSection() {
   const designated = trackedDesignations(game).length > 0;
   for (const input of reminderSwitches) {
     input.checked = game.reminders[/** @type {keyof Reminders} */ (input.dataset.reminder)];
@@ -176,7 +192,7 @@ for (const input of reminderSwitches) {
 }
 
 // Identity: what tiles show of each identity, saved the moment it changes.
-export function renderIdentitySheet() {
+function renderIdentitySheet() {
   for (const toggle of identityShowSwitches) toggle.checked = game.identity.show[/** @type {IdentityPart} */ (toggle.dataset.show)];
   for (const choice of identityBackgroundChoices.children) {
     choice.setAttribute('aria-pressed', String(game.identity.background === choice.dataset.background));
