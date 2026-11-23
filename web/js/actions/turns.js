@@ -6,19 +6,16 @@ import { nextTurn, previousTurn } from '../logic/rules.js';
 import { announce, seatName } from '../render/announce.js';
 import { haptic } from '../state/platform.js';
 import { game, turnSteps } from '../state/state.js';
-import { board } from '../ui/dom.js';
 import { commit } from './commit.js';
 import { autoEmptyPools } from './mana.js';
 import { maybeAskFirst, setAskFirst } from './mode.js';
 import { remind, turnStarted } from './reminders.js';
 
-// Shows a turn step on every tile and the pill, saves it at once and announces it.
+// Shows a turn step on every tile and the pill, saves it at once and announces it. A turn chip passed from the keyboard
+// is gone, and focus follows the turn to the chip that has it now (render/badges.js).
 function showTurn() {
-  const turnFocus = document.activeElement?.matches('.turn-chip');
   commit({ badges: 'all', pill: true });
   haptic();
-  // A turn chip passed from the keyboard is gone, so focus moves to the chip that now has the turn.
-  if (turnFocus && !document.activeElement?.matches('.turn-chip')) board.querySelector('.active-chip, .turn-chip')?.focus();
   const { active, round } = game.turn;
   announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `${seatName(active)}'s turn, round ${round}` : `Round ${round}`));
 }

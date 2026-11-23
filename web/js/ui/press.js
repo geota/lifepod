@@ -222,12 +222,23 @@ export function bindSeat(button, add, remove) {
 }
 
 // The turn chip and the pill's round button: a tap steps forward when the finger lifts, and a hold steps back once
-// when it registers. A hold never repeats, so a long press can't rewind several turns.
-export function bindStep(button, forward, back) {
+// when it registers. A hold never repeats, so a long press can't rewind several turns. With `turn`, which says where the
+// turn is, a press is over once anyone else steps the turn: the chip stays the same element through the redraws its
+// row gets in the meantime, but stepping now would undo or repeat that other step.
+/**
+ * @param {HTMLElement} button
+ * @param {() => void} forward
+ * @param {() => void} back
+ * @param {() => string} [turn]
+ */
+export function bindStep(button, forward, back, turn) {
   let press;
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
     press?.end();
+    const pressedAt = turn?.();
+    // The press still counts: its button is on the page and nobody has stepped the turn since it began.
+    const current_ = () => button.isConnected && turn?.() === pressedAt;
     const current = {
       pointerId: event.pointerId,
       held: false,
@@ -239,7 +250,7 @@ export function bindStep(button, forward, back) {
         delete button.dataset.pressed;
       },
       finish() {
-        const tap = press === current && !current.held && button.isConnected;
+        const tap = press === current && !current.held && current_();
         current.end();
         if (tap) forward();
       },
@@ -249,9 +260,9 @@ export function bindStep(button, forward, back) {
     button.dataset.pressed = '';
     ignoreClicksUntil = performance.now() + 800;
     current.timer = setTimeout(() => {
-      // A turn chip is rebuilt when someone else steps the turn, and then its pointerup never arrives. Its press
-      // is over: stepping back now would undo their step.
-      if (!button.isConnected) {
+      // A turn chip goes when someone else steps the turn, and then its pointerup never arrives. Its press is over:
+      // stepping back now would undo their step.
+      if (!current_()) {
         current.end();
         return;
       }
