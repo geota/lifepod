@@ -3,7 +3,10 @@ import { button, engines, openPage, saved, test } from './helpers.mjs';
 
 // Auto-drop (design/polish/SPEC.md §3.2): when a badge row runs out of room, parts give way in a fixed order on
 // every tile at once, and no count is ever hidden. Today's rows hold the colour identity chip, poison, tax, energy,
-// experience and rad (near), led by the turn chip when Turns is on, and commander damage led by a sword (far).
+// experience and rad (near), led by the turn chip when Turns is on, and commander damage led by a sword (far). The near
+// row drops the identity names, then the symbol (the indicator and the chip always stay); the far row drops the sword.
+// Then a row wraps onto a second line, and only then shrinks its type, down to 9px; a side whose second line would
+// cover a total or its glyphs shrinks first and wraps last.
 
 const seats = [0, 1, 2, 3, 4, 5];
 // Long names, a four-colour pie and a shard symbol, so the identity chips are as wide as they get.
@@ -42,8 +45,9 @@ async function resize(page, width, height = Math.round(width * 0.5625)) {
   });
 }
 
-// The board's drop tokens and badge sizes, and anything wrong: a count that's hidden, a chip outside its tile, or
-// type under the 9px hard floor.
+// The board's drop tokens and badge sizes, the most lines any near and far row takes, whether a row on two lines
+// covers a total or its glyphs, and anything wrong: a count that's hidden, a chip outside its tile, type under the 9px
+// floor, or an identity chip (or, where it's shown, its indicator) that's gone.
 function readDrops(page) {
   return page.evaluate(() => {
     const board = document.querySelector('#board');
@@ -63,22 +67,78 @@ function readDrops(page) {
       for (const row of player.querySelectorAll('.badges:not([hidden])')) {
         if (parseFloat(getComputedStyle(row).fontSize) < 9) problems.push(`type under 9px: ${getComputedStyle(row).fontSize}`);
       }
+      const identity = player.querySelector('.badges.near .ci-chip');
+      if (identity && !(identity.checkVisibility() && identity.offsetWidth)) problems.push('an identity chip is gone');
+      const indicator = identity?.querySelector('.ci');
+      if (indicator && !indicator.checkVisibility()) problems.push('an indicator is gone');
     }
+    const lines = row => new Set([...row.children].filter(chip => chip.offsetWidth).map(chip => chip.offsetTop)).size;
+    const rows = side => [...document.querySelectorAll(`.badges.${side}:not([hidden])`)];
     return {
       drop: board.dataset.drop ?? '',
       near: board.style.getPropertyValue('--near-badge-size'),
       far: board.style.getPropertyValue('--far-badge-size'),
+      lines: { near: Math.max(0, ...rows('near').map(lines)), far: Math.max(0, ...rows('far').map(lines)) },
+      covers: { near: rows('near').some(row => lines(row) > 1 && window.coversTotal(row)), far: rows('far').some(row => lines(row) > 1 && window.coversTotal(row)) },
       problems,
     };
   });
 }
 
-// How far the near row has gone through its steps (design/polish/SPEC.md §3.2), as the number of the last step taken.
-function nearStep({ drop, near }) {
-  const tokens = drop.split(' ');
-  if (tokens.includes('wrap')) return 6;
-  if (tokens.includes('identity')) return parseFloat(near) < 11 ? 5 : 4;
-  if (near) return 3;
+// Installs window.coversTotal(row) in the page: whether any chip in the row overlaps its tile's life total, − and +
+// glyphs or "Out" tag.
+async function addCoverCheck(page) {
+  await page.evaluate(() => {
+    window.coversTotal = (row) => {
+      const face = row.closest('.player-face');
+      const blockers = [face.querySelector('.score'), face.querySelector('.out-tag'), ...face.querySelectorAll('.controls button')]
+        .filter(blocker => blocker.offsetWidth).map(blocker => blocker.getBoundingClientRect());
+      return [...row.children].filter(chip => chip.offsetWidth).some((chip) => {
+        const box = chip.getBoundingClientRect();
+        return blockers.some(blocker => box.left < blocker.right - 0.5 && blocker.left < box.right - 0.5 && box.top < blocker.bottom - 0.5 && blocker.top < box.bottom - 0.5);
+      });
+    };
+  });
+}
+
+// Whether wrapping one side's rows at full type, with the drops taken now, would put a second line over a total or its
+// glyphs: the reason a side shrinks before it wraps. The board is put back at once, before anything can refit it.
+function wrapWouldCover(page, side) {
+  return page.evaluate((side) => {
+    const board = document.querySelector('#board');
+    const drop = board.dataset.drop ?? '';
+    const size = board.style.getPropertyValue(`--${side}-badge-size`);
+    board.dataset.drop = `${drop} ${side === 'near' ? 'wrap' : 'wrap-far'}`.trim();
+    board.style.removeProperty(`--${side}-badge-size`);
+    const covers = [...document.querySelectorAll(`.badges.${side}:not([hidden])`)]
+      .some(row => new Set([...row.children].filter(chip => chip.offsetWidth).map(chip => chip.offsetTop)).size > 1 && window.coversTotal(row));
+    if (drop) board.dataset.drop = drop;
+    else delete board.dataset.drop;
+    if (size) board.style.setProperty(`--${side}-badge-size`, size);
+    return covers;
+  }, side);
+}
+
+// A side's last resorts as taken: wrapped onto a second line, the type shrunk, or both.
+function lastResorts(drops, side) {
+  return { wrap: drops.drop.split(' ').includes(side === 'near' ? 'wrap' : 'wrap-far'), shrink: Boolean(drops[side]) };
+}
+
+// Checks the order of a side's last resorts at one width: a row shrinks without wrapping only where wrapping would have
+// covered a total, a row on two lines never covers one above the floor, and the type never goes under 9px.
+async function checkLastResorts(page, drops, side, view) {
+  const { wrap, shrink } = lastResorts(drops, side);
+  if (shrink && !wrap) assert.ok(await wrapWouldCover(page, side), `${view}: the ${side} row shrank before wrapping only because two lines would cover the total`);
+  if (drops.lines[side] > 1 && parseFloat(drops[side] || '99') > 9) assert.ok(!drops.covers[side], `${view}: two ${side} lines leave the totals clear`);
+  if (shrink) assert.ok(parseFloat(drops[side]) >= 9, `${view}: ${side} type ${drops[side]} stays at 9px or more`);
+}
+
+// How far the near row has gone through its steps (design/polish/SPEC.md §3.2): 1 for the names, 2 for the symbol,
+// 3 for the first last resort (a second line, or smaller type where two lines would cover the total) and 4 for both.
+function nearStep(drops) {
+  const tokens = drops.drop.split(' ');
+  const { wrap, shrink } = lastResorts(drops, 'near');
+  if (wrap || shrink) return 2 + Number(wrap) + Number(shrink);
   if (tokens.includes('symbol')) return 2;
   return tokens.includes('name') ? 1 : 0;
 }
@@ -90,7 +150,8 @@ function nearStep({ drop, near }) {
 async function checkWorstCase(t, engine) {
   for (const count of [4, 6]) {
     const page = await openBoard(t, engine, worstGame(count, { turns: true }), { width: 952, height: 427 });
-    for (const [width, height, far, nearLimit] of [[952, 427, true, 1], [640, 360, true, 6], [568, 320, false, 6]]) {
+    await addCoverCheck(page);
+    for (const [width, height, far, nearLimit] of [[952, 427, true, 1], [640, 360, true, 4], [568, 320, false, 4]]) {
       await resize(page, width, height);
       const view = `${count} players, ${width} × ${height}`;
       const drops = await readDrops(page);
@@ -107,12 +168,14 @@ async function checkWorstCase(t, engine) {
     // With the flag on the active tile too, that row is one chip longer: at 6 players the target also drops the symbol
     // (step 2), and nothing is hidden or clipped.
     const together = await openBoard(t, engine, worstGame(count, { turns: true, first: 0 }), { width: 952, height: 427 });
+    await addCoverCheck(together);
     await resize(together, 952, 427);
     const busiest = await readDrops(together);
     assert.deepEqual(busiest.problems, [], `${count} players, flag and turn chip together: every count shows inside its tile`);
     assert.ok(nearStep(busiest) <= 2, `${count} players, flag and turn chip together: near row at step ${nearStep(busiest)}, at most 2`);
     await together.close();
     const twoCounters = await openBoard(t, engine, worstGame(count, { everyCounter: false }), { width: 952, height: 427 });
+    await addCoverCheck(twoCounters);
     for (const [width, height] of [[952, 427], [640, 360]]) {
       await resize(twoCounters, width, height);
       const drops = await readDrops(twoCounters);
@@ -134,6 +197,7 @@ function nearOrder(page) {
 // row keeps its full size.
 async function checkCounterRow(t, engine) {
   const page = await openBoard(t, engine, worstGame(6), { width: 640, height: 360 });
+  await addCoverCheck(page);
   await resize(page, 640, 360);
   assert.deepEqual(await nearOrder(page), Array(6).fill(['identity', 'poison', 'casts', 'energy', 'experience', 'rad']));
   assert.deepEqual(await page.locator('.badges.near').evaluateAll(rows => rows.map(row => [...row.children].slice(1).map(chip => chip.textContent).join(' '))),
@@ -154,16 +218,17 @@ async function checkCounterRow(t, engine) {
 // On windows narrower than any phone, today's rows do run out of room. The steps come in the spec's order, every
 // count stays, and the board stays uniform. A sword dropped for a count of 10 doesn't come back at 9, and a new
 // game starts at full size again. The identity chips show only the indicator here, so the near row has nothing to
-// drop before its type shrinks.
+// drop before its last resorts.
 async function checkSteps(t, engine) {
   // Player 1's far row is the busiest: 10 from Player 2's commander, 9 from everyone else.
   const indicator = { indicator: true, symbol: false, name: false };
   const game = worstGame(6, { show: indicator, everyCounter: false, damage: (defender, attacker) => (defender === 0 && attacker === 1 ? 10 : 9) });
   const page = await openBoard(t, engine, game, { width: 640, height: 360 });
+  await addCoverCheck(page);
   await resize(page, 640);
   assert.equal((await readDrops(page)).drop, '', 'full size at 640 × 360');
 
-  // Narrow the window until the far row gives way: the sword goes first, before any type shrinks.
+  // Narrow the window until the far row gives way: the sword goes first, before the row wraps or its type shrinks.
   let width = 640;
   let drops;
   do {
@@ -190,27 +255,28 @@ async function checkSteps(t, engine) {
   assert.equal((await readDrops(page)).drop, '', 'room to spare brings the sword back');
   await page.close();
 
-  // With every count at 19, narrower windows take every far step: the sword goes, the type shrinks, never under
-  // 9px, then the row wraps at full size. The near row shrinks its type before the identity chip goes. Every tile
-  // uses the same steps and sizes throughout.
+  // With every count at 19, narrower windows take every far step: the sword goes, then the row's last resorts, a second
+  // line and smaller type, in that order unless two lines would cover the totals. The type never goes under 9px, and
+  // every tile uses the same steps and sizes throughout.
   const busy = await openBoard(t, engine, worstGame(6, { show: indicator, everyCounter: false }), { width: 560, height: 315 });
-  const order = ['sword', 'far type', 'wrap-far'];
+  await addCoverCheck(busy);
   let reached = -1;
   for (width = 560; width >= 300 && reached < 2; width -= 10) {
     await resize(busy, width);
     drops = await readDrops(busy);
     const view = `${width}px`;
     assert.deepEqual(drops.problems, [], `${view}: every count shows inside its tile`);
-    const step = drops.drop.includes('wrap-far') ? 2 : drops.far ? 1 : drops.drop.includes('sword') ? 0 : -1;
-    assert.ok(step >= reached, `${view}: steps only move forward as the window narrows (${order[step] ?? 'none'} after ${order[reached]})`);
+    const { wrap, shrink } = lastResorts(drops, 'far');
+    if (wrap || shrink) assert.ok(drops.drop.includes('sword'), `${view}: the sword went before any last resort`);
+    const step = Number(wrap) + Number(shrink) + (drops.drop.includes('sword') ? 0 : -1);
+    assert.ok(step >= reached, `${view}: steps only move forward as the window narrows (step ${step} after ${reached})`);
     reached = step;
-    if (drops.far) assert.ok(parseFloat(drops.far) >= 9 && parseFloat(drops.far) < 12.5, `${view}: far type ${drops.far} shrinks, never under 9px`);
-    if (drops.drop.includes('wrap-far')) assert.equal(drops.far, '', `${view}: a wrapped row keeps its full type`);
-    if (drops.drop.includes('identity')) assert.ok(drops.near, `${view}: the near row shrank before the identity chip went`);
+    await checkLastResorts(busy, drops, 'far', view);
+    await checkLastResorts(busy, drops, 'near', view);
     const sizes = await busy.locator('.badges').evaluateAll(rows => rows.map(row => `${row.classList[1]} ${getComputedStyle(row).fontSize}`));
     assert.equal(new Set(sizes).size, 2, `${view}: every near row and every far row is the same size (${[...new Set(sizes)]})`);
   }
-  assert.equal(reached, 2, 'the far row wraps on the narrowest windows');
+  assert.equal(reached, 2, 'the far row both wraps and shrinks on the narrowest windows');
 
   // A new game resets the counts and starts at full size.
   await button(busy, 'Settings').tap();
@@ -222,24 +288,29 @@ async function checkSteps(t, engine) {
 }
 
 // The near row gives way in the spec's order as the window narrows: the identity names, then the symbol (one colour
-// mark is enough beside the indicator), then the type down to 11px, then the identity chip, then the type down to
-// 9px, then a second line. Without the indicator the symbol is the chip's only colour mark, so it stays until the
-// whole chip goes. The order holds with only poison and tax on, from the smallest real phone down, and with every
-// counter on, from the target phone down.
+// mark is enough beside the indicator), then a second line, then smaller type, down to 9px (or the type first, where
+// two lines would cover the totals). The identity chip never goes, and nor does its indicator. Without the indicator
+// the symbol is the chip's only colour mark, so it stays; a chip that shows only the name keeps it. The order holds
+// with only poison and tax on, from the smallest real phone down, and with every counter on, from the target phone
+// down, and with two players, whose tall tiles leave room for a second line.
 async function checkNearSteps(t, engine) {
+  const symbolName = { indicator: false, symbol: true, name: true };
+  const nameOnly = { indicator: false, symbol: false, name: true };
   const passes = [
-    [allParts, 'all three parts', false, 640, 10], [{ indicator: false, symbol: true, name: true }, 'symbol and name', false, 640, 10],
-    [allParts, 'every counter, all three parts', true, 952, 8], [{ indicator: false, symbol: true, name: true }, 'every counter, symbol and name', true, 952, 8],
+    [6, allParts, 'all three parts', false, 640, 10], [6, symbolName, 'symbol and name', false, 640, 10], [6, nameOnly, 'name only', false, 640, 10],
+    [6, allParts, 'every counter, all three parts', true, 952, 8], [6, symbolName, 'every counter, symbol and name', true, 952, 8],
+    [2, allParts, 'two players, every counter, all three parts', true, 952, 16],
   ];
-  for (const [show, label, everyCounter, start, step] of passes) {
-    const page = await openBoard(t, engine, worstGame(6, { show, everyCounter }), { width: start, height: Math.round(start * 0.5625) });
+  for (const [count, show, label, everyCounter, start, step] of passes) {
+    const page = await openBoard(t, engine, worstGame(count, { show, everyCounter, turns: true }), { width: start, height: Math.round(start * 0.5625) });
+    await addCoverCheck(page);
     let reached = 0;
     const seen = new Set();
     for (let width = start; width >= 290; width -= step) {
       await resize(page, width);
       const drops = await readDrops(page);
       const view = `${label}, ${width}px`;
-      assert.deepEqual(drops.problems, [], `${view}: every count shows inside its tile`);
+      assert.deepEqual(drops.problems, [], `${view}: every count, identity chip and indicator shows inside its tile`);
       const step = nearStep(drops);
       assert.ok(step >= reached, `${view}: steps only move forward as the window narrows (step ${step} after ${reached})`);
       reached = step;
@@ -247,19 +318,23 @@ async function checkNearSteps(t, engine) {
       const tokens = drops.drop.split(' ');
       if (show.indicator) {
         if (tokens.includes('symbol')) assert.ok(tokens.includes('name'), `${view}: the names go before the symbol`);
-        if (tokens.includes('identity')) assert.ok(tokens.includes('symbol'), `${view}: the symbol goes before the chip`);
-      } else {
-        assert.ok(!tokens.includes('symbol'), `${view}: a symbol with no indicator beside it stays`);
-        if (tokens.includes('identity')) assert.ok(tokens.includes('name'), `${view}: the names go before the chip`);
-      }
-      if (tokens.includes('name')) {
-        const names = await page.locator('.badges.near .id-name').evaluateAll(nodes => nodes.filter(node => node.offsetWidth).length);
-        assert.equal(names, 0, `${view}: a dropped name is gone from every tile`);
+      } else assert.ok(!tokens.includes('symbol') || !(await page.locator('.badges.near .ci-chip .id-symbol').count()), `${view}: a symbol with no indicator beside it stays`);
+      const { wrap, shrink } = lastResorts(drops, 'near');
+      if (wrap || shrink) assert.ok(tokens.includes('name'), `${view}: the names go before the last resorts`);
+      await checkLastResorts(page, drops, 'near', view);
+      const names = await page.locator('.badges.near .id-name').evaluateAll(nodes => nodes.filter(node => node.offsetWidth).length);
+      if (tokens.includes('name') && show.name && (show.indicator || show.symbol)) assert.equal(names, 0, `${view}: a dropped name is gone from every tile`);
+      if (show.name && !show.indicator && !show.symbol) assert.equal(names, count, `${view}: a chip that shows only the name keeps it`);
+      if (!show.indicator && show.symbol) {
+        const symbols = await page.locator('.badges.near .id-symbol').evaluateAll(nodes => nodes.filter(node => node.offsetWidth).length);
+        assert.equal(symbols, count, `${view}: with no indicator, every symbol stays`);
       }
     }
-    assert.ok(seen.has(1), `${label}: the names go on their own first`);
+    // A chip that shows only the name keeps it, so there only the turn chip's word goes at step 1, and may not take a
+    // width of its own.
+    if (show.indicator || show.symbol) assert.ok(seen.has(1), `${label}: the names go on their own first`);
     if (show.indicator) assert.ok(seen.has(2), `${label}: then the symbol`);
-    assert.ok(reached >= 4, `${label}: the identity chip goes on the narrowest windows (reached step ${reached})`);
+    assert.ok(reached >= 3, `${label}: the narrowest windows take a last resort (reached step ${reached})`);
     await page.close();
   }
 }
@@ -269,6 +344,7 @@ async function checkNameHysteresis(t, engine) {
   // Player 1's near row is the busiest: poison 10 against 9 everywhere else, with the same long name on every tile.
   const game = worstGame(6, { poison: index => (index === 0 ? 10 : 9), identities: Array(6).fill('WURG'), everyCounter: false });
   const page = await openBoard(t, engine, game, { width: 640, height: 360 });
+  await addCoverCheck(page);
   await resize(page, 640);
   assert.equal((await readDrops(page)).drop, '', 'full size at 640 × 360');
   let width = 640;
@@ -297,6 +373,7 @@ async function checkNameHysteresis(t, engine) {
 async function checkTurnWord(t, engine) {
   const indicator = { indicator: true, symbol: false, name: false };
   const page = await openBoard(t, engine, worstGame(6, { show: indicator, turns: true }), { width: 952, height: 427 });
+  await addCoverCheck(page);
   let width = 952;
   let drops = await readDrops(page);
   while (!drops.drop && !drops.near && width > 300) {
@@ -311,11 +388,42 @@ async function checkTurnWord(t, engine) {
   assert.equal(await page.locator('.turn-chip .turn-round').evaluate(round => getComputedStyle(round, '::before').content), '"T"');
 }
 
+// Text doesn't shrink exactly in proportion to its type (gaps, padding and rounding don't), and in WebKit a busy row
+// shrunk by that estimate alone came out 2–4px wider than its tile. The type is measured again after each step down,
+// so at every width where a row shrinks it fits: its chips span no more than the row, and stay inside their tile.
+async function checkShrunkRowsFit(t, engine) {
+  for (const count of [4, 6]) {
+    const page = await openBoard(t, engine, worstGame(count, { turns: true, first: 0 }), { width: 760, height: 428 });
+    await addCoverCheck(page);
+    let shrunk = 0;
+    for (let width = 760; width >= 480; width -= 4) {
+      await resize(page, width);
+      const found = await page.evaluate(() => {
+        const board = document.querySelector('#board');
+        const shrinking = ['near', 'far'].filter(side => board.style.getPropertyValue(`--${side}-badge-size`));
+        const wide = [...document.querySelectorAll(shrinking.map(side => `.badges.${side}:not([hidden])`).join(', ') || ':not(*)')].flatMap((row) => {
+          const chips = [...row.children].filter(chip => chip.offsetWidth);
+          if (new Set(chips.map(chip => chip.offsetTop)).size > 1 || !chips.length) return [];
+          const span = chips.at(-1).offsetLeft + chips.at(-1).offsetWidth - chips[0].offsetLeft;
+          return span > row.clientWidth + 0.5 ? [`${row.classList[1]} row ${span}px in ${row.clientWidth}px`] : [];
+        });
+        return { shrinking: shrinking.length > 0, wide };
+      });
+      if (found.shrinking) shrunk += 1;
+      assert.deepEqual(found.wide, [], `${count} players, ${width}px: every shrunk row fits its width`);
+      assert.deepEqual((await readDrops(page)).problems, [], `${count} players, ${width}px: every count shows inside its tile`);
+    }
+    assert.ok(shrunk > 5, `${count} players: rows shrank at ${shrunk} widths`);
+    await page.close();
+  }
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a shrunk badge row is measured again until it fits`, { timeout: 120000 }, t => checkShrunkRowsFit(t, engine));
   test(`${name}: the word "Turn" goes first, with or without identity names`, { timeout: 60000 }, t => checkTurnWord(t, engine));
   test(`${name}: the busiest board today stays within the drop table on phones`, { timeout: 60000 }, t => checkWorstCase(t, engine));
   test(`${name}: badge rows give way in order, board-wide, without blinking`, { timeout: 120000 }, t => checkSteps(t, engine));
-  test(`${name}: the near row drops names, then the symbol, before its type shrinks`, { timeout: 240000 }, t => checkNearSteps(t, engine));
+  test(`${name}: the near row drops names, then the symbol, then wraps before its type shrinks`, { timeout: 240000 }, t => checkNearSteps(t, engine));
   test(`${name}: a dropped name doesn't blink back when a count ticks down`, { timeout: 60000 }, t => checkNameHysteresis(t, engine));
   test(`${name}: every counter's badge shows in order and fits six players at 640 × 360`, { timeout: 60000 }, t => checkCounterRow(t, engine));
 }

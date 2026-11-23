@@ -1174,8 +1174,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   pointer-events: none;
 }
 .badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--badge-size)); }
-.board[data-drop~="name"] .badges.near .ci-chip .id-name, .board[data-drop~="name"] .turn-word, .board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol,
-.board[data-drop~="identity"] .badges.near .ci-chip, .board[data-drop~="sword"] .badges.far .sword { display: none; }
+.board[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .board[data-drop~="name"] .turn-word,
+.board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .board[data-drop~="sword"] .badges.far .sword { display: none; }
 .board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
 .chip {
   display: inline-flex;

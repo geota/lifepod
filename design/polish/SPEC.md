@@ -194,68 +194,54 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 - the life total;
 - both −/+ halves;
 - every count: poison, tax, energy, experience, rad and each commander damage chip, and the monarch's crown and the initiative's castle (§13);
+- the identity chip, and its colour indicator wherever the chip shows one;
 - every control: the turn chip, the mana strip, map seats, counter cells, the pill.
 
 All of these keep 44px targets. Counts shrink their type before they ever leave.
 
-**Drop order, first to go first.** Each step is taken only if the previous one didn't make the row fit.
+**Overflow order, first to go first** (the owner's order, 22 November 2026; it replaced name, symbol, 11px, identity chip, 9px, wrap). Each step is taken only if the previous one didn't make the row fit.
 
 | # | Near row (identity and counters) | Far row (commander damage) |
 |---|---|---|
-| 1 | Words: the identity **name**, "Turn" in the turn chip (leaving the untap symbol and "T" with the number, T12), and "Pass it on" in the hint chip (§13, leaving its icon and arrow) | The **sword** label chip |
-| 2 | The identity **symbol**, when the indicator also shows (one colour mark is enough) | Shrink the type to the 11px floor |
-| 3 | Shrink the type to the 11px floor | Shrink the type to the 9px hard floor |
-| 4 | The **identity chip** entirely (the watermark still shows identity) | Wrap onto a second line |
-| 5 | Shrink the type to the 9px hard floor | |
-| 6 | Wrap the counters onto a second line, growing toward the total | |
+| 1 | Words: the identity **name**, "Turn" in the turn chip (leaving the untap symbol and "T" with the number, T12), and "Pass it on" in the hint chip (§13, leaving its icon and arrow). A chip that shows only the name keeps it, so it's never empty. | The **sword** label chip |
+| 2 | The identity **symbol**, when the indicator also shows (one colour mark is enough). The indicator always stays, and the chip never goes. | Wrap onto a second line, growing toward the total |
+| 3 | Wrap onto a second line, growing toward the total | Shrink the type, down to the 9px floor |
+| 4 | Shrink the type, down to the 9px floor | |
+
+**Two lines never cover the total.** Where a side's second line would cover a life total, its − or + glyph or the "Out" tag, that side shrinks its type before it wraps: steps 3 and 4 on the near row (2 and 3 on the far row) swap. A row that still doesn't fit on one line at 9px then wraps at 9px, the last resort. In practice the tall tiles of a 2-player game wrap first; on landscape phones at 3–6 players, where the rows sit close to the total, rows shrink first.
 
 **How the rule runs:**
 
-- `fitBadgeRows()` runs after every badge change and every layout change. It measures each row at full type with the current drops, then takes the next step until every row fits.
+- `fitBadgeRows()` runs after every badge change and every layout change. For each side, `fitBadgeSide()` measures the rows at full type with the current drops, then takes the next step until every row fits.
+- **Shrinking is measured, not estimated.** Text doesn't shrink exactly in proportion to its type (gaps, padding and rounding don't), so the type starts from a proportional estimate and steps down 0.25px at a time, measured again after each step, until every row fits or it reaches 9px. (WebKit left a busy row 2–4px wider than its tile with the estimate alone.)
 - **Levels are board-wide.** The busiest tile decides for every tile, so the board stays uniform. That's the same principle as §3.1, and it stops names flickering on one tile while staying on another.
 - **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game. Counters ticking up and down by one can't make names blink.
-- The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `identity`, `sword`, `wrap`); CSS hides the matching parts.
+- The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `sword`, `wrap`, `wrap-far`), and CSS hides the matching parts; `--near-badge-size` and `--far-badge-size` shrink the type.
 
-**What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent):
+**What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent), measured in Chromium with Roboto:
 
 | Screen | Near row | Far row |
 |---|---|---|
 | 952 × 427, 4 or 6 players | Step 1 (names and "Turn" go) | Full size |
-| 640 × 360, 6 players | Steps 1–4, then 6 (two lines, no identity chip) | Full size |
+| 640 × 360, 6 players | Steps 1–2, then the type shrinks (9.6px) on one line | Full size |
 | 568 × 320, 4 players | Steps 1–2 | Full size |
-| 568 × 320, 6 players | Steps 1–4, then 6 | Full size |
+| 568 × 320, 6 players | Steps 1–2, then 9px on two lines | Full size |
 
-**A typical 6-player game** (default chip, so indicator + name, long names like Ink-Treader, single-digit counts):
+**A typical game** (default chip, so indicator + name, long names like Ink-Treader, single-digit counts):
 
 | Screen | Every counter on | Only Poison and tax |
 |---|---|---|
-| 952 × 427 (target) | Full size | Full size |
-| 640 × 360 | Step 1: names go | Full size |
-| 568 × 320 | Steps 1–4: names, then the identity chip go | Full size |
-
-`spec.mjs spec-autodrop` logs these numbers.
-
-**Where each step starts, by the smallest tile's width** (`ui`), at 6 players.
-
-- The badge type sits at its 12.5px floor on every phone at 6 players, so width is what decides.
-- These are the container sizes the sweep found (`node design/polish/spec.mjs spec-sweep`, widths 952 → 568).
-- The rule itself measures the rows, so other content moves these points.
-
-| Step | Typical game | Worst case |
-|---|---|---|
-| 1. Names (and "Turn") go | below `ui` ≈ 260px | at the target already (`ui` 316px) |
-| 2. Symbol goes (when the indicator shows) | — (not shown by default) | below `ui` ≈ 290px |
-| 4. Identity chip goes | below `ui` ≈ 195px | below `ui` ≈ 270px |
-| 6. Counters wrap to two lines | not reached at 568 × 320 | below `ui` ≈ 245px |
-
-For reference, `ui` is 316px on the target, 283px at 852 × 393, 213px at 640 × 360 and 188px at 568 × 320.
+| 952 × 427 (target), 4 or 6 players | Full size | Full size |
+| 640 × 360, 6 players | Step 1: names go | Full size |
+| 568 × 320, 4 players | Full size | Full size |
+| 568 × 320, 6 players | Step 1: names go | Full size |
 
 **Why the symbol goes before the indicator** (the owner's example had name, then indicator, then symbol):
 
 - The indicator says the colours to everyone.
 - The symbol only says them to someone who knows the guild or family.
 - The default background already draws that same symbol behind the tile, so dropping it from the chip loses nothing.
-- If the background is Default or Off and the chip shows only the symbol, step 2 doesn't apply, and the symbol stays until step 4.
+- If the chip shows the symbol without the indicator, step 2 doesn't apply, and the symbol stays.
 
 **Fixed thresholds** (by board unit, so they also apply board-wide):
 
@@ -363,7 +349,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 ![Badges](renders/spec-badges.png)
 
 - **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero, then the monarch's crown and the initiative's castle on their holder's tile (§13).
-- It stays on one line at full size on the target. On smaller phones the auto-drop rules (§3.2) take the name, then the identity chip, before any count shrinks below 11px.
+- It stays on one line at full size on the target. On smaller phones the auto-drop rules (§3.2) take the name, then the symbol, then wrap or shrink; the identity chip and its indicator always stay.
 - **Decision: not the right side.** I mocked it with and without the identity chip. Reasons:
   - A column needs the + glyph to move in by 34px, which collides with the total at 6 players.
   - The name can't fit a column.

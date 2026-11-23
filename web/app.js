@@ -179,17 +179,19 @@ const maxCount = 99;
 // The custom starting life stepper's range.
 const maxStartingLife = 999;
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
-// tile. A drop step hides something on every tile (CSS reads its token from #board's data-drop); a floor step
-// shrinks the type, but no smaller than the floor; wrap lets the row take a second line, growing toward the total.
-// On the near row the identity's name, the turn chip's word "Turn" and the hint's "Pass it on" go first, leaving the untap
-// symbol and "T" with the round, then the identity's symbol where the indicator also shows (one colour mark is enough).
-// The monarch's crown and the initiative's castle never give way.
+// tile. Each row first drops words and marks: on the near row the identity's name, the turn chip's word "Turn" and the
+// hint's "Pass it on" (leaving the untap symbol and "T" with the round), then the identity's symbol where the indicator
+// also shows. The indicator always stays and the identity chip never goes: a chip that shows only the name keeps it. On
+// the far row, the sword. A drop hides something on every tile (CSS reads its token from #board's data-drop). Then come
+// the row's last resorts (lastResorts): wrapping onto a second line, growing toward the total, then shrinking the type,
+// no smaller than typeFloor. A side whose second line would cover a total or its glyphs shrinks first and wraps last.
+// Counts, the monarch's crown and the initiative's castle never give way.
 const dropSteps = {
   near: [
-    { drop: 'name', selector: '.ci-chip .id-name, .turn-chip .turn-word, .pass-chip .pass-word' }, { drop: 'symbol', selector: '.ci-chip .ci ~ .id-symbol' }, { floor: 11 },
-    { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true },
+    { drop: 'name', selector: '.ci-chip :is(.ci, .id-symbol) ~ .id-name, .turn-chip .turn-word, .pass-chip .pass-word' },
+    { drop: 'symbol', selector: '.ci-chip .ci ~ .id-symbol' },
   ],
-  far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
+  far: [{ drop: 'sword', selector: '.sword' }],
   // The mana strip sits at the far edge, under commander damage, and never covers the life total, the − and + glyphs,
   // the near row or the pill. Its type shrinks first, then it wraps toward the total if there's room. Each strip then
   // takes the first place that fits (fitStrips): its own line under the far row, or the end of the far row's line, or,
@@ -197,6 +199,9 @@ const dropSteps = {
   // strips that need it fold, so a short pool elsewhere keeps its spend buttons.
   strip: [{ floor: 11 }, { drop: 'strip-wrap', wrap: true }],
 };
+// A badge row's wrap token, and the smallest type a row shrinks to, which keeps a count legible.
+const wrapTokens = { near: 'wrap', far: 'wrap-far' };
+const typeFloor = 9;
 // A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
 // down by one can't make it blink.
 const dropSlack = 1.15;
@@ -241,8 +246,10 @@ let edits = /** @type {Edit[] | null} */ (null);
 let editStartScores = [];
 let announceTimer;
 const pendingAnnouncements = new Map();
-// How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none.
+// How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none. Past its drops, a
+// row's level counts its last resorts; wrapFirst says, for each side, whether wrapping comes before shrinking.
 let dropLevels = { near: 0, far: 0, strip: 0 };
+let wrapFirst = { near: true, far: true };
 let fitQueued = false;
 // The pill's buttons now and at rest, as last measured.
 let pillShape = '';
@@ -523,13 +530,65 @@ function syncDropTokens(levels) {
 
 // The drop tokens a side has at a level. A step that would hide nothing on the board is skipped.
 function dropTokens(side, level, rows = badgeRows(side)) {
-  return dropSteps[side].slice(0, level)
+  const tokens = dropSteps[side].slice(0, level)
     .filter(step => step.drop && (!step.selector || rows.some(row => row.querySelector(step.selector))))
     .map(step => step.drop);
+  if (side !== 'strip' && lastResorts(side, level).wrap) tokens.push(wrapTokens[side]);
+  return tokens;
+}
+
+// Which of a badge row's last resorts a level has taken: its first level past the drops wraps the row (or shrinks its
+// type, where wrapping would cover the total), and the next does both.
+function lastResorts(side, level) {
+  const past = level - dropSteps[side].length;
+  return { wrap: past >= (wrapFirst[side] ? 1 : 2), shrink: past >= (wrapFirst[side] ? 2 : 1) };
+}
+
+// Whether any chip in a row covers its tile's life total, the − and + glyphs or the "Out" tag.
+function rowCovers(row) {
+  const face = row.closest('.player-face');
+  const blockers = [face.querySelector('.score'), face.querySelector('.out-tag'), ...face.querySelectorAll('.controls button')]
+    .filter(blocker => blocker.offsetWidth).map(blocker => blocker.getBoundingClientRect());
+  return [...row.children].some(chip => chip.offsetWidth && blockers.some(blocker => overlaps(chip.getBoundingClientRect(), blocker)));
+}
+
+// How many lines a row's chips take as it's laid out.
+function rowLines(row) {
+  return new Set([...row.children].filter(chip => chip.offsetWidth).map(chip => chip.offsetTop)).size;
+}
+
+// Whether a row fits at its current type: on one line, or, where it may wrap, on two lines that leave the total and the
+// glyphs clear. With slack, the chips must fit with that much to spare. A pixel to spare absorbs each chip's rounding.
+function rowFits(row, wrap, slack = 1) {
+  const room = row.clientWidth - 1;
+  if (!wrap) return chipsWidth(row) * slack <= room;
+  const chips = [...row.children].filter(chip => chip.offsetWidth);
+  let lines = rowLines(row);
+  if (slack > 1) {
+    // The lines the chips would take with slack to spare, packed as a wrapping flex row packs them.
+    const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+    let used = 0;
+    lines = 1;
+    for (const chip of chips) {
+      const width = chip.offsetWidth * slack;
+      if (used && used + gap + width > room) {
+        lines += 1;
+        used = width;
+      } else used += (used ? gap : 0) + width;
+    }
+  }
+  return lines <= 2 && chips.every(chip => chip.offsetWidth <= room + 1) && (lines < 2 || !rowCovers(row));
 }
 
 function badgeRows(side) {
   return [...board.querySelectorAll(side === 'strip' ? '.mana-strip' : `.badges.${side}`)].filter(row => !row.hidden && row.offsetParent !== null && row.childElementCount);
+}
+
+// The chips' width on one line at the row's current type, wherever they wrap: each chip shown and the gaps between.
+function chipsLineWidth(row) {
+  const chips = [...row.children].filter(chip => chip.offsetWidth);
+  const gap = parseFloat(getComputedStyle(row).columnGap) || 0;
+  return chips.reduce((sum, chip) => sum + chip.offsetWidth, 0) + gap * Math.max(0, chips.length - 1);
 }
 
 // The chips' width at the row's current type, from the first chip shown to the last, gaps included.
@@ -551,41 +610,53 @@ function fitBadgeSide(side) {
     syncDropTokens(dropLevels);
     return;
   }
-  const steps = dropSteps[side];
+  const drops = dropSteps[side].length;
+  const highest = drops + 2;
   const base = parseFloat(getComputedStyle(rows[0]).fontSize);
-  const measure = (level) => {
+  const floor = Math.min(typeFloor, base);
+  // Sets a level and a type size (null for full type), and says whether every row then fits.
+  const fitsAt = (level, size, slack = 1) => {
     syncDropTokens({ ...dropLevels, [side]: level });
-    const taken = steps.slice(0, level);
-    const floors = taken.filter(step => step.floor).map(step => /** @type {number} */ (step.floor));
-    return {
-      // A pixel to spare absorbs the rounding of each chip's width.
-      ratio: Math.min(...rows.map(row => (row.clientWidth - 1) / Math.max(1, chipsWidth(row)))),
-      floor: floors.length ? Math.min(...floors) : null,
-      wrap: taken.some(step => step.wrap),
-    };
+    if (size === null) board.style.removeProperty(property);
+    else board.style.setProperty(property, `${size}px`);
+    return rows.every(row => rowFits(row, lastResorts(side, level).wrap, slack));
   };
-  const fits = (state, slack) => state.wrap || state.ratio >= slack || (state.floor !== null && base * state.ratio / slack >= state.floor);
+  // A level that shrinks the type fits if its rows fit at the floor.
+  const fits = (level, slack = 1) => fitsAt(level, lastResorts(side, level).shrink ? floor : null, slack);
+  // Wrapping comes before shrinking, unless a second line would cover a total or its glyphs.
+  wrapFirst = { ...wrapFirst, [side]: true };
+  fitsAt(drops + 1, null);
+  wrapFirst = { ...wrapFirst, [side]: !rows.some(row => rowLines(row) > 1 && rowCovers(row)) };
   let needed = 0;
-  let state = measure(0);
-  while (!fits(state, 1) && needed < steps.length) state = measure(++needed);
+  while (needed < highest && !fits(needed)) needed++;
   let level = needed;
-  const current = dropLevels[side];
+  const current = Math.min(dropLevels[side], highest);
   if (needed < current) {
     const kept = dropTokens(side, current, rows).length;
     level = current;
     for (let candidate = needed; candidate < current; candidate++) {
-      if (dropTokens(side, candidate, rows).length === kept || fits(measure(candidate), dropSlack)) {
+      if (dropTokens(side, candidate, rows).length === kept || fits(candidate, dropSlack)) {
         level = candidate;
         break;
       }
     }
   }
   dropLevels = { ...dropLevels, [side]: level };
-  state = measure(level);
-  // A wrapped row keeps its full type, since it has a second line to use.
-  if (!state.wrap && state.ratio < 1 && state.floor !== null) {
-    board.style.setProperty(property, `${Math.max(state.floor, Math.floor(base * state.ratio * 10) / 10)}px`);
+  if (!lastResorts(side, level).shrink) {
+    fitsAt(level, null);
+    return;
   }
+  // The type shrinks from an estimate, then steps down, measured again after each step, until every row fits or it
+  // reaches the floor. Text doesn't shrink exactly in proportion (gaps, padding and rounding don't), so the estimate
+  // alone can leave a row a few pixels too wide.
+  fitsAt(level, null);
+  const lines = lastResorts(side, level).wrap ? 2 : 1;
+  const estimate = Math.min(...rows.map((row) => {
+    const width = chipsLineWidth(row);
+    return width > 0 ? base * Math.min(1, (lines * (row.clientWidth - 1)) / width) : base;
+  }));
+  let size = Math.max(floor, Math.floor(estimate * 10) / 10);
+  while (!fitsAt(level, size) && size > floor) size = Math.max(floor, Math.round((size - 0.25) * 100) / 100);
 }
 
 // Whether two boxes overlap by more than a rounding error.

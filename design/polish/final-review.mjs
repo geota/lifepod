@@ -425,8 +425,7 @@ function audit() {
       const hidden = ['poison', 'casts', 'energy', 'experience', 'rad']
         .filter(kind => game.counters[kind === 'casts' ? 'commander' : kind] && game[kind]?.[index] > 0 && !shownKinds.includes(kind))
         .map(kind => `${kind} ${game[kind][index]}`);
-      const dropped = (document.querySelector('#board').dataset.drop ?? '').split(' ').includes('identity');
-      if (game.identities[index] && Object.values(game.identity.show).some(Boolean) && !dropped && ![...near.querySelectorAll('.ci-chip')].some(visible)) hidden.unshift('identity chip');
+      if (game.identities[index] && Object.values(game.identity.show).some(Boolean) && ![...near.querySelectorAll('.ci-chip')].some(visible)) hidden.unshift('identity chip');
       if (hidden.length) add('hidden', `P${index + 1} mana strip hides ${hidden.join(', ')}`);
       const turnChip = player.querySelector('.turn-chip');
       if (turnChip && !visible(turnChip)) add('hidden', `P${index + 1} mana strip hides the turn chip (${turnChip.className})`);
@@ -444,8 +443,8 @@ function audit() {
       }
     });
   }
-  // Every count chip must be visible (never dropped).
-  for (const chip of document.querySelectorAll('.badges.near .chip[data-kind], .badges.far .chip.damage')) {
+  // Every count chip, every identity chip and its colour indicator must be visible (never dropped, SPEC.md §3.2).
+  for (const chip of document.querySelectorAll('.badges.near .chip[data-kind], .badges.far .chip.damage, .badges.near .ci-chip, .badges.near .ci-chip .ci')) {
     if (!chip.closest('.badges').hidden && !document.querySelector('#board').dataset.mode && !visible(chip) && !(chip.closest('.near') && covered(chip))) add('dropped', `${who(chip)}${name(chip)} is hidden`);
   }
   return { problems, facts };
