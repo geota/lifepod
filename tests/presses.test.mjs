@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { engines, openPage, saved, savedGame, test } from './helpers.mjs';
+import { animationsDone, button, engines, openPage, saved, savedGame, test } from './helpers.mjs';
 
 // A press and the board redrawing under it (docs/review/DEEP-DIVE.md D1–D3): an extra tap on the mana strip, a Turn
 // press that a redraw lands in the middle of, and a hold that a dialog opens over. Each press keeps acting on what the
@@ -178,7 +178,40 @@ async function checkLastManaFocus(t, engine) {
   assert.equal(await focused(page), 'P1 subtract', 'the strip going hands focus to the tile, not the pill');
 }
 
+// B1 (docs/review/FINAL.md): the pill's Settings button opens settings on click, so the second tap of a double tap
+// lands inside the page that just opened, on whatever control sits under the pill. A dialog ignores pointer input for
+// its first moments (showDialog), so that tap changes nothing, while keys work at once. The guard is held while the
+// test taps (its animation paused), so the check doesn't race the clock; at the sizes where a second tap changed a
+// setting before: Rad, Turns or Identity's colour disc in Chromium, the player count or Style in WebKit.
+async function checkDoubleTapOnSettings(t, engine) {
+  for (const [width, height] of [[952, 427], [841, 701], [1366, 1024]]) {
+    const view = `${width} × ${height}`;
+    const page = await openPage(t, engine, { viewport: { width, height }, game: savedGame(4, { turns: 'rounds', style: 'material' }) });
+    const before = await saved(page);
+    const box = await button(page, 'Settings').boundingBox();
+    const centre = [box.x + box.width / 2, box.y + box.height / 2];
+    await page.touchscreen.tap(...centre);
+    await page.evaluate(() => document.querySelector('#settings').getAnimations().forEach(animation => animation.pause()));
+    await page.touchscreen.tap(...centre);
+    assert.deepEqual(await saved(page), before, `${view}: the second tap changes nothing`);
+    assert.equal(await page.locator('#save-setup').textContent(), 'Done', `${view}: and starts no new game`);
+    // Keys aren't held up.
+    const awake = page.getByRole('switch', { name: 'Keep awake', exact: true });
+    const wasAwake = await awake.isChecked();
+    await awake.focus();
+    await page.keyboard.press('Space');
+    assert.equal(await awake.isChecked(), !wasAwake, `${view}: a key works at once`);
+    // Once the guard ends, a tap works as ever.
+    await page.evaluate(() => document.querySelector('#settings').getAnimations().forEach(animation => animation.finish()));
+    await animationsDone(page.locator('#settings'));
+    await page.locator('#settings label', { has: awake }).tap();
+    assert.equal(await awake.isChecked(), wasAwake, `${view}: a tap works once the page has opened`);
+    await page.close();
+  }
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a double tap on Settings changes nothing in the page it opens`, t => checkDoubleTapOnSettings(t, engine));
   test(`${name}: an extra tap on the mana strip spends nothing else and takes no life`, t => checkStripBurst(t, engine));
   test(`${name}: a double tap on the eraser doesn't undo the clear`, t => checkEraserDoubleTap(t, engine));
   test(`${name}: a Turn press survives its row redrawing`, t => checkTurnSurvivesRedraw(t, engine));

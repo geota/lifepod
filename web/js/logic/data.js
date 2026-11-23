@@ -160,6 +160,9 @@ export const undoClearTime = 5000;
 // A mana strip keeps its buttons where they are for this long after its last tap, so a quick extra tap lands on what it
 // was aimed at (docs/review/DEEP-DIVE.md D1).
 export const stripHoldTime = 800;
+// A dialog or the settings page ignores pointer input for this long after it opens, so the second tap of a double tap
+// on the button that opened it can't land on a control inside (docs/review/FINAL.md B1).
+export const dialogOpenGuard = 350;
 // "Who goes first?": the shuffle lights tiles in turn for about 0.8s, and the chosen tile shows "Goes first" for a beat.
 export const shuffleTick = 90;
 export const shuffleTicks = 9;
