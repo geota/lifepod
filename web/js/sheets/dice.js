@@ -3,13 +3,17 @@
 
 import { haptic, reducedMotion } from '../state/platform.js';
 import { syncBackHandling } from '../state/state.js';
-import { diceButton } from '../ui/dom.js';
+import { diceButton, element } from '../ui/dom.js';
 
 const diceDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#dice'));
 const diceStage = /** @type {HTMLDivElement} */ (document.querySelector('#dice-stage'));
 const dicePicker = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#dice-picker'));
 const diceRoll = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-roll'));
 const diceResult = /** @type {HTMLParagraphElement} */ (document.querySelector('#dice-result'));
+// The result printed a second time on the far edge of the stage, turned 180° like the pill's round button, so a player
+// across the table reads the roll the right way up too (DESIGN-AUDIT S5). Screen readers hear it once, from #dice-result.
+const diceEcho = element('span', 'dice-echo');
+diceEcho.setAttribute('aria-hidden', 'true');
 let diceSides = 20;
 let die;
 let stopRoll;
@@ -21,7 +25,8 @@ function showDie(sides) {
   diceSides = sides;
   die = window.lifePodDice.stageDie(sides);
   die.showIdle();
-  diceStage.replaceChildren(die.shadow, die.die);
+  diceEcho.textContent = '';
+  diceStage.replaceChildren(die.shadow, die.die, diceEcho);
   diceRoll.textContent = `Roll d${sides}`;
   diceResult.textContent = '';
   for (const choice of dicePicker.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === sides));
@@ -31,12 +36,14 @@ function showDie(sides) {
 function rollDie() {
   if (stopRoll) return;
   diceResult.textContent = '';
+  diceEcho.textContent = '';
   const sides = diceSides;
   stopRoll = window.lifePodDice.roll(die, {
     reducedMotion: reducedMotion.matches,
     onLand(result) {
       haptic();
       diceResult.textContent = `Rolled ${result} on a d${sides}`;
+      diceEcho.textContent = String(result);
     },
     done() { stopRoll = undefined; },
   });

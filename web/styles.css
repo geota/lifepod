@@ -167,7 +167,8 @@
   /* The dice picker's chosen die, and an identity toggle's ring when it's on. */
   --pick-fill: var(--chosen-fill);
   --pick-ink: var(--chosen-ink);
-  --toggle-ring: var(--chosen-fill);
+  /* On the player tiles the chrome's accent stays off (DESIGN-AUDIT N2): a light ring, and the check in the seat colour. */
+  --toggle-ring: var(--text);
 
   /* Floating chrome: the pill, the settings header and dialogs. Solid in Material, so no backdrop filter, no edge, and
      the header is its own row above the settings body (--head-overlay 0). */
@@ -921,6 +922,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .mode-layer > .layer-hint { grid-row: 1; align-self: end; margin-bottom: 6px; }
 .mode-layer > .identity { grid-row: 3; margin-top: 6px; }
 .mode-layer[hidden] { display: none; }
+/* A board mode fades in over 120ms rather than swapping in one frame, so players across the table see it change. Only
+   opacity moves, so nothing is measured mid-way; reduced motion turns it off with every transition. */
+.mode-layer { transition: opacity .12s var(--ease); }
+@starting-style {
+  .mode-layer { opacity: 0; }
+}
 .board { --hint-size: clamp(.75rem, calc(3.6 * var(--u)), max(.875rem, 14 * var(--grow))); }
 .layer-hint { font-size: var(--hint-size); font-weight: var(--weight-semibold); line-height: 1.2; color: var(--text-soft); }
 /* Mode hints show only where every tile has room: ub ≥ 200 and ui ≥ 240. */
@@ -1005,8 +1012,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 }
 .identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
-/* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px accent
-   ring, with a check, so the state never rests on colour alone. */
+/* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px light
+   ring, with a check in the seat colour, so the state never rests on colour alone. */
 .identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
 .identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--toggle-ring); }
 .toggle-check {
@@ -1018,9 +1025,9 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   width: max(16px, calc(var(--toggle) * .34));
   height: max(16px, calc(var(--toggle) * .34));
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--seat);
   box-shadow: 0 0 0 2px var(--tile-panel);
-  color: var(--ink);
+  color: var(--button);
 }
 .toggle-check .icon { width: 62%; height: 62%; }
 .identity-toggle[aria-pressed="true"] .toggle-check { display: grid; }
@@ -1117,12 +1124,15 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
-/* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it. The holder's
-   cell fills with their seat colour; anyone else's is muted. */
+/* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it, in the seat
+   colour like every counter, so a cell nobody holds reads as one to tap rather than a disabled one (DESIGN-AUDIT S8).
+   The holder's cell fills with their seat colour and gets the identity toggles' check, so it doesn't rest on colour. */
+.designation-cell { position: relative; }
 .designation-cell .icon { font-size: 1.7em; }
-.designation-cell[data-zero] .icon { color: var(--muted); }
 .designation-cell[aria-pressed="true"] { background: var(--seat); color: var(--button); }
 .designation-cell[aria-pressed="true"] .icon { color: var(--button); }
+.designation-cell .toggle-check { --toggle: var(--cell); top: 0; right: 0; }
+.designation-cell[aria-pressed="true"] .toggle-check { display: grid; }
 /* Seven counter cells (every counter, the monarch and the initiative) go four to a row, and the gaps close up to 2px
    before a cell would go under 44px. A face too narrow for four (a turned seat at 568 × 320) takes three to a row with
    its gaps closed up. app.js sets data-cell-grid and each face's --wide-columns and --wide-gap. */
@@ -1133,7 +1143,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   column-gap: var(--wide-gap, var(--cell-gap));
   width: calc(var(--wide-columns, 4) * var(--cell) + (var(--wide-columns, 4) - 1) * var(--wide-gap, var(--cell-gap)));
 }
-.mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); }
+.mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); opacity: .5; }
 
 /* "Who goes first?": Me first on every tile, facing its player. The shuffle lights tiles in turn; the chosen tile
    shows "Goes first" in its seat colour while the others dim. */
@@ -1924,7 +1934,20 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   user-select: none;
 }
 .dice-stage:active { background: var(--dice-stage-pressed); }
-.dice-stage > svg { grid-area: 1 / 1; width: 74cqmin; height: 74cqmin; overflow: visible; }
+.dice-stage > svg { grid-area: 1 / 1; width: 70cqmin; height: 70cqmin; overflow: visible; }
+/* The result again on the stage's far edge, upside down, for the other side of the table. */
+.dice-echo {
+  grid-area: 1 / 1;
+  align-self: start;
+  margin-top: 2.5cqmin;
+  transform: rotate(180deg);
+  color: var(--text);
+  font-size: 9cqmin;
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
 .dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
 .dice-picker button {
   display: flex;
