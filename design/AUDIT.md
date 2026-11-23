@@ -1,6 +1,6 @@
 # LifePod design audit
 
-**Status:** all findings (A1–A8) are applied in the app, the icons, and the store art. The tokens now live in `web/styles.css`; `design/tokens.css` keeps the reasoning for each value. The icons are Phosphor Bold (MIT), matching Crema.
+**Status:** all findings (A1–A8) are applied in the app, the icons, and the store art. The tokens now live in `web/css/tokens.css`; `design/tokens.css` keeps the reasoning for each value. The icons are Phosphor Bold (MIT), matching Crema.
 
 Scope: the web UI in `web/` (board, setup dialog, seat rotation), the app icon (iOS master, Android adaptive layers, web icon) and the store art in `store/`. Checked from the CSS and markup, renders of the real app through Playwright Chromium (including a deuteranopia simulation), and measured contrast (WCAG 2.2) and OKLab colour distance (ΔE × 100).
 

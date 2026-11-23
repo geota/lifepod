@@ -196,7 +196,7 @@ function centreClearance(tile, pill, farClear) {
 // columns. Colours: on narrow or short boards, the first of 4 × 3, 3 × 4, 6 × 2 and 2 × 6 that fits (the layer keeps
 // 6px less than the clearance there, and 1px from other edges); elsewhere 4 × 3 always fits. Counter and mana cells:
 // three to a row, or two; seven counter cells four to a row. Identity toggles: five in a row where every tile has room (ui ≥ 264), otherwise three, or two.
-// The cell and toggle sizes follow styles.css (.counter-cells, .identity).
+// The cell and toggle sizes follow css/modes.css (.counter-cells, .identity).
 function fitModeGrids(faces, { width: ui, height: ub, size, grow, tight }) {
   const cell = Math.min(Math.max(44, Math.min((ui - 20) / 3, (ub - 10 - size) / 2)), 92 * grow);
   // Seven counter cells (every counter, the monarch and the initiative) take two rows of four, 6px in from the face's

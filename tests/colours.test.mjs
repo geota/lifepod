@@ -4,7 +4,7 @@ import {
   backHandling, button, engines, eventually, openPage, reload, saved, savedGame, seedGame, startGame, test, tileProblems, token, turnScreen,
 } from './helpers.mjs';
 
-// A swatch's palette as styles.css sets it for the page's tile set: players 1, 2 and 5 sit in the top row and use
+// A swatch's palette as the CSS sets it for the page's tile set: players 1, 2 and 5 sit in the top row and use
 // its lighter version, and players 3, 4 and 6 the darker bottom-row one.
 const palette = (page, colour, row, part = 'panel') => token(page, `--${colour}-${row}-${part}`);
 // Today's six seat panels, which stay the defaults: Sage, Sky, Coral, Violet, Amber and Teal.

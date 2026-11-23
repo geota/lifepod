@@ -93,7 +93,7 @@ export function setReduceTransparency(reduce) {
 // The system's text size, as a scale of the default (ACCESSIBILITY.md H1): Dynamic Type on iOS, which LifePodApp.swift
 // injects as window.initialTextScale and passes to window.setTextScale when it changes, and the font scale on Android,
 // which the bridge reports (the WebView's own text zoom is off, so it can't scale the fitted board). Settings and
-// dialogs grow their type with it (--text-scale in styles.css), up to twice the size; smaller sizes keep the default.
+// dialogs grow their type with it (--text-scale in css/tokens.css), up to twice the size; smaller sizes keep the default.
 /** @returns {number | undefined} */
 export function systemTextScale() {
   return android ? android.textScale?.() : window.initialTextScale;

@@ -4,7 +4,7 @@
 import { writeFileSync } from 'node:fs';
 import { oklchToHex, contrast, hexToRgb, rgbToHex, rgbToOklch } from './oklch.mjs';
 
-// Today's six seat palettes (web/styles.css). Seats 1, 2, 5 sit in the top row, 3, 4, 6 in the bottom row.
+// Today's six seat palettes (web/css/tokens.css). Seats 1, 2, 5 sit in the top row, 3, 4, 6 in the bottom row.
 const today = [
   { name: 'Sage', hue: 145, row: 'top', panel: '#2f432f', rim: '#556e4e', seat: '#d3eeaa', button: '#233324' },
   { name: 'Sky', hue: 238, row: 'top', panel: '#2c4352', rim: '#517187', seat: '#b6e0f7', button: '#21323e' },
@@ -100,7 +100,7 @@ const toLab = (hex) => {
   return [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)];
 };
 const labDistance = (a, b) => Math.hypot(...toLab(a).map((v, i) => v - toLab(b)[i]));
-// The contrast every tile palette must keep (web/styles.css): the life total, small text and the red of a life
+// The contrast every tile palette must keep (web/css/): the life total, small text and the red of a life
 // total at 0 or below, on the panel.
 const minimums = { life: 9, small: 7.6, lifeOut: 4.79 };
 const r3Rows = [];
@@ -124,7 +124,7 @@ for (const s of r3Swatches) {
 console.table(r3Rows.map(({ rim, button, ...r }) => r));
 for (const failure of failures) console.error('FAIL', failure);
 if (failures.length) process.exitCode = 1;
-// The new palettes as web/styles.css custom properties.
+// The new palettes as web/css/tokens.css custom properties.
 for (const s of r3Swatches.slice(r2Swatches.length)) {
   const id = s.name.toLowerCase();
   for (const row of ['top', 'bottom']) {

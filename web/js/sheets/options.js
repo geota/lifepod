@@ -64,7 +64,7 @@ function renderAllBadges() {
 }
 
 // Tile colours: a segmented choice, saved the moment it changes, like the switches. Swatch ids stay, so every player
-// keeps their colour. Each segment's strip shows its set's colours for players 1–4 (styles.css, from tiles7.mjs).
+// keeps their colour. Each segment's strip shows its set's colours for players 1–4 (css/settings.css, from tiles7.mjs).
 const tileSetChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#tile-set-choices'));
 const shuffleColoursSwitch = /** @type {HTMLInputElement} */ (document.querySelector('#shuffle-colours-switch'));
 function setTileColours(set) {
