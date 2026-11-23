@@ -3,13 +3,14 @@
 // mode's edits forwards and back. No DOM and no state of their own.
 
 import {
-  commanderLethal, countKinds, counterKinds, designations, identityColours, identityNames, manaColours, playOrders,
-  poisonLethal, seatLayouts, topRowPlayers,
+  commanderLethal, countKinds, counterKinds, designations, identityColours, identityNames, manaColours, maxCount, maxRound,
+  playOrders, poisonLethal, seatLayouts, topRowPlayers,
 } from './data.js';
 
 /** @typedef {import('./data.js').CountKind} CountKind */
 /** @typedef {import('./data.js').DesignationKind} DesignationKind */
 /** @typedef {import('./save.js').Game} Game */
+/** @typedef {import('./save.js').Turn} Turn */
 
 /**
  * One change made in an editing mode (damage, counters or mana), kept until the mode closes so it can be undone.
@@ -174,6 +175,39 @@ export function previousTurn(game) {
   return { previous, crossed };
 }
 
+// The turn after one step forward (SPEC §8), or null when it can't move. Rounds: the next round. Turn by turn: the next
+// player in play order who isn't out, and the next round when play passes the first player's seat. It doesn't move
+// with nobody's turn yet, when nobody else can take it, or past maxRound: in the last round, play holds rather than pass
+// the first player's seat, so turnBack always takes a step back exactly. actions/turns.js doesn't use these yet: stepTurn
+// should record a step only when turnForward moves, and stepBack's relaunch branch should take turnBack.
+/**
+ * @param {Game} game
+ * @returns {Turn | null}
+ */
+export function turnForward(game) {
+  const { turn } = game;
+  if (game.turns === 'rounds') return turn.round < maxRound ? { ...turn, round: turn.round + 1 } : null;
+  if (game.turns !== 'turns' || turn.active === null) return null;
+  const { next, crossed } = nextTurn(game);
+  if ((crossed && turn.round === maxRound) || (next === turn.active && !crossed)) return null;
+  return { ...turn, active: next, round: turn.round + Number(crossed) };
+}
+
+// The turn one step back when there's no step to undo (after a relaunch), or null when it can't move: the previous
+// round, or the previous player in play order who isn't out. The round never goes below 1.
+/**
+ * @param {Game} game
+ * @returns {Turn | null}
+ */
+export function turnBack(game) {
+  const { turn } = game;
+  if (game.turns === 'rounds') return turn.round > 1 ? { ...turn, round: turn.round - 1 } : null;
+  if (game.turns !== 'turns' || turn.active === null) return null;
+  const { previous, crossed } = previousTurn(game);
+  if ((crossed && turn.round === 1) || (previous === turn.active && !crossed)) return null;
+  return { ...turn, active: previous, round: turn.round - Number(crossed) };
+}
+
 // A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
 export function randomBelow(count) {
   const limit = Math.floor(0x100000000 / count) * count;
@@ -284,6 +318,81 @@ export function applyEdit(game, edit, direction) {
   for (const transfer of direction > 0 ? transfers : [...transfers].reverse()) {
     game[transfer.kind] = direction > 0 ? transfer.to : transfer.from;
   }
+}
+
+// The edits a mode's taps make (actions/edits.js), or null for a tap that would take a count below 0 or above maxCount.
+// Commander damage is combat damage: adding it to the monarch makes the attacker the monarch (CR 726.3), and adding it to
+// the player with the initiative gives the attacker the initiative (CR 727.3). Taking damage away moves nothing.
+/**
+ * @param {Game} game
+ * @param {number} defender
+ * @param {number} attacker
+ * @param {number} delta
+ * @returns {Edit | null}
+ */
+export function damageEdit(game, defender, attacker, delta) {
+  const next = game.commanderDamage[defender][attacker] + delta;
+  if (defender === attacker || next < 0 || next > maxCount) return null;
+  const transfers = delta > 0 ? trackedDesignations(game).filter(({ kind }) => game[kind] === defender)
+    .map(({ kind }) => ({ kind, from: defender, to: attacker })) : [];
+  return { kind: 'damage', index: defender, attacker, delta, transfers };
+}
+
+// Counters mode's designation cells: a tap gives it to that player, taking it from whoever had it, and a tap on the
+// holder's own cell clears it.
+/**
+ * @param {Game} game
+ * @param {DesignationKind} kind
+ * @param {number} index
+ * @returns {Edit}
+ */
+export function designationEdit(game, kind, index) {
+  const from = game[kind];
+  return { kind: 'designation', index, transfers: [{ kind, from, to: from === index ? null : index }] };
+}
+
+/**
+ * @param {Game} game
+ * @param {CountKind} kind
+ * @param {number} index
+ * @param {number} delta
+ * @returns {Edit | null}
+ */
+export function countEdit(game, kind, index, delta) {
+  const next = game[kind][index] + delta;
+  return next >= 0 && next <= maxCount ? { kind, index, delta } : null;
+}
+
+// Mana mode's edit: one colour in one player's pool, one up or down.
+/**
+ * @param {Game} game
+ * @param {number} index
+ * @param {number} colour
+ * @param {number} delta
+ * @returns {Edit | null}
+ */
+export function manaEdit(game, index, colour, delta) {
+  const next = game.pools[index][colour] + delta;
+  return next >= 0 && next <= maxCount ? { kind: 'mana', index, colour, delta } : null;
+}
+
+// Applies a new edit forwards, as a mode's tap does, and returns it. Anyone it puts out of the game hands on what they
+// hold (CR 726.4 and 727.4) in the same edit: the handoffs join its transfers, so applyEdit(game, edit, -1) undoes them
+// with it. actions/edits.js's commitEdit does the same today; it should call this instead.
+/**
+ * @param {Game} game
+ * @param {Edit} edit
+ * @returns {Edit}
+ */
+export function applyNewEdit(game, edit) {
+  const out = outPlayers(game);
+  applyEdit(game, edit, 1);
+  const handoffs = leavingTransfers(game, out);
+  if (handoffs.length) {
+    edit.transfers = [...(edit.transfers ?? []), ...handoffs];
+    for (const transfer of handoffs) game[transfer.kind] = transfer.to;
+  }
+  return edit;
 }
 
 // Every player an edit shows on: its own, and anyone a designation moved to or from.
