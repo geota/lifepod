@@ -1,5 +1,9 @@
 import { growPixel, placeReminders, requestFit, resetDrops } from './js/layout/fit.js';
 import {
+  compactGroups, fitCompactSwitches, keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody,
+  syncSettingsCue,
+} from './js/layout/settings.js';
+import {
   badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, designationKinds,
   designations, discardMessages, doneLabels, editingModes, faceAngles, faceEdges, firstBeat, identityColours,
   identityNames, manaColours, maxCount, maxRound, maxStartingLife, outLabels, playerCounts, poisonLethal, poisonWarning,
@@ -49,12 +53,7 @@ const diceRoll = /** @type {HTMLButtonElement} */ (document.querySelector('#dice
 const diceResult = /** @type {HTMLParagraphElement} */ (document.querySelector('#dice-result'));
 const rotateSeatsButton = /** @type {HTMLButtonElement} */ (document.querySelector('#rotate-seats'));
 const tileColoursButton = /** @type {HTMLButtonElement} */ (document.querySelector('#tile-colours'));
-const settings = /** @type {HTMLDialogElement} */ (document.querySelector('#settings'));
 const settingsForm = /** @type {HTMLFormElement} */ (document.querySelector('#settings-form'));
-const settingsBody = /** @type {HTMLDivElement} */ (document.querySelector('#settings-body'));
-const settingsContent = /** @type {HTMLDivElement} */ (document.querySelector('#settings-content'));
-const settingsHead = /** @type {HTMLElement} */ (settings.querySelector('.fs-head'));
-const settingsCue = /** @type {HTMLDivElement} */ (settings.querySelector('.scroll-cue'));
 const settingsFlip = /** @type {HTMLButtonElement} */ (document.querySelector('#settings-flip'));
 const settingsDone = /** @type {HTMLButtonElement} */ (document.querySelector('#save-setup'));
 const settingsPending = /** @type {HTMLParagraphElement} */ (document.querySelector('#settings-pending'));
@@ -63,7 +62,6 @@ const playerChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.que
 const lifePresets = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#life-presets'));
 const lifeEdit = /** @type {HTMLButtonElement} */ (document.querySelector('#life-edit'));
 const lifeValue = /** @type {HTMLSpanElement} */ (document.querySelector('#life-value'));
-const lifeEditor = /** @type {HTMLSpanElement} */ (document.querySelector('#life-editor'));
 const lifeInput = /** @type {HTMLInputElement} */ (document.querySelector('#life-input'));
 const manaSwitch = /** @type {HTMLInputElement} */ (document.querySelector('#mana-switch'));
 const autoEmptySwitch = /** @type {HTMLInputElement} */ (document.querySelector('#auto-empty-switch'));
@@ -1655,19 +1653,7 @@ function renderBadgeSizeSetting() {
   for (const choice of badgeSizeChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.size === game.badgeSize));
   badgeSizeSlider.render();
 }
-
-// Compact switch rows (styles.css) put their label over the mark and the switch where a row is too narrow for all three
-// on one line. Container queries cover the usual widths; this catches whatever they miss with the font and style in
-// use: a group with a label cut short stacks every row. It's checked whenever the settings body changes size, as when
-// settings opens or the window turns (the body, a scroller, doesn't change size when its rows stack, so its observer
-// can't loop), when the fonts arrive, and when the style changes, which changes the rows inside a group of the same
-// size.
-const compactGroups = [.../** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#settings :is(.compact-switches, .tracker-grid)'))];
-function fitCompactSwitches(group) {
-  group.removeAttribute('data-stacked');
-  const labels = [.../** @type {NodeListOf<HTMLElement>} */ (group.querySelectorAll('.nav-label'))];
-  group.toggleAttribute('data-stacked', labels.some(label => label.offsetWidth && label.scrollWidth > label.clientWidth + 0.5));
-}
+// The compact switch groups are checked whenever the settings body changes size (fitCompactSwitches).
 new ResizeObserver(() => compactGroups.forEach(fitCompactSwitches)).observe(settingsBody);
 
 // Style: saved the moment it's picked, after which it wins over the platform's default.
@@ -1754,49 +1740,7 @@ document.querySelector('#life-commit').addEventListener('click', () => closeLife
 lifeEditor.addEventListener('focusout', (event) => {
   if (!lifeEditor.contains(/** @type {Node | null} */ (event.relatedTarget))) closeLifeEditor(true, false);
 });
-
-// Keeps the field clear of the keyboard and the header. Android's WebView shrinks the page for the keyboard; iOS shrinks
-// only the visual viewport, so the body gets that much extra room (--keyboard) to scroll the field up into. Turned to
-// face the other side, the header is at the bottom of the screen and scrolling moves the field the other way.
-function keepLifeEditorInView() {
-  if (lifeEditor.hidden || !settings.open) return;
-  const view = window.visualViewport;
-  const viewTop = view ? view.offsetTop : 0;
-  const viewBottom = view ? view.offsetTop + view.height : window.innerHeight;
-  const flipped = settings.hasAttribute('data-flipped');
-  settings.style.setProperty('--keyboard', `${Math.max(0, Math.round(window.innerHeight - viewBottom))}px`);
-  const head = settingsHead.getBoundingClientRect();
-  const top = (flipped ? viewTop : Math.max(viewTop, head.bottom)) + 8;
-  const bottom = (flipped ? Math.min(viewBottom, head.top) : viewBottom) - 8;
-  const box = lifeEditor.getBoundingClientRect();
-  const move = box.bottom > bottom ? bottom - box.bottom : box.top < top ? top - box.top : 0;
-  if (move) settingsBody.scrollTop += flipped ? move : -move;
-}
 window.visualViewport?.addEventListener('resize', keepLifeEditorInView);
-
-// Layout B: two columns from 620px wide, Game, Table and Reminders then Track and Identity; one column below, in the
-// order Game, Track, Identity, Table, Reminders. The sections move rather than being reordered by CSS, so the reading and
-// focus order always match what shows. They stay put while the life field is open, so a resize from the keyboard can't
-// close it.
-const settingsSections = ['game', 'table', 'reminders', 'track', 'identity'].map(name => document.querySelector(`#settings-${name}`));
-function placeSettingsSections() {
-  if (!lifeEditor.hidden) return;
-  const columns = window.innerWidth >= 620;
-  const [game, table, reminderSection, track, identity] = settingsSections;
-  const [start, end] = settingsContent.querySelectorAll('.fs-col');
-  const wanted = columns ? [[game, table, reminderSection], [track, identity]] : [[game, track, identity, table, reminderSection], []];
-  settingsContent.toggleAttribute('data-columns', columns);
-  if (wanted[0].every((section, index) => start.children[index] === section) && end.children.length === wanted[1].length) return;
-  const focused = settings.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement) : null;
-  start.replaceChildren(...wanted[0]);
-  end.replaceChildren(...wanted[1]);
-  focused?.focus({ preventScroll: true });
-}
-
-// A fade along the bottom of the body while there's more below.
-function syncSettingsCue() {
-  settingsCue.toggleAttribute('data-more', settingsBody.scrollTop + settingsBody.clientHeight < settingsBody.scrollHeight - 1);
-}
 settingsBody.addEventListener('scroll', syncSettingsCue, { passive: true });
 
 function openSettings() {
