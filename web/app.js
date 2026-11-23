@@ -10,21 +10,22 @@ import {
   shuffleTicks, tileSetOrder, tileSets, trackers, undoClearTime,
 } from './js/logic/data.js';
 import {
-  applyEdit, editPlayers, hasCountersMode, hasMana, isOut, leavingTransfers, nextTurn, outPlayers, playOrder,
-  previousTurn, randomBelow, restPillButtons, trackedDesignations,
+  applyEdit, editPlayers, hasMana, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow,
+  trackedDesignations,
 } from './js/logic/rules.js';
 import {
   fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, normalizeIdentity,
 } from './js/logic/save.js';
 import { announce, announceDesignation, announceLife, announcePool, clearAnnouncements } from './js/render/announce.js';
+import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from './js/render/appearance.js';
 import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badges.js';
 import {
   renderModeLayer, setModeActions, syncAllSwatches, syncCounterCells, syncIdentity, syncManaCells, syncSeatMap,
 } from './js/render/modes.js';
+import { syncPill } from './js/render/pill.js';
 import { paintColours, renderScore } from './js/render/tile.js';
 import {
-  android, currentLandscapeAngle, defaultStyle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency,
-  syncWakeLock,
+  android, currentLandscapeAngle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency, syncWakeLock,
 } from './js/state/platform.js';
 import {
   boardMode, clearedPools, editStartHolders, edits, game, openBoardMode, reminders, saveGame, syncBackHandling,
@@ -72,8 +73,6 @@ const identityBackgroundChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (
 const chooseIdentitiesButton = /** @type {HTMLButtonElement} */ (document.querySelector('#choose-identities'));
 const restart = /** @type {HTMLDialogElement} */ (document.querySelector('#restart'));
 let selectedPlayerCount = game.scores.length;
-// The pill's buttons now and at rest, as last measured.
-let pillShape = '';
 // Settings' starting life, before Done applies it. selectedPlayerCount above is the same for players.
 let selectedLife = game.startingLife;
 let diceSides = 20;
@@ -434,39 +433,6 @@ function endUndoClears() {
   for (const index of [...clearedPools.keys()]) endUndoClear(index);
 }
 
-// The centre pill: commander damage (when Commander is on), counters (when a counter is on), dice and setup
-// at rest; Undo, save and ✕ while editing.
-function syncPill() {
-  const editing = editingModes.includes(boardMode);
-  const first = boardMode === 'first';
-  roundButton.hidden = boardMode !== null || game.turns === 'off';
-  roundBackButton.hidden = roundButton.hidden;
-  damageButton.hidden = boardMode !== null || !game.counters.commander;
-  countersButton.hidden = boardMode !== null || !hasCountersMode(game);
-  manaButton.hidden = boardMode !== null || !game.manaPool;
-  diceButton.hidden = boardMode !== null;
-  setupButton.hidden = editing || first;
-  shuffleButton.hidden = !first;
-  for (const button of [undoButton, saveButton]) button.hidden = !editing;
-  cancelButton.hidden = !editing && !first;
-  cancelButton.setAttribute('aria-label', first ? 'Skip' : 'Cancel');
-  undoButton.disabled = !edits?.length;
-  // The round, printed twice like a card index so both sides of the table can read it.
-  const { round, active } = game.turn;
-  for (const number of roundButton.querySelectorAll('.round > span')) number.textContent = String(round);
-  roundButton.setAttribute('aria-label', game.turns === 'rounds' ? `Round ${round}. Next round`
-    : active === null ? `Round ${round}. Choose who goes first` : `Round ${round}, Player ${active + 1}'s turn. Pass the turn`);
-  roundBackButton.setAttribute('aria-label', game.turns === 'rounds' ? 'Back one round' : 'Back one turn');
-  // The tap symbol gets a dot while any pool has mana.
-  manaButton.toggleAttribute('data-floating', game.pools.some((_, index) => hasMana(game, index)));
-  // The pill's length decides which face edges it reaches, so the board is measured again when it changes.
-  const shape = `${[...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length} ${restPillButtons(game)}`;
-  if (shape !== pillShape) {
-    pillShape = shape;
-    measureBoard();
-  }
-}
-
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
 // Counters mode ends with save or ✕, and keeps a list of its edits until then.
 /** @param {BoardMode} mode */
@@ -774,9 +740,6 @@ const lifeSlider = notchedSlider({
 
 // Tile colours: saved the moment it changes, like the switches. Swatch ids stay, so every player keeps their colour.
 const tileSetChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#tile-set-choices'));
-function applyTileColours() {
-  document.documentElement.dataset.tiles = game.tileColours;
-}
 function setTileColours(set) {
   if (set === game.tileColours) return;
   game.tileColours = set;
@@ -798,10 +761,6 @@ function renderTileSetting() {
 
 // Badge size: saved the moment it changes, like Tile colours. The rows are fitted again from full size, as at a new game.
 const badgeSizeChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#badge-size-choices'));
-function applyBadgeSize() {
-  if (game.badgeSize === 'default') delete board.dataset.badgeSize;
-  else board.dataset.badgeSize = game.badgeSize;
-}
 function setBadgeSize(size) {
   if (size === game.badgeSize) return;
   game.badgeSize = size;
@@ -827,10 +786,6 @@ new ResizeObserver(() => compactGroups.forEach(fitCompactSwitches)).observe(sett
 
 // Style: saved the moment it's picked, after which it wins over the platform's default.
 const styleChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#style-choices'));
-const currentStyle = () => game.style ?? defaultStyle;
-function applyStyle() {
-  document.documentElement.dataset.style = currentStyle();
-}
 function renderStyleSetting() {
   for (const choice of styleChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.choice === currentStyle()));
 }
