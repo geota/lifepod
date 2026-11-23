@@ -1,6 +1,6 @@
 // Chrome palettes for the style round (STYLE.md §5). Each replaces the app's :root surface, text and accent tokens; the
 // 12 tile palettes stay as they are. `node design/polish/palettes7.mjs` prints the contrast table STYLE.md quotes.
-import { readFileSync } from 'node:fs';
+import { readStyles } from '../../scripts/stylesheets.mjs';
 import { fileURLToPath } from 'node:url';
 
 export const palettes = {
@@ -38,9 +38,9 @@ const lin = c => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.
 const lum = hex => { const n = hex.replace('#', ''); const [r, g, b] = [0, 2, 4].map(i => parseInt(n.slice(i, i + 2), 16)); return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b); };
 export const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
 
-// The tile panels, from web/styles.css, for checking chrome that sits on tiles (the pill).
+// The tile panels, from the stylesheets (web/css/), for checking chrome that sits on tiles (the pill).
 function tilePanels() {
-  const css = readFileSync(fileURLToPath(new URL('../../web/styles.css', import.meta.url)), 'utf8');
+  const css = readStyles();
   return [...css.matchAll(/--([a-z]+)-(top|bottom)-panel:\s*(#[0-9a-f]{6})/g)].map(m => ({ name: `${m[1]}-${m[2]}`, hex: m[3] }));
 }
 

@@ -1,0 +1,455 @@
+/* Dialogs and settings: the confirmations, buttons, rows, segmented choices and Tile colours' bands (written by
+   design/polish/tiles7.mjs), switches, the settings page and the sliders. */
+/* The confirmations, Discard and New game (DESIGN-AUDIT S4): one style. The destructive action is a secondary button in
+   the danger tint, and the safe one, which has focus, is the primary. New game lists what resets. */
+dialog.confirm { width: min(380px, calc(100% - 32px)); }
+.confirm h2 { font-size: var(--type-title); letter-spacing: -.022em; }
+.confirm p { color: var(--muted); }
+.secondary.danger { background: var(--danger-fill); color: var(--danger-text); }
+.confirm-body { display: grid; gap: var(--space-1); }
+.confirm-list { display: grid; gap: 2px; margin: 0; padding: 0 0 0 1.25em; color: var(--text-soft); font-size: var(--type-label); }
+.confirm .confirm-keeps { font-size: var(--type-label); }
+
+dialog {
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 12px);
+  padding: 0;
+  border: var(--dialog-edge) solid var(--dialog-edge-color);
+  border-radius: var(--dialog-radius);
+  background: var(--dialog-fill);
+  color: var(--text);
+  box-shadow: var(--shadow-dialog);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+  font-size: var(--rem);
+  overscroll-behavior: contain;
+}
+dialog::backdrop { background: var(--scrim); }
+/* Dialogs and their scrim fade in as they open, and close at once. Only opacity moves, so nothing is measured mid-way. */
+dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--ease); }
+@starting-style {
+  dialog[open], dialog[open]::backdrop { opacity: 0; }
+}
+.sheet { display: grid; gap: var(--space-5); padding: var(--space-5); }
+.sheet-header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.sheet-header h2 { font-size: var(--type-title); letter-spacing: -.022em; }
+/* A title that wraps, such as "Discard 12 changes?" on a narrow phone, splits into even lines. */
+.sheet h2 { text-wrap: balance; }
+.sheet-note { color: var(--muted); font-size: var(--type-small); }
+.privacy-text { display: grid; gap: var(--space-2); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
+.privacy-text h4 { margin: var(--space-2) 0 0; font-size: calc(.875 * var(--rem)); color: var(--text); }
+.privacy-text h4:first-child { margin-top: 0; }
+.sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
+
+/* Buttons (direction A): capsules filled one tone above their card, with no outline. The primary button is the one
+   accent fill in its view. Pressed lays the 10% state layer over the fill; disabled is 38%. */
+.close, .primary, .secondary {
+  min-height: var(--tap-min);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+.close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: calc(1.125 * var(--rem)); }
+.primary, .secondary { padding: 0 var(--space-5); }
+.primary { border-color: var(--commit-fill); background: var(--commit-fill); color: var(--commit-ink); }
+.primary:active { background: var(--accent-pressed); }
+:is(.close, .secondary, .nav-row, .switch-row, .segmented > button, .dice-picker button:not([aria-pressed="true"]), .k-value):active {
+  background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
+}
+:is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: var(--disabled-opacity); }
+/* Pressed buttons and board-mode cells shrink by --press-scale (Glass); Material keeps them full size. */
+:is(.close, .primary, .secondary, .dice-picker button, button.k-value, .k-commit, .counter-cell, .swatch, .map-cell) { transition: transform var(--motion) var(--ease-press); }
+:is(.close, .primary, .secondary, .segmented > button, .dice-picker button, button.k-value, .k-commit, .counter-cell, .identity-toggle, .swatch:enabled, .map-cell):active { transform: scale(var(--press-scale)); }
+
+/* Rows: a board action or a switch, filled one tone above the card, 16px corners. In a switch row the whole row toggles
+   the switch. */
+.nav-row, .switch-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 10px 0 var(--row-inset);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--row-radius);
+  background: var(--row-fill);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+  color: var(--text);
+  font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  text-align: start;
+  cursor: pointer;
+}
+.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--text-soft); }
+.nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switch-row .switch { margin-inline-start: auto; }
+.switch-row[hidden] { display: none; }
+/* The input covers its row, so scrolling it into view on focus shows the whole row. */
+.switch-row input { position: absolute; inset: 0; inline-size: 100%; block-size: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.switch-row:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+/* A long switch label, such as auto-empty's, wraps rather than being cut short. */
+.wide-switch .nav-label { white-space: normal; line-height: 1.2; }
+/* Labels outside the fitted compact groups, and those in a group already stacked, wrap rather than end in an ellipsis
+   under larger text or the WCAG text-spacing overrides (ACCESSIBILITY.md L7). */
+:is(.fs-action, .reminder-grid .compact-switch, [data-stacked] .compact-switch) > .nav-label { white-space: normal; line-height: 1.2; }
+/* A row on its own has no divider, and a group's last row covers its own (Glass: DESIGN-AUDIT S10), however many
+   columns the group has and whichever rows are hidden. */
+.wide-switch { --row-divider: transparent; }
+:is(.fs-gamefoot, .fs-switches, .compact-switches, .fs-actions) { position: relative; }
+:is(.fs-gamefoot, .fs-switches, .compact-switches, .fs-actions)::after { position: absolute; inset: auto 0 0; height: 1px; content: ''; background: var(--group-end); pointer-events: none; }
+.setting-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: var(--space-1); }
+.setting-label { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
+
+/* Segmented choice: a connected group of equal 44px segments, 8px inner corners and 22px outer ones. The chosen
+   segment is the accent tint, ringed, and rounds into a full capsule. */
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--segment-gap);
+  padding: var(--segment-pad);
+  border-radius: var(--segment-track-radius);
+  background: var(--segment-track);
+}
+.segmented > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 0 6px;
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--segment-inner);
+  background: var(--segment-fill);
+  color: var(--text-soft);
+  font-size: calc(.9375 * var(--rem));
+  font-weight: var(--weight-semibold);
+  line-height: 1.15;
+  text-align: center;
+  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease), transform var(--motion) var(--ease-press);
+}
+.segmented > button:first-child { border-radius: var(--segment-outer) var(--segment-inner) var(--segment-inner) var(--segment-outer); }
+.segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
+.segmented > button[aria-pressed="true"] { border-color: var(--segment-chosen-fill); border-radius: var(--segment-chosen); background: var(--segment-chosen-fill); color: var(--segment-chosen-ink); box-shadow: var(--segment-chosen-shadow); }
+.segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
+/* Tile colours (DESIGN-AUDIT S2; the owner's "colour bands", P2): each segment is filled with four vertical bands, the
+   panels of the tiles players 1–4 get in its set (ids 0–3; players 1 and 2 in the top row, 3 and 4 in the bottom), with
+   a 4px foot of each band's rim along the bottom, which tells dark sets' bands apart, and the set's name over them in
+   near-white with a shadow. The chosen set has a solid accent ring, 3px with a 2px dark gap inside it; the foot moves up
+   inside the ring. Only --strip-1…4 and --strip-1…4-rim name colours, and design/polish/tiles7.mjs writes them for
+   each set below, so a set is just data: its button in index.html and its line here. The rules use the id so that the
+   pressed and hover layers, which other segments draw as a background image, go over the bands instead of replacing
+   them. */
+#tile-set-choices > button {
+  --band-state: transparent;
+  --foot-at: 0px;
+  min-height: max(var(--tap-min), 52px);
+  border: 0;
+  background:
+    linear-gradient(var(--band-state), var(--band-state)),
+    linear-gradient(90deg, var(--strip-1-rim) 25%, var(--strip-2-rim) 0 50%, var(--strip-3-rim) 0 75%, var(--strip-4-rim) 0) 0 calc(100% - var(--foot-at)) / 100% 4px no-repeat,
+    linear-gradient(90deg, var(--strip-1) 25%, var(--strip-2) 0 50%, var(--strip-3) 0 75%, var(--strip-4) 0);
+  color: var(--text);
+  text-shadow: 0 1px 2px #000c, 0 0 6px #0008;
+  box-shadow: none;
+}
+#tile-set-choices > button:active { --band-state: var(--state-pressed); }
+#tile-set-choices > button[aria-pressed="true"] { --foot-at: 5px; box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 0 5px var(--background); }
+/* Five sets or more where the section is narrow: two rows, three over two (or three over three), each row filling the
+   width, rather than five segments too narrow for their names. */
+@container settings-section (max-width: 359.98px) {
+  #tile-set-choices:has(> :nth-child(5)) { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #tile-set-choices:has(> :nth-child(5)) > button { grid-column: span 2; border-radius: var(--segment-inner); }
+  #tile-set-choices:has(> :nth-child(5):last-child) > :nth-child(n + 4) { grid-column: span 3; }
+}
+.tile-sets > [data-set="classic"] { --strip-1: #2f432f; --strip-1-rim: #556e4e; --strip-2: #2c4352; --strip-2-rim: #517187; --strip-3: #432a27; --strip-3-rim: #7b4f44; --strip-4: #342b41; --strip-4-rim: #655179; }
+.tile-sets > [data-set="soft"] { --strip-1: #2d4633; --strip-1-rim: #4f7658; --strip-2: #20454f; --strip-2-rim: #3a7584; --strip-3: #462828; --strip-3-rim: #7d4d4d; --strip-4: #2e2f48; --strip-4-rim: #565880; }
+.tile-sets > [data-set="jewel"] { --strip-1: #204421; --strip-1-rim: #447038; --strip-2: #15425b; --strip-2-rim: #347096; --strip-3: #4b211d; --strip-3-rim: #8a402e; --strip-4: #35244a; --strip-4-rim: #69458a; }
+.tile-sets > [data-set="clear"] { --strip-1: #184939; --strip-1-rim: #2d7b61; --strip-2: #124054; --strip-2-rim: #266e8f; --strip-3: #501717; --strip-3-rim: #8f3534; --strip-4: #281847; --strip-4-rim: #543a87; }
+
+/* Switch: 36 × 20. Off is an outlined track with a small thumb; on is the accent with a larger ink thumb, so the shape
+   changes as well as the colour. */
+.switch {
+  --inner-width: calc(var(--switch-width) - 2 * var(--switch-edge));
+  --inner-height: calc(var(--switch-height) - 2 * var(--switch-edge));
+  position: relative;
+  flex: none;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  border: var(--switch-edge) solid var(--control-border);
+  border-radius: var(--radius-full);
+  background: var(--switch-off-fill);
+  transition: background-color var(--motion) var(--ease), border-color var(--motion) var(--ease);
+}
+.switch::after {
+  position: absolute;
+  top: calc((var(--inner-height) - var(--switch-off-size)) / 2);
+  left: calc((var(--inner-height) - var(--switch-off-size)) / 2);
+  width: var(--switch-off-size);
+  height: var(--switch-off-size);
+  border-radius: 50%;
+  background: var(--switch-off-thumb);
+  box-shadow: var(--switch-thumb-shadow);
+  content: '';
+  transition: left var(--motion) var(--ease), width var(--motion) var(--ease), height var(--motion) var(--ease), top var(--motion) var(--ease);
+}
+input:checked + .switch { border-color: var(--switch-on-fill); background: var(--switch-on-fill); }
+input:checked + .switch::after {
+  top: calc((var(--inner-height) - var(--switch-on-size)) / 2);
+  left: calc(var(--inner-width) - var(--switch-on-size) - (var(--inner-height) - var(--switch-on-size)) / 2);
+  width: var(--switch-on-size);
+  height: var(--switch-on-size);
+  background: var(--switch-on-thumb);
+}
+
+/* Compact switch rows (Track's six and Identity's Show on tiles): each a whole 44px target with its mark, its label and
+   a switch. Where a row has too little room, such as on portrait phones or in a narrow column, the label goes over the
+   mark and the switch, so no label is cut short. */
+.compact-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
+.compact-switch { gap: 6px; padding-inline: 8px 6px; }
+.compact-switch > .ci { font-size: 16px; }
+/* The container queries cover the usual widths. app.js stacks a group (data-stacked) whose label would still be cut
+   short in its row, whatever the font and the style's switch and gaps (Glass's are wider). */
+.compact-switches[data-stacked] .compact-switch, .tracker-grid[data-stacked] .compact-switch {
+  display: grid;
+  grid-template-columns: auto auto;
+  place-content: center;
+  place-items: center;
+  gap: 4px 10px;
+  padding: 6px 4px;
+}
+:is(.compact-switches, .tracker-grid)[data-stacked] .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+:is(.compact-switches, .tracker-grid)[data-stacked] .compact-switch .switch { margin-inline-start: 0; }
+@container settings-section (max-width: 459.98px) {
+  .compact-switches .compact-switch {
+    display: grid;
+    grid-template-columns: auto auto;
+    place-content: center;
+    place-items: center;
+    gap: 4px 10px;
+    padding: 6px 4px;
+  }
+  .compact-switches .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+  .compact-switches .compact-switch .switch { margin-inline-start: 0; }
+}
+@container settings-section (max-width: 339.98px) {
+  .tracker-grid .compact-switch {
+    display: grid;
+    grid-template-columns: auto auto;
+    place-content: center;
+    place-items: center;
+    gap: 4px 10px;
+    padding: 6px 4px;
+  }
+  .tracker-grid .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+  .tracker-grid .compact-switch .switch { margin-inline-start: 0; }
+}
+
+/* Settings (design/polish/SETTINGS-SPEC.md §3): a full-screen page inside the safe area, with a fixed header and a body
+   that scrolls. It faces the phone, not the board, and the flip turns it 180° for a player across the table. */
+dialog.fs {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: var(--background);
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+dialog.fs::backdrop { background: var(--background); }
+dialog.fs[data-flipped] { transform: rotate(180deg); }
+/* The header is its own row over the body (Material), or floats over the top of the body, which scrolls under it (Glass,
+   --head-overlay 1). Either way the content starts below it, and focus scrolls clear of it (--head-clear). */
+.fs-frame {
+  --head-pad: var(--space-2);
+  --head-clear: calc(var(--head-overlay) * (var(--head-margin) + var(--tap-min) + 2 * var(--head-pad)));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
+  height: 100%;
+}
+.fs-head {
+  position: relative;
+  z-index: 1;
+  grid-row: 1;
+  grid-column: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--head-margin) calc(var(--head-margin) * var(--head-side, 1)) 0;
+  padding: var(--head-pad) var(--space-4);
+  border-radius: var(--head-radius);
+  background: var(--head-fill);
+  box-shadow: var(--head-shadow);
+  -webkit-backdrop-filter: var(--glass-filter);
+  backdrop-filter: var(--glass-filter);
+}
+.fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: calc(1.25 * var(--rem)); letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+.fs-head .close .icon { width: 18px; height: 18px; }
+.fs-done { flex: none; font-size: calc(1 * var(--rem)); font-weight: var(--weight-heavy); white-space: nowrap; }
+/* New game sits beside Done, always one tap away (it hides while a new game is pending, when Done starts it). */
+.fs-head .fs-newgame { flex: none; padding-inline: var(--space-4); font-size: calc(1 * var(--rem)); white-space: nowrap; }
+.fs-newgame[hidden] { display: none; }
+.fs-body {
+  position: relative;
+  grid-row: calc(2 - var(--head-overlay)) / 3;
+  grid-column: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: calc(var(--head-clear) + var(--space-2)) var(--space-2);
+  /* Room to scroll the life field above an iOS keyboard (app.js: keepLifeEditorInView). */
+  padding-bottom: var(--keyboard, 0px);
+}
+dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bottom: 0; }
+.fs-content { --content-top: var(--space-3); display: grid; align-content: start; gap: var(--space-3); width: min(1180px, 100%); margin: 0 auto; padding: calc(var(--content-top) + var(--head-clear)) var(--space-4) var(--space-6, 24px); }
+.fs-content[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
+.fs-content[data-columns] > .fs-about { grid-column: 1 / -1; }
+.fs-col { display: grid; gap: var(--space-3); min-width: 0; }
+.fs-col:empty { display: none; }
+/* Sections are cards (direction A): the surface on the page background, no border, 24px corners. */
+.fs-sec { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: var(--card-edge) solid var(--border); border-radius: var(--card-radius); background: var(--card-fill); container: settings-section / inline-size; }
+.fs-sec > h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 2px; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
+.fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--text-soft); }
+/* One column: a label sits beside its control when the card has room (480px), otherwise above it. In two columns each
+   label stays above its control. */
+@container settings-section (min-width: 480px) {
+  .fs-content:not([data-columns]) .setting-row:not(.k-row, :has(> .compact-switches)) { grid-template-columns: calc(7.5 * var(--rem)) minmax(0, 1fr); gap: var(--space-2); }
+}
+.fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
+/* Reminders: two to a line where each row has room for its whole label, otherwise one. */
+.fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(13 * var(--rem))), 1fr)); }
+.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--action-min)), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
+.fs-action { min-height: 48px; }
+.fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
+.fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.fs-gamefoot > .fs-awake { flex: 1 1 calc(11 * var(--rem)); max-width: calc(18 * var(--rem)); min-height: 48px; }
+/* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
+.fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
+.fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
+/* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() or none on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
+.fs-pending[data-empty] { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); }
+.fs .privacy-text { max-width: none; font-size: var(--type-small); }
+/* A fade along the bottom of the body while there's more below. */
+.scroll-cue { position: sticky; bottom: 0; height: 0; pointer-events: none; }
+.scroll-cue::before {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  content: '';
+  background: linear-gradient(#11121300, var(--background) 85%);
+  opacity: 0;
+  transition: opacity .15s;
+}
+.scroll-cue[data-more]::before { opacity: 1; }
+/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole, and while New game
+   shows beside Done the title is left to screen readers. A floating header (Glass) halves its side margin and takes the
+   other half from its padding. */
+@media (max-width: 400px) {
+  .fs-head { --head-side: .5; gap: 6px; padding-inline: calc(var(--space-3) - var(--head-margin) / 2); }
+  .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: calc(.9375 * var(--rem)); line-height: 1.1; white-space: normal; }
+  .fs-head .fs-newgame { padding-inline: 12px; font-size: calc(.9375 * var(--rem)); }
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
+  .fs-head:has(> .fs-newgame:not([hidden])) h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .fs-head:has(> .fs-newgame:not([hidden])) #settings-flip { margin-inline-start: auto; }
+}
+/* Under 360px tall (568 × 320), the header and the cards tighten. */
+@media (max-height: 359.98px) {
+  .fs-frame { --head-pad: var(--space-1); }
+  .fs-head { padding-inline: var(--space-3); }
+  .fs-content { --content-top: var(--space-2); gap: var(--space-2); padding-inline: var(--space-3); padding-bottom: var(--space-4); }
+  .fs-col { gap: var(--space-2); }
+  .fs-sec { gap: 6px; padding: 10px; }
+}
+
+/* Players and starting life: notched sliders (design/polish/STYLE.md §4, direction A). The stops are 44px buttons over
+   a 16px track with an accent fill, notches as dots and a 4px bar handle. The whole slider takes a tap or a sideways
+   drag; a vertical swipe scrolls the page. */
+.k-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'slider slider'; }
+#players-row, #badge-size-row { grid-template-areas: 'label label' 'slider slider'; }
+.k-row > .setting-label { grid-area: label; }
+.k-row > .k-slider { grid-area: slider; }
+.k-row > .k-val { grid-area: value; justify-self: end; }
+.k-slider { --track-top: 44px; position: relative; height: 80px; margin: 0 22px; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.k-stops { position: absolute; inset: 0 0 auto; height: 44px; }
+.k-stop {
+  position: absolute;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  transform: translateX(-50%);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text-soft);
+  font-size: calc(.9375 * var(--rem));
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.k-stop[aria-pressed="true"] { color: var(--accent); font-weight: 800; }
+/* A slider whose stops are words (Badge size): each stop is as wide as its word, and the ends keep room for half of one. */
+.k-words .k-slider { margin: 0 36px; }
+.k-words .k-stop { width: auto; min-width: var(--tap-min); padding: 0 6px; white-space: nowrap; }
+.k-stop:active { background: var(--state-pressed); }
+.k-track { position: absolute; inset: var(--track-top) 0 0; border-radius: var(--radius-sm); }
+.k-track:focus-visible { outline-offset: 4px; }
+.k-track::before, .k-fill { position: absolute; top: 50%; height: var(--slider-track); transform: translateY(-50%); border-radius: var(--radius-full); content: ''; }
+.k-track::before { left: -8px; right: -8px; background: var(--slider-track-fill); }
+.k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--slider-fill); }
+/* At the track's start nothing is filled, so no sliver of fill peeks out beside the handle (DESIGN-AUDIT S9). */
+.k-track[data-min] .k-fill { visibility: hidden; }
+.k-ticks { position: absolute; inset: 0; }
+.k-tick { position: absolute; top: 50%; width: var(--tick-width); height: var(--tick-height); transform: translate(-50%, -50%); border-radius: var(--tick-radius); background: var(--tick-fill); }
+.k-tick[data-stop] { width: var(--tick-stop-width); height: var(--tick-stop-height); }
+.k-tick[data-filled] { background: var(--tick-filled); opacity: var(--tick-filled-opacity); }
+.k-thumb { position: absolute; top: 50%; left: var(--p, 0%); width: var(--slider-thumb-width); height: var(--slider-thumb-height); transform: translate(-50%, -50%); border-radius: var(--slider-thumb-radius); background: var(--slider-thumb-fill); box-shadow: var(--slider-thumb-ring); }
+/* A value off the track (a starting life under 10 or over 60) pins the handle to that end, with an arrow beyond it. */
+.k-track[data-pinned] .k-thumb::after { position: absolute; top: 50%; width: 0; height: 0; border-block: 6px solid transparent; transform: translateY(-50%); content: ''; }
+.k-track[data-pinned="high"] .k-thumb::after { left: calc(100% + 4px); border-inline-start: 7px solid var(--accent); }
+.k-track[data-pinned="low"] .k-thumb::after { right: calc(100% + 4px); border-inline-end: 7px solid var(--accent); }
+/* The value, and the field it turns into. */
+.k-val { display: flex; }
+.k-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 76px;
+  min-height: var(--tap-min);
+  padding: 0 12px 0 16px;
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
+  color: var(--text);
+  font-size: calc(1.125 * var(--rem));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.k-value[hidden] { display: none; }
+.k-edit { display: grid; color: var(--muted); }
+.k-edit .icon { width: 14px; height: 14px; }
+.k-editor { padding: 0; border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+.k-editor input { width: 3.4em; min-height: var(--tap-min); padding: 0 4px 0 14px; border: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent); }
+.k-editor input:focus-visible { outline: 0; }
+.k-commit { display: grid; place-items: center; flex: none; width: var(--tap-min); height: var(--tap-min); padding: 0; border: 0; border-radius: 50%; background: var(--accent); color: var(--ink); }
+.k-commit:active { background: var(--accent-pressed); }
+.k-commit .icon { width: 18px; height: 18px; }
+@media (max-height: 359.98px) {
+  .k-slider { --slider-thumb-height: 28px; height: 72px; }
+}
+

@@ -2,11 +2,11 @@
 // native and Wake Lock stand-ins, seeding and reloading a game, the fake clock, the pinned test font, and the one
 // "a whole 44px target, inside its tile, clear of the pill" check.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import { after, test as nodeTest } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
 import { startServer } from '../scripts/serve.mjs';
+import { readStyles, stylesheets } from '../scripts/stylesheets.mjs';
 
 // ---- Registering tests ----------------------------------------------------------------------------------------------
 
@@ -179,7 +179,8 @@ export async function openPage(t, engine, {
 
   const base = await origin();
   if (font === 'roboto') {
-    await context.route(`${base}/styles.css`, async (route) => {
+    // After the last stylesheet, as if it ended the page's CSS.
+    await context.route(`${base}/${stylesheets().at(-1)}`, async (route) => {
       const response = await route.fetch();
       await route.fulfill({ response, body: `${await response.text()}\n${testFontCss}` });
     });
@@ -356,9 +357,9 @@ export async function setSwitches(page, wanted) {
 
 // ---- Styles ---------------------------------------------------------------------------------------------------------
 
-// A colour custom property of the root, as styles.css sets it for the page's current style and tile set, read as a
+// A colour custom property of the root, as the stylesheets set it for the page's current style and tile set, read as a
 // computed colour (rgb(…)) so it compares with getComputedStyle. Tests compare with these rather than copying values
-// from styles.css, so a palette tweak doesn't fail tests about behaviour. Any other CSS colour, such as 'transparent',
+// from the CSS, so a palette tweak doesn't fail tests about behaviour. Any other CSS colour, such as 'transparent',
 // is read the same way.
 export function token(page, name) {
   return page.evaluate((name) => {
@@ -372,8 +373,9 @@ export function token(page, name) {
   }, name);
 }
 
-// styles.css as text, for tests that check a rule rather than its result.
-export const stylesCss = readFileSync(new URL('../web/styles.css', import.meta.url), 'utf8');
+// The page's CSS as text, every stylesheet in link order (scripts/stylesheets.mjs), for tests that check a rule rather
+// than its result.
+export const stylesCss = readStyles();
 
 // ---- Geometry -------------------------------------------------------------------------------------------------------
 

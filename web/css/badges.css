@@ -1,0 +1,316 @@
+/* Badges: the badge rows at rest, their chips, turns and rounds, reminders, the mana strip, the identity chip and the
+   colour indicator. */
+/* Badge rows at rest. They are display-only and appear only when they have something to show. The far edge,
+   toward the table, holds commander damage, led by a sword in its own circle, and sits clear of the centre
+   controls; the near edge (the player's own) holds colour identity, then poison, tax, energy, experience and rad.
+   Tight chips keep a busy poison and tax row on one line at 6 players on a 320 × 568 phone. When a row still runs
+   out of room, app.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every tile at once: data-drop
+   tokens on #board hide parts, and --near-badge-size and --far-badge-size shrink the type. */
+.badges {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.badges[hidden], .board[data-mode]:not([data-mode="rotate"]) :is(.badges, .near-edge, .far-edge) { display: none; }
+/* The far edge stacks the far row over the mana strip, while a pool has mana, 4px in from the tile's sides, 8px from
+   its far edge or clear of the pill where the pill reaches it. app.js sets --far-offset to the deepest clearance among
+   the tiles whose far edges share a line, so a board row's far rows line up, and adds --space-4 from the upright pill
+   with 2 players. */
+.far-edge {
+  position: absolute;
+  z-index: 3;
+  top: max(calc(8 * var(--grow)), var(--far-offset, 0px));
+  left: calc(4px + var(--clear-start, 0px));
+  right: calc(4px + var(--clear-end, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: var(--far-badge-size, var(--far-row-size));
+  pointer-events: none;
+}
+.badges.far { position: relative; align-self: stretch; font-size: var(--far-badge-size, var(--far-row-size)); }
+/* The near edge holds the near row, 3px in from the tile's sides. It keeps clear of the pill where the pill reaches
+   past it (a rotated seat). */
+.near-edge {
+  position: absolute;
+  z-index: 3;
+  left: calc(3px + var(--clear-start, 0px));
+  right: calc(3px + var(--clear-end, 0px));
+  bottom: max(calc(8 * var(--grow)), var(--clear-near, 0px));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+.badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--near-row-size)); }
+/* Each tile's edges carry their side's tokens (fit.js writes them there rather than on #board, so a step restyles only
+   the rows): .near-edge the near row's, .far-edge the far row's and the strip's. */
+.near-edge[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .near-edge[data-drop~="name"] .turn-word,
+.near-edge[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .far-edge[data-drop~="sword"] .badges.far .sword { display: none; }
+.near-edge[data-drop~="wrap"] .badges.near, .far-edge[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .16em;
+  height: 1.7em;
+  padding: 0 .3em;
+  border-radius: var(--radius-full);
+  background: var(--chip-background);
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.chip .icon { width: .95em; height: .95em; }
+.chip.sword { width: 1.7em; padding: 0; justify-content: center; color: var(--muted); }
+.chip.sword .icon { width: 1em; height: 1em; }
+/* A commander damage chip is a tiny piece of the attacker's tile: their panel, their rim and the number in their
+   seat colour, like their seat on the map. */
+.chip.damage { padding: 0 .42em; background: var(--panel); color: var(--seat); box-shadow: inset 0 0 0 1.5px var(--rim); }
+/* Close to losing: amber tinted text from 15 commander damage or 7 poison; at 21 or 10, red tinted text and a
+   thin red ring, and the life total turns red. Both pass 4.89:1 on every tile colour (palette.mjs). */
+.chip[data-level] { font-weight: var(--weight-heavy); }
+.chip[data-level="warn"] { color: var(--warn); background: linear-gradient(var(--warn-tint), var(--warn-tint)), var(--chip-background); }
+.chip[data-level="out"] {
+  color: var(--life-out);
+  background: linear-gradient(var(--life-out-tint), var(--life-out-tint)), var(--chip-background);
+  box-shadow: inset 0 0 0 1.5px var(--life-out);
+}
+/* Turns: the turn chip leads the near row. Rounds: the first player's flag and the round, outlined in the seat colour.
+   Turn by turn: the active player's untap symbol, "Turn" and the round, filled with the seat colour (with nobody's
+   turn yet, every player's chip is outlined), and the first player's small flag. The chips are buttons with a
+   64 × 44 hit area, in a row that's otherwise display-only. */
+.turn-chip, .strip-chip { position: relative; gap: .32em; padding: 0 .55em 0 .45em; border: 0; font-weight: var(--weight-heavy); pointer-events: auto; }
+.turn-chip::after, .strip-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: 44px; content: ''; border-radius: 22px; transform: translate(-50%, -50%); }
+.turn-chip :is(.icon, .mana-icon) { width: 1em; height: 1em; font-size: 1em; }
+.turn-chip:is(.round-chip, .start-chip) { background: var(--button); color: var(--seat); box-shadow: inset 0 0 0 1.5px var(--seat); }
+.turn-chip.active-chip { background: var(--seat); color: var(--button); }
+.turn-chip:is(:active, [data-pressed]), .strip-chip:active { background: var(--cell-pressed); color: var(--text); }
+.turn-chip:focus-visible, .strip-chip:focus-visible { outline-offset: 2px; }
+/* Once "Turn" gives way, the round keeps a "T" (T12), so the untap symbol doesn't read as a letter. The chip tightens
+   a little to make room for it. */
+.near-edge[data-drop~="name"] .turn-round::before { content: 'T'; letter-spacing: -.02em; }
+.near-edge[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
+.chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
+.chip.flag-chip .icon { width: .95em; height: .95em; }
+/* The monarch and the initiative at rest: the holder's crown or castle, round like the flag. A holder who is out and
+   hasn't handed it on gets "Pass it on" instead, outlined like a Start chip; it's a button that opens counters mode. Its
+   words give way with the identity names (design/polish/SPEC.md §3.2), leaving the icon and the arrow. */
+.chip.designation-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
+.chip.pass-chip { position: relative; gap: .22em; padding: 0 .55em 0 .45em; border: 0; background: var(--button); color: var(--seat); box-shadow: inset 0 0 0 1.5px var(--seat); font-weight: var(--weight-heavy); pointer-events: auto; }
+.chip.pass-chip > .icon[data-icon="arrow-bend-up-right"] { width: .8em; height: .8em; color: var(--text-soft); }
+.pass-chip .pass-word { margin-inline-start: .1em; color: var(--text); }
+.pass-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
+.pass-chip:active { background: var(--cell-pressed); }
+.pass-chip:focus-visible { outline-offset: 2px; }
+.near-edge[data-drop~="name"] .pass-chip .pass-word { display: none; }
+.near-edge[data-drop~="name"] .pass-chip { padding-inline: .38em; }
+/* Turn reminders (Settings → Reminders): "Monarch: draw a card" or "Initiative: venture into Undercity", facing the
+   player, for 3 seconds or until tapped. In the turn chip's language: the tile's button fill and a ring in the seat
+   colour, with the crown or castle in the seat colour. app.js puts them on their own line above the near edge where
+   that's clear of the total and the glyphs, and otherwise over the near edge (data-reminder="over"), whose row and
+   mana strip step aside for those seconds. A reminder too long for its tile drops its label (data-fit="compact"), then wraps. */
+.reminders {
+  position: absolute;
+  z-index: 1;
+  bottom: calc(100% + var(--space-1));
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--badge-size);
+  pointer-events: none;
+}
+.reminders:empty { display: none; }
+.chip.reminder-chip {
+  position: relative;
+  gap: .4em;
+  max-width: 100%;
+  height: auto;
+  min-height: 1.9em;
+  padding: .25em .75em .25em .55em;
+  border: 0;
+  background: var(--button);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1.5px var(--seat);
+  font-weight: var(--weight-semibold);
+  line-height: 1.15;
+  text-align: start;
+  white-space: nowrap;
+  pointer-events: auto;
+  animation: reminder-in var(--motion) var(--ease);
+}
+.chip.reminder-chip[data-fit] { overflow: hidden; }
+.reminder-chip[data-fit] .reminder-label { display: none; }
+.chip.reminder-chip[data-fit="wrap"] { white-space: normal; text-align: center; }
+.player[data-reminder="over"] .reminders { bottom: 0; }
+.player[data-reminder="over"] .badges.near { visibility: hidden; }
+.reminder-chip > .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--seat); }
+.reminder-chip b { font-weight: var(--weight-heavy); color: var(--seat); }
+.reminder-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: max(100%, var(--tap-min)); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
+.reminder-chip:active { background: var(--cell-pressed); }
+.reminder-chip:focus-visible { outline-offset: 2px; }
+/* A keyframe entrance rather than @starting-style: restingBox in app.js measures the chip with an important inline
+   transform, which outranks an animation but not a transition. */
+@keyframes reminder-in { from { opacity: 0; transform: translateY(.4em); } }
+/* Floating mana at rest (design/polish/SPEC.md §9): while a pool has mana, a strip shows each colour it holds and its
+   amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a 44px-tall
+   target at least 44px wide, on a 32px capsule. It sits at the far edge, under commander damage and toward the total,
+   so the two most used counts are together, and both badge rows always stay. Commander damage keeps the far row to
+   itself, and the strip's type never shrinks, so every symbol stays legible on a 44px target. app.js puts each strip in
+   the first place that fits clear of the life total, the − and + glyphs, the near row and the pill (data-strip on the
+   tile): below, on its own line under the far row, where strip-wrap lets it grow toward the total onto a second line;
+   fold, one chip that shows the pool and opens mana mode, on its own line there; or near, that chip at the end of the
+   near row, by the player. */
+.mana-strip {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: none;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0 2px;
+  font-size: var(--strip-size, calc(clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))) * var(--badge-scale)));
+  pointer-events: auto;
+}
+/* Below: the strip's targets sit 2px under the far row, or with no far row its capsule sits where the far row would. */
+.player[data-strip="below"] .mana-strip { margin-top: -6px; }
+.player[data-strip="below"] .far-edge:has(> .badges.far:not([hidden])) > .mana-strip { margin-top: 2px; }
+/* The capsule is 32px tall, and grows to the targets' 44px with a larger Badge size, so the symbols stay inside it. */
+.mana-strip::before { position: absolute; inset: clamp(0px, calc(22px - .8em), 6px) 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
+.mana-strip[hidden] { display: none; }
+.player[data-strip="below"] .far-edge[data-drop~="strip-wrap"] .mana-strip { flex-wrap: wrap; }
+/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, the full-size picker, on its own
+   line under the far row. Where even that can't fit, the strip hides and the same chip ends the near row (near), where
+   it takes the near row's type and gives way with it like any other chip. */
+.player[data-strip="near"] .mana-strip, .badges.near > .strip-chip { display: none; }
+.player[data-strip="near"] .badges.near > .strip-chip { display: inline-flex; }
+.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--far-row-size)); }
+.badges.near > .strip-chip { font-size: 1em; }
+.player[data-strip="fold"] .mana-strip { padding: 0; }
+.player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
+.player[data-strip="fold"] .mana-strip > .strip-chip { display: inline-flex; }
+.player[data-strip="fold"] .far-edge:has(> .badges.far:not([hidden])) > .mana-strip { margin-top: 2px; }
+.strip-chip .pip { --pip-size: 1.15em; }
+.strip-chip .summary-item { display: flex; align-items: center; gap: .12em; }
+/* Three colours or more overlap like a stack of coins, before the pool's total. */
+.strip-chip .pip + .pip { margin-inline-start: -.45em; box-shadow: 0 0 0 1.5px var(--button); }
+.strip-chip > .icon { width: .9em; height: .9em; color: var(--seat); }
+.strip-chip > .icon[data-icon="undo"] { color: var(--text-soft); }
+.mana-strip > button:not(.chip) {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--text);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.mana-strip > button:not(.chip):active { background: var(--wash); }
+/* A colour spent to 0 keeps its place while the strip is being tapped, dimmed, until the strip reflows. */
+.mana-strip > .strip-spend[aria-disabled="true"] { opacity: var(--disabled-opacity); }
+.mana-strip .pip { --pip-size: 1.25em; }
+.mana-strip > button.strip-clear { color: var(--text-soft); }
+.strip-clear .icon { width: 1.05em; height: 1.05em; }
+.mana-strip > button.strip-undo { gap: 6px; padding: 0 12px 0 8px; color: var(--text-soft); font-size: .85em; font-weight: var(--weight-semibold); }
+.strip-undo .icon { width: 1.1em; height: 1.1em; }
+/* Damage chips keep the attacker's panel when they warn, with the ring and number in the warning colour. */
+.chip.damage[data-level="warn"] { background: var(--panel); box-shadow: inset 0 0 0 1.5px var(--warn); }
+.chip.damage[data-level="out"] { background: var(--panel); }
+/* The identity chip: any of the indicator, the symbol and the name. Its padding makes a lone indicator or symbol a
+   round chip, like the sword, and a chip with the name a capsule. */
+.chip.ci-chip { gap: .26em; padding: 0 .29em; }
+.chip.ci-chip :is(.ci, .id-symbol) { font-size: 1.12em; }
+.chip.ci-chip .id-symbol { color: var(--text); }
+.chip.ci-chip .id-name { margin-inline-end: .14em; font-size: .86em; letter-spacing: .01em; color: var(--text-soft); }
+/* Colour identity: each colour's mana symbol on its disc, like a mana cost. --pip-size sets the disc; the symbol
+   is 77% of it, as Mana's own cost style draws it. */
+.pip {
+  --pip-size: 1.05em;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: var(--pip-size);
+  height: var(--pip-size);
+  border-radius: 50%;
+  background: var(--pip);
+  color: var(--pip-ink);
+}
+.pip::before { font: normal normal normal calc(var(--pip-size) * .77)/1 Mana; content: var(--glyph); speak: never; }
+.pip[data-pip="W"] { --pip: var(--pip-w); --glyph: '\e600'; }
+.pip[data-pip="U"] { --pip: var(--pip-u); --glyph: '\e601'; }
+.pip[data-pip="B"] { --pip: var(--pip-b); --glyph: '\e602'; }
+.pip[data-pip="R"] { --pip: var(--pip-r); --glyph: '\e603'; }
+.pip[data-pip="G"] { --pip: var(--pip-g); --glyph: '\e604'; }
+.pip[data-pip="C"] { --pip: var(--pip-c); --glyph: '\e904'; }
+
+/* The colour indicator printed on cards: one disc split into the identity's colours, with Mana's dividing lines
+   on top. With no identity set it's an empty ring. */
+/* A light rim gives every slice an edge on the dark chip, so black, green and blue stay visible without changing the
+   printed colours. */
+.ci {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1em;
+  height: 1em;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--ci-rim);
+  color: #010101;
+}
+.ci::before { font: normal normal normal 1em/1 Mana; speak: never; }
+.ci[data-count="1"]::before { content: '\e98a'; }
+.ci[data-count="2"]::before { content: '\e98b'; }
+.ci[data-count="3"]::before { content: '\e98c'; }
+.ci[data-count="4"]::before { content: '\e98d'; }
+.ci[data-count="5"]::before { content: '\e98e'; }
+.ci[data-ci=""] { box-shadow: inset 0 0 0 1.5px var(--rim); }
+.ci[data-ci="W"] { background: #fff; }
+.ci[data-ci="U"] { background: #3b6ba0; }
+.ci[data-ci="B"] { background: #383431; }
+.ci[data-ci="R"] { background: #c6553e; }
+.ci[data-ci="G"] { background: #3d684b; }
+.ci[data-ci="WU"] { background: conic-gradient(#fff 45deg, #3b6ba0 45deg 225deg, #fff 225deg); }
+.ci[data-ci="WB"] { background: conic-gradient(#fff 45deg, #383431 45deg 225deg, #fff 225deg); }
+.ci[data-ci="WR"] { background: conic-gradient(#c6553e 45deg, #fff 45deg 225deg, #c6553e 225deg); }
+.ci[data-ci="WG"] { background: conic-gradient(#3d684b 45deg, #fff 45deg 225deg, #3d684b 225deg); }
+.ci[data-ci="UB"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 225deg, #3b6ba0 225deg); }
+.ci[data-ci="UR"] { background: conic-gradient(#3b6ba0 45deg, #c6553e 45deg 225deg, #3b6ba0 225deg); }
+.ci[data-ci="UG"] { background: conic-gradient(#3d684b 45deg, #3b6ba0 45deg 225deg, #3d684b 225deg); }
+.ci[data-ci="BR"] { background: conic-gradient(#383431 45deg, #c6553e 45deg 225deg, #383431 225deg); }
+.ci[data-ci="BG"] { background: conic-gradient(#383431 45deg, #3d684b 45deg 225deg, #383431 225deg); }
+.ci[data-ci="RG"] { background: conic-gradient(#c6553e 45deg, #3d684b 45deg 225deg, #c6553e 225deg); }
+.ci[data-ci="WUB"] { background: conic-gradient(#383431 60deg, #fff 60deg 180deg, #3b6ba0 180deg 300deg, #383431 300deg); }
+.ci[data-ci="WUR"] { background: conic-gradient(#c6553e 60deg, #fff 60deg 180deg, #3b6ba0 180deg 300deg, #c6553e 300deg); }
+.ci[data-ci="WUG"] { background: conic-gradient(#3b6ba0 60deg, #3d684b 60deg 180deg, #fff 180deg 300deg, #3b6ba0 300deg); }
+.ci[data-ci="WBR"] { background: conic-gradient(#fff 60deg, #383431 60deg 180deg, #c6553e 180deg 300deg, #fff 300deg); }
+.ci[data-ci="WBG"] { background: conic-gradient(#383431 60deg, #3d684b 60deg 180deg, #fff 180deg 300deg, #383431 300deg); }
+.ci[data-ci="WRG"] { background: conic-gradient(#fff 60deg, #c6553e 60deg 180deg, #3d684b 180deg 300deg, #fff 300deg); }
+.ci[data-ci="UBR"] { background: conic-gradient(#c6553e 60deg, #3b6ba0 60deg 180deg, #383431 180deg 300deg, #c6553e 300deg); }
+.ci[data-ci="UBG"] { background: conic-gradient(#3d684b 60deg, #3b6ba0 60deg 180deg, #383431 180deg 300deg, #3d684b 300deg); }
+.ci[data-ci="URG"] { background: conic-gradient(#3b6ba0 60deg, #c6553e 60deg 180deg, #3d684b 180deg 300deg, #3b6ba0 300deg); }
+.ci[data-ci="BRG"] { background: conic-gradient(#3d684b 60deg, #383431 60deg 180deg, #c6553e 180deg 300deg, #3d684b 300deg); }
+.ci[data-ci="WUBR"] { background: conic-gradient(#fff 45deg, #3b6ba0 45deg 135deg, #383431 135deg 225deg, #c6553e 225deg 315deg, #fff 315deg); }
+.ci[data-ci="WUBG"] { background: conic-gradient(#3d684b 45deg, #fff 45deg 135deg, #3b6ba0 135deg 225deg, #383431 225deg 315deg, #3d684b 315deg); }
+.ci[data-ci="WURG"] { background: conic-gradient(#c6553e 45deg, #3d684b 45deg 135deg, #fff 135deg 225deg, #3b6ba0 225deg 315deg, #c6553e 315deg); }
+.ci[data-ci="WBRG"] { background: conic-gradient(#383431 45deg, #c6553e 45deg 135deg, #3d684b 135deg 225deg, #fff 225deg 315deg, #383431 315deg); }
+.ci[data-ci="UBRG"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 135deg, #c6553e 135deg 225deg, #3d684b 225deg 315deg, #3b6ba0 315deg); }
+.ci[data-ci="WUBRG"] { background: conic-gradient(#fff 36deg, #3b6ba0 36deg 108deg, #383431 108deg 180deg, #c6553e 180deg 252deg, #3d684b 252deg 324deg, #fff 324deg); }
+

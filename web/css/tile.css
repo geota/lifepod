@@ -1,0 +1,348 @@
+/* Tile: the Tile colours sets (data-tiles, written by design/polish/tiles7.mjs), each tile's palette, the one size
+   per board, the face, the background and the identity symbol, the total and the life halves, and seat rotation. */
+/* Tile colour sets (design/polish/TILES.md), the Tile colours setting: app.js sets data-tiles on <html>. The :root
+   palettes above are Classic; each set below replaces all 96 tokens under the same swatch ids, so a player's colour
+   carries over between sets, and each id keeps its colour family in every set, so the default seats (ids 0–5) are
+   spread. Written and checked by design/polish/tiles7.mjs (tiles7.json): on every panel the life total is at least
+   9:1, small text 7.6:1, the life-out red 4.79:1 and the seat colour 7.35:1. Clear is the default. */
+[data-tiles="soft"] {
+  --sage-top-panel: #2d4633; --sage-top-rim: #4f7658; --sage-top-seat: #bcecc6; --sage-top-button: #213425;
+  --sage-bottom-panel: #203826; --sage-bottom-rim: #406749; --sage-bottom-seat: #b8e8c2; --sage-bottom-button: #16291a;
+  --sky-top-panel: #20454f; --sky-top-rim: #3a7584; --sky-top-seat: #a7ebfd; --sky-top-button: #17343b;
+  --sky-bottom-panel: #123741; --sky-bottom-rim: #2a6574; --sky-bottom-seat: #a3e6f9; --sky-bottom-button: #0a282f;
+  --coral-top-panel: #553635; --coral-top-rim: #8d5c5b; --coral-top-seat: #ffd1d0; --coral-top-button: #402827;
+  --coral-bottom-panel: #462828; --coral-bottom-rim: #7d4d4d; --coral-bottom-seat: #fecbca; --coral-bottom-button: #331c1c;
+  --violet-top-panel: #3b3c57; --violet-top-rim: #656790; --violet-top-seat: #d8dbfe; --violet-top-button: #2c2d41;
+  --violet-bottom-panel: #2e2f48; --violet-bottom-rim: #565880; --violet-bottom-seat: #d3d6ff; --violet-bottom-button: #212135;
+  --amber-top-panel: #4a3d22; --amber-top-rim: #7c693e; --amber-top-seat: #f4dba8; --amber-top-button: #372e19;
+  --amber-bottom-panel: #3c3015; --amber-bottom-rim: #6d592f; --amber-bottom-seat: #efd7a3; --amber-bottom-button: #2c220d;
+  --teal-top-panel: #173e39; --teal-top-rim: #306e66; --teal-top-seat: #9de3d8; --teal-top-button: #0e2d29;
+  --teal-bottom-panel: #07312c; --teal-bottom-rim: #1f5f57; --teal-bottom-seat: #99dfd4; --teal-bottom-button: #03211e;
+  --rose-top-panel: #513544; --rose-top-rim: #885c72; --rose-top-seat: #fecee6; --rose-top-button: #3d2733;
+  --rose-bottom-panel: #432836; --rose-bottom-rim: #774d63; --rose-bottom-seat: #ffc7e3; --rose-bottom-button: #311c27;
+  --indigo-top-panel: #24394d; --indigo-top-rim: #446586; --indigo-top-seat: #b1d8ff; --indigo-top-button: #182838;
+  --indigo-bottom-panel: #172b3f; --indigo-bottom-rim: #355676; --indigo-bottom-seat: #abd4fd; --indigo-bottom-button: #0d1d2c;
+  --slate-top-panel: #373b40; --slate-top-rim: #60676e; --slate-top-seat: #d0d9e3; --slate-top-button: #282b2f;
+  --slate-bottom-panel: #2a2e32; --slate-bottom-rim: #51585f; --slate-bottom-seat: #ccd5de; --slate-bottom-button: #1c2023;
+  --copper-top-panel: #493020; --copper-top-rim: #7f573e; --copper-top-seat: #fac7a8; --copper-top-button: #352215;
+  --copper-bottom-panel: #3b2314; --copper-bottom-rim: #704930; --copper-bottom-seat: #f6c3a4; --copper-bottom-button: #29170b;
+  --olive-top-panel: #343a1e; --olive-top-rim: #5e673b; --olive-top-seat: #cedaa5; --olive-top-button: #252914;
+  --olive-bottom-panel: #272d11; --olive-bottom-rim: #50582d; --olive-bottom-seat: #cad6a1; --olive-bottom-button: #1a1e09;
+  --orchid-top-panel: #3f3047; --orchid-top-rim: #70577c; --orchid-top-seat: #e5c6f5; --orchid-top-button: #2e2134;
+  --orchid-bottom-panel: #322339; --orchid-bottom-rim: #60486c; --orchid-bottom-seat: #e1c2f0; --orchid-bottom-button: #221628;
+}
+[data-tiles="jewel"] {
+  --sage-top-panel: #204421; --sage-top-rim: #447038; --sage-top-seat: #cef293; --sage-top-button: #16331a;
+  --sage-bottom-panel: #173818; --sage-bottom-rim: #316835; --sage-bottom-seat: #b2ebb2; --sage-bottom-button: #0c2810;
+  --sky-top-panel: #15425b; --sky-top-rim: #347096; --sky-top-seat: #ade2fe; --sky-top-button: #103045;
+  --sky-bottom-panel: #01344d; --sky-bottom-rim: #0f6089; --sky-bottom-seat: #b4e1ff; --sky-bottom-button: #012437;
+  --coral-top-panel: #5b2d29; --coral-top-rim: #995049; --coral-top-seat: #fed2cd; --coral-top-button: #44211d;
+  --coral-bottom-panel: #4b211d; --coral-bottom-rim: #8a402e; --coral-bottom-seat: #fec7b3; --coral-bottom-button: #351511;
+  --violet-top-panel: #43335a; --violet-top-rim: #745997; --violet-top-seat: #e5d5fe; --violet-top-button: #322544;
+  --violet-bottom-panel: #35244a; --violet-bottom-rim: #69458a; --violet-bottom-seat: #e7ccfe; --violet-bottom-button: #271839;
+  --amber-top-panel: #4d3c03; --amber-top-rim: #87671f; --amber-top-seat: #fedd76; --amber-top-button: #372b00;
+  --amber-bottom-panel: #3c2d00; --amber-bottom-rim: #6e5602; --amber-bottom-seat: #f3d78d; --amber-bottom-button: #2b2000;
+  --teal-top-panel: #034741; --teal-top-rim: #00796f; --teal-top-seat: #90f3e5; --teal-top-button: #01352f;
+  --teal-bottom-panel: #013a35; --teal-bottom-rim: #136a5a; --teal-bottom-seat: #a2f2dc; --teal-bottom-button: #022923;
+  --rose-top-panel: #622049; --rose-top-rim: #a4397c; --rose-top-seat: #ffcde8; --rose-top-button: #4a1636;
+  --rose-bottom-panel: #520f3b; --rose-bottom-rim: #91286d; --rose-bottom-seat: #ffc7e5; --rose-bottom-button: #3c082a;
+  --indigo-top-panel: #2c327b; --indigo-top-rim: #505bc2; --indigo-top-seat: #d4dcfe; --indigo-top-button: #1f245e;
+  --indigo-bottom-panel: #21246b; --indigo-bottom-rim: #434bb1; --indigo-bottom-seat: #cfd8fe; --indigo-bottom-button: #151750;
+  --slate-top-panel: #353e46; --slate-top-rim: #5c6a7b; --slate-top-seat: #cfe1f1; --slate-top-button: #252e35;
+  --slate-bottom-panel: #27303a; --slate-bottom-rim: #4d5b6a; --slate-bottom-seat: #cbdced; --slate-bottom-button: #1b2229;
+  --copper-top-panel: #5e2e01; --copper-top-rim: #9d5104; --copper-top-seat: #ffd4b8; --copper-top-button: #462201;
+  --copper-bottom-panel: #4a2401; --copper-bottom-rim: #894400; --copper-bottom-seat: #fecfb0; --copper-bottom-button: #361801;
+  --olive-top-panel: #374202; --olive-top-rim: #5f7205; --olive-top-seat: #d1ed6e; --olive-top-button: #293102;
+  --olive-bottom-panel: #2b3401; --olive-bottom-rim: #526204; --olive-bottom-seat: #cde86a; --olive-bottom-button: #1d2501;
+  --orchid-top-panel: #572164; --orchid-top-rim: #8f43a0; --orchid-top-seat: #f6ceff; --orchid-top-button: #41174c;
+  --orchid-bottom-panel: #491054; --orchid-bottom-rim: #7f328f; --orchid-bottom-seat: #f5c7ff; --orchid-bottom-button: #35093e;
+}
+[data-tiles="clear"] {
+  --sage-top-panel: #184939; --sage-top-rim: #2d7b61; --sage-top-seat: #9df3d2; --sage-top-button: #11372a;
+  --sage-bottom-panel: #063b2c; --sage-bottom-rim: #196c53; --sage-bottom-seat: #98efce; --sage-bottom-button: #032b1f;
+  --sky-top-panel: #124054; --sky-top-rim: #266e8f; --sky-top-seat: #aae1ff; --sky-top-button: #0b2f3f;
+  --sky-bottom-panel: #013246; --sky-bottom-rim: #115f7f; --sky-bottom-seat: #9fdeff; --sky-bottom-button: #012332;
+  --coral-top-panel: #5f2524; --coral-top-rim: #a14542; --coral-top-seat: #ffc9c4; --coral-top-button: #471a19;
+  --coral-bottom-panel: #501717; --coral-bottom-rim: #8f3534; --coral-bottom-seat: #ffc3be; --coral-bottom-button: #3a0e0e;
+  --violet-top-panel: #352556; --violet-top-rim: #624997; --violet-top-seat: #d0c0ff; --violet-top-button: #24183e;
+  --violet-bottom-panel: #281847; --violet-bottom-rim: #543a87; --violet-bottom-seat: #ccbbff; --violet-bottom-button: #1a0c31;
+  --amber-top-panel: #4b3e01; --amber-top-rim: #7e6a04; --amber-top-seat: #f4de87; --amber-top-button: #382e01;
+  --amber-bottom-panel: #3c3100; --amber-bottom-rim: #6d5b01; --amber-bottom-seat: #efda83; --amber-bottom-button: #2b2301;
+  --teal-top-panel: #033d44; --teal-top-rim: #046d79; --teal-top-seat: #6ee6f7; --teal-top-button: #002c31;
+  --teal-bottom-panel: #012f34; --teal-bottom-rim: #065d67; --teal-bottom-seat: #69e2f3; --teal-bottom-button: #001f24;
+  --rose-top-panel: #5a2c50; --rose-top-rim: #964c86; --rose-top-seat: #feccf1; --rose-top-button: #44203c;
+  --rose-bottom-panel: #4b1e42; --rose-bottom-rim: #853d76; --rose-bottom-seat: #ffc5f0; --rose-bottom-button: #371430;
+  --indigo-top-panel: #2e2f60; --indigo-top-rim: #5456a4; --indigo-top-seat: #c8cefe; --indigo-top-button: #202047;
+  --indigo-bottom-panel: #222151; --indigo-bottom-rim: #464693; --indigo-bottom-seat: #c3c9fe; --indigo-bottom-button: #15153a;
+  --slate-top-panel: #452338; --slate-top-rim: #7d4667; --slate-top-seat: #f9b2db; --slate-top-button: #311727;
+  --slate-bottom-panel: #37162b; --slate-bottom-rim: #6d3758; --slate-bottom-seat: #f4aed6; --slate-bottom-button: #250c1b;
+  --copper-top-panel: #572504; --copper-top-rim: #964613; --copper-top-seat: #fec2a4; --copper-top-button: #401902;
+  --copper-bottom-panel: #451a00; --copper-bottom-rim: #833903; --copper-bottom-seat: #ffbc9a; --copper-bottom-button: #301000;
+  --olive-top-panel: #333824; --olive-top-rim: #5c6544; --olive-top-seat: #ccd8af; --olive-top-button: #242818;
+  --olive-bottom-panel: #262b17; --olive-bottom-rim: #4e5636; --olive-bottom-seat: #c8d3ab; --olive-bottom-button: #191d0d;
+  --orchid-top-panel: #493263; --orchid-top-rim: #7b57a4; --orchid-top-seat: #e6d5fe; --orchid-top-button: #37254b;
+  --orchid-bottom-panel: #3b2554; --orchid-bottom-rim: #6c4794; --orchid-bottom-seat: #e3d0fe; --orchid-bottom-button: #2b193e;
+}
+
+/* app.js gives each tile, swatch and colour dot a data-colour and data-row, which pick its palette. */
+.player, .swatch {
+  --panel: var(--sage-top-panel);
+  --rim: var(--sage-top-rim);
+  --seat: var(--sage-top-seat);
+  --button: var(--sage-top-button);
+}
+[data-colour="sage"][data-row="top"] { --panel: var(--sage-top-panel); --rim: var(--sage-top-rim); --seat: var(--sage-top-seat); --button: var(--sage-top-button); }
+[data-colour="sage"][data-row="bottom"] { --panel: var(--sage-bottom-panel); --rim: var(--sage-bottom-rim); --seat: var(--sage-bottom-seat); --button: var(--sage-bottom-button); }
+[data-colour="sky"][data-row="top"] { --panel: var(--sky-top-panel); --rim: var(--sky-top-rim); --seat: var(--sky-top-seat); --button: var(--sky-top-button); }
+[data-colour="sky"][data-row="bottom"] { --panel: var(--sky-bottom-panel); --rim: var(--sky-bottom-rim); --seat: var(--sky-bottom-seat); --button: var(--sky-bottom-button); }
+[data-colour="coral"][data-row="top"] { --panel: var(--coral-top-panel); --rim: var(--coral-top-rim); --seat: var(--coral-top-seat); --button: var(--coral-top-button); }
+[data-colour="coral"][data-row="bottom"] { --panel: var(--coral-bottom-panel); --rim: var(--coral-bottom-rim); --seat: var(--coral-bottom-seat); --button: var(--coral-bottom-button); }
+[data-colour="violet"][data-row="top"] { --panel: var(--violet-top-panel); --rim: var(--violet-top-rim); --seat: var(--violet-top-seat); --button: var(--violet-top-button); }
+[data-colour="violet"][data-row="bottom"] { --panel: var(--violet-bottom-panel); --rim: var(--violet-bottom-rim); --seat: var(--violet-bottom-seat); --button: var(--violet-bottom-button); }
+[data-colour="amber"][data-row="top"] { --panel: var(--amber-top-panel); --rim: var(--amber-top-rim); --seat: var(--amber-top-seat); --button: var(--amber-top-button); }
+[data-colour="amber"][data-row="bottom"] { --panel: var(--amber-bottom-panel); --rim: var(--amber-bottom-rim); --seat: var(--amber-bottom-seat); --button: var(--amber-bottom-button); }
+[data-colour="teal"][data-row="top"] { --panel: var(--teal-top-panel); --rim: var(--teal-top-rim); --seat: var(--teal-top-seat); --button: var(--teal-top-button); }
+[data-colour="teal"][data-row="bottom"] { --panel: var(--teal-bottom-panel); --rim: var(--teal-bottom-rim); --seat: var(--teal-bottom-seat); --button: var(--teal-bottom-button); }
+[data-colour="rose"][data-row="top"] { --panel: var(--rose-top-panel); --rim: var(--rose-top-rim); --seat: var(--rose-top-seat); --button: var(--rose-top-button); }
+[data-colour="rose"][data-row="bottom"] { --panel: var(--rose-bottom-panel); --rim: var(--rose-bottom-rim); --seat: var(--rose-bottom-seat); --button: var(--rose-bottom-button); }
+[data-colour="indigo"][data-row="top"] { --panel: var(--indigo-top-panel); --rim: var(--indigo-top-rim); --seat: var(--indigo-top-seat); --button: var(--indigo-top-button); }
+[data-colour="indigo"][data-row="bottom"] { --panel: var(--indigo-bottom-panel); --rim: var(--indigo-bottom-rim); --seat: var(--indigo-bottom-seat); --button: var(--indigo-bottom-button); }
+[data-colour="slate"][data-row="top"] { --panel: var(--slate-top-panel); --rim: var(--slate-top-rim); --seat: var(--slate-top-seat); --button: var(--slate-top-button); }
+[data-colour="slate"][data-row="bottom"] { --panel: var(--slate-bottom-panel); --rim: var(--slate-bottom-rim); --seat: var(--slate-bottom-seat); --button: var(--slate-bottom-button); }
+[data-colour="copper"][data-row="top"] { --panel: var(--copper-top-panel); --rim: var(--copper-top-rim); --seat: var(--copper-top-seat); --button: var(--copper-top-button); }
+[data-colour="copper"][data-row="bottom"] { --panel: var(--copper-bottom-panel); --rim: var(--copper-bottom-rim); --seat: var(--copper-bottom-seat); --button: var(--copper-bottom-button); }
+[data-colour="olive"][data-row="top"] { --panel: var(--olive-top-panel); --rim: var(--olive-top-rim); --seat: var(--olive-top-seat); --button: var(--olive-top-button); }
+[data-colour="olive"][data-row="bottom"] { --panel: var(--olive-bottom-panel); --rim: var(--olive-bottom-rim); --seat: var(--olive-bottom-seat); --button: var(--olive-bottom-button); }
+[data-colour="orchid"][data-row="top"] { --panel: var(--orchid-top-panel); --rim: var(--orchid-top-rim); --seat: var(--orchid-top-seat); --button: var(--orchid-top-button); }
+[data-colour="orchid"][data-row="bottom"] { --panel: var(--orchid-bottom-panel); --rim: var(--orchid-bottom-rim); --seat: var(--orchid-bottom-seat); --button: var(--orchid-bottom-button); }
+
+.player {
+  /* The tile's own panel, for rings on cells drawn in another player's colour. */
+  --tile-panel: var(--panel);
+  /* A pressed life half is washed in the seat colour, only while a finger is down. Counter cells are a quiet
+     disc that lights toward the seat colour while pressed. */
+  --wash: color-mix(in oklab, var(--seat) 17%, transparent);
+  --cell-fill: color-mix(in oklab, var(--button) 55%, var(--panel));
+  --cell-pressed: color-mix(in oklab, var(--seat) 26%, var(--panel));
+  position: relative;
+  container-type: size;
+  overflow: hidden;
+  background: var(--panel);
+}
+/* Turn by turn: the active tile's panel lifts 14% toward its seat colour, inside a 3px ring in its seat colour. */
+.board:not([data-mode]) .player[data-active] {
+  background: color-mix(in oklab, var(--panel) 86%, var(--seat));
+  box-shadow: inset 0 0 0 3px var(--seat);
+}
+
+/* One size per board (design/polish/SPEC.md §3.1): app.js sets --ui and --ub to the smallest tile face's width and
+   height, and tile content is sized from u, a hundredth of --ui, instead of from each tile's own size. Every tile
+   then draws its total, glyphs, badges and mode layers at the same size. --board-digits is the most digits in any
+   total. The board flags are board-wide thresholds: data-narrow (ui < 240), data-short (ub < 200) and data-wide
+   (ui ≥ 264). */
+.board {
+  --u: calc(var(--ui, 400px) / 100);
+  /* A hundredth of --ub, for the badges' height budget. */
+  --ub-unit: calc(var(--ub, 400px) / 100);
+  /* Badges are sized from both of a tile's dimensions (DESIGN-AUDIT S1): from its width, 3.6u as before, and up to 5u
+     where the tile's height leaves room (4.4 hundredths of --ub), so a tall tablet tile's counts grow instead of
+     leaving most of the tile empty. A phone tile is short, so its height never lifts it past 3.6u, and the cap still
+     holds phones at 16px. Auto-drop gives way as before where a row runs out of width. */
+  --badge-size: clamp(.78125rem, max(calc(3.6 * var(--u)), min(calc(5 * var(--u)), calc(4.4 * var(--ub-unit)))), max(1rem, 16 * var(--grow)));
+  /* Settings → Table → Badge size scales the badge rows and the mana strip: their chips, counts, icons and the colour
+     indicator (data-badge-size on #board). A row grows no taller than fits between its edge and the total on every
+     tile (app.js measures --far-room and --near-room), and never below the default. A larger system text size
+     (--text-scale) grows them as far as Larger, whatever Badge size says (ACCESSIBILITY.md H1). */
+  --badge-scale: clamp(1, var(--text-scale), 1.4);
+  --far-row-size: max(var(--badge-size), min(calc(var(--badge-size) * var(--badge-scale)), var(--far-room, 100vmax)));
+  --near-row-size: max(var(--badge-size), min(calc(var(--badge-size) * var(--badge-scale)), var(--near-room, 100vmax)));
+}
+.board[data-badge-size="large"] { --badge-scale: clamp(1.2, var(--text-scale), 1.4); }
+.board[data-badge-size="larger"] { --badge-scale: 1.4; }
+
+.player-face {
+  --control-size: clamp(44px, calc(18 * var(--u)), 74 * var(--grow));
+  --control-gap: clamp(4px, calc(3 * var(--u)), 16 * var(--grow));
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  transform: translate(-50%, -50%) rotate(var(--angle, 0deg));
+  container-type: size;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+}
+.player[data-edge="top"] { --angle: 180deg; }
+.player[data-edge="left"] { --angle: 90deg; }
+.player[data-edge="right"] { --angle: -90deg; }
+.player:is([data-edge="left"], [data-edge="right"]) .player-face { width: 100cqh; height: 100cqw; }
+.player-face::before {
+  position: absolute;
+  inset: -29% -55% auto auto;
+  z-index: -1;
+  width: 124%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, transparent 0 17px, var(--seat) 18px, transparent 19px 27px);
+  opacity: var(--ring-opacity);
+  content: '';
+}
+/* The background behind the total (design/polish/SPEC.md §2.3): app.js puts the identity's symbol or its colour
+   indicator in .watermark, faint and centred like a card's watermark, in place of the rings. */
+.player[data-background] .player-face::before { content: none; }
+.watermark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: -1;
+  display: grid;
+  place-items: center;
+  color: var(--seat);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.watermark:empty { display: none; }
+.player[data-background="symbol"] .watermark { font-size: min(var(--ub, 400px) * .86, var(--ui, 400px) * .62); opacity: var(--watermark-opacity); }
+
+/* An identity's symbol, from the Mana font: a colour's mana symbol, a guild, a clan, a Streets of New Capenna
+   family or the colour pie. Four colours are the colour pie drawn from the five mana symbols on a pentagon (W at
+   the top, then clockwise U, B, R and G), with the missing colour as a ghost at 25%. */
+.id-symbol { flex: none; display: inline-grid; place-items: center; width: 1em; height: 1em; font: normal normal normal 1em/1 Mana; }
+.id-symbol::before { content: var(--symbol); speak: never; }
+.id-symbol.pie { position: relative; width: 1.1em; height: 1.1em; }
+.id-symbol.pie::before { content: none; }
+.id-symbol.pie > span { position: absolute; font-size: .46em; line-height: 1; transform: translate(-50%, -50%); }
+.id-symbol.pie > span::before { content: var(--symbol); speak: never; }
+.id-symbol.pie > [data-ghost] { opacity: .25; }
+.id-symbol.pie > [data-at="W"] { left: 50%; top: 14%; }
+.id-symbol.pie > [data-at="U"] { left: 86%; top: 40%; }
+.id-symbol.pie > [data-at="B"] { left: 72%; top: 84%; }
+.id-symbol.pie > [data-at="R"] { left: 28%; top: 84%; }
+.id-symbol.pie > [data-at="G"] { left: 14%; top: 40%; }
+:is([data-symbol="W"], .pie > [data-at="W"]) { --symbol: '\e600'; }
+:is([data-symbol="U"], .pie > [data-at="U"]) { --symbol: '\e601'; }
+:is([data-symbol="B"], .pie > [data-at="B"]) { --symbol: '\e602'; }
+:is([data-symbol="R"], .pie > [data-at="R"]) { --symbol: '\e603'; }
+:is([data-symbol="G"], .pie > [data-at="G"]) { --symbol: '\e604'; }
+[data-symbol="WU"] { --symbol: '\e90c'; } /* Azorius */
+[data-symbol="WB"] { --symbol: '\e912'; } /* Orzhov */
+[data-symbol="UB"] { --symbol: '\e90e'; } /* Dimir */
+[data-symbol="UR"] { --symbol: '\e911'; } /* Izzet */
+[data-symbol="BG"] { --symbol: '\e90f'; } /* Golgari */
+[data-symbol="BR"] { --symbol: '\e913'; } /* Rakdos */
+[data-symbol="WR"] { --symbol: '\e90d'; } /* Boros */
+[data-symbol="RG"] { --symbol: '\e910'; } /* Gruul */
+[data-symbol="UG"] { --symbol: '\e915'; } /* Simic */
+[data-symbol="WG"] { --symbol: '\e914'; } /* Selesnya */
+[data-symbol="WBG"] { --symbol: '\e916'; } /* Abzan */
+[data-symbol="WUR"] { --symbol: '\e917'; } /* Jeskai */
+[data-symbol="UBG"] { --symbol: '\e919'; } /* Sultai */
+[data-symbol="WBR"] { --symbol: '\e918'; } /* Mardu */
+[data-symbol="URG"] { --symbol: '\e91a'; } /* Temur */
+[data-symbol="WUG"] { --symbol: '\ea0d'; } /* Bant: Brokers */
+[data-symbol="WRG"] { --symbol: '\ea0e'; } /* Naya: Cabaretti */
+[data-symbol="UBR"] { --symbol: '\ea0f'; } /* Grixis: Maestros */
+[data-symbol="WUB"] { --symbol: '\ea10'; } /* Esper: Obscura */
+[data-symbol="BRG"] { --symbol: '\ea11'; } /* Jund: Riveteers */
+[data-symbol="WUBRG"] { --symbol: '\e9f0'; } /* colour pie */
+.score {
+  min-width: 0;
+  font-size: clamp(2rem, 19vmin, max(7rem, 112 * var(--grow)));
+  font-size: min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2)));
+  line-height: 1;
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.055em;
+  padding-inline-end: .055em;
+  color: var(--text);
+}
+.score[data-out] { color: var(--life-out); }
+/* A player who is out (0 life, 10 poison or 21 commander damage) says so under the total, in the total's red, and
+   their other badges dim. The cause, a lethal poison or damage chip, keeps its full colour. */
+.out-tag {
+  grid-area: 1 / 2;
+  align-self: end;
+  justify-self: center;
+  display: none;
+  position: relative;
+  top: .95em;
+  padding: .12em .5em;
+  border-radius: var(--radius-full);
+  background: linear-gradient(var(--life-out-tint), var(--life-out-tint)), var(--chip-background);
+  box-shadow: inset 0 0 0 1.5px var(--life-out);
+  color: var(--life-out);
+  font-size: max(.6875rem, calc(var(--badge-size) * .86));
+  font-weight: var(--weight-heavy);
+  letter-spacing: .08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.player[data-out] .out-tag { display: block; }
+.board[data-mode="rotate"] .out-tag { visibility: hidden; }
+.player[data-out] .badges .chip:not([data-level="out"], .turn-chip, .strip-chip, .pass-chip) { opacity: .82; filter: saturate(.35); }
+/* The life halves have no button chrome: the − and + glyphs sit near the tile's outer edges, 5u in. */
+.controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--control-gap);
+  width: 100%;
+  /* An end of the face the centre pill reaches past (a rotated seat) keeps clear of it, as the far row does. app.js
+     sets --clear-far, --clear-end, --clear-near and --clear-start on each tile from where the pill is. */
+  padding-inline: var(--clear-start, 0px) var(--clear-end, 0px);
+}
+.controls button {
+  display: grid;
+  place-items: center;
+  width: clamp(44px, calc(16 * var(--u)), 84 * var(--grow));
+  min-height: var(--tap-min);
+  height: clamp(44px, calc(15 * var(--u)), 57 * var(--grow));
+  padding: 0;
+  font-size: clamp(1.75rem, calc(12 * var(--u)), max(2.5rem, 46 * var(--grow)));
+  border: 0;
+  background: none;
+  color: var(--seat);
+}
+.controls .subtract { justify-self: start; margin-inline-start: calc(5 * var(--u)); }
+.controls .add { justify-self: end; margin-inline-end: calc(5 * var(--u)); }
+.controls button:is(:active, [data-pressed]) { color: var(--text); }
+/* Each button's touch area covers its half of the tile: − on the reader's left, + on the right. A press washes
+   that half, rounded on its inner corners. */
+/* z-index keeps the touch areas above the total while its change animation runs. */
+.controls button::after { position: absolute; z-index: 1; top: 0; bottom: 0; content: ''; }
+.controls .subtract::after { left: 0; right: 50%; border-radius: 0 28px 28px 0; }
+.controls .add::after { left: 50%; right: 0; border-radius: 28px 0 0 28px; }
+.controls button:is(:active, [data-pressed])::after { background: var(--wash); }
+
+.rotate-seat {
+  position: absolute;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+/* While rotating seats, the badge takes the + button's place, which is always well inside the tile. */
+.controls .subtract { grid-area: 1 / 1; }
+.controls .score { grid-area: 1 / 2; }
+.controls .add { grid-area: 1 / 3; }
+.rotate-badge {
+  grid-area: 1 / 3;
+  justify-self: end;
+  margin-inline-end: calc(5 * var(--u));
+  display: grid;
+  place-items: center;
+  width: clamp(36px, calc(13 * var(--u)), 48 * var(--grow));
+  aspect-ratio: 1;
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-full);
+  background: var(--button);
+  color: var(--seat);
+  font-size: clamp(1.125rem, calc(7 * var(--u)), max(1.5rem, 24 * var(--grow)));
+}
+.board:not([data-mode="rotate"]) .rotate-badge, .board[data-mode="rotate"] .controls button { visibility: hidden; }
+.rotate-seat:active { background: var(--press-overlay); }
+.rotate-seat:focus-visible { outline-offset: -3px; }
+

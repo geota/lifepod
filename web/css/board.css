@@ -1,0 +1,180 @@
+/* Board: the page base (box sizing, buttons, focus ring), the icons, the board and its rotation, and the centre pill
+   with its round and mana buttons. */
+*, *::before, *::after { box-sizing: border-box; }
+body, h1, h2, h3, p { margin: 0; }
+body { overflow: hidden; }
+button, input { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+button, .player { -webkit-user-select: none; user-select: none; }
+button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+/* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
+.icon { display: block; width: 1em; height: 1em; fill: currentColor; }
+/* Game symbols from the Mana font: the d20 for dice, infect for poison, the commander symbol for commander tax, energy,
+   rad, the colour pie for identity, the tap symbol for the mana pool and the untap symbol for turns. */
+.mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
+.mana-icon::before { content: var(--glyph); speak: never; }
+.mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
+.mana-icon[data-glyph="infect"] { --glyph: '\ea73'; }
+.mana-icon[data-glyph="energy"] { --glyph: '\e907'; }
+.mana-icon[data-glyph="rad"] { --glyph: '\ea50'; }
+.mana-icon[data-glyph="pie"] { --glyph: '\e9f0'; }
+.mana-icon[data-glyph="tap"] { --glyph: '\e61a'; }
+.mana-icon[data-glyph="untap"] { --glyph: '\e61b'; }
+.mana-icon[data-glyph="commander"] { --glyph: '\e9c6'; }
+
+/* app.js turns the board so seats stay fixed to the device as the screen rotates. */
+.app {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100vw;
+  height: 100vh;
+  width: 100dvw;
+  height: 100dvh;
+  transform: translate(-50%, -50%);
+  /* Several players touch at once, so the browser must not treat touches as zoom or scroll gestures. */
+  touch-action: none;
+  -webkit-touch-callout: none;
+}
+.app:is([data-board-turn="90"], [data-board-turn="270"]) {
+  width: 100vh;
+  height: 100vw;
+  width: 100dvh;
+  height: 100dvw;
+}
+.app[data-board-turn="90"] { transform: translate(-50%, -50%) rotate(90deg); }
+.app[data-board-turn="180"] { transform: translate(-50%, -50%) rotate(180deg); }
+.app[data-board-turn="270"] { transform: translate(-50%, -50%) rotate(270deg); }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() or none on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.board {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
+  gap: var(--seam-width);
+  height: 100%;
+}
+
+.board-controls {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  transform: translate(-50%, -50%);
+}
+/* app.js places the pill on a seam that only far rows face (design/polish/FINAL-REVIEW.md #1). With 2 players that's the
+   middle seam, so the pill stands upright along it, and the round's two copies face the two players. */
+.board-controls[data-vertical] { transform: translate(-50%, -50%) rotate(90deg); }
+/* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target, or up to
+   64px on tablets. app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
+.board-controls::before {
+  position: absolute;
+  inset: calc(var(--setup-button) / 8);
+  content: '';
+  border: var(--pill-edge) solid var(--pill-edge-color);
+  border-radius: var(--radius-full);
+  background: var(--pill-background);
+  box-shadow: var(--pill-shadow);
+}
+.pill-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--setup-button);
+  height: var(--setup-button);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-soft);
+  font-size: clamp(1.25rem, 20 * var(--grow), 1.625rem);
+}
+.pill-button[hidden] { display: none; }
+.pill-button::before {
+  position: absolute;
+  inset: var(--pill-inset) 2px;
+  content: '';
+  border-radius: var(--radius-full);
+}
+.pill-button:nth-child(1 of :not([hidden]))::before { inset-inline-start: var(--pill-inset); }
+.pill-button:nth-last-child(1 of :not([hidden]))::before { inset-inline-end: var(--pill-inset); }
+.pill-button:not([hidden]) ~ .pill-button::after {
+  position: absolute;
+  top: calc(2 * var(--pill-inset));
+  bottom: calc(2 * var(--pill-inset));
+  left: 0;
+  width: 1px;
+  content: '';
+  background: var(--border);
+}
+.pill-button::before { transition: transform var(--motion) var(--ease-press); }
+.pill-button:active::before { background: var(--state-pressed); transform: scale(var(--press-scale)); }
+.pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
+.setup-icon[hidden], .rotation-done[hidden] { display: none; }
+/* While rotating seats or choosing colours or identities, only the Done disc stays. */
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--commit-fill); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--commit-ink); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button::before { content: none; }
+/* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
+.save-button { color: var(--commit-ink); }
+.save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--commit-fill); }
+.save-button:active::before { background: var(--accent-pressed); }
+#board-controls .save-button::after, #board-controls .save-button:not([hidden]) + .pill-button::after { content: none; }
+.pill-button:disabled { opacity: .38; cursor: default; }
+/* "Back one turn" for keyboards and screen readers: hidden beside the round button, and shown as a ‹ button there while
+   it has keyboard focus. */
+#round-back:focus-visible {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--setup-button);
+  height: var(--setup-button);
+  padding: 0;
+  overflow: visible;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() or none on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
+  clip-path: none;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text);
+  font-size: clamp(1.25rem, 20 * var(--grow), 1.625rem);
+  outline-offset: -4px;
+}
+.pill-button:disabled::before { content: none; }
+/* The round button: the round printed twice like a card index, the top copy upside down, on a disc ringed in the
+   accent. */
+.round-button .round {
+  position: relative;
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  place-items: center;
+  width: calc(var(--setup-button) * .7);
+  height: calc(var(--setup-button) * .7);
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+  color: var(--text);
+  font-size: calc(var(--setup-button) * .27);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+.round-button .round > span:first-child { transform: rotate(180deg); }
+.round-button .round::after { position: absolute; top: 50%; left: 22%; right: 22%; height: 1px; content: ''; background: var(--border); }
+.round-button[data-pressed]::before { background: var(--state-pressed); }
+/* The mana pool's tap symbol, with a dot while any pool has mana. */
+.pill-button > .mana-icon, .mana-dot { position: relative; }
+#mana-button[data-floating] { color: var(--accent); }
+.mana-dot { position: absolute; top: calc(var(--setup-button) * .24); right: calc(var(--setup-button) * .2); width: 7px; height: 7px; border-radius: 50%; }
+#mana-button[data-floating] .mana-dot { background: var(--accent); }
+
