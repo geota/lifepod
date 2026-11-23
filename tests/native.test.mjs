@@ -118,6 +118,39 @@ test('node: the bridge names match the Android and iOS wrappers', () => {
   assert.match(appJs, /window\.closeOpenDialog = \(\) => \{/);
 });
 
+// Offline below the page, whatever its CSP says (AGENTS.md, "Invariants"; docs/review/LOGIC-AND-STATIC.md S1). Android:
+// no INTERNET permission, every navigation refused, and every request answered by the interceptor, with a 404 for
+// anything that isn't a bundled file. iOS: a content rule list that blocks every load but the app's own files, added
+// before the first load, and only the start page as a navigation.
+const offlineRules = JSON.parse(swift.match(/private let offlineRules = """\n([\s\S]+?)\n\s*"""/)[1]);
+// What WebKit does with a URL under the rules: the last block or ignore-previous-rules whose url-filter matches wins.
+// The filters are regular expressions, case-insensitive by default (WebKit's content blocker format).
+const blockedOnIos = url => offlineRules.reduce((blocked, { trigger, action }) => {
+  if (!new RegExp(trigger['url-filter'], trigger['url-filter-is-case-sensitive'] ? '' : 'i').test(url)) return blocked;
+  return action.type === 'block' ? true : action.type === 'ignore-previous-rules' ? false : blocked;
+}, false);
+
+test('node: neither app can load anything from outside it', () => {
+  assert.doesNotMatch(read('android/AndroidManifest.xml'), /permission/i, 'the Android manifest asks for no permission, INTERNET included');
+  assert.match(kotlin, /override fun shouldOverrideUrlLoading\(\s*view: WebView,\s*request: WebResourceRequest,\s*\): Boolean = true/, 'Android refuses every navigation');
+  assert.match(kotlin, /override fun shouldInterceptRequest\(\s*view: WebView,\s*request: WebResourceRequest,\s*\): WebResourceResponse \{/, 'and answers every request itself');
+  assert.match(kotlin, /return WebResourceResponse\(\s*"text\/plain",\s*"UTF-8",\s*404,/);
+
+  for (const url of ['lifepod://app/index.html', 'lifepod://app/js/state/state.js', 'LIFEPOD://APP/fonts/mana.woff2', 'about:blank']) {
+    assert.equal(blockedOnIos(url), false, `iOS loads ${url}`);
+  }
+  for (const url of ['https://example.com/', 'http://127.0.0.1:8080/index.html', 'wss://example.com/socket', 'ws://example.com/',
+    'file:///etc/hosts', 'blob:lifepod://app/1234', 'data:text/plain,hi', 'lifepod://other/index.html', 'ftp://example.com/', 'https://app/lifepod://app/']) {
+    assert.equal(blockedOnIos(url), true, `iOS blocks ${url}`);
+  }
+  assert.ok(offlineRules.every(({ trigger }) => Object.keys(trigger).join() === 'url-filter'), 'each rule applies to every resource type and frame');
+  // The rules go on before the first load: makeUIView loads only through loadOffline, which adds them first.
+  assert.match(swift, /context\.coordinator\.loadOffline\(in: view\)\n\s*return view/);
+  assert.match(swift, /if let rules \{\s*webView\.configuration\.userContentController\.add\(rules\)\s*\} else \{[^}]*\}\s*self\.loadTracker\(in: webView\)/);
+  assert.match(swift, /let localPage = action\.request\.url == startPage\s*decisionHandler\(localPage && action\.targetFrame\?\.isMainFrame == true \? \.allow : \.cancel\)/,
+    'iOS allows only the start page as a navigation');
+});
+
 // A renderer that dies again and again as the page loads stops being restarted after a few tries, and a native message
 // offers to try again, on both platforms with the same limits (docs/review/LOGIC-AND-STATIC.md S2).
 test('node: the apps stop restarting a renderer that keeps dying on load', () => {
