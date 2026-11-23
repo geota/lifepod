@@ -1,8 +1,10 @@
 // What the board modes change: an editing mode's edits (commander damage, counters, designations and mana), each
 // applied, shown and saved at once and kept for Undo and ✕, and the choices that Colours and Identity save at once.
 
-import { countKinds, maxCount } from '../logic/data.js';
-import { applyEdit, editPlayers, leavingTransfers, outPlayers, trackedDesignations } from '../logic/rules.js';
+import { countKinds } from '../logic/data.js';
+import {
+  applyEdit, applyNewEdit, countEdit, damageEdit, designationEdit, editPlayers, manaEdit,
+} from '../logic/rules.js';
 import { normalizeIdentity } from '../logic/save.js';
 import { announce, announceDesignation, announceLife, announcePool } from '../render/announce.js';
 import { syncAllSwatches, syncCounterCells, syncIdentity, syncManaCells, syncSeatMap } from '../render/modes.js';
@@ -62,19 +64,14 @@ function showEdit(edit) {
   haptic();
 }
 
-// An edit made in a mode. Anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4), in the same edit.
+// An edit made in a mode, or null for a tap that would take a count out of range, which does nothing. applyNewEdit
+// applies it, and anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4) in the same edit.
 /**
- * @param {Edit} edit
+ * @param {Edit | null} edit
  */
 function commitEdit(edit) {
-  const out = outPlayers(game);
-  applyEdit(game, edit, 1);
-  const handoffs = leavingTransfers(game, out);
-  if (handoffs.length) {
-    edit.transfers = [...(edit.transfers ?? []), ...handoffs];
-    for (const transfer of handoffs) game[transfer.kind] = transfer.to;
-  }
-  /** @type {Edit[]} */ (edits).push(edit);
+  if (!edit) return;
+  /** @type {Edit[]} */ (edits).push(applyNewEdit(game, edit));
   showEdit(edit);
 }
 
@@ -85,30 +82,21 @@ export function undoEdit() {
   showEdit(edit);
 }
 
-// Commander damage is combat damage: adding it to the monarch makes the attacker the monarch (CR 726.3), and adding it
-// to the player with the initiative gives the attacker the initiative (CR 727.3). Taking damage away moves nothing.
+// The modes' taps. The edit each makes, and what it passes on, is in rules.js: commander damage to the monarch or the
+// initiative's holder passes it to the attacker (damageEdit), and a designation cell gives it or clears it
+// (designationEdit).
 export function stepDamage(defender, attacker, delta) {
-  const next = game.commanderDamage[defender][attacker] + delta;
-  if (next < 0 || next > maxCount) return;
-  const transfers = delta > 0 ? trackedDesignations(game).filter(({ kind }) => game[kind] === defender)
-    .map(({ kind }) => ({ kind, from: defender, to: attacker })) : [];
-  commitEdit({ kind: 'damage', index: defender, attacker, delta, transfers });
+  commitEdit(damageEdit(game, defender, attacker, delta));
 }
 
-// Counters mode's designation cells: a tap gives it to that player, taking it from whoever had it, and a tap on the
-// holder's own cell clears it.
 export function toggleDesignation(kind, index) {
-  const from = game[kind];
-  commitEdit({ kind: 'designation', index, transfers: [{ kind, from, to: from === index ? null : index }] });
+  commitEdit(designationEdit(game, kind, index));
 }
 
 export function stepCount(kind, index, delta) {
-  const next = game[kind][index] + delta;
-  if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
+  commitEdit(countEdit(game, kind, index, delta));
 }
 
-// Mana mode's edit: one colour in one player's pool, one up or down.
 export function stepMana(index, colour, delta) {
-  const next = game.pools[index][colour] + delta;
-  if (next >= 0 && next <= maxCount) commitEdit({ kind: 'mana', index, colour, delta });
+  commitEdit(manaEdit(game, index, colour, delta));
 }

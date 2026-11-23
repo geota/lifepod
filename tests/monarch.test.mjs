@@ -417,6 +417,57 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: starting a turn or taking the initiative by handoff reminds them to venture`, t => checkStartReminders(t, engine));
 }
 
+// "Who goes first?" picking the initiative's holder starts their turn, so they venture, whether the board comes back
+// after the "Goes first" beat or sooner by ✕ or Escape (SPEC-COMPLIANCE B2).
+const firstBeat = 700;
+async function checkFirstPickReminder(t, engine) {
+  const game = savedGame(4, { counters: { ...designations }, turns: 'turns', turn: { first: null, active: null, round: 1 }, initiative: 1, monarch: null });
+  const page = await openPage(t, engine, { clock: true, motion: 'no-preference', game });
+  const ask = async () => {
+    await page.locator('#round-button').tap();
+    await eventually(() => mode(page), 'first');
+  };
+  await ask();
+  await button(page, 'Me first, Player 2').tap();
+  assert.deepEqual(await reminders(page), [[], [], [], []], 'not during the beat');
+  await page.clock.runFor(firstBeat);
+  assert.equal(await mode(page), null);
+  assert.deepEqual(await reminders(page), [[], ['initiative'], [], []], 'after the beat, Player 2 ventures');
+
+  for (const leave of [() => button(page, 'Skip').tap(), () => page.keyboard.press('Escape')]) {
+    await seedGame(page, game);
+    await ask();
+    await button(page, 'Me first, Player 2').tap();
+    await leave();
+    assert.equal(await mode(page), null, 'the board comes back at once');
+    assert.deepEqual((await saved(page)).turn, { first: 1, active: 1, round: 1 }, 'and the pick stands');
+    assert.deepEqual(await reminders(page), [[], ['initiative'], [], []], 'Player 2 still ventures');
+    await page.clock.runFor(firstBeat);
+    assert.deepEqual(await reminders(page), [[], ['initiative'], [], []], 'once');
+  }
+}
+
+// Before anyone's turn has started, taking the initiative reminds nobody yet; its holder ventures when their turn starts
+// (SPEC-COMPLIANCE B3).
+async function checkNoReminderBeforeTurns(t, engine) {
+  const page = await openPage(t, engine, {
+    clock: true,
+    game: savedGame(4, { counters: { ...designations }, turns: 'turns', turn: { first: null, active: null, round: 1 }, initiative: null, monarch: null }),
+  });
+  await button(page, 'Counters').tap();
+  await cell(page, 3, 'initiative').tap();
+  await button(page, 'Save').tap();
+  assert.equal((await saved(page)).initiative, 2);
+  assert.deepEqual(await reminders(page), [[], [], [], []], 'no turn has started, so nobody ventures yet');
+  await tile(page, 3).locator('.start-chip').tap();
+  assert.deepEqual(await reminders(page), [[], [], ['initiative'], []], 'Player 3 ventures as their turn starts');
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: picking who goes first reminds them to venture, even when the board comes back early`, t => checkFirstPickReminder(t, engine));
+  test(`${name}: taking the initiative before any turn reminds nobody until their turn starts`, t => checkNoReminderBeforeTurns(t, engine));
+}
+
 // ---- Settings → Reminders and gesture hints -----------------------------------------------------------------------
 
 async function checkGestureHints(t, engine) {

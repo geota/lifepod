@@ -11,10 +11,7 @@ import {
 import { maxStartingLife, playerCounts } from '../logic/data.js';
 import { boardMode, game, syncBackHandling } from '../state/state.js';
 import { element, icon, setupButton } from '../ui/dom.js';
-import {
-  renderBadgeSizeSetting, renderIdentitySheet, renderRemindersSection, renderStyleSetting, renderTileSetting,
-  renderTrackSheet, wakeInput,
-} from './options.js';
+import { renderOptions } from './options.js';
 import { notchedSlider } from './slider.js';
 
 const rotateSeatsButton = /** @type {HTMLButtonElement} */ (document.querySelector('#rotate-seats'));
@@ -178,16 +175,10 @@ settingsBody.addEventListener('scroll', syncSettingsCue, { passive: true });
 function openSettings() {
   selectedPlayerCount = game.scores.length;
   selectedLife = game.startingLife;
-  wakeInput.checked = game.keepAwake;
   settings.removeAttribute('data-flipped');
   settingsFlip.setAttribute('aria-pressed', 'false');
   renderSettings();
-  renderTrackSheet();
-  renderRemindersSection();
-  renderIdentitySheet();
-  renderTileSetting();
-  renderBadgeSizeSetting();
-  renderStyleSetting();
+  renderOptions();
   placeSettingsSections();
   showDialog(settings);
   // Settings always open at the top.

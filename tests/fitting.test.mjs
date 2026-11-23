@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appUrl, engines, faceBoxes, fontsReady, openPage, reload, savedGame, test } from './helpers.mjs';
+import { engines, faceBoxes, fontsReady, openPage, reload, savedGame, test } from './helpers.mjs';
 
 const { chromium } = engines;
 // A strip keeps its buttons in place for stripHoldTime after its last tap (web/js/logic/data.js).
@@ -70,7 +70,11 @@ function busyBoard() {
   });
 }
 
-const stats = page => page.evaluate(() => ({ ...window.lifePodDebug.layoutStats, drop: document.querySelector('#board').dataset.drop ?? '' }));
+// How often the board has been measured and fitted (layoutStats in web/js/layout/fit.js), read from the page's own
+// module instance, and the drop the fit chose.
+const stats = page => page.evaluate(async () => ({
+  ...(await import('/js/layout/fit.js')).layoutStats, drop: document.querySelector('#board').dataset.drop ?? '',
+}));
 
 // Dispatches a press on the first element matching selector, as a finger does, and waits out the fit it queues.
 function press(page, selector) {
@@ -87,7 +91,7 @@ function press(page, selector) {
 // A strip tap that changes no width (3 → 2) runs no fit: one layout and a few style recalcs, against the 56–113 layouts
 // and 120–134 recalcs of a full fit. A tap that does change the rows still fits them, once.
 async function checkStripTapCost(t) {
-  const page = await openPage(t, chromium, { clock: true, url: `${await appUrl()}?debug`, game: busyBoard() });
+  const page = await openPage(t, chromium, { clock: true, game: busyBoard() });
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
   const counts = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics
@@ -106,16 +110,16 @@ async function checkStripTapCost(t) {
   // Once the strip reflows, a spend that empties a colour changes the row, and fits it once.
   await page.clock.runFor(stripHoldTime);
   for (let tap = 0; tap < 2; tap++) await press(page, '.player:nth-child(4) .strip-spend[data-colour="R"]');
-  const reflow = await page.evaluate(() => window.lifePodDebug.layoutStats.fits);
+  const reflow = (await stats(page)).fits;
   await page.clock.runFor(stripHoldTime);
-  assert.equal(await page.evaluate(() => window.lifePodDebug.layoutStats.fits) - reflow, 1, 'the strip reflowing fits the rows once');
+  assert.equal((await stats(page)).fits - reflow, 1, 'the strip reflowing fits the rows once');
 }
 
 // A resize measures the board once and fits it once, though the ResizeObserver, the resize event and Chromium's font
 // events all answer it. A font event after which no more faces have loaded keeps the drops; and a measure whose
 // readings haven't changed, as the ResizeObserver's first callback at startup, does nothing.
 async function checkResizeCost(t, engine) {
-  const page = await openPage(t, engine, { url: `${await appUrl()}?debug`, game: busyBoard() });
+  const page = await openPage(t, engine, { game: busyBoard() });
   const start = await stats(page);
   await page.evaluate(() => window.dispatchEvent(new Event('resize')));
   assert.deepEqual(await stats(page), start, 'a resize event with nothing changed measures and fits nothing');

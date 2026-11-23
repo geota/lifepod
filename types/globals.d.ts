@@ -25,7 +25,10 @@ interface LifePodMessageHandler<Message> {
   postMessage(message: Message): void;
 }
 
-/** `window.webkit.messageHandlers` in the iOS app. Elsewhere `window.webkit` is undefined. */
+/**
+ * `window.webkit.messageHandlers` in the iOS app. In a browser `window.webkit` is undefined, and another WKWebView host
+ * can have handlers of its own, so platform.js takes these only when `game` is there.
+ */
 interface LifePodIosHandlers {
   /** Saves the game, as a JSON string. */
   game: LifePodMessageHandler<string>;
@@ -78,12 +81,6 @@ interface Window {
    */
   closeOpenDialog(): boolean;
   lifePodDice: LifePodDice;
-  /** Set by app.js only when the page's URL has ?debug: the internals the design scripts drive. */
-  lifePodDebug?: {
-    game: unknown;
-    remind(index: number | null, kind: 'monarch' | 'initiative'): void;
-    layoutStats: { measures: number; fits: number; skippedFits: number };
-  };
 }
 
 // Lookups by selector. Every element the scripts look up by selector is an HTML element (the inline SVG icons are only

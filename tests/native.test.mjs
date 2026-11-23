@@ -71,6 +71,20 @@ test('node: every file the page loads is served by the Android and iOS apps and 
   assert.match(read('.github/workflows/ci.yml'), /name: Bundle offline web app\n\s+working-directory: web\n\s+run: zip -r -X "\$RUNNER_TEMP\/lifepod-web\.zip" \.\n/);
 });
 
+// The page's CSP (AGENTS.md, "Invariants"): every fetch directive is 'self', the app's own origin, or 'none'. Both apps
+// serve the page from a real origin (lifepod://app/, https://appassets.androidplatform.net/) and the tests over http, so
+// nothing needs file:, and a network source such as https:, http:, data:, blob: or * would let the page reach outside it.
+test('node: the CSP loads nothing but the app\'s own files', () => {
+  const csp = read('web/index.html').match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)[1];
+  const directives = Object.fromEntries(csp.split(';').map(part => part.trim().split(/\s+/)).map(([name, ...sources]) => [name, sources]));
+  assert.deepEqual(directives, {
+    'default-src': ["'none'"], 'script-src': ["'self'"], 'style-src': ["'self'"], 'font-src': ["'self'"], 'img-src': ["'self'"],
+    'base-uri': ["'none'"], 'form-action': ["'none'"],
+  });
+  // Neither app injects a policy of its own.
+  for (const source of [kotlin, swift]) assert.doesNotMatch(source, /Content-Security-Policy/);
+});
+
 test('node: the bridge names match the Android and iOS wrappers', () => {
   // Android: the interface's name, its methods, and the methods the page calls.
   assert.match(kotlin, /addJavascriptInterface\(GameBridge\(\), "LifePodAndroid"\)/);
@@ -79,7 +93,7 @@ test('node: the bridge names match the Android and iOS wrappers', () => {
   assert.deepEqual(matches(appJs, /\bandroid\??\.(\w+)/g), sorted(androidMethods), 'the page calls exactly those methods');
 
   // iOS: the message handlers registered and handled, the messages the page posts, and the injected saved game.
-  assert.match(appJs, /const ios = window\.webkit\?\.messageHandlers;/);
+  assert.match(appJs, /const ios = window\.webkit\?\.messageHandlers\?\.game \? window\.webkit\.messageHandlers : undefined;/);
   assert.deepEqual(matches(swift, /controller\.add\(context\.coordinator, name: "(\w+)"\)/g), sorted(iosMessages), 'LifePodApp registers exactly the mocked handlers');
   assert.deepEqual(matches(swift, /case \("(\w+)"/g), sorted(iosMessages), 'and handles each of them');
   assert.deepEqual(matches(appJs, /\bios\??\.(\w+)/g), sorted(iosMessages), 'the page posts exactly those messages');
@@ -102,6 +116,39 @@ test('node: the bridge names match the Android and iOS wrappers', () => {
   assert.match(kotlin, /evaluateJavascript\(CLOSE_DIALOG\) \{ handled ->\s+if \(handled != "true"\) super\.onBackPressed\(\)/);
   assert.match(kotlin, /OnBackInvokedCallback \{ webView\.evaluateJavascript\(CLOSE_DIALOG, null\) \}/);
   assert.match(appJs, /window\.closeOpenDialog = \(\) => \{/);
+});
+
+// Offline below the page, whatever its CSP says (AGENTS.md, "Invariants"; docs/review/LOGIC-AND-STATIC.md S1). Android:
+// no INTERNET permission, every navigation refused, and every request answered by the interceptor, with a 404 for
+// anything that isn't a bundled file. iOS: a content rule list that blocks every load but the app's own files, added
+// before the first load, and only the start page as a navigation.
+const offlineRules = JSON.parse(swift.match(/private let offlineRules = """\n([\s\S]+?)\n\s*"""/)[1]);
+// What WebKit does with a URL under the rules: the last block or ignore-previous-rules whose url-filter matches wins.
+// The filters are regular expressions, case-insensitive by default (WebKit's content blocker format).
+const blockedOnIos = url => offlineRules.reduce((blocked, { trigger, action }) => {
+  if (!new RegExp(trigger['url-filter'], trigger['url-filter-is-case-sensitive'] ? '' : 'i').test(url)) return blocked;
+  return action.type === 'block' ? true : action.type === 'ignore-previous-rules' ? false : blocked;
+}, false);
+
+test('node: neither app can load anything from outside it', () => {
+  assert.doesNotMatch(read('android/AndroidManifest.xml'), /permission/i, 'the Android manifest asks for no permission, INTERNET included');
+  assert.match(kotlin, /override fun shouldOverrideUrlLoading\(\s*view: WebView,\s*request: WebResourceRequest,\s*\): Boolean = true/, 'Android refuses every navigation');
+  assert.match(kotlin, /override fun shouldInterceptRequest\(\s*view: WebView,\s*request: WebResourceRequest,\s*\): WebResourceResponse \{/, 'and answers every request itself');
+  assert.match(kotlin, /return WebResourceResponse\(\s*"text\/plain",\s*"UTF-8",\s*404,/);
+
+  for (const url of ['lifepod://app/index.html', 'lifepod://app/js/state/state.js', 'LIFEPOD://APP/fonts/mana.woff2', 'about:blank']) {
+    assert.equal(blockedOnIos(url), false, `iOS loads ${url}`);
+  }
+  for (const url of ['https://example.com/', 'http://127.0.0.1:8080/index.html', 'wss://example.com/socket', 'ws://example.com/',
+    'file:///etc/hosts', 'blob:lifepod://app/1234', 'data:text/plain,hi', 'lifepod://other/index.html', 'ftp://example.com/', 'https://app/lifepod://app/']) {
+    assert.equal(blockedOnIos(url), true, `iOS blocks ${url}`);
+  }
+  assert.ok(offlineRules.every(({ trigger }) => Object.keys(trigger).join() === 'url-filter'), 'each rule applies to every resource type and frame');
+  // The rules go on before the first load: makeUIView loads only through loadOffline, which adds them first.
+  assert.match(swift, /context\.coordinator\.loadOffline\(in: view\)\n\s*return view/);
+  assert.match(swift, /if let rules \{\s*webView\.configuration\.userContentController\.add\(rules\)\s*\} else \{[^}]*\}\s*self\.loadTracker\(in: webView\)/);
+  assert.match(swift, /let localPage = action\.request\.url == startPage\s*decisionHandler\(localPage && action\.targetFrame\?\.isMainFrame == true \? \.allow : \.cancel\)/,
+    'iOS allows only the start page as a navigation');
 });
 
 // A renderer that dies again and again as the page loads stops being restarted after a few tries, and a native message
@@ -186,6 +233,24 @@ test('webkit: the iOS bridge saves and loads, keeps the screen awake and ticks',
   assert.deepEqual((await calls(page, 'keepAwake')).at(-1), [false], 'the switch turns keep awake off');
   await reload(page);
   assert.deepEqual(await calls(page, 'keepAwake'), [[false]], 'and it stays off on the next launch');
+});
+
+// Another WKWebView host, such as an in-app browser, can have message handlers but not LifePodApp's game handler. The page
+// runs there as in a browser, saving to its own storage, rather than throw on every save (DEEP-DIVE D4).
+test('webkit: a WKWebView host without the game handler gets the browser fallbacks', async (t) => {
+  const page = await openPage(t, webkit, {
+    before: p => p.addInitScript(() => {
+      window.otherMessages = [];
+      window.webkit = { messageHandlers: { other: { postMessage: message => window.otherMessages.push(message) } } };
+    }),
+  });
+  await button(page, 'Add one life to Player 1').tap();
+  assert.equal((await scores(page))[0], 41);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')).scores[0]), 41, 'the game saves to browser storage');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.style), 'material', 'and starts on Material, as in a browser');
+  assert.deepEqual(await page.evaluate(() => window.otherMessages), [], "nothing goes to the host's handler");
+  await reload(page);
+  assert.equal((await scores(page))[0], 41, 'and loads again');
 });
 
 // Reduce Transparency on iOS: LifePodApp.swift injects it before the page loads and runs its own script when it changes.

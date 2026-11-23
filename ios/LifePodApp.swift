@@ -10,6 +10,18 @@ private let appScheme = "lifepod"
 private let appHost = "app"
 private let startPage = URL(string: "\(appScheme)://\(appHost)/index.html")!
 
+// The app's counterpart to Android's missing INTERNET permission (docs/review/LOGIC-AND-STATIC.md S1): a content rule
+// list that blocks every load, then lets through only the app's own files and about: (blank frames). WebKit applies it
+// below the page, so a fetch, an image or a socket to anywhere else fails even if the CSP in index.html were loosened.
+// tests/native.test.mjs checks what these rules let through.
+private let offlineRules = """
+    [
+      {"trigger": {"url-filter": ".*"}, "action": {"type": "block"}},
+      {"trigger": {"url-filter": "^lifepod://app/"}, "action": {"type": "ignore-previous-rules"}},
+      {"trigger": {"url-filter": "^about:"}, "action": {"type": "ignore-previous-rules"}}
+    ]
+    """
+
 // A web content process that ends within quickRestart seconds of loading counts as ending on load; after
 // maxQuickRestarts such ends in a row the tracker stops reloading. Keep these in step with MainActivity.kt.
 private let quickRestart: TimeInterval = 10
@@ -57,7 +69,7 @@ private struct TrackerView: UIViewRepresentable {
             view.isInspectable = true
         #endif
         context.coordinator.setActive(isActive)
-        context.coordinator.loadTracker(in: view)
+        context.coordinator.loadOffline(in: view)
         return view
     }
 
@@ -130,6 +142,8 @@ private struct TrackerView: UIViewRepresentable {
             UIApplication.shared.isIdleTimerDisabled = keepAwake && isActive
         }
 
+        // The page navigates nowhere: only the start page loads, in the main frame, and every other navigation, such as
+        // an http or https link, is cancelled. The page has no links out (About and the privacy text are plain text).
         func webView(
             _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
@@ -208,6 +222,23 @@ private struct TrackerView: UIViewRepresentable {
                 message.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor),
             ])
             crashNotice = notice
+        }
+
+        // Compiles offlineRules and adds them before the first load, so the page never runs without them. They stay on
+        // the content controller across reloads. A static list that fails to compile is a bug: Debug builds stop on it,
+        // and a Release build still loads, offline through the CSP alone, rather than show nothing.
+        func loadOffline(in webView: WKWebView) {
+            WKContentRuleListStore.default().compileContentRuleList(
+                forIdentifier: "offline", encodedContentRuleList: offlineRules
+            ) { [weak self, weak webView] rules, error in
+                guard let self, let webView else { return }
+                if let rules {
+                    webView.configuration.userContentController.add(rules)
+                } else {
+                    assertionFailure("The offline rules didn't compile: \(String(describing: error))")
+                }
+                self.loadTracker(in: webView)
+            }
         }
 
         func loadTracker(in webView: WKWebView) {

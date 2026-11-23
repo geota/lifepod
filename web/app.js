@@ -10,13 +10,12 @@ import {
 } from './js/actions/edits.js';
 import { clearPool, spendMana, undoClear } from './js/actions/mana.js';
 import {
-  cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst,
+  cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst, skipFirst,
 } from './js/actions/mode.js';
 import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
-import { layoutStats, loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
-import { compactGroups, fitCompactSwitches } from './js/layout/settings.js';
+import { loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
 import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
 import { setBadgeActions } from './js/render/badges.js';
@@ -32,7 +31,7 @@ import {
 } from './js/ui/dom.js';
 import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
-import './js/sheets/options.js';
+import { fitAllCompactSwitches } from './js/sheets/options.js';
 import './js/sheets/settings.js';
 import './js/sheets/dice.js';
 
@@ -46,7 +45,7 @@ window.setTextScale = (scale) => {
   setTextScale(scale);
   resetDrops();
   syncBoardTurn();
-  compactGroups.forEach(fitCompactSwitches);
+  fitAllCompactSwitches();
 };
 
 // The pill's buttons (the setup button is settings.js's, and the dice button dice.js's).
@@ -66,7 +65,7 @@ saveButton.addEventListener('click', () => {
   remind(taker, 'initiative');
 });
 cancelButton.addEventListener('click', () => {
-  if (boardMode === 'first') setBoardMode(null);
+  if (boardMode === 'first') skipFirst();
   else cancelEditing();
 });
 discardDialog.addEventListener('close', () => {
@@ -126,7 +125,7 @@ document.fonts?.addEventListener?.('loadingdone', () => {
   resetDrops();
   syncBoardTurn();
   requestFit();
-  compactGroups.forEach(fitCompactSwitches);
+  fitAllCompactSwitches();
 });
 // WebKit can fire `loading` and never `loadingdone`, so each load also fits the board again once document.fonts.ready
 // settles, keeping the drops it has (the hysteresis decides): a face that arrives late can't leave a mana strip or a
@@ -135,12 +134,8 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
   if (!fontsArrived()) return;
   syncBoardTurn();
   requestFit();
-  compactGroups.forEach(fitCompactSwitches);
+  fitAllCompactSwitches();
 }));
-
-// A module's names aren't page globals, so the design scripts (design/polish/final-review.mjs) reach the few internals they
-// drive through ?debug in the URL. The apps never load the page with it.
-if (new URLSearchParams(location.search).has('debug')) window.lifePodDebug = { game, remind, layoutStats };
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.
 setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, undoClear, dismissReminder, setBoardMode });

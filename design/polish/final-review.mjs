@@ -26,7 +26,7 @@ const doShots = !args.has('--sweep');
 const doSweep = !args.has('--shots');
 // Run as a script; tests/design.test.mjs imports it only for its snippets.
 if (import.meta.main) await mkdir(outDir, { recursive: true });
-// The app over http. The internals it drives come from the page's own modules (inPage in lib.mjs), not ?debug.
+// The app over http. The internals it drives come from the page's own modules (inPage in lib.mjs).
 const server = import.meta.main ? await serveApp() : null;
 const app = server?.url;
 

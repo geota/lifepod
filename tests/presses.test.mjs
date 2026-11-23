@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appUrl, engines, openPage, saved, savedGame, test } from './helpers.mjs';
+import { engines, openPage, saved, savedGame, test } from './helpers.mjs';
 
 // A press and the board redrawing under it (docs/review/DEEP-DIVE.md D1–D3): an extra tap on the mana strip, a Turn
 // press that a redraw lands in the middle of, and a hold that a dialog opens over. Each press keeps acting on what the
@@ -12,7 +12,8 @@ const holdDelay = 500;
 const undoClearTime = 5000;
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
-const debugGame = page => page.evaluate(() => window.lifePodDebug.game);
+// The game as the page holds it, from its own module instance (web/js/state/state.js), saved or not.
+const liveGame = page => page.evaluate(async () => (await import('/js/state/state.js')).game);
 // Each tile's strip as it reads: 'R3 C1 clear', 'undo', or '' with no strip.
 const strips = page => page.locator('.mana-strip').evaluateAll(rows => rows.map(row => (row.hidden ? '' : [...row.children]
   .filter(item => !item.matches('.chip') && item.checkVisibility())
@@ -66,7 +67,7 @@ async function checkEraserDoubleTap(t, engine) {
 // and lifts just after: the end of "Undo clear" redraws P1's rows, and the turn still passes.
 async function checkTurnSurvivesRedraw(t, engine) {
   const page = await openPage(t, engine, {
-    clock: true, url: `${await appUrl()}?debug`,
+    clock: true,
     game: savedGame(4, { turns: 'turns', turn: { first: 0, active: 0, round: 1 }, manaPool: true, pools: [[2, 0, 0, 0, 0, 0], ...Array(3).fill([0, 0, 0, 0, 0, 0])] }),
   });
   await tile(page, 1).locator('.strip-clear').tap();
@@ -80,15 +81,15 @@ async function checkTurnSurvivesRedraw(t, engine) {
   assert.equal((await strips(page))[0], '', '"Undo clear" ended during the press');
   assert.ok(await before.evaluate(node => node.isConnected), 'the chip is the same element after the redraw');
   await page.mouse.up();
-  assert.equal((await debugGame(page)).turn.active, 1, 'the turn passed to P2');
+  assert.equal((await liveGame(page)).turn.active, 1, 'the turn passed to P2');
   await page.clock.runFor(holdDelay);
-  assert.equal((await debugGame(page)).turn.active, 1, 'and nothing stepped it back');
+  assert.equal((await liveGame(page)).turn.active, 1, 'and nothing stepped it back');
 }
 
 // D3: a hold stops when a dialog opens over it. In counters mode, P1 holds their poison cell, which takes one away every
 // 100ms; ✕ (here Android back) opens "Discard 10 changes?", and the count stays at what the question says.
 async function checkHoldUnderDialog(t, engine) {
-  const page = await openPage(t, engine, { clock: true, url: `${await appUrl()}?debug`, game: savedGame(4, { counters: { poison: true } }) });
+  const page = await openPage(t, engine, { clock: true, game: savedGame(4, { counters: { poison: true } }) });
   await page.getByRole('button', { name: 'Counters', exact: true }).tap();
   const poison = tile(page, 1).locator('.counter-cell[data-kind="poison"]');
   for (let tap = 0; tap < 8; tap++) await poison.tap();
@@ -112,12 +113,12 @@ async function checkHoldUnderDialog(t, engine) {
   await page.mouse.move(plus.x + plus.width / 2, plus.y + plus.height / 2);
   await page.mouse.down();
   await page.clock.runFor(650);
-  const held = (await debugGame(page)).scores[1];
+  const held = (await liveGame(page)).scores[1];
   assert.equal(held, 43, 'a tap and two repeats');
   await page.locator('#setup-button').evaluate(setup => setup.click());
   await page.clock.runFor(400);
   await page.mouse.up();
-  assert.equal((await debugGame(page)).scores[1], 43, 'the hold stops when settings opens');
+  assert.equal((await liveGame(page)).scores[1], 43, 'the hold stops when settings opens');
 }
 
 // ---- Keyboard focus through redraws (docs/review/ACCESSIBILITY.md M4) ------------------------------------------------
@@ -133,7 +134,7 @@ const focused = page => page.evaluate(() => {
 // next in its row, or another of the tile's badge controls, or its subtract button, never <body> or the pill.
 async function checkFocusThroughRedraws(t, engine) {
   const page = await openPage(t, engine, {
-    clock: true, url: `${await appUrl()}?debug`,
+    clock: true,
     game: savedGame(4, {
       turns: 'turns', turn: { first: 1, active: 0, round: 1 }, counters: { initiative: true }, initiative: 0,
       manaPool: true, pools: [[2, 1, 0, 0, 0, 0], ...Array(3).fill([0, 0, 0, 0, 0, 0])],
@@ -142,7 +143,7 @@ async function checkFocusThroughRedraws(t, engine) {
   // On this short tile a reminder covers the near row, so focus on the turn chip moves to the reminder in its place,
   // and back to the turn chip when the reminder ends.
   await tile(page, 1).locator('.active-chip').focus();
-  await page.evaluate(() => window.lifePodDebug.remind(0, 'initiative'));
+  await page.evaluate(async () => (await import('/js/actions/reminders.js')).remind(0, 'initiative'));
   assert.equal(await tile(page, 1).getAttribute('data-reminder'), 'over');
   assert.equal(await focused(page), 'P1 reminder-chip', 'a reminder covering the focused turn chip takes focus');
   await page.clock.runFor(3000);

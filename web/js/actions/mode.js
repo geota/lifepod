@@ -6,6 +6,7 @@ import {
   designations, discardMessages, doneLabels, editingModes, firstBeat, shuffleTick, shuffleTicks,
 } from '../logic/data.js';
 import { applyEdit, isOut, playOrder, randomBelow } from '../logic/rules.js';
+import { fitTurn } from '../logic/save.js';
 import { announceMode, announceModeEnd, clearAnnouncements, seatName } from '../render/announce.js';
 import { renderBadges } from '../render/badges.js';
 import { renderModeLayer } from '../render/modes.js';
@@ -58,11 +59,21 @@ export function chooseFirst(index) {
   go.replaceChildren(icon('flag'), 'Goes first');
   /** @type {Element} */ (go.nextElementSibling).textContent = game.turns === 'rounds' ? 'Tap the flag to start each round' : 'Tap Turn when your turn ends';
   announceModeEnd(`${seatName(index)}, goes first`);
-  // Their turn starts once the board is back, where its reminder can show.
-  shuffleTimer = setTimeout(() => {
-    setBoardMode(null);
-    turnStarted();
-  }, reducedMotion.matches ? 0 : firstBeat);
+  // Their turn starts once the board is back, where its reminder can show (setBoardMode).
+  shuffleTimer = setTimeout(() => setBoardMode(null), reducedMotion.matches ? 0 : firstBeat);
+}
+
+// ✕, Escape or Android back in "Who goes first?". With nobody picked, it's a skip, which leaves no first player: no
+// flag, round 1 (SPEC §8), even when Turns went from Off to on in a game whose round had moved on. During the "Goes
+// first" beat the pick stands, and the board just comes back sooner.
+export function skipFirst() {
+  if (game.turn.first === null) {
+    game.turn = fitTurn(null, game.scores.length);
+    turnSteps.length = 0;
+    // Saved now; closing the mode redraws the tiles and the pill.
+    commit();
+  }
+  setBoardMode(null);
 }
 
 // The centre shuffle picks a random player who isn't out, lighting tiles around the table before landing on them.
@@ -100,7 +111,8 @@ export function setBoardMode(mode) {
   const closed = boardMode;
   // A pick of who goes first is announced already, and the mode closes a beat after it. An editing mode's end is
   // announced by what ended it: Save, Discard, or ✕ with no changes (cancelEditing).
-  const quietly = board.hasAttribute('data-picked') || editingModes.includes(closed);
+  const picked = board.hasAttribute('data-picked');
+  const quietly = picked || editingModes.includes(closed);
   if (closed === null && mode !== null) modeOpener = document.activeElement;
   cancelPresses();
   clearTimeout(shuffleTimer);
@@ -134,6 +146,9 @@ export function setBoardMode(mode) {
   focusTarget?.focus();
   announceMode(mode, quietly ? null : closed);
   syncBackHandling();
+  // "Who goes first?" closing on a pick, after its beat or early by ✕, Escape or back: the first turn starts now that the
+  // board is back, and its player's reminder can show (SPEC §13).
+  if (picked) turnStarted();
   // A mode opened from settings, such as Rotate seats, was still open when settings' close event looked, so the question
   // waits for the mode to end.
   if (mode === null) maybeAskFirst();
@@ -180,5 +195,6 @@ export function discardEdits() {
 // Leaves the open board mode the way ✕ or the check mark would without saving anything new.
 export function leaveBoardMode() {
   if (editingModes.includes(boardMode)) cancelEditing();
+  else if (boardMode === 'first') skipFirst();
   else setBoardMode(null);
 }

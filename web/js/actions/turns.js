@@ -1,8 +1,8 @@
 // Turns (design/polish/SPEC.md §8): stepping forward and back, by round or turn by turn, starting a player's turn, and
 // the steps kept so a hold steps back exactly.
 
-import { maxCount, maxRound } from '../logic/data.js';
-import { nextTurn, previousTurn } from '../logic/rules.js';
+import { maxCount } from '../logic/data.js';
+import { turnBack, turnForward } from '../logic/rules.js';
 import { announce, seatName } from '../render/announce.js';
 import { haptic } from '../state/platform.js';
 import { game, turnSteps } from '../state/state.js';
@@ -25,23 +25,21 @@ function recordStep(before, emptied) {
   if (turnSteps.length > 200) turnSteps.shift();
 }
 
-// The next step forward. Rounds: the next round. Turn by turn: the next player in play order who isn't out, and the
-// round goes up when play passes the first player's seat. With nobody's turn yet, the pill asks who goes first.
+// The next step forward (turnForward in rules.js). Rounds: the next round. Turn by turn: the next player in play order
+// who isn't out, and the round goes up when play passes the first player's seat. With nobody's turn yet, the pill asks
+// who goes first. In the last round (maxRound) play holds rather than start another, and nothing is recorded, so a step
+// back always undoes exactly one step.
 export function stepTurn() {
   if (game.turns === 'off') return;
-  const before = { ...game.turn };
-  if (game.turns === 'rounds') {
-    game.turn.round = Math.min(maxRound, game.turn.round + 1);
-  } else {
-    if (game.turn.active === null) {
-      setAskFirst(true);
-      maybeAskFirst();
-      return;
-    }
-    const { next, crossed } = nextTurn(game);
-    game.turn.active = next;
-    if (crossed) game.turn.round = Math.min(maxRound, game.turn.round + 1);
+  if (game.turns === 'turns' && game.turn.active === null) {
+    setAskFirst(true);
+    maybeAskFirst();
+    return;
   }
+  const before = { ...game.turn };
+  const next = turnForward(game);
+  if (!next) return;
+  game.turn = next;
   recordStep(before, autoEmptyPools());
   showTurn();
   if (game.turns === 'turns') {
@@ -63,7 +61,7 @@ export function startTurn(index) {
 }
 
 // One step back: the last step taken, with any pools it emptied, or after a relaunch the previous player in play
-// order (or the previous round). The round never goes below 1.
+// order or the previous round (turnBack in rules.js). The round never goes below 1.
 export function stepBack() {
   if (game.turns === 'off') return;
   const step = turnSteps.pop();
@@ -72,15 +70,10 @@ export function stepBack() {
     step.emptied?.forEach((pool, index) => pool.forEach((amount, colour) => {
       game.pools[index][colour] = Math.min(maxCount, game.pools[index][colour] + amount);
     }));
-  } else if (game.turns === 'rounds') {
-    if (game.turn.round === 1) return;
-    game.turn.round -= 1;
   } else {
-    if (game.turn.active === null) return;
-    const { previous, crossed } = previousTurn(game);
-    if (crossed && game.turn.round === 1) return;
-    game.turn.active = previous;
-    if (crossed) game.turn.round -= 1;
+    const back = turnBack(game);
+    if (!back) return;
+    game.turn = back;
   }
   showTurn();
 }
