@@ -1,27 +1,24 @@
 import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
-import { placeReminders, requestFit, resetDrops } from './js/layout/fit.js';
+import { requestFit, resetDrops } from './js/layout/fit.js';
 import {
   compactGroups, fitCompactSwitches, keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody,
   syncSettingsCue,
 } from './js/layout/settings.js';
 import {
-  badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, designationKinds,
-  designations, discardMessages, doneLabels, editingModes, faceAngles, firstBeat, identityColours, manaColours,
-  maxCount, maxRound, maxStartingLife, playerCounts, poisonLethal, poisonWarning, reminderText, reminderTime,
-  shuffleTick, shuffleTicks, swatches, tileSetOrder, tileSets, trackers, undoClearTime,
+  badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, designations, discardMessages, doneLabels, editingModes,
+  faceAngles, firstBeat, identityColours, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, reminderText,
+  reminderTime, shuffleTick, shuffleTicks, swatches, tileSetOrder, tileSets, trackers, undoClearTime,
 } from './js/logic/data.js';
 import {
-  applyEdit, dangerLevel, editPlayers, hasCountersMode, hasMana, isOut, leavingTransfers, needsPassing, nextTurn,
-  outPlayers, playOrder, poolText, previousTurn, randomBelow, restPillButtons, seatGrid, seatRow, shownCounters, toFace,
-  trackedDesignations,
+  applyEdit, editPlayers, hasCountersMode, hasMana, isOut, leavingTransfers, nextTurn, outPlayers, playOrder,
+  previousTurn, randomBelow, restPillButtons, seatGrid, seatRow, shownCounters, toFace, trackedDesignations,
 } from './js/logic/rules.js';
 import {
   fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, normalizeIdentity,
 } from './js/logic/save.js';
 import { announce, announceDesignation, announceLife, announcePool, clearAnnouncements } from './js/render/announce.js';
-import {
-  counterIcon, designationIcon, identityChip, inColourOf, paintColours, renderScore, renderWatermark,
-} from './js/render/tile.js';
+import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badges.js';
+import { counterIcon, designationIcon, identityChip, inColourOf, paintColours, renderScore } from './js/render/tile.js';
 import {
   android, currentLandscapeAngle, defaultStyle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency,
   syncWakeLock,
@@ -32,8 +29,8 @@ import {
 } from './js/state/state.js';
 import {
   announcer, board, boardControls, cancelButton, countersButton, damageButton, diceButton, discardDialog, element, icon,
-  manaButton, manaIcon, playerTemplate, roundBackButton, roundButton, saveButton, setupButton, shuffleButton,
-  undoButton, visuallyHidden,
+  manaButton, playerTemplate, roundBackButton, roundButton, saveButton, setupButton, shuffleButton, undoButton,
+  visuallyHidden,
 } from './js/ui/dom.js';
 import { bindCounter, bindSeat, bindStep, bindTap, cancelPresses } from './js/ui/press.js';
 
@@ -338,11 +335,6 @@ function handOnLeavers(wasOut) {
   if (transfers.length) saveGame();
 }
 
-// Redraws the holders' near rows: whether an out holder's tile asks to pass it on depends on who else is still in.
-function renderPassHints() {
-  for (const kind of designationKinds) if (game[kind] !== null) renderBadges(game[kind]);
-}
-
 // A counter cell: a circle with the counter's icon over its count. A tap adds one, and holding takes one away
 // with repeats, as on the commander damage map. A visually hidden button beside it takes one away for keyboards
 // and screen readers.
@@ -536,24 +528,6 @@ function clearReminders() {
   reminders.clear();
 }
 
-// The reminders a tile shows, newest last: each a chip in the turn chip's style that a tap dismisses. A chip already
-// showing stays the same element, so a redraw of the tile neither replays its entrance nor pulls it from under a finger.
-function syncReminderChips(index, box) {
-  const showing = new Map([...box.children].map(chip => [chip.dataset.designation, chip]));
-  const chips = [...(reminders.get(index)?.keys() ?? [])].map(kind => showing.get(kind) ?? reminderChip(index, kind));
-  if (chips.length !== box.childElementCount || chips.some((chip, at) => box.children[at] !== chip)) box.replaceChildren(...chips);
-}
-
-function reminderChip(index, kind) {
-  const [label, words] = reminderText[kind].split(': ');
-  const chip = element('button', 'chip reminder-chip', designationIcon(kind), element('span', 'reminder-words', element('b', 'reminder-label', `${label}: `), words));
-  chip.type = 'button';
-  chip.dataset.designation = kind;
-  chip.setAttribute('aria-label', `${reminderText[kind]}. Dismiss`);
-  bindTap(chip, () => dismissReminder(index, kind));
-  return chip;
-}
-
 // One step back: the last step taken, with any pools it emptied, or after a relaunch the previous player in play
 // order (or the previous round). The round never goes below 1.
 function stepBack() {
@@ -646,42 +620,6 @@ function buildFirstPicker(index) {
   return element('div', 'first-picker', go, hint);
 }
 
-// The turn chips that lead a tile's near row. Rounds: the first player's flag carries the round and steps it. Turn by
-// turn: the active player's chip says "Turn" and the round and passes the turn, and the first player keeps a small
-// flag; with nobody's turn yet, every player who isn't out has a "Start" chip to start theirs.
-function turnChips(index) {
-  const { turns } = game;
-  const { first, active, round } = game.turn;
-  const chips = [];
-  if (turns === 'rounds' && first === index) {
-    const chip = element('button', 'chip turn-chip round-chip', icon('flag'), String(round));
-    chip.setAttribute('aria-label', `Round ${round}. Next round`);
-    bindStep(chip, stepTurn, stepBack);
-    chips.push(chip);
-  } else if (turns === 'turns') {
-    if (active === index || (active === null && !isOut(game, index))) {
-      // When the word "Turn" gives way, the round keeps a "T" so the untap symbol doesn't read as a letter.
-      const chip = active === index
-        ? element('button', 'chip turn-chip active-chip', manaIcon('untap'), element('span', 'turn-word', 'Turn'), element('span', 'turn-round', String(round)))
-        : element('button', 'chip turn-chip start-chip', manaIcon('untap'), 'Start');
-      chip.setAttribute('aria-label', active === index ? `Player ${index + 1}'s turn, round ${round}. Pass the turn`
-        : `Start Player ${index + 1}'s turn`);
-      if (active === index) bindStep(chip, stepTurn, stepBack);
-      else bindTap(chip, () => startTurn(index));
-      chips.push(chip);
-    }
-    if (first === index) {
-      const flag = element('span', 'chip flag-chip', icon('flag'), visuallyHidden('Went first'));
-      chips.push(flag);
-    }
-  }
-  for (const chip of chips) {
-    if (chip.tagName === 'BUTTON') chip.type = 'button';
-    else chip.setAttribute('role', 'listitem');
-  }
-  return chips;
-}
-
 // Mana mode's edit: one colour in one player's pool, one up or down.
 function stepMana(index, colour, delta) {
   const next = game.pools[index][colour] + delta;
@@ -766,148 +704,6 @@ function endUndoClear(index) {
 
 function endUndoClears() {
   for (const index of [...clearedPools.keys()]) endUndoClear(index);
-}
-
-// A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then the eraser. Or
-// "Undo clear" for 5 seconds after the eraser.
-function stripItems(index) {
-  if (clearedPools.has(index)) {
-    const undo = element('button', 'strip-undo', icon('undo'), 'Undo clear');
-    undo.type = 'button';
-    undo.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
-    bindTap(undo, () => undoClear(index));
-    return [undo, stripChip(index)];
-  }
-  const items = manaColours.flatMap((colour, at) => {
-    const amount = game.pools[index][at];
-    if (!amount) return [];
-    const pip = element('span', 'pip');
-    pip.dataset.pip = colour.id;
-    pip.setAttribute('aria-hidden', 'true');
-    const spend = element('button', 'strip-spend', pip, String(amount));
-    spend.type = 'button';
-    spend.dataset.colour = colour.id;
-    spend.setAttribute('aria-label', `Player ${index + 1}, ${amount} ${colour.name} mana. Spend one`);
-    bindTap(spend, () => spendMana(index, at));
-    return [spend];
-  });
-  const eraser = element('button', 'strip-clear', icon('eraser'));
-  eraser.type = 'button';
-  eraser.setAttribute('aria-label', `Clear Player ${index + 1}'s mana pool`);
-  bindTap(eraser, () => clearPool(index));
-  return [...items, eraser, stripChip(index)];
-}
-
-// The strip folded into one chip, where the strip can't fit: the pool's colours and amounts with a caret, which opens
-// mana mode. Or, for 5 seconds after the eraser, "Undo".
-function stripChip(index) {
-  let chip;
-  if (clearedPools.has(index)) {
-    chip = element('button', 'chip strip-chip', icon('undo'), 'Undo');
-    chip.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
-    bindTap(chip, () => undoClear(index));
-  } else {
-    // One colour and its amount, or several colours' symbols stacked before the pool's total, so the chip stays short.
-    const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
-    const pip = (colour) => {
-      const symbol = element('span', 'pip');
-      symbol.dataset.pip = colour.id;
-      return symbol;
-    };
-    const parts = held.length > 1
-      ? [element('span', 'summary-item', ...held.map(({ colour }) => pip(colour)), String(held.reduce((sum, { amount }) => sum + amount, 0)))]
-      : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
-    chip = element('button', 'chip strip-chip', ...parts, icon('caret-right'));
-    chip.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(game, index)}. Open mana`);
-    bindTap(chip, () => setBoardMode('mana'));
-  }
-  chip.type = 'button';
-  return chip;
-}
-
-// The holder's chip at rest: the crown or the castle. A holder who is out and hasn't handed it on (no Turn by turn
-// turn to start from) gets a "Pass it on" chip instead, which opens counters mode to give it to someone.
-function designationChip({ kind, label, name, still }, index) {
-  if (needsPassing(game, kind, index)) {
-    const chip = element('button', 'chip pass-chip', designationIcon(kind), icon('arrow-bend-up-right'), element('span', 'pass-word', 'Pass it on'));
-    chip.type = 'button';
-    chip.dataset.designation = kind;
-    chip.setAttribute('aria-label', `Player ${index + 1} is out and ${still}. Pass ${name} on in counters`);
-    bindTap(chip, () => setBoardMode('counters'));
-    return chip;
-  }
-  const chip = element('span', 'chip designation-chip', designationIcon(kind), visuallyHidden(label));
-  chip.dataset.designation = kind;
-  return chip;
-}
-
-// The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
-// damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first, and under it
-// the mana strip while the pool has mana. The near edge holds the colour identity chip, then poison, tax, energy,
-// experience and rad, each only when it's set and its switch is on, then the monarch's crown and the initiative's castle
-// on their holder's tile. A turn reminder shows above the near edge, or over it on a short tile.
-function renderBadges(index) {
-  const player = board.children[index];
-  if (!player) return;
-  renderWatermark(index);
-  const far = player.querySelector('.badges.far');
-  const damage = game.counters.commander ? game.commanderDamage[index]
-    .map((amount, attacker) => ({ amount, attacker })).filter(({ amount }) => amount > 0)
-    .sort((a, b) => b.amount - a.amount || a.attacker - b.attacker) : [];
-  // The sword only labels the row: each chip already says whose commander it counts.
-  const sword = element('span', 'chip sword', icon('sword'));
-  sword.setAttribute('aria-hidden', 'true');
-  const foldedChip = game.manaPool && (hasMana(game, index) || clearedPools.has(index)) ? stripChip(index) : null;
-  far.replaceChildren(...(damage.length ? [sword] : []), ...damage.map(({ amount, attacker }) => {
-    const chip = inColourOf(element('span', 'chip damage', String(amount),
-      visuallyHidden(` commander damage from Player ${attacker + 1}`)), attacker);
-    chip.setAttribute('role', 'listitem');
-    const level = dangerLevel(amount, commanderWarning, commanderLethal);
-    if (level) chip.dataset.level = level;
-    return chip;
-  }), ...(foldedChip ? [foldedChip] : []));
-  // The strip folded onto the end of the far row, shown only when it can go nowhere else.
-  far.hidden = damage.length === 0;
-  const near = player.querySelector('.badges.near');
-  player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
-  // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
-  const strip = player.querySelector('.mana-strip');
-  const hadFocus = strip.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement).dataset.colour ?? '' : null;
-  const floating = game.manaPool && (hasMana(game, index) || clearedPools.has(index));
-  strip.replaceChildren(...(floating ? stripItems(index) : []));
-  strip.hidden = !floating;
-  if (floating) {
-    // Keep keyboard focus in the strip as items come and go.
-    if (hadFocus !== null) (strip.querySelector(`[data-colour="${hadFocus}"]`) ?? strip.querySelector('.strip-spend, .strip-clear, .strip-undo'))?.focus();
-  } else {
-    delete player.dataset.strip;
-    if (hadFocus !== null) setupButton.focus();
-  }
-  const chips = [...turnChips(index)];
-  const identity = identityChip(game.identities[index], game.identity.show);
-  if (identity) chips.push(identity);
-  for (const { kind } of shownCounters(game)) {
-    const value = game[kind][index];
-    if (value === 0) continue;
-    const chip = kind === 'casts' ? element('span', 'chip', visuallyHidden('Commander tax '), counterIcon(kind), `+${value * 2}`)
-      : element('span', 'chip', counterIcon(kind), String(value), visuallyHidden(` ${kind}`));
-    chip.dataset.kind = kind;
-    const level = kind === 'poison' ? dangerLevel(value, poisonWarning, poisonLethal) : '';
-    if (level) chip.dataset.level = level;
-    chips.push(chip);
-  }
-  for (const designation of trackedDesignations(game)) {
-    if (game[designation.kind] === index) chips.push(designationChip(designation, index));
-  }
-  syncReminderChips(index, /** @type {HTMLElement} */ (near.parentElement).querySelector('.reminders'));
-  placeReminders(player);
-  for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
-  // Keep keyboard focus on a turn chip as the row is rebuilt. When the turn moves to another tile, showTurn follows it.
-  const turnFocus = near.contains(document.activeElement) && /** @type {Element} */ (document.activeElement).matches('.turn-chip');
-  near.replaceChildren(...chips);
-  if (turnFocus) near.querySelector('.turn-chip')?.focus();
-  near.hidden = chips.length === 0;
-  requestFit();
 }
 
 // The centre pill: commander damage (when Commander is on), counters (when a counter is on), dice and setup
@@ -1701,6 +1497,8 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
 // A module's names aren't page globals, so the design scripts (design/polish/final-review.mjs) reach the few internals they
 // drive through ?debug in the URL. The apps never load the page with it.
 if (new URLSearchParams(location.search).has('debug')) window.lifePodDebug = { game, remind };
+// The renderers' buttons call these actions, which sit above them.
+setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, undoClear, dismissReminder, setBoardMode });
 applyTileColours();
 applyBadgeSize();
 applyStyle();
