@@ -107,16 +107,20 @@ async function addCoverCheck(page) {
 // glyphs: the reason a side shrinks before it wraps. The board is put back at once, before anything can refit it.
 function wrapWouldCover(page, side) {
   return page.evaluate((side) => {
-    const board = document.querySelector('#board');
-    const drop = board.dataset.drop ?? '';
+    // The fit writes each side's drop tokens and type size on every tile's edge (web/js/layout/fit.js).
     const edges = [...document.querySelectorAll(`.${side}-edge`)];
+    const drop = edges[0].dataset.drop ?? '';
     const size = edges[0].style.getPropertyValue(`--${side}-badge-size`);
-    board.dataset.drop = `${drop} ${side === 'near' ? 'wrap' : 'wrap-far'}`.trim();
-    for (const edge of edges) edge.style.removeProperty(`--${side}-badge-size`);
+    for (const edge of edges) {
+      edge.dataset.drop = `${drop} ${side === 'near' ? 'wrap' : 'wrap-far'}`.trim();
+      edge.style.removeProperty(`--${side}-badge-size`);
+    }
     const covers = [...document.querySelectorAll(`.badges.${side}:not([hidden])`)]
       .some(row => new Set([...row.children].filter(chip => chip.offsetWidth).map(chip => chip.offsetTop)).size > 1 && window.coversTotal(row));
-    if (drop) board.dataset.drop = drop;
-    else delete board.dataset.drop;
+    for (const edge of edges) {
+      if (drop) edge.dataset.drop = drop;
+      else delete edge.dataset.drop;
+    }
     if (size) for (const edge of edges) edge.style.setProperty(`--${side}-badge-size`, size);
     return covers;
   }, side);

@@ -1245,9 +1245,11 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   pointer-events: none;
 }
 .badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--near-row-size)); }
-.board[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .board[data-drop~="name"] .turn-word,
-.board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .board[data-drop~="sword"] .badges.far .sword { display: none; }
-.board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
+/* Each tile's edges carry their side's tokens (fit.js writes them there rather than on #board, so a step restyles only
+   the rows): .near-edge the near row's, .far-edge the far row's and the strip's. */
+.near-edge[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .near-edge[data-drop~="name"] .turn-word,
+.near-edge[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .far-edge[data-drop~="sword"] .badges.far .sword { display: none; }
+.near-edge[data-drop~="wrap"] .badges.near, .far-edge[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1290,8 +1292,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .turn-chip:focus-visible, .strip-chip:focus-visible { outline-offset: 2px; }
 /* Once "Turn" gives way, the round keeps a "T" (T12), so the untap symbol doesn't read as a letter. The chip tightens
    a little to make room for it. */
-.board[data-drop~="name"] .turn-round::before { content: 'T'; letter-spacing: -.02em; }
-.board[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
+.near-edge[data-drop~="name"] .turn-round::before { content: 'T'; letter-spacing: -.02em; }
+.near-edge[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
 .chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
 .chip.flag-chip .icon { width: .95em; height: .95em; }
 /* The monarch and the initiative at rest: the holder's crown or castle, round like the flag. A holder who is out and
@@ -1304,8 +1306,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .pass-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
 .pass-chip:active { background: var(--cell-pressed); }
 .pass-chip:focus-visible { outline-offset: 2px; }
-.board[data-drop~="name"] .pass-chip .pass-word { display: none; }
-.board[data-drop~="name"] .pass-chip { padding-inline: .38em; }
+.near-edge[data-drop~="name"] .pass-chip .pass-word { display: none; }
+.near-edge[data-drop~="name"] .pass-chip { padding-inline: .38em; }
 /* Turn reminders (Settings → Reminders): "Monarch: draw a card" or "Initiative: venture into Undercity", facing the
    player, for 3 seconds or until tapped. In the turn chip's language: the tile's button fill and a ring in the seat
    colour, with the crown or castle in the seat colour. app.js puts them on their own line above the near edge where
@@ -1386,7 +1388,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* The capsule is 32px tall, and grows to the targets' 44px with a larger Badge size, so the symbols stay inside it. */
 .mana-strip::before { position: absolute; inset: clamp(0px, calc(22px - .8em), 6px) 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
 .mana-strip[hidden] { display: none; }
-.board[data-drop~="strip-wrap"] .player[data-strip="below"] .mana-strip { flex-wrap: wrap; }
+.player[data-strip="below"] .far-edge[data-drop~="strip-wrap"] .mana-strip { flex-wrap: wrap; }
 /* Folded: the strip shows only its chip, with a caret that says it opens mana mode, the full-size picker, on its own
    line under the far row. Where even that can't fit, the strip hides and the same chip ends the near row (near), where
    it takes the near row's type and gives way with it like any other chip. */

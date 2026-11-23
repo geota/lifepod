@@ -10,7 +10,8 @@ import { board, boardControls } from '../ui/dom.js';
 // tile. Each row first drops words and marks: on the near row the identity's name, the turn chip's word "Turn" and the
 // hint's "Pass it on" (leaving the untap symbol and "T" with the round), then the identity's symbol where the indicator
 // also shows. The indicator always stays and the identity chip never goes: a chip that shows only the name keeps it. On
-// the far row, the sword. A drop hides something on every tile (CSS reads its token from #board's data-drop). Then come
+// the far row, the sword. A drop hides something on every tile (CSS reads its token from data-drop on each tile's edge,
+// and #board's data-drop lists them all once a fit is done). Then come
 // the row's last resorts (lastResorts): wrapping onto a second line, growing toward the total, then shrinking the type,
 // no smaller than typeFloor. A side whose second line would cover a total or its glyphs shrinks first and wraps last.
 // Counts, the monarch's crown and the initiative's castle never give way.
@@ -111,6 +112,7 @@ function fitBadgeRows() {
   if (fitStrips()) fitBadgeSide('near');
   // A turn reminder's place depends on how tall the near edge came out.
   for (const index of reminders.keys()) placeReminders(board.children[index]);
+  syncBoardDrops();
   fitted = fitInputs();
 }
 
@@ -138,8 +140,23 @@ function measureBadgeRoom() {
   set('--near-room', near);
 }
 
+// Writes each side's drop tokens on the tiles' edges: the near row's on .near-edge, the far row's and the strip's on
+// .far-edge. Written there rather than on #board, a fit's trial steps restyle only the rows (PERFORMANCE.md F1).
 function syncDropTokens(levels) {
-  const tokens = Object.keys(dropSteps).flatMap(side => dropTokens(side, levels[side])).join(' ');
+  const near = dropTokens('near', levels.near).join(' ');
+  const far = [...dropTokens('far', levels.far), ...dropTokens('strip', levels.strip)].join(' ');
+  for (const [selector, tokens] of /** @type {const} */ ([['.near-edge', near], ['.far-edge', far]])) {
+    for (const edge of /** @type {NodeListOf<HTMLElement>} */ (board.querySelectorAll(selector))) {
+      if (tokens === (edge.dataset.drop ?? '')) continue;
+      if (tokens) edge.dataset.drop = tokens;
+      else delete edge.dataset.drop;
+    }
+  }
+}
+
+// #board's data-drop lists every token the fit took, for the tests and the design scripts; nothing styles from it.
+function syncBoardDrops() {
+  const tokens = Object.keys(dropSteps).flatMap(side => dropTokens(side, dropLevels[side])).join(' ');
   if (tokens === (board.dataset.drop ?? '')) return;
   if (tokens) board.dataset.drop = tokens;
   else delete board.dataset.drop;
