@@ -131,3 +131,50 @@ async function checkFits(t, engine) {
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: every badge size fits every board on the target and the stress size`, { timeout: 300000 }, t => checkFits(t, engine));
 }
+
+// A larger Badge size never draws a badge row smaller than a smaller size does on the same board (docs/review/FINAL.md
+// U1): a row whose chips grow too tall to wrap clear of the total shrinks on one line, and the fit then keeps a smaller
+// size's full type where that's larger. Checked on the busiest boards, at the sweep's sizes
+// (design/polish/final-review.mjs), at 3–6 players: Turn by turn, every counter, the monarch and the initiative, long
+// identity names, and mana floating or not.
+const sweepSizes = [[952, 427], [852, 393], [640, 360], [568, 320], [375, 667], [320, 568], [841, 701], [1366, 1024]];
+function crowdedGame(count, badgeSize, floating) {
+  return busyGame(count, badgeSize, {
+    counters: { commander: true, poison: true, energy: true, experience: true, rad: true, monarch: true, initiative: true },
+    monarch: 0, initiative: 1, experience: Array(count).fill(10), rad: Array(count).fill(14),
+    identities: ['WURG', 'UB', 'UBRG', 'BG', 'WBRG', 'RG'].slice(0, count),
+    turns: 'turns', turn: { first: 0, active: 2, round: 12 },
+    pools: Array.from({ length: count }, (_, i) => (floating || i === 0 ? [1, 0, 2, 3, 0, 1] : [0, 0, 0, 0, 0, 0])),
+  });
+}
+
+async function checkMonotonic(t, engine) {
+  const problems = [];
+  for (const [width, height] of sweepSizes) {
+    const page = await openPage(t, engine, { viewport: { width, height }, orientation: width > height ? 90 : 0 });
+    for (const count of [3, 4, 5, 6]) {
+      for (const floating of [false, true]) {
+        let smaller = null;
+        for (const size of sizes) {
+          await seedGame(page, crowdedGame(count, size, floating));
+          const drawn = await page.evaluate(() => Object.fromEntries(['near', 'far'].map((side) => {
+            const rows = [...document.querySelectorAll(`.badges.${side}`)].filter(row => row.getClientRects().length && row.childElementCount);
+            return [side, Math.min(...rows.map(row => parseFloat(getComputedStyle(row).fontSize)))];
+          })));
+          for (const side of ['near', 'far']) {
+            if (smaller && drawn[side] < smaller.drawn[side] - 0.01) {
+              problems.push(`${width} × ${height}, ${count} players${floating ? ', floating' : ''}: the ${side} row is ${drawn[side]}px at ${size}, ${smaller.drawn[side]}px at ${smaller.size}`);
+            }
+          }
+          smaller = { size, drawn };
+        }
+      }
+    }
+    await page.close();
+  }
+  assert.deepEqual(problems, [], 'a larger Badge size never draws a row smaller');
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a larger Badge size never draws a badge row smaller`, { timeout: 300000 }, t => checkMonotonic(t, engine));
+}

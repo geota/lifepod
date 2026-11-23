@@ -40,10 +40,10 @@ dialog#settings.fs
 
 | Section | Contents, in order |
 |---|---|
-| **Game** | Players **[STYLE Q4]**; Starting life **[STYLE Q5]**; then a footer row with **New game** (secondary button) and **Keep awake** (switch row) side by side |
+| **Game** | Players **[STYLE Q4]**; Starting life **[STYLE Q5]**; then a footer row with **New game** (secondary button) and **Keep awake** (switch row) side by side. *As built (§11):* New game is in the header, and Keep awake has the footer to itself, across the card. |
 | **Track** | Eight switch rows (Commander, Poison, Energy, Experience, Rad, Mana pool, Monarch, Initiative), two to a line; Turns (Off · Rounds · Turn by turn); "Empty mana pools when the turn passes", shown only while Mana pool is on and Turns isn't Off |
 | **Identity** | Show on tiles (three compact switches: Indicator, Symbol, Name); Background (Symbol · Default · Off); the note line; **Choose identities** (board action) |
-| **Table** | **Colours** and **Rotate seats** (board actions), side by side; then, added after the build, Style (§9), Tile colours (§7) and Badge size (§10) |
+| **Table** | **Colours** and **Rotate seats** (board actions), side by side; then, added after the build, Style (§9), Tile colours (§7) and Badge size (§10). *As built:* Style, Tile colours, Shuffle tile colours each game (§11) and Badge size come first, and the two board actions last. |
 | **Reminders** | Turn reminders, Pass-it-on hints and Gesture hints, compact switch rows (§8) |
 | **About** | Privacy and credits, today's text, in small muted type |
 
@@ -88,7 +88,7 @@ dialog#settings.fs
 | **Done** | Closes settings. |
 | **Start new game** (Done's label while a change is pending) | Starts the new game with the chosen players and life (as `startGame` does today), then closes. No confirmation, because the button says what it does. |
 | ✕, Escape, Android back | Closes settings and **drops a pending players or life change**. Everything else was saved already. If the inline life editor is open, the first back closes the keyboard (the system's job), and the next one closes settings. |
-| **New game** (Game section) | Opens today's `#restart` confirmation over settings. Confirming starts a new game with the current settings and closes both. Cancelling returns to settings. Hidden while a change is pending. |
+| **New game** (Game section; *as built,* in the header, §11) | Opens today's `#restart` confirmation over settings. Confirming starts a new game with the current settings and closes both. Cancelling returns to settings. Hidden while a change is pending. |
 
 ### Pending new game (P1)
 
@@ -98,7 +98,7 @@ While a change is pending:
 
 - **Done** reads **Start new game**.
 - **New game** hides.
-- A line in the Game section says what will happen: "Starts a new game with 6 players at 40 life when you leave settings."
+- A line in the Game section says what will happen: "Starts a new game with 6 players at 40 life when you press Start new game."
 - **Board actions start the new game first, then their mode.** For example, Colours right after choosing 6 players starts a 6-player game and opens Colours on it.
 - Undoing the change (choosing the old values again) clears the pending state.
 
@@ -123,7 +123,7 @@ Each is a row with its icon, its label and an out-to-the-board arrow. The row's 
 - Starting life: presets 20 · 30 · 40, or any whole number from 1 to 999.
 - Either control **[STYLE Q4, Q5]** follows these rules:
   - It changes `selectedPlayerCount` and `selectedLife` only (pending until Done).
-  - It announces its value to screen readers ("4 players", "Starting life 40").
+  - It announces its value to screen readers ("4 players", "40 life").
   - It works by tap as well as by drag (WCAG 2.5.7).
 - Arrow keys step the value; Page Up and Page Down step life by 5.
 
@@ -146,7 +146,8 @@ Each is a row with its icon, its label and an out-to-the-board arrow. The row's 
 - Switch rows stay `<label>` with `role="switch"` inputs.
 - Board actions are buttons named for what they do: "Choose identities on the board", "Choose tile colours on the board", "Rotate seats on the board".
 - Done's accessible name follows its label.
-- The pending line is `aria-live="polite"`.
+- The pending line is `aria-live="polite"`. *As built:* the line itself isn't live; a visually hidden `#settings-status` beside it says the same words once a burst of slider steps settles (700ms after the last change), along with the life field's messages. Board announcements made while settings or a dialog is open go to that dialog's own hidden live region (`data-announcer`), since `#announcer` is outside it (FINAL.md B2).
+- *As built:* settings and the dialogs grow their type with the system text size, up to twice the default (`--text-scale`, set by `setTextScale` in `js/state/platform.js` at launch, and by `window.setTextScale` in app.js when the iOS app reports a change); the board keeps its own fitted type. Zoom stays on: the board turns pinches and double taps away itself, so only settings and the dialogs zoom, and closing one puts the scale back (`resetZoom`).
 - Focus is visible on every control (2px ring at 3:1, WCAG 2.4.13). The fixed header must never cover the focused control (2.4.11), so the body gets `scroll-padding-top` equal to the header's height. *As built (§7):* the header is its own grid row above the scrolling body, so it can't cover a control, and the body has 8px scroll padding.
 
 ## 6. Build steps and tests
@@ -180,7 +181,7 @@ Each is a row with its icon, its label and an out-to-the-board arrow. The row's 
 
 ## 7. As built (22 November 2026)
 
-Built with [STYLE.md](STYLE.md)'s picks: direction A (tonal) on every control type, Graphite + lime for the chrome, the notched players and life sliders with the inline life field, and a solid pill whose fill is one token (`--pill-background`) so a glass pill can replace it. The tiles, the life halves and the twelve tile palettes are unchanged. Tests: `tests/settings.test.mjs` replaces `setup.test.mjs`; `sizes.test.mjs` checks the page on every screen it lists.
+Built with [STYLE.md](STYLE.md)'s picks: direction A (tonal) on every control type, Graphite + lime for the chrome, the notched players and life sliders with the inline life field, and a solid pill whose fill is one token (`--pill-background`) so a glass pill can replace it. The tiles, the life halves and the twelve tile palettes are unchanged. Tests: `tests/settings.test.mjs` replaces `setup.test.mjs`; `tests/sizes-settings.test.mjs` and `tests/sizes-settings-glass.test.mjs` check the page on every screen in `tests/sizes-checks.mjs`.
 
 **Theme tokens.** Direction A's colours, fills and edges, state layers, focus ring, motion, corner radii, elevation, switch and slider geometry are custom properties in one block, `:root, [data-style="material"]` at the top of `web/css/tokens.css` (`<html data-style="material">`). Component rules read only those tokens, so a second style, such as STYLE.md's direction B, can be a block of overrides under `[data-style="glass"]` without touching a component rule. Text is the Graphite chrome's (`#f2f2ef`, soft `#dedfe2`) on the tiles as well, which TILES.md checked against every tile set.
 
@@ -203,7 +204,7 @@ Where the build differs from the spec above, and why:
 | New game's confirmation over settings | Android back and Escape close the top dialog first (the confirmation), then settings | `closeOpenDialog` now closes the last open dialog. |
 | Header at 320 × 568 | Under 400px wide the header tightens, and "Start new game" may wrap onto two lines | So the title stays whole beside it. |
 | Mode cells' pressed state | Counter and mana cells press with the 10% state layer (direction A); the turn chip and Me first keep their seat wash | Cells are controls in the chrome's style; the chip and Me first belong to the tile, like the life halves. |
-| Identity toggles | Off is a raised disc with the symbol muted; on keeps the symbol in full colour inside a 2px accent ring, with the check | Direction A's selected style without filling the symbol, which is the information. |
+| Identity toggles | Off is a raised disc with the symbol muted; on keeps the symbol in full colour inside a 2px accent ring, with the check | Direction A's selected style without filling the symbol, which is the information. *As built (DESIGN-AUDIT N2):* a light ring, and the check in the seat's colour, in both styles. |
 | The pill | No border; the solid `--raised` fill and a soft two-layer shadow | Direction A. The fill is `--pill-background`, the shadow `--pill-shadow`. |
 | Table: Colours and Rotate seats | Table also holds **Tile colours**, a four-stop slider in the players slider's style: Classic · Soft · Jewel · Clear, default Clear (design/polish/TILES.md) | Added after the spec, at the owner's request. It saves at once, like the switches; it isn't part of a pending new game. `tileColours` is validated in `loadGame()`, and a save without it gets Clear. The sets come from `tiles7.json`; `palette.test.mjs` checks each against it and the contrast minimums. |
 
@@ -220,7 +221,7 @@ With the monarch and the initiative (SPEC.md §13), Settings gains a **Reminders
 - All on by default and saved the moment they change, in `game.reminders` (`loadGame()` keeps each on unless it was saved as exactly false). Gesture hints always shows, so the section always has something in it.
 - **Placement (layout B):** the left column, after Table: Game, Table and Reminders are about as tall as Track and Identity, and Reminders is the least-used section. In one column it comes after Table, before About. `placeSettingsSections()` moves it with the others.
 - **Rows:** compact switch rows like Track's, two to a line where each row has room for its whole label (13rem), otherwise one, so no label is ever cut short (a container's auto-fit grid rather than Track's label-over-switch rule).
-- Tests: `tests/monarch.test.mjs` (which rows show when, the order of the sections in both layouts, 44px rows, saving) and `sizes.test.mjs` (every screen, no label cut short).
+- Tests: `tests/monarch.test.mjs` (which rows show when, the order of the sections in both layouts, 44px rows, saving) and `tests/sizes-settings*.test.mjs` (every screen, no label cut short).
 
 ## 9. Style (added 22 November 2026)
 
@@ -228,13 +229,13 @@ At the owner's request, Settings → **Table** gains **Style: Material · Glass*
 
 | | Material | Glass |
 |---|---|---|
-| Floating chrome: the pill, the settings header, dialogs (dice, New game, discard) | Solid, as in §7 | Tinted glass ([GLASS.md](GLASS.md)'s recipe): the surface at 68% over `blur(18px) saturate(1.3)`, a 1px light edge and a top highlight |
+| Floating chrome: the pill, the settings header, dialogs (dice, New game, discard) | Solid, as in §7 | Tinted glass ([GLASS.md](GLASS.md)'s recipe): the surface at 68% over `blur(18px) saturate(1.3)`, a 1px light edge and a top highlight. *As built (§11):* the pill has no blur, over a solid tint with the edge and highlight. |
 | Settings header | Its own row above the body | Floats 8px in from the top and sides, rounded 22px; the body scrolls under it |
 | Cards and rows | Filled rows on 24px cards | Grouped lists: rows share a 20px card, split by hairlines, with switches on the right edge |
 | Segmented controls, dice picker | The chosen one is a lime tint (see Accent L3 below) | One track; the chosen segment or die is a raised thumb in the lime tint, mixed over the track (was a neutral #707379 thumb) |
 | Switches | 36 × 20, outlined off, accent on | 40 × 24: a grey track (3.6:1 on the card) with a white thumb off; the accent with an ink thumb on |
 | Sliders | 16px track, dot notches, 4px lime bar handle; a muted lime fill | 4px grey track, tick lines, a round white 28px thumb; the same muted lime fill |
-| Identity toggles | Accent ring | Light ring; the accent stays on the check |
+| Identity toggles | Accent ring | Light ring; the accent stays on the check. *As built:* the check is in the seat's colour, as in Material. |
 | Map seats, swatches | 16px corners | 12px corners |
 | Pressed | 10% layer | 10% layer and a shrink to 96% |
 | Motion | 200ms emphasised easing | A 250ms spring with a gentle overshoot |
@@ -244,23 +245,23 @@ At the owner's request, Settings → **Table** gains **Style: Material · Glass*
 - **Fallbacks to solid surfaces:**
   - no `backdrop-filter` (`@supports not`, for both the prefixed and unprefixed property);
   - `prefers-reduced-transparency: reduce`;
-  - iOS Reduce Transparency, which WebKit doesn't expose as the media query: `LifePodApp.swift` injects `window.initialReduceTransparency` before the page loads and calls `window.setReduceTransparency(…)` on `UIAccessibility.reduceTransparencyStatusDidChangeNotification`; app.js sets `data-reduce-transparency` on `<html>`, which CSS treats like the media query;
+  - iOS Reduce Transparency, which WebKit doesn't expose as the media query: `LifePodApp.swift` injects `window.initialReduceTransparency` before the page loads and calls `window.setReduceTransparency(…)` on `UIAccessibility.reduceTransparencyStatusDidChangeNotification`; `js/state/platform.js` sets `data-reduce-transparency` on `<html>`, which CSS treats like the media query;
   - `prefers-contrast: more`, which also gives each surface a 2px `--control-border` outline (5.3:1).
 - **Reduced motion:** no transitions in either style, and Glass's presses don't shrink.
-- **How it's built:** Glass is one block of token overrides, `[data-style="glass"]`, after Material's in `web/css/tokens.css`; app.js sets `data-style` on `<html>`. Where Material hard-coded a value (row fill and spacing, the segment track, the dice pick, slider ticks, the header's place, the press scale, the backdrop filter, edge colours), it's now a token both styles set. The fallbacks are token overrides too. There are no per-style component rules.
+- **How it's built:** Glass is one block of token overrides, `[data-style="glass"]`, after Material's in `web/css/tokens.css`; `js/render/appearance.js` sets `data-style` on `<html>`. Where Material hard-coded a value (row fill and spacing, the segment track, the dice pick, slider ticks, the header's place, the press scale, the backdrop filter, edge colours), it's now a token both styles set. The fallbacks are token overrides too. There are no per-style component rules.
 - **Focus under the floating header:** the body's `scroll-padding-top` and the content's top padding both include the header's height (`--head-clear`), so the header can't cover the focused control (WCAG 2.4.11), and the life field still scrolls clear of the header and the keyboard.
 
-Tests: `tests/style.test.mjs` (the default on the web, Android and iOS, the pick persisting and winning, Glass on the key surfaces, each fallback and reduced motion); `tests/native.test.mjs` (the Reduce Transparency bridge, in the contract and in WebKit); `tests/settings.test.mjs` (the header never covers focus and the life field, in both styles); `tests/sizes.test.mjs` and `tests/sizes-glass.test.mjs` (every screen, one style each). `node design/polish/final-review.mjs --sweep` sweeps both styles.
+Tests: `tests/style.test.mjs` (the default on the web, Android and iOS, the pick persisting and winning, Glass on the key surfaces, each fallback and reduced motion); `tests/native.test.mjs` (the Reduce Transparency bridge, in the contract and in WebKit); `tests/settings.test.mjs` (the header never covers focus and the life field, in both styles); the `tests/sizes-*.test.mjs` files, split by concern, with a `-glass` copy of each (every screen, one style each). `node design/polish/final-review.mjs --sweep` sweeps both styles.
 
 ## 10. Badge size (added 22 November 2026)
 
 At the owner's request, Settings → **Table** gains **Badge size: Default · Large · Larger**, a three-stop notched slider in the Tile colours slider's style, after Tile colours.
 
-- **What it scales:** the near and far badge rows and the mana strip, their chips, counts, icons and the colour indicator, by 1.2 (Large) and 1.4 (Larger). Default is the size from before the setting. Mode cells (map seats, counter and mana cells, swatches, identity toggles) and totals stay as they are.
+- **What it scales:** the near and far badge rows and the mana strip, their chips, counts, icons and the colour indicator, by 1.2 (Large) and 1.4 (Larger). Default is the size from before the setting, except that a larger system text size raises Default and Large up to ×1.4 (`--badge-scale` in `web/css/tile.css`, from `--text-scale`). A larger size never draws a row smaller than a smaller size would (SPEC.md §3.2). Mode cells (map seats, counter and mana cells, swatches, identity toggles) and totals stay as they are.
 - **Room:** a row grows no taller than one row fits between its edge (or the pill's clearance) and the life total, its glyphs and the "Out" tag, on every tile (`measureBadgeRoom()` in `web/js/layout/fit.js` sets `--far-room` and `--near-room`), and never below the default. So on a small board a row may stay at or near the default size: at 568 × 320 with 6 players the far row grows only from 12.5px to 12.9px.
 - **Overflow:** the same order at every size (SPEC.md §3.2): names, then the symbol, then a second line, then smaller type down to 9px, or the type first where two lines would cover a total. A change of size fits the rows again from full size, as a new game does.
 - **The strip:** its type scales, and its capsule grows from 32px toward its targets' 44px so the larger symbols stay inside it. Its targets stay 44px.
-- **Saving:** it saves at once, like the switches, and isn't part of a pending new game. `badgeSize` is validated in `loadGame()`: anything but `default`, `large` or `larger`, or a save from before the setting, gets Default. `applyBadgeSize()` in `web/js/render/appearance.js` sets `data-badge-size` on `#board` for Large and Larger, and styles.css sets `--badge-scale` from it.
+- **Saving:** it saves at once, like the switches, and isn't part of a pending new game. `badgeSize` is validated in `loadGame()`: anything but `default`, `large` or `larger`, or a save from before the setting, gets Default. `applyBadgeSize()` in `web/js/render/appearance.js` sets `data-badge-size` on `#board` for Large and Larger, and `web/css/tile.css` sets `--badge-scale` from it.
 - Tests: `tests/badge-size.test.mjs` (the slider, saving and loading, what scales and what doesn't, every size fitting 2–6 players on the target and the stress size in both engines) and `tests/autodrop.test.mjs` (the overflow order at each size). `node design/polish/final-review.mjs --sweep` sweeps the board at rest, rotating and with reminders at Large and Larger.
 
 ## 11. New game in the header, and the design audit's fixes (added 23 November 2026)
@@ -269,13 +270,14 @@ From the owner's requests and [DESIGN-AUDIT.md](../../docs/review/DESIGN-AUDIT.m
 
 | Where | Change |
 |---|---|
-| **Header** | **New game** moves from the Game section's footer into the fixed header, beside Done (✕ · Settings · flip · New game · Done), so it's one tap from anywhere in settings. It hides while a players or life change is pending, when Done reads **Start new game** and starts it without asking (P1, as in §4). Under 400px wide, while New game shows, the "Settings" title is left to screen readers so the four buttons fit at 320px. Keep awake stays in the Game footer on its own. |
+| **Header** | **New game** moves from the Game section's footer into the fixed header, beside Done (✕ · Settings · flip · New game · Done), so it's one tap from anywhere in settings. It hides while a players or life change is pending, when Done reads **Start new game** and starts it without asking (P1, as in §4). While New game shows in a header under 26em wide (in the header's own type size, so a large system text size counts), the "Settings" title is left to screen readers rather than cut short, so the four buttons fit at 320px. Keep awake stays in the Game footer on its own, across the card. On a tablet the header's buttons line up with the content's edges. |
 | **New game's confirmation** | `#restart` takes Discard's layout and style (S4), one `dialog.confirm` style for both: the title, a line ("For 4 players. This resets:"), a list of what resets, naming only what this game shows (life back to the starting life, counters and commander tax, commander damage, floating mana, turns back to round 1, the monarch and the initiative, colour identities, and "Tile colours, shuffled" when the shuffle is on), and what stays ("Settings, seats and tile colours stay."). The destructive **Start new game** is a secondary button in the danger tint (`--danger-fill`, `--danger-text`); **Cancel** is the primary and has focus, so Enter, Escape and back all cancel. The ✕ in its header goes. What a new game resets is SPEC.md §10.2. |
 | **Table → Tile colours** | A segmented control in Style's pattern instead of the four-stop slider (S2). Since 23 November (the owner's P2, "colour bands"), each segment is filled with four vertical bands of players 1–4's panels in its set, a 4px foot of their rims, and the name over them in near-white with a shadow; the chosen set has a solid lime ring, 3px with a 2px dark gap inside. The colours are `--strip-*`, written into `web/css/settings.css` by `design/polish/tiles7.mjs` from one list of sets, so a set is just data. With five sets in a section under 360px wide, the control wraps three over two. |
 | **Table → Shuffle tile colours each game** | A wide switch row after Tile colours, off by default and saved at once in `game.shuffleColours` (`loadGame` keeps only exactly `true`). When on, each new game deals every player a random, distinct swatch, one per colour family (SPEC.md §10.2; TILES.md). |
 | **Accent** | Row icons and section-title icons are soft text, not lime (S3). **Accent L3, "tint" (23 November, the owner's pick):** a chosen segment and the chosen die are a 20% lime wash over the card (Glass: over the track) with lime text and a 1px lime ring at 45% alpha (`--chosen-fill`, `--chosen-ink`, `--chosen-ring`); slider fills are the lime at 42% over the track, with filled ticks in lime at 60%, and Material's thumb stays lime. Solid lime is kept for committing (`--commit-fill`: Done and other primary buttons, the pill's save disc and its Done disc in rotate, colours and identity modes), switches that are on and the focus ring. The chosen text is 8.5:1 on the tint (Glass 7.4:1); the tint alone is about 1.5:1 against an unselected segment, so the ring carries WCAG 1.4.11 at 4.4:1 or more (`tests/style.test.mjs`). |
-| **Sliders** | At the minimum the fill is hidden (`data-min` on the track), so no sliver shows beside Material's bar handle (S9). |
-| **Glass** | A group's last row has no hairline (a 1px cover in the card's colour, `--group-end`, whatever the columns or hidden rows), a row on its own has none, and the board actions are one full-width list (`--action-min: 100%`). Under 360px tall the header is a solid row, as in Material (`--head-overlay: 0`). The board's pill drops its blur and takes a 90% tint (`--pill-tint`); settings and the dialogs keep the blur (S10). Glass's spring is now only for press scale (`--ease-press`); fades and the switch thumb use Material's easing (N5). |
+| **Sliders** | At the minimum the fill is hidden (`data-min` on the track), so no sliver shows beside Material's bar handle (S9), and the handle's 6px ring covers the track's rounded ends at the minimum and the maximum. |
+| **Dialogs** | Every dialog, settings included, ignores pointer input for its first 350ms (`showDialog`), so the second tap of a double tap on the button that opened it can't change a control inside (FINAL.md B1). Keys work at once. |
+| **Glass** | A group's last row has no hairline (a 1px cover in the card's colour, `--group-end`, whatever the columns or hidden rows), a row on its own has none, and the board actions are one full-width list (`--action-min: 100%`). Under 360px tall the header is a solid row, as in Material (`--head-overlay: 0`). The board's pill drops its blur and takes a solid tint (`--pill-tint`; a 90% tint still let the seams through, FINAL.md U4); settings and the dialogs keep the blur (S10). Glass's spring is now only for press scale (`--ease-press`); fades and the switch thumb use Material's easing (N5). |
 | **Scroll cue** | It shows only while content is below, not just the bottom padding, so it never sits over the last row (N6). |
 
 Tests: `tests/new-game.test.mjs` (what a new game resets and keeps, the shuffle switch, and shuffled colours being distinct, one per family, random and from the crypto generator through a seeded stand-in), `tests/settings.test.mjs` (New game in the header, the confirmation's list and buttons, the Tile colours segments and their previews, the slider's minimum), `tests/style.test.mjs` (soft icons, Glass's group ends and actions, the inline header under 360px tall, the unblurred pill) and `tests/palette.test.mjs` (the default seats' spread).

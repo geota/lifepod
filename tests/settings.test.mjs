@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
-import { backHandling, button, engines, eventually, openPage, reload, saved, savedGame, scores, seedGame, test, token, turnScreen } from './helpers.mjs';
+import { animationsDone, backHandling, button, engines, eventually, openPage, reload, saved, savedGame, scores, seedGame, test, token, turnScreen } from './helpers.mjs';
 
 // The full-screen settings page (design/polish/SETTINGS-SPEC.md) and its controls (design/polish/STYLE.md): layout B,
 // the notched players and life sliders, the inline life editor, the pending new game (P1), the flip (O1), board
@@ -168,6 +168,8 @@ for (const [name, engine] of Object.entries(engines)) {
 test('chromium: a touch drag along the players slider picks a value', async (t) => {
   const page = await openPage(t, chromium);
   await button(page, 'Settings').tap();
+  // Raw touches skip Playwright's wait for a target, so wait out the page's first moments, when it ignores pointers.
+  await animationsDone(page.locator('#settings'));
   const cdp = await page.context().newCDPSession(page);
   const from = await pointFor(page, 'players', 4, [2, 6]);
   const to = await pointFor(page, 'players', 2, [2, 6]);
@@ -572,6 +574,7 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(await body.evaluate(node => [getComputedStyle(node).overflowY, getComputedStyle(node).overscrollBehaviorY]), ['auto', 'contain']);
     // The wheel scrolls the body even over a slider, and the slider keeps its value. (Mobile WebKit has no wheel.)
     if (engine === chromium) {
+      await animationsDone(page.locator('#settings'));
       const slider = await page.locator('#players-slider').boundingBox();
       await page.mouse.move(slider.x + slider.width / 2, slider.y + slider.height / 2);
       await page.mouse.wheel(0, 200);
@@ -815,5 +818,19 @@ for (const [name, engine] of Object.entries(engines)) {
     });
     await eventually(() => group.evaluate(node => node.hasAttribute('data-stacked')), true, 'the group stacks');
     assert.deepEqual(await cut(), [], 'still no label is cut short');
+  });
+}
+
+// The Keep awake row fills its card like the other rows, so its switch sits at the card's edge (docs/review/FINAL.md U2;
+// it was capped from when it shared Game's footer with New game).
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the Keep awake row fills its card`, async (t) => {
+    for (const style of ['material', 'glass']) {
+      const page = await openPage(t, engine, { viewport: { width: 952, height: 427 }, style });
+      await button(page, 'Settings').tap();
+      const [row, foot] = await page.locator('.fs-awake').evaluate(node => [node.getBoundingClientRect().width, node.parentElement.getBoundingClientRect().width]);
+      assert.ok(Math.abs(row - foot) < 1, `${style}: the row is ${row}px in its ${foot}px footer`);
+      await page.close();
+    }
   });
 }

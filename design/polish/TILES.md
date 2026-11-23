@@ -1,6 +1,6 @@
 # Tile colour schemes
 
-**Status:** options for the owner, 22 November 2026. Nothing in `web/` has changed. The owner kept today's twelve tile palettes (STYLE Q3) and asked for alternatives to choose from.
+**Status:** options for the owner, 22 November 2026. *Since shipped:* Settings → Table → Tile colours offers four sets, Classic, Soft, Jewel and Clear, with Clear the default (`tileSets` in `web/js/logic/data.js`, SETTINGS-SPEC.md §7). The owner kept today's twelve tile palettes (STYLE Q3) and asked for alternatives to choose from.
 
 **How the sets are made and checked:**
 
@@ -100,7 +100,7 @@ If the owner prefers today's look as the default, keep Today and use **Deep rows
 | | One-time design pick | "Tile colours" setting |
 |---|---|---|
 | What it is | The owner picks one set; it ships for everyone | Settings → Table gets a segmented **Tile colours**: for example Clear · Classic · Jewel · Soft |
-| Cost | None | One saved field (`tileScheme`), one CSS class on `.app` swapping the 96 tokens, a test per set. Swatch ids stay the same, so saved colour choices carry over. |
+| Cost | None | One saved field (`tileScheme`), one CSS class on `.app` swapping the 96 tokens, a test per set. Swatch ids stay the same, so saved colour choices carry over. *As built:* the field is `tileColours`, and `data-tiles` on `<html>` picks the set. |
 | For | One look to maintain and test; no clutter | A colour-blind player can choose for the table; taste differs between groups |
 | Against | One set can't suit everyone | One more setting; four sets to keep passing contrast |
 

@@ -271,8 +271,12 @@ dialog.fs {
 dialog.fs::backdrop { background: var(--background); }
 dialog.fs[data-flipped] { transform: rotate(180deg); }
 /* The header is its own row over the body (Material), or floats over the top of the body, which scrolls under it (Glass,
-   --head-overlay 1). Either way the content starts below it, and focus scrolls clear of it (--head-clear). */
+   --head-overlay 1). Either way the content starts below it, and focus scrolls clear of it (--head-clear). Where the
+   window is wider than the content (--content-max, on tablets), the header's buttons line up with the content's edges:
+   a header row keeps its full width and pads its buttons in, and a floating header narrows to the content. */
 .fs-frame {
+  --content-max: 1180px;
+  --content-gutter: max(0px, (100% - var(--content-max)) / 2);
   --head-pad: var(--space-2);
   --head-clear: calc(var(--head-overlay) * (var(--head-margin) + var(--tap-min) + 2 * var(--head-pad)));
   display: grid;
@@ -288,8 +292,8 @@ dialog.fs[data-flipped] { transform: rotate(180deg); }
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: var(--head-margin) calc(var(--head-margin) * var(--head-side, 1)) 0;
-  padding: var(--head-pad) var(--space-4);
+  margin: var(--head-margin) calc(var(--head-margin) * var(--head-side, 1) + var(--content-gutter) * var(--head-overlay)) 0;
+  padding: var(--head-pad) calc(var(--space-4) + var(--content-gutter) * (1 - var(--head-overlay)));
   border-radius: var(--head-radius);
   background: var(--head-fill);
   box-shadow: var(--head-shadow);
@@ -315,7 +319,7 @@ dialog.fs[data-flipped] { transform: rotate(180deg); }
   padding-bottom: var(--keyboard, 0px);
 }
 dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bottom: 0; }
-.fs-content { --content-top: var(--space-3); display: grid; align-content: start; gap: var(--space-3); width: min(1180px, 100%); margin: 0 auto; padding: calc(var(--content-top) + var(--head-clear)) var(--space-4) var(--space-6, 24px); }
+.fs-content { --content-top: var(--space-3); display: grid; align-content: start; gap: var(--space-3); width: min(var(--content-max), 100%); margin: 0 auto; padding: calc(var(--content-top) + var(--head-clear)) var(--space-4) var(--space-6, 24px); }
 .fs-content[data-columns] { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 .fs-content[data-columns] > .fs-about { grid-column: 1 / -1; }
 .fs-col { display: grid; gap: var(--space-3); min-width: 0; }
@@ -336,7 +340,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.fs-gamefoot > .fs-awake { flex: 1 1 calc(11 * var(--rem)); max-width: calc(18 * var(--rem)); min-height: 48px; }
+.fs-gamefoot > .fs-awake { flex: 1 1 calc(11 * var(--rem)); min-height: 48px; }
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
 .fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
@@ -357,13 +361,18 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   transition: opacity .15s;
 }
 .scroll-cue[data-more]::before { opacity: 1; }
-/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole, and while New game
-   shows beside Done the title is left to screen readers. A floating header (Glass) halves its side margin and takes the
-   other half from its padding. */
+/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole. A floating header
+   (Glass) halves its side margin and takes the other half from its padding. */
 @media (max-width: 400px) {
   .fs-head { --head-side: .5; gap: 6px; padding-inline: calc(var(--space-3) - var(--head-margin) / 2); }
   .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: calc(.9375 * var(--rem)); line-height: 1.1; white-space: normal; }
   .fs-head .fs-newgame { padding-inline: 12px; font-size: calc(.9375 * var(--rem)); }
+}
+/* While New game shows beside Done in a header too narrow for the whole title, the title is left to screen readers
+   rather than cut short: on the narrowest portrait phones, and on small phones with a large system text size. The
+   width is in the header's own type size, which grows with the text size. */
+.fs-head { container: settings-head / inline-size; }
+@container settings-head (max-width: 26em) {
   /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
   .fs-head:has(> .fs-newgame:not([hidden])) h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .fs-head:has(> .fs-newgame:not([hidden])) #settings-flip { margin-inline-start: auto; }

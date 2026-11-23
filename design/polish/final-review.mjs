@@ -781,7 +781,8 @@ if (import.meta.main) {
     example: list[0],
   }));
   const indicators = await indicatorContrast();
-  await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
+  // Only a sweep writes findings.json, so --shots leaves the last sweep's findings alone.
+  if (doSweep) await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
   console.log('Indicator discs on chips (need 3:1 from the fill or the rim):', indicators.map(d => `${d.colour} fill ${d.lowest}, rim ${d.rim}${d.visible ? '' : ' FAILS'}`).join(' · '));
   console.log(`${runs} sweep states, ${allFindings.length} problems in ${summary.length} groups, ${pageErrors.length} page errors, ${Math.round((Date.now() - started) / 1000)}s`);
   for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      styles ${s.styles.join(' ')} · sizes ${s.sizes.join(' ')} · badges ${s.badges.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.style ?? 'material'} ${s.example.size} ${s.example.badge ?? 'default'} badges ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);

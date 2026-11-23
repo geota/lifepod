@@ -218,14 +218,25 @@ function rowFits(row, wrap, slack = 1) {
 // not on #board: a size written on the board restyles every element on it, and the fit writes one at every step it
 // tries (docs/review/PERFORMANCE.md P10). Every tile gets the same size, so the board stays uniform.
 const sizeEdges = { near: '.near-edge', far: '.far-edge', strip: '.far-edge' };
+// A row's full type, where it starts from a smaller Badge size's (fitBadgeSide), goes there too, under its own name, so
+// --near-badge-size and --far-badge-size still mean only that the type shrank.
 const sizeProperties = { near: '--near-badge-size', far: '--far-badge-size', strip: '--strip-size' };
+const fullProperties = { near: '--near-full-size', far: '--far-full-size' };
 /**
  * @param {'near' | 'far' | 'strip'} side
  * @param {number | null} size null for full type
  */
 function setRowSize(side, size) {
-  const property = sizeProperties[side];
-  const value = size === null ? '' : `${size}px`;
+  setEdges(side, sizeProperties[side], size === null ? '' : `${size}px`);
+}
+/**
+ * @param {'near' | 'far'} side
+ * @param {number | string | null} size null for the Badge size's own full type, or a CSS length
+ */
+function setRowFull(side, size) {
+  setEdges(side, fullProperties[side], size === null ? '' : typeof size === 'number' ? `${size}px` : size);
+}
+function setEdges(side, property, value) {
   for (const edge of /** @type {NodeListOf<HTMLElement>} */ (board.querySelectorAll(sizeEdges[side]))) {
     if (edge.style.getPropertyValue(property) === value) continue;
     if (value) edge.style.setProperty(property, value);
@@ -252,18 +263,68 @@ function chipsWidth(row) {
   return last.offsetLeft + last.offsetWidth - chips[0].offsetLeft;
 }
 
-// Takes the fewest steps that make every row on one side of the board fit at the same type size. The busiest
-// tile decides for every tile, so the board stays uniform. A step already taken is only undone when the rows
-// would fit without it with 15% to spare.
+// The scales of the Badge sizes below Larger (css/tile.css's --badge-scale): Large and Default.
+const smallerScales = [1.2, 1];
+
+// Fits one side of the board's badge rows, and keeps Badge size monotonic: a larger size never draws a row smaller than
+// a smaller size would on the same board. A row at a larger size has taller chips, so its second line can reach the
+// total where a smaller size's doesn't; it then shrinks on one line instead of wrapping, and can come out below the
+// smaller size's full type. So when the rows have to shrink, the fit tries again from each smaller size's full type,
+// as long as that's larger than what it has, and keeps whichever draws the largest type (the larger size on a tie).
 function fitBadgeSide(side) {
   const rows = badgeRows(side);
   setRowSize(side, null);
+  setRowFull(side, null);
   if (!rows.length) {
     syncDropTokens(dropLevels);
     return;
   }
+  const current = dropLevels[side];
+  let best = fitSideFrom(side, rows, null, current);
+  if (best.size !== null) {
+    for (const full of smallerFullSizes(side, rows[0])) {
+      if (best.drawn >= full - 0.01) break;
+      const next = fitSideFrom(side, rows, full, current);
+      if (next.drawn > best.drawn + 0.01) best = next;
+      if (next.size === null) break;
+    }
+  }
+  dropLevels = { ...dropLevels, [side]: best.level };
+  wrapFirst = { ...wrapFirst, [side]: best.wrapFirst };
+  syncDropTokens(dropLevels);
+  setRowFull(side, best.full);
+  setRowSize(side, best.size);
+}
+
+// Each smaller Badge size's full type on a side, largest first and below this Badge size's full type: the default
+// badge size times its scale, capped by the side's room (measureBadgeRoom) and never below the default.
+function smallerFullSizes(side, row) {
+  setRowSize(side, null);
+  setRowFull(side, null);
+  const full = parseFloat(getComputedStyle(row).fontSize);
+  setRowFull(side, 'var(--badge-size)');
+  const badgeSize = parseFloat(getComputedStyle(row).fontSize);
+  const measured = parseFloat(board.style.getPropertyValue(`--${side}-room`));
+  const room = Number.isNaN(measured) ? Infinity : measured;
+  return smallerScales.map(scale => Math.max(badgeSize, Math.min(badgeSize * scale, room)))
+    .filter(size => size < full - 0.01);
+}
+
+// Takes the fewest steps that make every row on one side of the board fit at the same type size, from a full type
+// (null for the Badge size's own), without keeping the result: it returns the level, the wrap order, the shrunk size
+// (null if the type stays full) and the type that draws. The busiest tile decides for every tile, so the board stays
+// uniform. A step already taken (current) is only undone when the rows would fit without it with 15% to spare.
+/**
+ * @param {'near' | 'far'} side
+ * @param {HTMLElement[]} rows
+ * @param {number | null} full
+ * @param {number} current
+ */
+function fitSideFrom(side, rows, full, current) {
   const drops = dropSteps[side].length;
   const highest = drops + 2;
+  setRowSize(side, null);
+  setRowFull(side, full);
   const base = parseFloat(getComputedStyle(rows[0]).fontSize);
   const floor = Math.min(typeFloor, base);
   // Sets a level and a type size (null for full type), and says whether every row then fits.
@@ -281,22 +342,19 @@ function fitBadgeSide(side) {
   let needed = 0;
   while (needed < highest && !fits(needed)) needed++;
   let level = needed;
-  const current = Math.min(dropLevels[side], highest);
-  if (needed < current) {
-    const kept = dropTokens(side, current, rows).length;
-    level = current;
-    for (let candidate = needed; candidate < current; candidate++) {
+  const taken = Math.min(current, highest);
+  if (needed < taken) {
+    const kept = dropTokens(side, taken, rows).length;
+    level = taken;
+    for (let candidate = needed; candidate < taken; candidate++) {
       if (dropTokens(side, candidate, rows).length === kept || fits(candidate, dropSlack)) {
         level = candidate;
         break;
       }
     }
   }
-  dropLevels = { ...dropLevels, [side]: level };
-  if (!lastResorts(side, level).shrink) {
-    fitsAt(level, null);
-    return;
-  }
+  const result = { level, wrapFirst: wrapFirst[side], full, size: /** @type {number | null} */ (null), drawn: base };
+  if (!lastResorts(side, level).shrink) return result;
   // The type shrinks from an estimate, then steps down, measured again after each step, until every row fits or it
   // reaches the floor. Text doesn't shrink exactly in proportion (gaps, padding and rounding don't), so the estimate
   // alone can leave a row a few pixels too wide.
@@ -308,6 +366,7 @@ function fitBadgeSide(side) {
   }));
   let size = Math.max(floor, Math.floor(estimate * 10) / 10);
   while (!fitsAt(level, size) && size > floor) size = Math.max(floor, Math.round((size - 0.25) * 100) / 100);
+  return { ...result, size, drawn: size };
 }
 
 // Whether two boxes overlap by more than a rounding error.

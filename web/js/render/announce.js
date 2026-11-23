@@ -1,5 +1,5 @@
-// What screen readers hear about the board (#announcer): changes are announced once a burst of them settles, each
-// player's news in seat order, rather than on every step of a hold.
+// What screen readers hear about the board (#announcer, or an open dialog's own live region): changes are announced
+// once a burst of them settles, each player's news in seat order, rather than on every step of a hold.
 
 import { designations, tileSets } from '../logic/data.js';
 import { poolText } from '../logic/rules.js';
@@ -49,9 +49,17 @@ export function announce(index, kind, describe) {
   announceTimer = setTimeout(flushAnnouncements, 700);
 }
 
+// While a dialog is open, everything outside it is out of the accessibility tree, #announcer included, so the board's
+// news goes to the topmost open dialog's own live region instead (data-announcer in index.html; docs/review/FINAL.md
+// B2): a Track switch in settings that passes the monarch on is heard while settings is still open.
+function liveRegion() {
+  const open = [...document.querySelectorAll('dialog[open]')].at(-1);
+  return open?.querySelector('[data-announcer]') ?? announcer;
+}
+
 function flushAnnouncements() {
   clearTimeout(announceTimer);
-  announcer.textContent = [...pendingAnnouncements.values()].sort((a, b) => a.index - b.index)
+  liveRegion().textContent = [...pendingAnnouncements.values()].sort((a, b) => a.index - b.index)
     .map(item => item.describe()).join('. ');
   pendingAnnouncements.clear();
 }
@@ -86,11 +94,11 @@ export function announceModeEnd(words) {
 // Says who holds a designation now, once a burst of changes settles.
 export function announceDesignation(kind) {
   const { name, role } = /** @type {Designation} */ (designations.find(designation => designation.kind === kind));
-  announce(-1, kind, () => (game[kind] === null ? `Nobody has ${name}` : `Player ${game[kind] + 1} ${role}`));
+  announce(-1, kind, () => (game[kind] === null ? `Nobody has ${name}` : `${seatName(game[kind])}, ${role}`));
 }
 
 export function announcePool(index) {
-  announce(index, 'mana', () => `Player ${index + 1}, mana pool ${poolText(game, index)}`);
+  announce(index, 'mana', () => `${seatName(index)}, mana pool ${poolText(game, index)}`);
 }
 
 // A new board drops whatever was still waiting to be read.

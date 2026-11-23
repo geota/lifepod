@@ -211,6 +211,7 @@ Each direction is one token set applied to every control in §2. The tile palett
 - **Tap the number to edit it inline.** It becomes a field with a ✓.
   - Enter, ✓, tapping elsewhere or closing settings commits (1–999).
   - An empty or out-of-range entry reverts to the last value.
+  - *As built:* Enter, ✓, tapping elsewhere or Done commits; ✕, Escape or back closes settings without committing. An invalid entry on Enter or ✓ keeps the field open and says why; tapping elsewhere puts the last value back.
   - A value off the track (say 25 or 100) shows in the field. The thumb then rests at the nearest point on the track, or pinned to the end for 100.
 
 ### The no-keyboard decision
@@ -351,19 +352,19 @@ Glass follows §3 B, with these differences:
 | §3 B | As built | Why |
 |---|---|---|
 | Palette: Midnight + ice in the mock-up | Graphite + lime, as in Material | The owner kept one palette; only the control style changes. |
-| Glass on the pill and the settings header | Also on dialogs (dice, New game, discard) | The owner's call: all the floating chrome. Cards and rows stay solid. |
-| `blur(16–22px) saturate(1.5)` | GLASS.md's tinted recipe: the surface at 68% over `blur(18px) saturate(1.3)`, a 1px `#ffffff1f` edge and an `inset 0 1px 0 #ffffff22` highlight | GLASS.md measured it at 10:1 or better for the pill's icons on any tile. |
+| Glass on the pill and the settings header | Also on dialogs (dice, New game, discard) | The owner's call: all the floating chrome. Cards and rows stay solid. *Later (DESIGN-AUDIT S10, FINAL.md U4):* the pill has no blur, over a solid tint with the glass edge and highlight. |
+| `blur(16–22px) saturate(1.5)` | GLASS.md's tinted recipe: the surface at 68% over `blur(18px) saturate(1.3)`, a 1px `#ffffff1f` edge and an `inset 0 1px 0 #ffffff22` highlight, on the settings header and the dialogs; the pill keeps only the edge and highlight | GLASS.md measured it at 10:1 or better for the pill's icons on any tile. |
 | The settings header floats | It floats 8px in from the top and sides, rounded 22px, and the body scrolls under it; focus scrolls clear of it | So the glass has something to show, without covering the focused control. |
 | Switch: a white 20px thumb | White when off; **ink when on** | White on the lime accent is 1.1:1 and the thumb would vanish; ink is 12.6:1. Off, the grey track is 3.6:1 on the card and the white thumb 4.75:1 on the track. |
 | Segments: a raised light thumb | A thumb in the lime tint (the accent at 20% over the `--raised` track), lime text and a 1px lime ring, with the thumb's shadow; the dice picker's chosen die too. It was a neutral `#707379` thumb with white text until Accent L3 (23 November). | The same "tint, not solid" choice as Material. Text 7.4:1 on the tint; the ring is 4.7:1 against the track (WCAG 1.4.11). |
 | Slider: a thin track | 4px in the thumb grey (3.6:1 on the card), a muted lime fill (the accent at 42% over the track, since Accent L3), tick lines (the accent at 60% where filled), a round white 28px thumb | The track keeps a visible boundary. The muted fill is only 1.85:1 on the grey track, so the white thumb (4.8:1 on the track) carries the value. |
 | Pressed scales to 96% | Buttons, segments, the dice picker, the life value, the pill's discs, and the counter, mana, map, swatch and identity cells; rows only take the 10% layer | Rows press like iOS list rows. Chips keep their size, so the badge rows' fitting never measures a shrunk chip. |
 | Reduced motion falls back to a fade | No transitions and no shrinking | As in Material: nothing moves. |
-| Identity toggles: not specified | A light ring when on, the accent check kept | B keeps the accent for Done and switches; the check reads as "on". |
+| Identity toggles: not specified | A light ring when on, and the check in the seat's colour, as in Material (DESIGN-AUDIT N2) | The accent stays off the player tiles; the check reads as "on". |
 
 **Accent L3, "tint" (23 November 2026).** The owner chose to keep solid lime for committing only. In both styles a chosen segment, the chosen die and a slider's fill are tints of the lime (`--chosen-fill`, `--chosen-ink`, `--chosen-ring`, `--slider-fill`, `--tick-filled*`), and solid lime stays on Done and other primary buttons, the pill's save and Done discs (`--commit-fill`, `--commit-ink`), switches that are on and the focus ring. This replaces §6's "one selected style (accent fill)". See SETTINGS-SPEC.md §9 for the contrast figures.
 
 **Fallbacks** (GLASS.md): solid surfaces without `backdrop-filter`, under `prefers-reduced-transparency: reduce`, and under iOS Reduce Transparency (passed from `LifePodApp.swift` as `data-reduce-transparency`); solid with a 2px `--control-border` outline under `prefers-contrast: more`.
 
-**Checks:** `tests/style.test.mjs`, `tests/sizes.test.mjs` with `tests/sizes-glass.test.mjs`, and `node design/polish/final-review.mjs --sweep`, which sweeps every state in both styles.
+**Checks:** `tests/style.test.mjs`, the `tests/sizes-*.test.mjs` files with their `-glass` copies, and `node design/polish/final-review.mjs --sweep`, which sweeps every state in both styles.
 

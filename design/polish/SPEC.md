@@ -8,7 +8,7 @@
 
 **Target device: Pixel 11 Pro class, 952 × 427 CSS px in landscape.**
 
-- The Pixel 11 Pro has the same panel as the Pixel 10 Pro: 6.3", 2856 × 1280 at 495 ppi ([whatismyscreensize.com: 11 Pro](https://www.whatismyscreensize.com/device/pixel-11-pro), [10 Pro](https://www.whatismyscreensize.com/device/pixel-10-pro)). At the default 3× density, that's the 952 × 427 already in `tests/sizes.test.mjs`. No published source gives the 11 Pro's CSS viewport, so check it on a device.
+- The Pixel 11 Pro has the same panel as the Pixel 10 Pro: 6.3", 2856 × 1280 at 495 ppi ([whatismyscreensize.com: 11 Pro](https://www.whatismyscreensize.com/device/pixel-11-pro), [10 Pro](https://www.whatismyscreensize.com/device/pixel-10-pro)). At the default 3× density, that's the 952 × 427 already in the `tests/sizes-*.test.mjs` checks (`tests/sizes-checks.mjs`). No published source gives the 11 Pro's CSS viewport, so check it on a device.
 - **Design and render at 952 × 427 first.** Every mock-up's lead frame uses this size.
 - 640 × 360 (the smallest real phone) and 568 × 320 (the stress test) must keep working:
   - life totals, the −/+ halves and every 44px target always work;
@@ -135,7 +135,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 - **Each tile shows:**
   - a preview chip with *all three* (indicator, symbol and name), whatever the tiles are set to display (the owner: "show name / indicator / symbol when choosing");
   - the five mana-symbol toggles.
-- **Toggles:** `clamp(44px, 12u, 72 × grow)`, one row where five fit, otherwise 3 + 2 (6 players on phones).
+- **Toggles:** `clamp(44px, 12u, 72 × grow)`, one row where five fit, otherwise 3 + 2 (6 players on phones). *As built:* a face too narrow for three takes two to a row (`layout/board.js`).
 - An empty identity previews as "No identity".
 
 ## 3. One size per board, and what drops when space runs out (Q8: yes; Q9: no)
@@ -158,7 +158,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
   - `--ub`: the smallest face height left inside them;
   - `--board-digits`: the most digits in any total, minimum 2.
 - It runs again on resize, rotation, a player-count change, a seat rotation, and any total whose digit count changes.
-- Tile CSS uses `u = var(--ui) / 100` in place of `cqi`: `--control-size: clamp(44px, 18u, 74 × grow)`, glyphs `clamp(1.75rem, 12u, …)`, badges `clamp(.78rem, 3.6u, …)` and so on.
+- Tile CSS uses `u = var(--ui) / 100` in place of `cqi`: `--control-size: clamp(44px, 18u, 74 × grow)`, glyphs `clamp(1.75rem, 12u, …)`, badges `clamp(.78rem, max(3.6u, min(5u, 4.4·ub/100)), …)` (from the tile's width, and up to 5u where its height leaves room, so tablet badges grow) and so on.
 - The total's size is `min(clamp(2rem, 19vmin, max(7rem, 112 × grow)), (ui − 2·control − 2·gap − 8px) × 1.5 / board-digits)`.
 
 **Centring (added 22 November 2026):**
@@ -179,7 +179,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 
 | Screen | Players | `ui` × `ub` | Life | Badges |
 |---|---|---|---|---|
-| **952 × 427 (target)** | 2 | 427 × 475 | 81px | 15.4px |
+| **952 × 427 (target)** | 2 | 427 × 475 | 81px | 16px |
 | | 3–4 | 427–475 × 213 | 81px | 16px |
 | | 5–6 | 316 × 213 | 81px | 12.5px |
 | 640 × 360 | 6 | 212 × 179 | 68px | 12.5px |
@@ -216,7 +216,8 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 - **Shrinking is measured, not estimated.** Text doesn't shrink exactly in proportion to its type (gaps, padding and rounding don't), so the type starts from a proportional estimate and steps down 0.25px at a time, measured again after each step, until every row fits or it reaches 9px. (WebKit left a busy row 2–4px wider than its tile with the estimate alone.)
 - **Levels are board-wide.** The busiest tile decides for every tile, so the board stays uniform. That's the same principle as §3.1, and it stops names flickering on one tile while staying on another.
 - **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game or a change of Badge size. Counters ticking up and down by one can't make names blink.
-- The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `sword`, `wrap`, `wrap-far`, and `strip-wrap` for the mana strip, §9), and CSS hides the matching parts; `--near-badge-size` and `--far-badge-size` shrink the type.
+- The steps are set as `data-drop` tokens on each tile's `.near-edge` (`name`, `symbol`, `wrap`) and `.far-edge` (`sword`, `wrap-far`, and `strip-wrap` for the mana strip, §9), and CSS hides the matching parts there; `--near-badge-size` and `--far-badge-size` on the same edges shrink the type. `#board`'s `data-drop` lists every token taken, for the tests; nothing styles from it.
+- **A larger Badge size never draws a row smaller** (FINAL.md U1). Its taller chips can make a second line cover the total where a smaller size's doesn't, so the row shrinks on one line instead and can land below the smaller size's full type. When a side has to shrink, the fit tries again from each smaller size's full type (`--near-full-size`, `--far-full-size`) while that's larger, and keeps whichever draws the largest type.
 
 **What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent), measured in Chromium with Roboto:
 
@@ -248,8 +249,8 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 | Item | Shown when |
 |---|---|
 | Mode hints ("Tap +1 · hold −1", "Your tile colour") | `ub ≥ 200` and `ui ≥ 240`, as today. Shown on the target; hidden at 640 × 360 and below with 6 players. |
-| Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2. |
-| Mana strip | Never dropped. It tries its four places (§9) at full type, then with its type shrunk to an 11px floor, then wrapped (`strip-wrap`). |
+| Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2, or two to a row where three don't fit. |
+| Mana strip | Never dropped, and its type never shrinks. It takes the first of its three places (§9) that fits, wrapping toward the total (`strip-wrap`) where that folds fewer strips. |
 | Settings header | Fixed at the top of the full-screen settings page; it tightens to 4px padding under 360px tall (SETTINGS-SPEC.md §3). |
 | Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. |
 
@@ -315,7 +316,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ## 5. Tile colours: twelve swatches
 
-- With identity moved out, Colours mode shows only the swatches, as a 4 × 3 grid: `clamp(44px, min((100% − 24px)/4, (100% − 40px)/3), 60 × grow)`. Every tile fits it at 44px or more, including 6 players at 640×360.
+- With identity moved out, Colours mode shows only the swatches, as a 4 × 3 grid (*as built:* on a narrow or short board, `ui < 240` or `ub < 200`, the first of 4 × 3, 3 × 4, 6 × 2 and 2 × 6 that fits each face, `layout/board.js`): `clamp(44px, min((100% − 24px)/4, (100% − 40px)/3), 60 × grow)`. Every tile fits it at 44px or more, including 6 players at 640×360.
 - **Decision: add three hues** where the hue circle has gaps: Copper (about 55°), Olive (120°) and Orchid (330°).
   - `palette.mjs` generates them with the existing contrast checks: life total ≥ 9:1, small text ≥ 7.6:1, and the life-out red ≥ 4.79:1.
   - The values in the mock-up are placeholders.
@@ -329,11 +330,11 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - Player counters only, never permanent counters.
 - **Counters mode:**
   - One circle per enabled counter, in this order: poison, tax, energy, experience, rad.
-  - Three per row, last row centred. *As built:* with the designations (§13), seven cells go four to a row.
+  - Three per row, last row centred. *As built:* with the designations (§13), seven cells go four to a row, and a face too narrow for three takes two.
   - Each circle shows the icon over the count. Tap +1; hold −1 with repeat (500ms, then every 100ms), the map's rule. The hint is "Tap +1 · hold −1", hidden on short tiles.
   - Cell size: `clamp(44px, min((ui − 20px)/3, (ub − 58px)/2), 92 × grow)`. That's 78px on the target at 4 or 6 players, 61px at 640 × 360 and 50px at 568 × 320 (6 players).
   - Undo, ✓ and ✕ work as today. Counts are 0–99, and tax shows +2n.
-- **Icons:** poison is Mana infect `\ea73` (shipped), tax Mana's commander symbol `\e9c6` (`.ms-commander`; it was the Phosphor crown until the crown went to the monarch, §13), energy Mana `\e907`, rad Mana `\ea50`, experience the **Phosphor graduation cap (fill)**.
+- **Icons:** poison is Mana infect `\ea73` (shipped), tax Mana's commander symbol `\e9c6` (`data-glyph="commander"`; it was the Phosphor crown until the crown went to the monarch, §13), energy Mana `\e907`, rad Mana `\ea50`, experience the **Phosphor graduation cap (fill)**.
 
 ![Experience](renders/spec-experience.png)
 
@@ -409,7 +410,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - **The strip's type never shrinks**, so every symbol stays legible on its 44px target. Overflow loses detail by folding instead.
   - It takes the first place that fits clear of the total, the glyphs, the "Out" tag, the near row and the pill: its own line just under the far row, toward the total, wrapping onto a second line there if needed; folded into one chip (the pool, and a caret › that says it opens mana mode, the full-size picker) on its own line under the far row; or that chip at the end of the near row, by the player. With no commander damage it takes the far row's place.
   - As built: on the phones checked (952 × 427 and 568 × 320, 3 to 6 players) the gap between the far row and the total is shorter than a 44px line, so the chip goes to the near row there; a 1366 × 1024 tablet and the 3- and 5-player end seats keep the full strip under commander damage.
-  - *As built:* the strip tries those four places at full type, then again with its type shrunk (down to an 11px floor), then wrapped toward the total (`strip-wrap`, `layout/fit.js`). Its level is board-wide, with the same 15% hysteresis as the badge rows, and only the strips that need it fold.
+  - *As built:* the strip has three places, below the far row, folded there, and folded on the near row, all at full type, and one step, wrapping toward the total (`strip-wrap`, `layout/fit.js`), taken where it folds fewer strips. Its level is board-wide, with the same 15% hysteresis as the badge rows, and only the strips that need it fold.
   - The turn chip stays in the near row, so it never meets the strip.
   - Strip items are 44px tall:
     - **Tap a symbol to spend 1** of that colour. It saves at once. A colour that reaches 0 keeps its place, dimmed, until 800ms after the strip's last tap, then the strip reflows, so a quick extra tap can't land on whatever would have slid under the finger. The tile's − and + ignore touches for that time too.
