@@ -86,7 +86,7 @@ Open `ios/LifePod.xcodeproj` in Xcode and run the **LifePod** target on a simula
 
 ## Browser preview
 
-Open `web/index.html` to try the tracker on your computer. The preview uses browser storage and requests a screen wake lock where supported.
+Run `npm run preview` and open http://127.0.0.1:8080/ to try the tracker on your computer (`PORT=…` picks another port). The page is ES modules, which browsers don't run from a file, so opening `web/index.html` directly shows no board. The preview uses browser storage and requests a screen wake lock where supported.
 
 ## Lint
 

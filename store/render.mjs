@@ -2,7 +2,8 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { appFile as app, button, fakeScreenOrientation } from '../tests/helpers.mjs';
+import { serveApp } from '../design/serve.mjs';
+import { button, fakeScreenOrientation } from '../tests/helpers.mjs';
 
 const out = new URL('./', import.meta.url).pathname;
 
@@ -53,7 +54,7 @@ async function renderScene(browser, device, scene) {
     keepAwake: true,
   });
   await fakeScreenOrientation(page);
-  await page.goto(app);
+  await page.goto(server.url);
   const turn = await page.locator('.app').getAttribute('data-board-turn');
   if (turn !== '0') throw new Error(`${scene.name} rendered with the board turned ${turn}°`);
   if (scene.open === 'dice') {
@@ -79,6 +80,7 @@ async function renderScene(browser, device, scene) {
   return path;
 }
 
+const server = await serveApp();
 const browser = await chromium.launch();
 try {
   for (const device of devices) {
@@ -95,6 +97,7 @@ try {
   await graphic.screenshot({ path: `${out}play/feature-graphic.png` });
 } finally {
   await browser.close();
+  await server.close();
 }
 
 // Play's 512 × 512 icon comes from the iOS app icon art.

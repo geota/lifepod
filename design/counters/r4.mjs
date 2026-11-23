@@ -3,10 +3,11 @@
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { appFile as app } from '../../tests/helpers.mjs';
+import { serveApp } from '../serve.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
 const only = process.argv.slice(2);
+const server = await serveApp();
 const browser = await chromium.launch();
 const errors = [];
 const SCALE = 3;
@@ -186,7 +187,7 @@ async function open(size, variant) {
       sessionStorage.setItem('r4-seeded', '1');
     }
   }, games[size]);
-  await page.goto(app);
+  await page.goto(server.url);
   await page.waitForSelector('#board .player');
   if (variant.css) await page.addStyleTag({ content: variant.css });
   if (variant.js) await page.evaluate(variant.js);
@@ -379,4 +380,5 @@ for (const [name, run] of Object.entries(strips)) {
   await run();
 }
 await browser.close();
+await server.close();
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }

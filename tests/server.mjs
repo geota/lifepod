@@ -11,10 +11,8 @@ import { fileURLToPath } from 'node:url';
 // `npm test` starts one server for the whole run (globalSetup below, through --test-global-setup) and passes its origin
 // to every test file in LIFEPOD_TEST_ORIGIN. A file run on its own (`node --test tests/x.test.mjs`) starts its own.
 
-const roots = [
-  ['/__tests__/fonts/', fileURLToPath(new URL('./fonts/', import.meta.url))],
-  ['/', fileURLToPath(new URL('../web/', import.meta.url))],
-];
+const testFonts = fileURLToPath(new URL('./fonts/', import.meta.url));
+const webRoot = fileURLToPath(new URL('../web/', import.meta.url));
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -28,13 +26,13 @@ const types = {
 };
 
 // The file a request path names, or null if it is outside the served folders.
-function fileFor(pathname) {
+function fileFor(roots, pathname) {
   const [prefix, root] = roots.find(([mount]) => pathname.startsWith(mount));
   const file = resolve(root, `.${pathname.slice(prefix.length - 1)}`);
   return file === root || file.startsWith(root.endsWith(sep) ? root : root + sep) ? file : null;
 }
 
-async function respond(request, response) {
+async function respond(roots, request, response) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     response.writeHead(405, { allow: 'GET, HEAD' }).end();
     return;
@@ -47,7 +45,7 @@ async function respond(request, response) {
     return;
   }
   if (pathname.endsWith('/')) pathname += 'index.html';
-  const file = fileFor(pathname);
+  const file = fileFor(roots, pathname);
   const info = file && await stat(file).catch(() => null);
   if (!info?.isFile()) {
     response.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
@@ -62,9 +60,11 @@ async function respond(request, response) {
   else createReadStream(file).pipe(response);
 }
 
-export async function startServer() {
+// web is the folder served at / (the design scripts can point it at another copy of web/), and port 0 lets the system pick.
+export async function startServer({ web = webRoot, port: listen = 0 } = {}) {
+  const roots = [['/__tests__/fonts/', testFonts], ['/', resolve(web) + sep]];
   const server = createServer((request, response) => {
-    respond(request, response).catch(() => {
+    respond(roots, request, response).catch(() => {
       if (!response.headersSent) response.writeHead(500);
       response.end();
     });
@@ -73,7 +73,7 @@ export async function startServer() {
   server.keepAliveTimeout = 1000;
   await new Promise((done, fail) => {
     server.once('error', fail);
-    server.listen(0, '127.0.0.1', done);
+    server.listen(listen, '127.0.0.1', done);
   });
   const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
   return {

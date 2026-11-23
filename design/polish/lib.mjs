@@ -2,10 +2,10 @@
 // and JS, and compose labelled comparison strips. Nothing here changes web/.
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { appFile as defaultApp } from '../../tests/helpers.mjs';
+import { serveApp } from '../serve.mjs';
 
-// LIFEPOD_APP points the renders at another copy of web/, such as a clean checkout while web/ is mid-edit.
-const app = process.env.LIFEPOD_APP ? new URL(`file://${process.env.LIFEPOD_APP}`).href : defaultApp;
+// The app over http (design/serve.mjs); LIFEPOD_APP points the renders at another copy of web/.
+let server;
 
 export const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
 export const sizes = {
@@ -40,11 +40,13 @@ export function game(count, extra = {}) {
 let browser;
 export const errors = [];
 export async function launch() {
+  server = await serveApp();
   browser = await chromium.launch();
   return browser;
 }
 export async function close() {
   await browser.close();
+  await server.close();
   if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 }
 
@@ -62,7 +64,7 @@ export async function open(size, seed, variant = {}, scale = 2) {
       sessionStorage.setItem('polish-seeded', '1');
     }
   }, seed);
-  await page.goto(app);
+  await page.goto(server.url);
   await page.waitForSelector('#board .player');
   if (variant.css) await page.addStyleTag({ content: variant.css });
   if (variant.js) await page.evaluate(variant.js);

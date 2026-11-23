@@ -16,13 +16,17 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright-core';
-import { appFile as app, fakeScreenOrientation, turnScreen } from '../../tests/helpers.mjs';
+import { fakeScreenOrientation, turnScreen } from '../../tests/helpers.mjs';
+import { serveApp } from '../serve.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/final/', import.meta.url));
 const args = new Set(process.argv.slice(2));
 const doShots = !args.has('--sweep');
 const doSweep = !args.has('--shots');
 await mkdir(outDir, { recursive: true });
+// The app over http, with ?debug for the internals it drives (lifePodDebug in web/app.js).
+const server = await serveApp();
+const app = `${server.url}?debug`;
 
 // Sizes in CSS px, as the window is. Portrait windows report a portrait screen (angle 0), the rest landscape (90).
 const styles = ['material', 'glass'];
@@ -150,8 +154,11 @@ const modes = {
     await click(page, '#settings-close');
   },
   dice: page => click(page, '#dice-button'),
-  // Turn reminders on every tile, the monarch's and the initiative's in turn (app.js's remind(), a page global).
-  reminders: page => page.evaluate(() => game.scores.forEach((_, index) => remind(index, index % 2 ? 'initiative' : 'monarch'))),
+  // Turn reminders on every tile, the monarch's and the initiative's in turn (remind(), through ?debug).
+  reminders: page => page.evaluate(() => {
+    const { game, remind } = window.lifePodDebug;
+    game.scores.forEach((_, index) => remind(index, index % 2 ? 'initiative' : 'monarch'));
+  }),
   // Settings (design/polish/SETTINGS-SPEC.md): at the top, scrolled to the end, with a new game pending, with the life
   // field open, and turned to face the other side.
   settings: openSetup,
@@ -756,6 +763,7 @@ if (doSweep) {
   await accessibility();
 }
 await browser.close();
+await server.close();
 
 // Summary: problems grouped by kind and by a normalised message, with where they happen.
 const key = f => `${f.kind}: ${f.detail.replace(/^P\d /, '').replace(/[\d.]+(px²|px|×[\d.]+|:1)/g, 'N$1').replace(/"[^"]*"/g, '"…"').replace(/\(.*?\)/g, '(…)')}`;
