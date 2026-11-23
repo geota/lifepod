@@ -431,8 +431,51 @@ export function tileProblems(page, { targets = '', parts = '', pill = true } = {
   }, [targets, parts, pill]);
 }
 
-// Anything wrong with the mana strips at rest: a strip over its tile's life total, − and + glyphs, "Out" tag or near
-// row, or a strip target that isn't a whole 44px target inside its tile (tileProblems, without the pill).
+// Each tile's face in its own coordinates, with its far edge at the top: its width and height, the room its measured
+// clearances from the pill leave (--clear-far and so on), and for each named selector the box around every visible
+// match inside the face, or null. Boxes are { left, right, top, bottom } from the face's top left as its player reads
+// it, so a face turned by the board or its seat compares like an upright one.
+export function faceBoxes(page, selectors) {
+  return page.locator('.player').evaluateAll((players, selectors) => players.map((player) => {
+    const face = player.querySelector('.player-face');
+    const matrix = (element) => {
+      const value = getComputedStyle(element).transform;
+      return new DOMMatrixReadOnly(value === 'none' ? undefined : value);
+    };
+    const { a, b } = matrix(document.querySelector('.app')).multiply(matrix(face));
+    const angle = ((Math.round(Math.atan2(b, a) / (Math.PI / 2)) * 90) % 360 + 360) % 360;
+    const screen = face.getBoundingClientRect();
+    const local = (rect) => {
+      const box = {
+        0: { left: rect.left - screen.left, top: rect.top - screen.top, right: rect.right - screen.left, bottom: rect.bottom - screen.top },
+        90: { left: rect.top - screen.top, top: screen.right - rect.right, right: rect.bottom - screen.top, bottom: screen.right - rect.left },
+        180: { left: screen.right - rect.right, top: screen.bottom - rect.bottom, right: screen.right - rect.left, bottom: screen.bottom - rect.top },
+        270: { left: screen.bottom - rect.bottom, top: rect.left - screen.left, right: screen.bottom - rect.top, bottom: rect.right - screen.left },
+      }[angle];
+      return Object.fromEntries(Object.entries(box).map(([key, value]) => [key, Math.round(value * 10) / 10]));
+    };
+    const union = (selector) => {
+      const boxes = [...face.querySelectorAll(selector)].filter(element => element.checkVisibility() && element.getBoundingClientRect().width > 0)
+        .map(element => element.getBoundingClientRect());
+      if (!boxes.length) return null;
+      return local({
+        left: Math.min(...boxes.map(box => box.left)), right: Math.max(...boxes.map(box => box.right)),
+        top: Math.min(...boxes.map(box => box.top)), bottom: Math.max(...boxes.map(box => box.bottom)),
+      });
+    };
+    const clear = edge => parseFloat(getComputedStyle(player).getPropertyValue(`--clear-${edge}`)) || 0;
+    const width = face.offsetWidth;
+    const height = face.offsetHeight;
+    return {
+      edge: player.dataset.edge, width, height,
+      room: { left: clear('start'), right: width - clear('end'), top: clear('far'), bottom: height - clear('near') },
+      ...Object.fromEntries(Object.entries(selectors).map(([name, selector]) => [name, union(selector)])),
+    };
+  }), selectors);
+}
+
+// Anything wrong with the mana strips at rest: a strip over its tile's life total, − and + glyphs, "Out" tag, far row
+// or near row, or a strip target that isn't a whole 44px target inside its tile and clear of the pill (tileProblems).
 export async function stripProblems(page) {
   const covers = await page.evaluate(() => {
     const overlaps = (a, b) => a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
@@ -440,12 +483,12 @@ export async function stripProblems(page) {
       const strip = player.querySelector('.mana-strip');
       if (strip.hidden || !strip.offsetWidth) return [];
       const box = strip.getBoundingClientRect();
-      return [...player.querySelectorAll('.score, .controls button, .out-tag, .badges.near > *')]
+      return [...player.querySelectorAll('.score, .controls button, .out-tag, .badges.near > *, .badges.far > *')]
         .filter(blocker => blocker.checkVisibility() && blocker.offsetWidth && overlaps(box, blocker.getBoundingClientRect()))
         .map(blocker => `P${index + 1} strip: covers ${blocker.className}`);
     });
   });
-  return [...covers, ...await tileProblems(page, { targets: '.mana-strip:not([hidden]) button:not(.chip)', pill: false })];
+  return [...covers, ...await tileProblems(page, { targets: '.mana-strip:not([hidden]) button:not(.chip)' })];
 }
 
 // ---- Native stand-ins -----------------------------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { button, engines, openPage, savedGame, test, tileProblems } from './helpers.mjs';
+import { button, engines, faceBoxes, openPage, savedGame, test, tileProblems } from './helpers.mjs';
 
 // Centring (design/polish/SPEC.md §3.1): a tile keeps clear of the centre pill only on the edges the pill actually
 // reaches, as measured (--clear-far, --clear-end, --clear-near and --clear-start), and centres everything else in what's
@@ -22,51 +22,16 @@ function busyGame(count, rotations) {
   });
 }
 
-// Each tile's face in its own coordinates: where the measured clearances leave room, and the boxes of what's checked
-// (the far row's chips, and the open mode layer's content and hint), all as { left, right, top, bottom } with the far
-// edge at the top. A face turned by the board or by its seat is mapped back through its angle on screen.
-function readFaces(page) {
-  return page.locator('.player').evaluateAll(players => players.map((player) => {
-    const face = player.querySelector('.player-face');
-    const matrix = (element) => {
-      const value = getComputedStyle(element).transform;
-      return new DOMMatrixReadOnly(value === 'none' ? undefined : value);
-    };
-    const { a, b } = matrix(document.querySelector('.app')).multiply(matrix(face));
-    const angle = ((Math.round(Math.atan2(b, a) / (Math.PI / 2)) * 90) % 360 + 360) % 360;
-    const screen = face.getBoundingClientRect();
-    const width = face.offsetWidth;
-    const height = face.offsetHeight;
-    const local = (rect) => {
-      const box = {
-        0: { left: rect.left - screen.left, top: rect.top - screen.top, right: rect.right - screen.left, bottom: rect.bottom - screen.top },
-        90: { left: rect.top - screen.top, top: screen.right - rect.right, right: rect.bottom - screen.top, bottom: screen.right - rect.left },
-        180: { left: screen.right - rect.right, top: screen.bottom - rect.bottom, right: screen.right - rect.left, bottom: screen.bottom - rect.top },
-        270: { left: screen.bottom - rect.bottom, top: rect.left - screen.left, right: screen.bottom - rect.top, bottom: rect.right - screen.left },
-      }[angle];
-      return Object.fromEntries(Object.entries(box).map(([key, value]) => [key, Math.round(value * 10) / 10]));
-    };
-    const union = (elements) => {
-      const boxes = elements.filter(element => element.checkVisibility() && element.getBoundingClientRect().width > 0).map(element => element.getBoundingClientRect());
-      if (!boxes.length) return null;
-      return local({
-        left: Math.min(...boxes.map(box => box.left)), right: Math.max(...boxes.map(box => box.right)),
-        top: Math.min(...boxes.map(box => box.top)), bottom: Math.max(...boxes.map(box => box.bottom)),
-      });
-    };
-    const clear = edge => parseFloat(getComputedStyle(player).getPropertyValue(`--clear-${edge}`)) || 0;
-    const layer = face.querySelector('.mode-layer');
-    const content = layer.hidden ? [] : [...layer.querySelectorAll(':scope > .seat-map, :scope > .counter-cells, .swatches, :scope > .identity-preview > .chip, :scope > .identity, :scope > .first-picker')];
-    const hint = layer.querySelector(':scope > .layer-hint');
-    return {
-      edge: player.dataset.edge,
-      room: { left: clear('start'), right: width - clear('end'), top: clear('far'), bottom: height - clear('near') },
-      layerTop: parseFloat(getComputedStyle(layer).paddingTop),
-      far: union([...face.querySelectorAll('.badges.far > *')]),
-      content: union(content),
-      hint: hint ? union([hint]) : null,
-    };
-  }));
+// Each tile's face, far edge at the top (faceBoxes): the far row's chips, and the open mode layer's content and hint,
+// with how far the layer's padding keeps its content from the far edge.
+async function readFaces(page) {
+  const faces = await faceBoxes(page, {
+    far: '.badges.far > *',
+    content: '.mode-layer:not([hidden]) > :is(.seat-map, .counter-cells, .identity, .first-picker), .mode-layer:not([hidden]) .swatches, .mode-layer:not([hidden]) > .identity-preview > .chip',
+    hint: '.mode-layer:not([hidden]) > .layer-hint',
+  });
+  const tops = await page.locator('.player .mode-layer').evaluateAll(layers => layers.map(layer => parseFloat(getComputedStyle(layer).paddingTop)));
+  return faces.map((face, index) => ({ ...face, layerTop: tops[index] }));
 }
 
 const middle = (low, high) => (low + high) / 2;

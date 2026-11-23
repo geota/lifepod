@@ -1145,17 +1145,23 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   gap: 2px;
   pointer-events: none;
 }
-.badges[hidden], .board[data-mode]:not([data-mode="rotate"]) :is(.badges, .near-edge) { display: none; }
-.badges.far {
+.badges[hidden], .board[data-mode]:not([data-mode="rotate"]) :is(.badges, .near-edge, .far-edge) { display: none; }
+/* The far edge stacks the far row over the mana strip, while a pool has mana, 4px in from the tile's sides, 8px from
+   its far edge or clear of the pill where the pill reaches it. */
+.far-edge {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   top: max(calc(8 * var(--grow)), var(--clear-far, 0px));
   left: calc(4px + var(--clear-start, 0px));
   right: calc(4px + var(--clear-end, 0px));
-  font-size: var(--far-badge-size, var(--badge-size));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
 }
-/* The near edge stacks the mana strip, while a pool has mana, over the near row, 3px in from the tile's sides. It keeps
-   the far row's clearance where the pill reaches past it (a rotated seat). */
+.badges.far { position: relative; align-self: stretch; font-size: var(--far-badge-size, var(--badge-size)); }
+/* The near edge holds the near row, 3px in from the tile's sides. It keeps clear of the pill where the pill reaches
+   past it (a rotated seat). */
 .near-edge {
   position: absolute;
   z-index: 3;
@@ -1270,7 +1276,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .reminder-chip[data-fit] .reminder-label { display: none; }
 .chip.reminder-chip[data-fit="wrap"] { white-space: normal; text-align: center; }
 .player[data-reminder="over"] .reminders { bottom: 0; }
-.player[data-reminder="over"] :is(.badges.near, .mana-strip) { visibility: hidden; }
+.player[data-reminder="over"] .badges.near { visibility: hidden; }
 .reminder-chip > .icon { flex: none; width: 1.1em; height: 1.1em; color: var(--seat); }
 .reminder-chip b { font-weight: var(--weight-heavy); color: var(--seat); }
 .reminder-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: max(100%, var(--tap-min)); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
@@ -1279,13 +1285,14 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* A keyframe entrance rather than @starting-style: restingBox in app.js measures the chip with an important inline
    transform, which outranks an animation but not a transition. */
 @keyframes reminder-in { from { opacity: 0; transform: translateY(.4em); } }
-/* Floating mana at rest (design/polish/FINAL-REVIEW.md #3): while a pool has mana, a strip shows each colour it holds
-   and its amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a
-   44px-tall target at least 44px wide, on a 32px capsule. The near row always stays. app.js puts each strip in the
-   first place that fits clear of the life total, the − and + glyphs and the near row (data-strip on the tile):
-   above, on its own line over the near row; inline, at the end of the near row's line; or fold, one chip at the end
-   of the near row that shows the pool and opens mana mode. --strip-size shrinks the type and strip-wrap lets a strip
-   above grow upward onto a second line. */
+/* Floating mana at rest (design/polish/SPEC.md §9): while a pool has mana, a strip shows each colour it holds and its
+   amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a 44px-tall
+   target at least 44px wide, on a 32px capsule. It sits at the far edge, under commander damage and toward the total,
+   so the two most used counts are together, and both badge rows always stay. app.js puts each strip in the first place
+   that fits clear of the life total, the − and + glyphs, the near row and the pill (data-strip on the tile): below, on
+   its own line under the far row; inline, at the end of the far row's line; fold, one chip that shows the pool and
+   opens mana mode, on its own line; or fold-inline, that chip at the end of the far row. --strip-size shrinks the type
+   and strip-wrap lets a strip below grow toward the total onto a second line. */
 .mana-strip {
   position: relative;
   z-index: 1;
@@ -1301,25 +1308,26 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   font-size: var(--strip-size, clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))));
   pointer-events: auto;
 }
-/* Above: the strip's targets sit 2px over the near row, or with no near row its capsule sits where the near row would. */
-.player[data-strip="above"] .mana-strip { margin-bottom: -6px; }
-.player[data-strip="above"] .near-edge:has(> .badges.near:not([hidden])) > .mana-strip { margin-bottom: 2px; }
+/* Below: the strip's targets sit 2px under the far row, or with no far row its capsule sits where the far row would. */
+.player[data-strip="below"] .mana-strip { margin-top: -6px; }
+.player[data-strip="below"] .far-edge:has(> .badges.far:not([hidden])) > .mana-strip { margin-top: 2px; }
 .mana-strip::before { position: absolute; inset: 6px 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
 .mana-strip[hidden] { display: none; }
-.board[data-drop~="strip-wrap"] .player[data-strip="above"] .mana-strip { flex-wrap: wrap-reverse; }
-/* Inline: the near row, then the strip, on one line whose targets reach 2px from the tile's edge. */
-.player[data-strip="inline"] .near-edge { flex-direction: row; justify-content: center; gap: 4px; bottom: max(2px, var(--clear-near, 0px) - 6px); }
-.player[data-strip="inline"] .badges.near { flex: 1 1 0; min-width: 0; align-self: center; }
+.board[data-drop~="strip-wrap"] .player[data-strip="below"] .mana-strip { flex-wrap: wrap; }
+/* Inline: the far row, then the strip, on one line whose targets reach 2px from the tile's edge (or from the pill's
+   clearance, where the pill reaches it). */
+.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--clear-far, 0px) - 6px); }
+.player[data-strip="inline"] .badges.far { flex: 1 1 0; min-width: 0; align-self: center; }
 .player[data-strip="inline"] .mana-strip { order: 1; }
-/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line over the near row.
-   Where even that can't fit, the strip hides and the same chip ends the near row (fold-inline). */
-.player[data-strip="fold-inline"] .mana-strip, .badges.near > .strip-chip { display: none; }
-.player[data-strip="fold-inline"] .badges.near > .strip-chip { display: inline-flex; }
-.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--near-badge-size, var(--badge-size)); }
+/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line under the far row.
+   Where even that can't fit, the strip hides and the same chip ends the far row (fold-inline). */
+.player[data-strip="fold-inline"] .mana-strip, .badges.far > .strip-chip { display: none; }
+.player[data-strip="fold-inline"] .badges.far > .strip-chip { display: inline-flex; }
+.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--badge-size)); }
 .player[data-strip="fold"] .mana-strip { padding: 0; }
 .player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
 .player[data-strip="fold"] .mana-strip > .strip-chip { display: inline-flex; }
-.player[data-strip="fold"] .near-edge:has(> .badges.near:not([hidden])) > .mana-strip { margin-bottom: 2px; }
+.player[data-strip="fold"] .far-edge:has(> .badges.far:not([hidden])) > .mana-strip { margin-top: 2px; }
 .strip-chip .pip { --pip-size: 1.15em; }
 .strip-chip .summary-item { display: flex; align-items: center; gap: .12em; }
 /* Three colours or more overlap like a stack of coins, before the pool's total. */

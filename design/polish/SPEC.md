@@ -415,7 +415,10 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode (edit kind `mana`).
 - **At rest:**
   - A tile shows a strip **only while its pool has mana**, and only the colours it holds: for example (R)3 (C)1 [eraser].
-  - **The near badge row always stays** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place). The strip takes the first place that fits clear of the total, the glyphs and the near row: its own line above the near row; the end of the near row's line; folded into one chip (the pool, and a caret › that says it opens mana mode) on its own line; or that chip at the end of the near row. The turn chip never leaves the near row.
+  - **Both badge rows always stay** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place).
+  - **The strip sits at the far edge, with commander damage** (moved there on 22 November 2026, at the owner's request): the two most used operations are together and the tile is balanced, with the near row at the player's edge and commander damage and mana at the far edge.
+  - It takes the first place that fits clear of the total, the glyphs, the "Out" tag, the near row and the pill: its own line just under the far row, toward the total; the end of the far row's line; folded into one chip (the pool, and a caret › that says it opens mana mode) on its own line under the far row; or that chip at the end of the far row. With no commander damage it takes the far row's place.
+  - The turn chip stays in the near row, so it never meets the strip.
   - Strip items are 44px tall:
     - **Tap a symbol to spend 1** of that colour. It saves at once, and the strip shrinks as colours reach 0.
     - **The eraser clears the pool** and leaves "Undo clear" in the strip's place for 5 seconds; a tap restores the pool.

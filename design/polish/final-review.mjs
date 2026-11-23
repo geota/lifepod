@@ -410,8 +410,9 @@ function audit() {
     if (spread > 0.5) add('uniform', `${key} differs between tiles: ${shown.map(px).join(' / ')}`);
   }
   facts.sizes = Object.fromEntries(Object.entries(sizesBy).map(([k, v]) => [k, [...new Set(v.filter(x => x !== null).map(px))]]).filter(([, v]) => v.length));
-  // While a pool has mana, its strip must leave the near row in place: list the counts and chips that don't show. A
-  // strip folded into one chip must say that it opens mana mode (a caret).
+  // While a pool has mana, its strip sits at the far edge, with commander damage (SPEC.md §9), and must leave both badge
+  // rows in place: list the counts and chips that don't show, and a strip nearer the near edge than the far edge. A
+  // strip folded into one chip must say that it opens mana mode (a caret). Commander damage is checked below.
   const game = JSON.parse(localStorage.getItem('lifepod-game'));
   // A turn reminder that takes its tile's near edge (data-reminder="over", on tiles too short to show it above) hides the
   // near row and the strip on purpose for its 3 seconds, so their checks skip that tile.
@@ -434,6 +435,13 @@ function audit() {
       if (folded && !chip) add('hidden', `P${index + 1} folded mana strip shows no chip`);
       if (chip && !chip.querySelector('.icon[data-icon="caret-right"], .icon[data-icon="undo"]')) add('hidden', `P${index + 1} folded mana strip has no cue that it opens mana mode`);
       if (!folded && !visible(player.querySelector('.mana-strip'))) add('hidden', `P${index + 1} mana strip doesn't show`);
+      const shownStrip = [player.querySelector('.mana-strip'), chip].find(el => el && visible(el));
+      if (shownStrip) {
+        const centre = el => { const b = rect(el); return [(b.left + b.right) / 2, (b.top + b.bottom) / 2]; };
+        const away = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+        const at = centre(shownStrip);
+        if (away(at, centre(player.querySelector('.far-edge'))) > away(at, centre(player.querySelector('.near-edge')))) add('place', `P${index + 1} mana strip sits by the near edge, not the far edge`);
+      }
     });
   }
   // Every count chip must be visible (never dropped).

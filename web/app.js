@@ -190,10 +190,11 @@ const dropSteps = {
     { drop: 'identity', selector: '.ci-chip' }, { floor: 9 }, { drop: 'wrap', wrap: true },
   ],
   far: [{ drop: 'sword', selector: '.sword' }, { floor: 11 }, { floor: 9 }, { drop: 'wrap-far', wrap: true }],
-  // The mana strip never covers the life total, the − and + glyphs or the near row. Its type shrinks first, then it
-  // wraps upward if there's room above it. Each strip then takes the first place that fits (fitStrips): its own line
-  // above the near row, or the end of the near row's line, or, folded, one chip in the near row that shows the pool and
-  // opens mana mode. Only the strips that need it fold, so a short pool elsewhere keeps its spend buttons.
+  // The mana strip sits at the far edge, under commander damage, and never covers the life total, the − and + glyphs,
+  // the near row or the pill. Its type shrinks first, then it wraps toward the total if there's room. Each strip then
+  // takes the first place that fits (fitStrips): its own line under the far row, or the end of the far row's line, or,
+  // folded, one chip that shows the pool and opens mana mode, on its own line or at the end of the far row. Only the
+  // strips that need it fold, so a short pool elsewhere keeps its spend buttons.
   strip: [{ floor: 11 }, { drop: 'strip-wrap', wrap: true }],
 };
 // A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
@@ -499,17 +500,17 @@ function requestFit() {
   queueMicrotask(fitBadgeRows);
 }
 
-// The near rows are fitted first, then each mana strip takes the first place that fits. A strip folded onto the end of
-// its near row's line takes room from that row, so the near rows are fitted again around it.
+// The badge rows are fitted first, then each mana strip takes the first place that fits. A strip folded onto the end of
+// its far row's line takes room from that row, so the far rows are fitted again around it.
 function fitBadgeRows() {
   fitQueued = false;
   for (const player of board.children) {
     if (player.querySelector('.mana-strip').hidden) delete player.dataset.strip;
-    else player.dataset.strip = 'above';
+    else player.dataset.strip = 'below';
   }
   fitBadgeSide('near');
   fitBadgeSide('far');
-  if (fitStrips()) fitBadgeSide('near');
+  if (fitStrips()) fitBadgeSide('far');
   // A turn reminder's place depends on how tall the near edge came out.
   for (const index of reminders.keys()) placeReminders(board.children[index]);
 }
@@ -592,14 +593,15 @@ function overlaps(a, b) {
   return a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
 }
 
-// The mana strips never cover a life total, its − and + glyphs, the "Out" tag, the far row, the near row or the pill,
-// and the near rows always stay (design/polish/FINAL-REVIEW.md #3). Each strip takes the first of these that fits:
-//   'above': its own line between the total and the near row;
-//   'inline': at the end of the near row's line, where the near row leaves room;
-//   'fold': folded into one chip that shows the pool and opens mana mode, on its own line above the near row;
-//   'fold-inline': that chip at the end of the near row, which wraps around it like any other chip.
+// The mana strips sit at the far edge, with commander damage (design/polish/SPEC.md §9). They never cover a life total,
+// its − and + glyphs, the "Out" tag, the near row or the pill, and both badge rows always stay. Each strip takes the
+// first of these that fits:
+//   'below': its own line between the far row and the total;
+//   'inline': at the end of the far row's line, where the far row leaves room;
+//   'fold': folded into one chip that shows the pool and opens mana mode, on its own line under the far row;
+//   'fold-inline': that chip at the end of the far row, which gives way around it like any other chip.
 // The type steps (shrink, then wrap) are board-wide like the badge rows: the fewest that fold the fewest strips, with
-// the same 15% to spare before a step is undone. Returns whether a chip took room on a near row's line.
+// the same 15% to spare before a step is undone. Returns whether a chip took room on a far row's line.
 function fitStrips() {
   const strips = [...board.querySelectorAll('.mana-strip')].filter(strip => !strip.hidden && /** @type {HTMLElement} */ (strip.parentElement).offsetParent !== null);
   board.style.removeProperty('--strip-size');
@@ -622,7 +624,7 @@ function fitStrips() {
   const clear = (strip) => {
     const box = strip.getBoundingClientRect();
     const face = strip.closest('.player-face');
-    const blockers = [face.querySelector('.score'), face.querySelector('.out-tag'), ...face.querySelectorAll('.controls button, .badges.far > *')];
+    const blockers = [face.querySelector('.score'), face.querySelector('.out-tag'), ...face.querySelectorAll('.controls button, .badges.near > *')];
     return !overlaps(box, pill) && !blockers.some(blocker => blocker.offsetWidth && overlaps(box, blocker.getBoundingClientRect()));
   };
   // Where one strip goes at the current type, with slack to spare across the line, and what that costs: a folded strip
@@ -630,15 +632,16 @@ function fitStrips() {
   const place = (strip, slack, wrap) => {
     const player = tileOf(strip);
     const room = /** @type {HTMLElement} */ (strip.parentElement).clientWidth;
-    const near = player.querySelector('.badges.near');
-    const nearWidth = near.hidden ? 0 : chipsWidth(near);
-    const besideNear = width => nearWidth + (nearWidth ? 4 : 0) + width <= room + 1;
-    player.dataset.strip = 'above';
+    const far = player.querySelector('.badges.far');
+    const farWidth = far.hidden ? 0 : chipsWidth(far);
+    const besideFar = width => farWidth + (farWidth ? 4 : 0) + width <= room + 1;
+    player.dataset.strip = 'below';
     if ((wrap || lineWidth(strip) * slack <= room + 1) && clear(strip)) return 0;
     player.dataset.strip = 'inline';
-    if (besideNear(lineWidth(strip) * slack) && clear(strip)) return 0;
+    if (besideFar(lineWidth(strip) * slack) && clear(strip)) return 0;
     player.dataset.strip = 'fold';
-    if (strip.offsetWidth * slack <= room + 1 && clear(strip)) return 1;
+    // With no far row, the chip's own line is where the end of the far row's line would be.
+    if ((strip.offsetWidth * slack <= room + 1 && clear(strip)) || far.hidden) return 1;
     player.dataset.strip = 'fold-inline';
     return 2;
   };
@@ -652,12 +655,12 @@ function fitStrips() {
     const wrap = taken.some(step => step.wrap);
     if (floors.length) {
       // Each strip shrinks toward the line it can have: its own line where that's clear of the total, otherwise what the
-      // near row leaves on its line.
+      // far row leaves on its line.
       const ratio = Math.min(...strips.map((strip) => {
         const player = tileOf(strip);
-        const near = player.querySelector('.badges.near');
-        player.dataset.strip = 'above';
-        const room = /** @type {HTMLElement} */ (strip.parentElement).clientWidth - (clear(strip) || near.hidden ? 0 : chipsWidth(near) + 4);
+        const far = player.querySelector('.badges.far');
+        player.dataset.strip = 'below';
+        const room = /** @type {HTMLElement} */ (strip.parentElement).clientWidth - (clear(strip) || far.hidden ? 0 : chipsWidth(far) + 4);
         return room / (lineWidth(strip) * slack);
       }));
       if (ratio < 1) board.style.setProperty('--strip-size', `${Math.max(Math.min(...floors), Math.floor(base * ratio * 10) / 10)}px`);
@@ -2414,10 +2417,10 @@ function designationChip({ kind, label, name, still }, index) {
 }
 
 // The badge rows, each only when it has something to show. The far edge, toward the table, holds commander
-// damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first. The near
-// edge holds the colour identity chip, then poison, tax, energy, experience and rad, each only when it's set and its
-// switch is on, then the monarch's crown and the initiative's castle on their holder's tile. A turn reminder shows above
-// the near edge, or over it on a short tile.
+// damage: a sword, like the pill's, then one chip per opponent in their own tile colour, largest first, and under it
+// the mana strip while the pool has mana. The near edge holds the colour identity chip, then poison, tax, energy,
+// experience and rad, each only when it's set and its switch is on, then the monarch's crown and the initiative's castle
+// on their holder's tile. A turn reminder shows above the near edge, or over it on a short tile.
 function renderBadges(index) {
   const player = board.children[index];
   if (!player) return;
@@ -2429,6 +2432,7 @@ function renderBadges(index) {
   // The sword only labels the row: each chip already says whose commander it counts.
   const sword = element('span', 'chip sword', icon('sword'));
   sword.setAttribute('aria-hidden', 'true');
+  const foldedChip = game.manaPool && (hasMana(index) || clearedPools.has(index)) ? stripChip(index) : null;
   far.replaceChildren(...(damage.length ? [sword] : []), ...damage.map(({ amount, attacker }) => {
     const chip = inColourOf(element('span', 'chip damage', String(amount),
       visuallyHidden(` commander damage from Player ${attacker + 1}`)), attacker);
@@ -2436,11 +2440,12 @@ function renderBadges(index) {
     const level = dangerLevel(amount, commanderWarning, commanderLethal);
     if (level) chip.dataset.level = level;
     return chip;
-  }));
+  }), ...(foldedChip ? [foldedChip] : []));
+  // The strip folded onto the end of the far row, shown only when it can go nowhere else.
   far.hidden = damage.length === 0;
   const near = player.querySelector('.badges.near');
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
-  // While a pool has mana, or for 5 seconds after the eraser, its strip shows over the near row, which stays.
+  // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
   const strip = player.querySelector('.mana-strip');
   const hadFocus = strip.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement).dataset.colour ?? '' : null;
   const floating = game.manaPool && (hasMana(index) || clearedPools.has(index));
@@ -2454,7 +2459,6 @@ function renderBadges(index) {
     if (hadFocus !== null) setupButton.focus();
   }
   const chips = [...turnChips(index)];
-  const foldedChip = floating ? stripChip(index) : null;
   const identity = identityChip(game.identities[index], game.identity.show);
   if (identity) chips.push(identity);
   for (const { kind } of shownCounters()) {
@@ -2472,8 +2476,6 @@ function renderBadges(index) {
   }
   syncReminderChips(index, /** @type {HTMLElement} */ (near.parentElement).querySelector('.reminders'));
   placeReminders(player);
-  // The strip folded onto the near row, shown only when it can go nowhere else.
-  if (foldedChip) chips.push(foldedChip);
   for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
   // Keep keyboard focus on a turn chip as the row is rebuilt. When the turn moves to another tile, showTurn follows it.
   const turnFocus = near.contains(document.activeElement) && /** @type {Element} */ (document.activeElement).matches('.turn-chip');
