@@ -223,7 +223,9 @@ export async function openPage(t, engine, {
   const once = seed ? await page.addInitScript(writeStorage, { origin: base, entries: [[...storageKeys[platform], JSON.stringify(seed)]] }) : null;
   await page.goto(url ?? `${base}/index.html`);
   await once?.dispose();
-  if (font === 'roboto') await fontsReady(page);
+  // Every page, WebKit's included: its Mana symbols are a web font too, and a strip or a row measured before they
+  // arrived could otherwise be checked where it was first placed.
+  await fontsReady(page);
   return page;
 }
 const cspPrefix = '[lifepod-test] Content Security Policy violation:';

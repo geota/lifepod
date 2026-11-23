@@ -3443,7 +3443,15 @@ if (window.ResizeObserver) new ResizeObserver(measureBoard).observe(board);
 document.fonts?.addEventListener?.('loadingdone', () => {
   dropLevels = { near: 0, far: 0, strip: 0 };
   syncBoardTurn();
+  compactGroups.forEach(fitCompactSwitches);
 });
+// WebKit can fire `loading` and never `loadingdone`, so each load also fits the board again once document.fonts.ready
+// settles, keeping the drops it has (the hysteresis decides): a face that arrives late can't leave a mana strip or a
+// badge row placed by another font's measurements, over a total.
+document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(() => {
+  syncBoardTurn();
+  compactGroups.forEach(fitCompactSwitches);
+}));
 applyTileColours();
 applyBadgeSize();
 applyStyle();
