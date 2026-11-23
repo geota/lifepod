@@ -1,14 +1,16 @@
 // Spec mock-ups (renders/spec-*.png), drawn on the current app (web/index.html) with injected CSS and JS.
 // Nothing in web/ changes. Run from the repo root:  node design/polish/spec.mjs [strip ...]
+// spec-setup and spec-identity-page are gone: they mocked the old setup and Identity sheets, which the settings page and
+// the built identity mode replaced. Their last renders stay in renders/.
 // Every frame uses the spec baseline: button style B and one life-total size per board (SPEC §3).
 // The official experience icon isn't bundled: set EXP_SVG to a local copy of https://files.mtg.wiki/Exp.svg to
 // draw it in spec-experience; without it that frame says so.
 import { readFileSync, existsSync } from 'node:fs';
-import { launch, close, open, tap, game, shot, compose, outDir } from './lib.mjs';
+import { launch, close, open, inPage, tap, game, shot, compose, outDir } from './lib.mjs';
 import ph from './icons.mjs';
 
 const only = process.argv.slice(2);
-await launch();
+if (import.meta.main) await launch();
 
 // ---- Shared ---------------------------------------------------------------------------------------------------
 
@@ -113,7 +115,7 @@ const uniformJs = `
     board.style.setProperty('--ui', Math.min(...faces.map(f => f.offsetWidth)) + 'px');
     board.style.setProperty('--ub', Math.min(...faces.map(f => f.offsetHeight)) + 'px');
     board.style.setProperty('--board-digits', Math.max(2, ...game.scores.map(s => String(s).length)));
-    fitAllBadges();
+    requestFit();
   };
   mkUniform();`;
 // Today's per-tile sizing with style B, for comparison (cqi instead of the board unit).
@@ -142,21 +144,27 @@ const backgroundCss = `
 // Replace the near row's identity chip with one in a display mode.
 const chipModeJs = show => `
   const show = ${JSON.stringify(show)};
-  const base = renderBadges;
-  window.renderBadges = function (index) {
-    base(index);
+  extendBadges(function (index) {
     const near = board.children[index]?.querySelector('.badges.near');
     const old = near?.querySelector('.ci-chip'); const id = game.identities[index];
     if (!old || !id) return;
     if (!show.indicator && !show.symbol && !show.name) old.remove(); else old.replaceWith(mk.chip(id, show));
-    near.hidden = near.childElementCount === 0; fitBadgeRow(near);
-  };
-  [...board.children].forEach((p, i) => renderBadges(i));`;
+    near.hidden = near.childElementCount === 0; requestFit();
+  });`;
+
+// The page code the strips run, for tests/design.test.mjs.
+export const snippets = () => ({
+  'chip modes and background': { seed: idSeed, js: helpersJs + uniformJs + chipModeJs({ indicator: 1, name: 1 }) + backgroundJs('symbol') },
+  'counter cells': { seed: idSeed, js: helpersJs + "setBoardMode('counters');" + cellsJs },
+  turns: { seed: idSeed, js: helpersJs + turnJs({ mode: 'turns', active: 3, hit: true }) },
+  mana: { seed: idSeed, js: helpersJs + manaJs('mode') },
+  'auto-drop': { seed: idSeed6, js: helpersJs + dropJs + chipModeJs({ indicator: 1, symbol: 1, name: 1 }) + dropSeedJs + 'mkDrop();' },
+});
 
 // Opens a board with the spec baseline. extra: { css, js } applied after it.
 async function board(size, seed, extra = {}) {
   const p = await open(size, seed, { css: baseCss + backgroundCss + (extra.css ?? ''), js: helpersJs + uniformJs });
-  if (extra.js) await p.evaluate(extra.js);
+  if (extra.js) await p.evaluate(inPage(extra.js));
   await p.evaluate('mkUniform()');
   await p.waitForTimeout(120);
   return p;
@@ -231,168 +239,6 @@ strips['spec-identity-board'] = async () => {
   await compose('spec-identity-board', 'Identity on the board: chip mode × background', '', rows);
 };
 
-// The Identity sheet (setup → Identity) and the identity board mode it starts.
-const sheetCss = `
-  ${glyphCss}
-  .k-sheet { width: min(600px, calc(100% - 32px)); }
-  .k-sheet .sheet { gap: 8px; padding: 12px 16px 14px; }
-  .k-head { display: flex; align-items: center; gap: 6px; min-height: 44px; }
-  .k-head h2 { flex: 1; font-size: 1.25rem; letter-spacing: -.02em; }
-  .k-row { display: grid; grid-template-columns: 7.5rem 1fr; align-items: center; gap: 8px; }
-  .k-row-head { grid-template-columns: 7.5rem 1fr auto auto; gap: 6px; }
-  .k-sheet:has(.k-row-head) .sheet { padding-block: 10px; gap: 6px; }
-  .k-label { font-size: .875rem; font-weight: 650; color: var(--text-soft); }
-  .k-seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 12px; background: var(--background); }
-  .k-seg > button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: none; color: var(--text-soft); font-size: .9375rem; font-weight: 650; }
-  .k-seg > button[aria-pressed="true"] { background: var(--accent); color: var(--ink); }
-  .k-seg > button .icon, .k-seg > button .mk-glyph { width: 16px; height: 16px; font-size: 16px; }
-  .k-step { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; border-radius: 10px; background: var(--accent); color: var(--ink); font-weight: 750; text-align: center; }
-  .k-step button { min-height: 44px; border: 0; background: none; color: var(--ink); font-size: 1.125rem; font-weight: 700; }
-  .k-grid { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 6px; }
-  .k-nav, .k-switch { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px 0 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--background); color: var(--text); font-size: .875rem; font-weight: 650; text-align: left; }
-  .k-nav > .icon:first-child, .k-nav > .mk-glyph:first-child, .k-switch > .icon:first-child, .k-switch > .mk-glyph:first-child { width: 18px; height: 18px; font-size: 18px; color: var(--accent); flex: none; }
-  .k-nav .k-sub { margin-left: auto; display: flex; gap: 4px; color: var(--muted); font-weight: 500; }
-  .k-nav .k-sub .icon, .k-nav .k-sub .mk-glyph { width: 14px; height: 14px; font-size: 14px; }
-  .k-nav > .k-caret { width: 14px; height: 14px; margin-left: auto; color: var(--muted); }
-  .k-nav .k-sub + .k-caret { margin-left: 0; }
-  .k-switch .switch { margin-left: auto; }
-  .k-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-  .k-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .k-primary, .k-secondary { min-height: 48px; border-radius: 12px; font-size: 1rem; font-weight: 700; }
-  .k-primary { border: 0; background: var(--accent); color: var(--ink); }
-  .k-secondary { border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-  .k-icon { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); }
-  .k-icon .icon { width: 18px; height: 18px; }
-  .k-text { min-height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: none; color: var(--muted); font-size: .875rem; font-weight: 650; }
-  .k-note { margin: -2px 0 0; color: var(--muted); font-size: .8125rem; }`;
-// Builds a k-sheet from a small description language and opens it.
-const sheetJs = (spec) => `
-  const S = ${JSON.stringify(spec)};
-  const el = (tag, cls, ...kids) => { const n = document.createElement(tag); if (cls) n.className = cls; n.append(...kids.filter(k => k != null)); return n; };
-  const ico = n => n.startsWith('g:') ? mk.glyph(n.slice(2)) : n === 'x' ? (() => { const s = document.querySelector('#setup .close svg').cloneNode(true); s.setAttribute('class', 'icon'); return s; })() : n === 'sword' ? (() => { const s = mk.svg('caret-right'); s.firstChild.setAttribute('d', iconPaths.sword); return s; })() : n === 'crown' ? icon('crown') : mk.svg(n);
-  const seg = (items, cls = '') => el('div', 'k-seg ' + cls, ...items.map(it => it.step ? el('div', 'k-step', el('button', '', '−'), el('span', '', it.step), el('button', '', '+'))
-    : (() => { const b = el('button', '', it.icon ? ico(it.icon) : null, it.label ?? ''); b.setAttribute('aria-pressed', String(!!it.on)); return b; })()));
-  const sw = (it) => { const l = el('label', 'k-switch', it.icon ? ico(it.icon) : null, el('span', '', it.label), el('input'), el('span', 'switch')); l.querySelector('input').type = 'checkbox'; l.querySelector('input').checked = !!it.on; return l; };
-  const nav = (it) => el('button', 'k-nav', it.icon ? ico(it.icon) : null, el('span', '', it.label), it.sub ? el('span', 'k-sub', ...it.sub.map(s => s.startsWith('t:') ? s.slice(2) : ico(s))) : null, (() => { const c = mk.svg('caret-right'); c.classList.add('k-caret'); return c; })());
-  const parts = S.rows.map(r => {
-    if (r.seg && S.compact && r === S.rows[0]) return el('div', 'k-row k-row-head', el('span', 'k-label', r.label), seg(r.seg, r.multi ? 'multi' : ''), el('button', 'k-text', 'About'), el('button', 'k-icon', ico('x')));
-    if (r.seg) return el('div', 'k-row', el('span', 'k-label', r.label), seg(r.seg, r.multi ? 'multi' : ''));
-    if (r.grid) { const g = el('div', 'k-grid', ...r.grid.map(it => it.nav ? nav(it) : sw(it))); g.style.setProperty('--cols', r.cols ?? 3); return g; }
-    if (r.note) return el('p', 'k-note', r.note);
-    if (r.actions) return el('div', 'k-actions', ...r.actions.map(a => el('button', a.primary ? 'k-primary' : 'k-secondary', a.label)));
-    if (r.primary) return el('button', 'k-primary', r.primary);
-    return null;
-  });
-  const head = el('div', 'k-head', S.back ? el('button', 'k-icon', ico('caret-left')) : null, el('h2', '', S.title), S.about ? el('button', 'k-text', 'About') : null, el('button', 'k-icon', ico('x')));
-  const d = el('dialog', 'k-sheet', el('div', 'sheet', S.compact ? null : head, ...parts));
-  document.body.append(d); d.showModal(); document.activeElement?.blur();`;
-
-const setupSpec = (life = [{ label: '20' }, { label: '30' }, { label: '40', on: 1 }, { label: 'Custom' }]) => ({
-  title: 'Game setup', about: true,
-  rows: [
-    { label: 'Players', seg: [2, 3, 4, 5, 6].map(n => ({ label: String(n), on: n === 4 })) },
-    { label: 'Starting life', seg: life },
-    { grid: [{ nav: 1, icon: 'flag-fill', label: 'Track', sub: ['sword', 'g:infect', 'g:untap'] }, { nav: 1, icon: 'g:pie', label: 'Identity' }, { nav: 1, icon: 'palette', label: 'Colours' }] },
-    { grid: [{ nav: 1, icon: 'arrows-clockwise', label: 'Rotate seats' }, { icon: 'sun-dim', label: 'Keep awake', on: 1 }], cols: 2 },
-    { actions: [{ label: 'New game' }, { label: 'Done', primary: 1 }] },
-  ],
-});
-const trackSpec = {
-  title: 'Track', back: true,
-  rows: [
-    { grid: [{ icon: 'sword', label: 'Commander', on: 1 }, { icon: 'g:infect', label: 'Poison', on: 1 }, { icon: 'g:energy', label: 'Energy' },
-      { icon: 'graduation-cap', label: 'Experience' }, { icon: 'g:rad', label: 'Rad' }, { icon: 'g:tap', label: 'Mana pool', on: 1 }] },
-    { label: 'Turns', seg: [{ label: 'Off' }, { label: 'Rounds', icon: 'flag-fill' }, { label: 'Turn by turn', icon: 'g:untap', on: 1 }] },
-    { grid: [{ icon: 'eraser', label: 'Empty mana pools when the turn passes', on: 1 }], cols: 1 },
-  ],
-};
-const identitySpec = {
-  title: 'Identity', back: true,
-  rows: [
-    { label: 'Show on tiles', multi: 1, seg: [{ label: 'Indicator', on: 1 }, { label: 'Symbol' }, { label: 'Name', on: 1 }] },
-    { label: 'Background', seg: [{ label: 'Symbol', on: 1 }, { label: 'Indicator' }, { label: 'Off' }] },
-    { note: 'Nothing shows on a tile until its player picks an identity. Turning every “Show on tiles” option off hides the chip.' },
-    { primary: 'Choose identities' },
-  ],
-};
-
-strips['spec-setup'] = async () => {
-  const rows = [];
-  const tall = { width: 952, height: 427 };
-  const measure = p => p.evaluate(() => { const d = document.querySelector('dialog[open]'); return { h: Math.round(d.getBoundingClientRect().height), scroll: d.scrollHeight > d.clientHeight + 1 }; });
-  const sheet = async (size, spec) => {
-    const p = await board(size, game(4), { css: sheetCss });
-    await p.evaluate(sheetJs(spec)); await p.waitForTimeout(100);
-    const m = await measure(p);
-    const f = await crop(p, 'dialog[open]', 6);
-    await p.close();
-    return { f, m };
-  };
-  const main = await sheet('target', setupSpec());
-  const custom = await sheet({ width: 640, height: 360 }, setupSpec([{ label: '20' }, { label: '30' }, { label: '40' }, { step: '25' }]));
-  rows.push({ title: 'Game setup', note: 'Two segmented controls, a grid of navigation rows, one switch row and the two buttons. Custom starting life swaps its segment for a − 25 + stepper: no keyboard. Track, Identity and Colours open their own sheets or modes; Rotate seats starts the board mode as today.',
-    frames: [caption(fit(main.f, 410), `952 × 427 · ${main.m.h}px${main.m.scroll ? ' · scrolls' : ' · fits'}`), caption(fit(custom.f, 410), `Custom life · 640 × 360 · ${custom.m.h}px${custom.m.scroll ? ' · scrolls' : ' · fits'}`)] });
-  const compact = await sheet({ width: 568, height: 320 }, { ...setupSpec(), compact: true });
-  rows.push({ title: 'Below 360px tall: the header folds into the Players row', note: 'The title goes; About and ✕ move to the end of the Players row. Same controls, same 44px targets.', frames: [caption(fit(compact.f, 410), `568 × 320 (stress) · ${compact.m.h}px${compact.m.scroll ? ' · scrolls' : ' · fits'}`)] });
-  const track = await sheet('target', trackSpec);
-  const ident = await sheet('target', identitySpec);
-  rows.push({ title: 'Track and Identity sheets (‹ returns to setup)', note: 'Track: a switch row per tracker, the Turns choice and the auto-empty switch (shown only while Mana pool is on and Turns isn’t Off). Identity: what the chip shows (any combination), the background, and the button that starts choosing.',
-    frames: [caption(fit(track.f, 410), `Track · ${track.m.h}px`), caption(fit(ident.f, 410), `Identity · ${ident.m.h}px`)] });
-  await compose('spec-setup', 'Setup with six control types', 'Segmented choice (single or multiple), stepper, navigation row, switch row, primary and secondary buttons, and icon/text buttons in the header. Every target is at least 44px; the sheets fit 393px-tall phones.', rows);
-};
-
-// The identity board mode: every tile previews indicator, symbol and name above its five toggles.
-const identityModeJs = `
-  [...board.children].forEach((p, i) => {
-    const layer = p.querySelector('.mode-layer'); layer.hidden = false;
-    const id = game.identities[i];
-    const preview = document.createElement('div'); preview.className = 'mk-preview';
-    preview.append(id ? mk.chip(id, { indicator: 1, symbol: 1, name: 1 }) : Object.assign(document.createElement('span'), { className: 'chip', textContent: 'No identity' }));
-    const toggles = buildIdentity(i); toggles.classList.add('mk-toggles');
-    layer.replaceChildren(preview, toggles);
-  });
-  syncIdentity();`;
-const identityModeCss = `
-  .mk-preview { display: flex; justify-content: center; margin-bottom: 4px; font-size: clamp(.875rem, calc(4.2 * var(--u)), 1.25rem); pointer-events: none; }
-  .mk-toggles { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: calc(var(--ui) - 12px); }
-  .mk-toggles .identity-toggle { --t: clamp(44px, calc(12 * var(--u)), 72 * var(--grow)); width: var(--t); height: var(--t); font-size: 0; }
-  .mk-toggles .identity-toggle .pip { --pip-size: calc(var(--t) * .62); }
-  @container (max-width: 240px) { .mk-toggles { max-width: 150px; } }`;
-// Twelve swatches once identity has its own page.
-const coloursCss = `
-  .swatches { grid-template-columns: repeat(4, var(--swatch-size)) !important; }
-  .colour-picker { --swatch-size: clamp(44px, min((100cqi - 24px) / 4, (100cqb - 40px) / 3), 60 * var(--grow)) !important; }
-  [data-colour="copper"] { --panel: oklch(.36 .06 55); --rim: oklch(.52 .08 55); --seat: oklch(.9 .07 60); --button: oklch(.28 .05 55); }
-  [data-colour="olive"] { --panel: oklch(.36 .06 120); --rim: oklch(.52 .08 120); --seat: oklch(.91 .08 120); --button: oklch(.28 .05 120); }
-  [data-colour="orchid"] { --panel: oklch(.35 .07 330); --rim: oklch(.52 .09 330); --seat: oklch(.9 .07 330); --button: oklch(.27 .05 330); }`;
-const coloursJs = `
-  document.querySelectorAll('.swatches').forEach(g => { for (const id of ['copper', 'olive', 'orchid']) { const b = document.createElement('button'); b.className = 'swatch'; b.dataset.colour = id; b.dataset.row = 'bottom'; g.append(b); } });
-  document.querySelectorAll('.colour-picker').forEach(p => { delete p.dataset.identity; p.querySelectorAll('.identity, .identity-button').forEach(n => n.remove()); });
-  document.querySelectorAll('.layer-hint').forEach(h => { h.textContent = 'Your tile colour'; });`;
-
-strips['spec-identity-page'] = async () => {
-  const rows = [];
-  const frames = [];
-  for (const [size, seed, label] of [['target', idSeed, 'Pixel 11 Pro · 952 × 427 · 4 players'], ['small', idSeed6, '6 players · 640 × 360']]) {
-    const p = await board(size, seed, { css: identityModeCss });
-    await tap(p, '#setup-button'); await tap(p, '#tile-colours'); await p.waitForTimeout(80);
-    await p.evaluate(identityModeJs); await p.evaluate('mkUniform()'); await p.waitForTimeout(100);
-    frames.push(caption(fit(await shot(p), 410), label));
-    await p.close();
-  }
-  rows.push({ title: 'Choosing identities (setup → Identity → Choose identities)', note: 'A board mode like Colours, ending with ✓. Each tile shows its five mana-symbol toggles and, above them, everything the identity can show: indicator, symbol and name, whatever the tiles are set to display.', frames });
-  const f2 = [];
-  for (const [size, seed, label] of [['target', idSeed, 'Pixel 11 Pro · 952 × 427 · 4 players'], ['small', idSeed6, '6 players · 640 × 360']]) {
-    const p = await board(size, seed, { css: coloursCss });
-    await tap(p, '#setup-button'); await tap(p, '#tile-colours'); await p.waitForTimeout(80);
-    await p.evaluate(coloursJs); await p.waitForTimeout(100);
-    f2.push(caption(fit(await shot(p), 410), label));
-    await p.close();
-  }
-  rows.push({ title: 'Colours on their own: room for twelve swatches', note: 'With identity out of the colours layer, every tile has room for a 4 × 3 grid at 44px or more. The three new hues (Copper, Olive, Orchid here, placeholder values) fill the gaps in the hue circle; palette.mjs generates the real ones.', frames: f2 });
-  await compose('spec-identity-page', 'Identity gets its own page; Colours gets twelve swatches', '', rows);
-};
-
 // ---- 2. Uniform life size at 3 and 5 players ------------------------------------------------------------------
 
 strips['spec-uniform'] = async () => {
@@ -452,7 +298,7 @@ strips['spec-counters'] = async () => {
     for (const [size, n, label] of [['target', 4, 'Pixel 11 Pro · 952 × 427 · 4 players'], ['small', 6, '6 players · 640 × 360']]) {
       const p = await board(size, game(n, { poison: [3, 0, 7, 1, 0, 2].slice(0, n), casts: [1, 0, 2, 0, 1, 0].slice(0, n) }), { css: cellsCss(shape) });
       await tap(p, '#counters-button'); await p.waitForTimeout(80);
-      await p.evaluate(cellsJs); await pressed(p, '.player:nth-child(3) .mk-cell', 2);
+      await p.evaluate(inPage(cellsJs)); await pressed(p, '.player:nth-child(3) .mk-cell', 2);
       const sz = await p.evaluate(() => { const c = document.querySelector('.mk-cell'); return `${c.offsetWidth}×${c.offsetHeight}`; });
       frames.push(caption(fit(await shot(p), 410), `${label} · cell ${sz} · P3 holding energy`));
       await p.close();
@@ -486,12 +332,12 @@ const turnJs = ({ mode, round = 3, first = 1, active = null, hit = false, icon: 
   const icon2 = n => n.startsWith('g:') ? mk.glyph(n.slice(2)) : mk.svg(n);
   if (${JSON.stringify(mode)} === 'rounds') {
     const m = element('button', 'chip mk-turn rounds', mk.svg('flag-fill'), '${round}'); if (${hit}) m.classList.add('hit');
-    near(${first}).prepend(m); near(${first}).hidden = false; fitBadgeRow(near(${first}));
+    near(${first}).prepend(m); near(${first}).hidden = false; requestFit();
   } else {
-    const f = element('span', 'chip mk-flag', mk.svg('flag-fill')); near(${first}).prepend(f); near(${first}).hidden = false; fitBadgeRow(near(${first}));
+    const f = element('span', 'chip mk-flag', mk.svg('flag-fill')); near(${first}).prepend(f); near(${first}).hidden = false; requestFit();
     board.children[${active}].classList.add('is-active');
     const t = element('button', 'chip mk-turn active', icon2(${JSON.stringify(ic.startsWith('g:') || ph[ic] ? ic : 'g:' + ic)}), 'Turn ${round}'); if (${hit}) t.classList.add('hit');
-    near(${active}).prepend(t); near(${active}).hidden = false; fitBadgeRow(near(${active}));
+    near(${active}).prepend(t); near(${active}).hidden = false; requestFit();
   }`;
 
 strips['spec-turns'] = async () => {
@@ -625,14 +471,11 @@ strips['spec-badges'] = async () => {
   const extraJs = `
     const vals = { energy: [5, 2, 0, 8, 1, 3], experience: [2, 0, 1, 0, 3, 1], rad: [4, 0, 0, 2, 0, 6] };
     const ic = { energy: () => mk.glyph('energy'), experience: () => mk.svg('graduation-cap-fill'), rad: () => mk.glyph('rad') };
-    const base2 = renderBadges;
-    window.renderBadges = function (index) {
-      base2(index);
+    extendBadges(function (index) {
       const near = board.children[index]?.querySelector('.badges.near'); if (!near) return;
       for (const k of ['energy', 'experience', 'rad']) if (vals[k][index] > 0) near.append(element('span', 'chip', ic[k](), String(vals[k][index])));
-      near.hidden = near.childElementCount === 0; fitBadgeRow(near);
-    };
-    [...board.children].forEach((p, i) => renderBadges(i));`;
+      near.hidden = near.childElementCount === 0; requestFit();
+    });`;
   const sideCss = split => `
     .badges.near${split ? ':not(.mk-idrow)' : ''} { left: auto; right: 4px; top: 50%; bottom: auto; width: auto; transform: translateY(-50%); flex-direction: column; align-items: flex-end; gap: 3px; }
     .badges.near${split ? ':not(.mk-idrow)' : ''} { font-size: 12.5px !important; }
@@ -642,10 +485,11 @@ strips['spec-badges'] = async () => {
     [...board.children].forEach((p) => {
       const near = p.querySelector('.badges.near'); const id = near.querySelector('.chip.mk-id'); if (!id) return;
       const row = element('div', 'badges near mk-idrow'); row.append(id); near.after(row);
-      near.hidden = near.childElementCount === 0; fitBadgeRow(near); fitBadgeRow(row);
+      near.hidden = near.childElementCount === 0; requestFit(); requestFit();
     });`;
   const rows = [];
-  const colFit = `const of0 = fitBadgeRow; window.fitBadgeRow = row => { if (getComputedStyle(row).flexDirection === 'column') { row.style.removeProperty('font-size'); return; } of0(row); };`;
+  // The app's fitting can't be patched from outside a module any more, so the column rows shrink like the others.
+  const colFit = '';
   for (const [letter, title, note, css, js] of [
     ['1', 'Near row (chosen)', 'Identity chip (indicator + name) first, then the counters, centred on the player’s own edge. Reads as one line from the seat; never collides with − or +.', '', ''],
     ['2', 'Right side, everything', 'All chips stack on the reader’s right, between the + glyph and the edge. The + moves in by 34px, the name has to go (a column can’t hold “Glint-Eye”), and six chips are taller than a 6-player tile’s middle band.', sideCss(false), ''],
@@ -690,21 +534,18 @@ const dropJs = `
     };
     const near = plan('.badges.near', [{ drop: 'name' }, { drop: 'symbol' }, { floor: 11 }, { drop: 'identity' }, { floor: 9 }, { wrap: 1 }]);
     const far = plan('.badges.far', [{ drop: 'sword' }, { floor: 11 }, { floor: 9 }, { wrap: 1 }]);
-    if (!on.has('wrap')) fitAllBadges(); else document.querySelectorAll('.badges.far').forEach(r => fitBadgeRow(r));
+    if (!on.has('wrap')) requestFit(); else document.querySelectorAll('.badges.far').forEach(r => requestFit());
     return { near, far };
   };`;
 const dropSeedJs = `
   const vals = { energy: [12, 2, 0, 8, 1, 3], experience: [10, 0, 1, 0, 3, 1], rad: [14, 0, 0, 2, 0, 6] };
   const ic = { energy: () => mk.glyph('energy'), experience: () => mk.svg('graduation-cap-fill'), rad: () => mk.glyph('rad') };
-  const base3 = renderBadges;
-  window.renderBadges = function (index) {
-    base3(index);
+  extendBadges(function (index) {
     const near = board.children[index]?.querySelector('.badges.near'); if (!near) return;
     for (const k of ['energy', 'experience', 'rad']) if (vals[k][index] > 0) near.append(element('span', 'chip', ic[k](), String(vals[k][index])));
     if (index === 0) { const t = element('span', 'chip mk-turn', mk.glyph('untap'), element('span', 'mk-word', 'Turn '), '3'); near.prepend(t); }
     near.hidden = near.childElementCount === 0;
-  };
-  [...board.children].forEach((p, i) => renderBadges(i));`;
+  });`;
 
 strips['spec-autodrop'] = async () => {
   const n6 = [0, 1, 2, 3, 4, 5];
@@ -726,10 +567,8 @@ strips['spec-autodrop'] = async () => {
   const typical = `
     const vals = { energy: [5, 2, 0, 8, 1, 3], experience: [2, 0, 1, 0, 3, 1], rad: [4, 0, 0, 2, 0, 6] };
     const ic = { energy: () => mk.glyph('energy'), experience: () => mk.svg('graduation-cap-fill'), rad: () => mk.glyph('rad') };
-    const b4 = renderBadges;
-    window.renderBadges = function (index) { b4(index); const near = board.children[index]?.querySelector('.badges.near'); if (!near) return;
-      for (const k of ['energy', 'experience', 'rad']) if (vals[k][index] > 0) near.append(element('span', 'chip', ic[k](), String(vals[k][index]))); near.hidden = near.childElementCount === 0; };
-    [...board.children].forEach((p, i) => renderBadges(i));`;
+    extendBadges(function (index) { const near = board.children[index]?.querySelector('.badges.near'); if (!near) return;
+      for (const k of ['energy', 'experience', 'rad']) if (vals[k][index] > 0) near.append(element('span', 'chip', ic[k](), String(vals[k][index]))); near.hidden = near.childElementCount === 0; });`;
   const t6 = game(6, { identities: ['WURG', 'UBRG', 'WBR', 'WUBG', 'WUBRG', 'R'], poison: [3, 1, 7, 1, 0, 2], casts: [1, 2, 2, 0, 1, 0] });
   for (const [size, label, counters] of [['target', '952 × 427', true], [{ width: 640, height: 360 }, '640 × 360', true], [{ width: 568, height: 320 }, '568 × 320', true],
     ['target', '952 × 427 (poison + tax only)', false], [{ width: 640, height: 360 }, '640 × 360 (poison + tax only)', false], [{ width: 568, height: 320 }, '568 × 320 (poison + tax only)', false]]) {
@@ -762,8 +601,11 @@ strips['spec-sweep'] = async () => {
   }
 };
 
-for (const [name, run] of Object.entries(strips)) {
-  if (only.length && !only.includes(name)) continue;
-  await run();
+// Run as a script; tests/design.test.mjs imports it only for its snippets.
+if (import.meta.main) {
+  for (const [name, run] of Object.entries(strips)) {
+    if (only.length && !only.includes(name)) continue;
+    await run();
+  }
+  await close();
 }
-await close();

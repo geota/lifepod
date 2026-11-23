@@ -1,14 +1,17 @@
-// Round 4 renders: colour and pip fixes, mocked on the real app (web/index.html) with injected CSS and JS.
+// Round 4 renders: colour and pip fixes, mocked on the real app (web/index.html) with injected CSS and JS. The player
+// sheet these strips once also drew is gone, so its frames are too.
 // Writes design/counters/renders/r4-*.png. Run from the repo root: node design/counters/r4.mjs [strip ...]
 import { writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { serveApp } from '../../scripts/serve.mjs';
+import { inPage } from '../polish/lib.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
 const only = process.argv.slice(2);
-const server = await serveApp();
-const browser = await chromium.launch();
+// Run as a script; tests/design.test.mjs imports it only for its snippets.
+const server = import.meta.main ? await serveApp() : null;
+const browser = import.meta.main ? await chromium.launch() : null;
 const errors = [];
 const SCALE = 3;
 const sizes = {
@@ -64,18 +67,21 @@ const map = {
   },
 };
 
-// Taken swatches get their owner's tag from a small JS wrapper around syncSwatches.
+// Taken swatches get their owner's tag, after any redraw of the swatches.
 const ownerTagJs = `
-  const sync = syncSwatches;
-  window.syncSwatches = function (group) {
-    sync(group);
+  afterRender(() => document.querySelectorAll('.swatches').forEach(group => {
     for (const button of group.children) {
       button.querySelector('.owner')?.remove();
       const owner = game.colors.indexOf(Number(button.value));
       if (button.disabled) button.append(element('span', 'owner', 'P' + (owner + 1)));
     }
-  };
-  syncAllSwatches();`;
+  }));`;
+// The page code the strips run, for tests/design.test.mjs.
+export const snippets = () => ({
+  'owner tags': { seed: games.four, js: "setBoardMode('colours');" + ownerTagJs },
+  'sword chip': { seed: games.six, js: swordChipJs('lead') },
+  'sword in every chip': { seed: games.six, js: swordChipJs('each') },
+});
 const taken = {
   today: { title: 'Today', note: '40% opacity plus a seat-colour strike: the swatch takes on the tile underneath.', css: '' },
   A: {
@@ -99,22 +105,24 @@ const taken = {
 };
 
 const swordChipJs = (mode) => `
-  iconPaths.sword = ${JSON.stringify(sword)};
-  const render = renderBadges;
-  window.renderBadges = function (index) {
-    render(index);
+  // The app's icons don't include the sword, so it's drawn from its path here.
+  const swordIcon = () => {
+    const svg = icon('minus');
+    svg.firstChild.setAttribute('d', ${JSON.stringify(sword)});
+    return svg;
+  };
+  extendBadges(function (index) {
     const far = board.children[index]?.querySelector('.badges.far');
     if (!far || far.hidden) return;
     if (${JSON.stringify(mode)} === 'lead') {
-      const chip = element('span', 'chip sword', icon('sword'));
+      const chip = element('span', 'chip sword', swordIcon());
       chip.setAttribute('aria-hidden', 'true');
       far.prepend(chip);
     } else {
-      for (const chip of far.children) chip.prepend(icon('sword'));
+      for (const chip of far.children) chip.prepend(swordIcon());
     }
-    fitBadgeRow(far);
-  };
-  board.children.length && [...board.children].forEach((_, index) => renderBadges(index));`;
+    requestFit();
+  });`;
 const swordChip = {
   today: { title: 'Today', note: 'No sword: the coloured chips have no label.', css: '' },
   lead: {
@@ -190,8 +198,7 @@ async function open(size, variant) {
   await page.goto(server.url);
   await page.waitForSelector('#board .player');
   if (variant.css) await page.addStyleTag({ content: variant.css });
-  if (variant.js) await page.evaluate(variant.js);
-  await page.evaluate(() => fitAllBadges());
+  if (variant.js) await page.evaluate(inPage(variant.js));
   return page;
 }
 
@@ -325,20 +332,17 @@ const strips = {
   },
   async 'r4-taken-swatches'() {
     const rows = [];
-    const sheet = { action: 'sheet', clip: 'sheet', player: { four: 2, six: 3 } };
     for (const variant of Object.values(taken)) {
       const f = [
         { ...(await frame('four', variant, { action: 'colours' })), caption: `Colours mode · ${sizes.four.label}` },
         { ...(await frame('six', variant, { action: 'colours' })), caption: `Colours mode · ${sizes.six.label}` },
-        { ...(await frame('four', variant, sheet)), caption: 'Player sheet · 4 players, Player 3' },
-        { ...(await frame('six', variant, sheet)), caption: 'Player sheet · 6 players, Player 4' },
       ];
       rows.push(`<div class="row"><div class="label"><h2>${esc(variant.title)}</h2><p>${esc(variant.note)}</p></div><div>
         <div class="frames">${f.slice(0, 2).map(x => `<figure>${shot(x)}<figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>
         <div class="frames" style="margin-top:10px">${f.slice(2).map(x => `<figure>${shot(x)}<figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div></div></div>`);
     }
     await compose('r4-taken-swatches', 'R4.2 Taken swatches, with no transparency',
-      'Top: Game setup → Colours, every tile picking at once. Bottom: counters mode → palette button, the sheet facing that player. A swatch another player has can’t be chosen.', rows);
+      'Game setup → Colours, every tile picking at once. A swatch another player has can’t be chosen. (The player sheet these once showed is gone.)', rows);
   },
   async 'r4-sword-chip'() {
     const rows = [];
@@ -357,28 +361,27 @@ const strips = {
   },
   async 'r4-pips'() {
     const rows = [];
-    const toggles = { action: 'sheet', clip: '#identity-toggles', player: { four: 2 } };
     for (const variant of Object.values(pips)) {
       const four = await frame('four', variant, { crops: '.badges.near' });
       const six = await frame('six', variant, { crops: '.badges.near' });
-      const sheet = await frame('four', variant, toggles);
       four.caption = sizes.four.label; six.caption = sizes.six.label;
       rows.push(`<div class="row"><div class="label"><h2>${esc(variant.title)}</h2><p>${esc(variant.note)}</p></div><div>
-        <div class="frames">${[four, six].map(x => `<figure>${img(x.image, x.width)}<figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}
-        <figure>${img(sheet.image, sheet.width * 2)}<figcaption>Sheet toggles, 2× · Player 3 has W B</figcaption></figure></div>
+        <div class="frames">${[four, six].map(x => `<figure>${img(x.image, x.width)}<figcaption>${esc(x.caption)}</figcaption></figure>`).join('')}</div>
         <p style="margin:10px 0 6px;color:#8f998d;font-size:11.5px">Near rows, 2× and upright</p>
         <div class="crops" style="max-width:1340px;margin-bottom:6px">${cropHtml([...four.crops, ...six.crops], 2).slice('<div class="crops">'.length)}
       </div></div>`);
     }
     await compose('r4-pips', 'R4.4 Colour identity pips: making black look like the others',
-      'The board at rest and the player sheet’s W U B R G C toggles. Identities: 4 players WUBRG, UB, WB, C on Sage, Sky, Coral, Violet; 6 players WUBRG, B, WUB, C, BRG, WB on Amber, Teal, Rose, Indigo, Slate, Sage. Variants also show unchosen toggles at full colour, since their dimming is transparency too.', rows);
+      'The board at rest (the player sheet’s toggles these once showed are gone). Identities: 4 players WUBRG, UB, WB, C on Sage, Sky, Coral, Violet; 6 players WUBRG, B, WUB, C, BRG, WB on Amber, Teal, Rose, Indigo, Slate, Sage. Variants also show unchosen toggles at full colour, since their dimming is transparency too.', rows);
   },
 };
 
-for (const [name, run] of Object.entries(strips)) {
-  if (only.length && !only.includes(name)) continue;
-  await run();
+if (import.meta.main) {
+  for (const [name, run] of Object.entries(strips)) {
+    if (only.length && !only.includes(name)) continue;
+    await run();
+  }
+  await browser.close();
+  await server.close();
+  if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 }
-await browser.close();
-await server.close();
-if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
