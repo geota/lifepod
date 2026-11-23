@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { chromium, webkit } from 'playwright-core';
 import {
   androidMethods, backHandling, button, eventually, iosCalls, iosGlobals, iosMessages, mockWakeLock, openPage, reload, scores, test,
@@ -12,7 +12,9 @@ import {
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const kotlin = read('android/src/dev/maceiras/lifepod/MainActivity.kt');
 const swift = read('ios/LifePodApp.swift');
-const appJs = read('web/app.js');
+// The page's scripts, app.js and its modules under web/js/ (and dice.js), as one source.
+const appJs = readdirSync(new URL('../web/', import.meta.url), { recursive: true }).map(String).filter(path => path.endsWith('.js'))
+  .sort().map(path => read(`web/${path}`)).join('\n');
 const sorted = values => [...new Set(values)].sort();
 const matches = (source, pattern) => sorted([...source.matchAll(pattern)].map(match => match[1]));
 

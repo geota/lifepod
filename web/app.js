@@ -11,8 +11,16 @@ import {
   shownCounters, toFace, trackedDesignations,
 } from './js/logic/rules.js';
 import {
-  fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, loadGame, normalizeIdentity,
+  fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, normalizeIdentity,
 } from './js/logic/save.js';
+import {
+  android, currentLandscapeAngle, defaultStyle, haptic, ios, isPortraitWindow, portraitQuery, readScreen, reducedMotion,
+  setReduceTransparency, syncWakeLock,
+} from './js/state/platform.js';
+import {
+  boardMode, clearedPools, editStartHolders, editStartScores, edits, game, openBoardMode, reminders, saveGame,
+  syncBackHandling, turnSteps,
+} from './js/state/state.js';
 
 /** @typedef {import('./js/logic/data.js').BoardMode} BoardMode */
 /** @typedef {import('./js/logic/data.js').CountKind} CountKind */
@@ -21,14 +29,10 @@ import {
 /** @typedef {import('./js/logic/rules.js').Edit} Edit */
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
 /** @typedef {import('./js/logic/save.js').IdentitySettings} IdentitySettings */
-/** @typedef {import('./js/logic/data.js').QuarterTurn} QuarterTurn */
 /** @typedef {import('./js/logic/data.js').Reminders} Reminders */
 /** @typedef {import('./js/logic/data.js').Style} Style */
 /** @typedef {import('./js/logic/data.js').TurnMode} TurnMode */
 
-const storageKey = 'lifepod-game';
-const android = window.LifePodAndroid;
-const ios = window.webkit?.messageHandlers;
 const board = /** @type {HTMLParent} */ (document.querySelector('#board'));
 const playerTemplate = /** @type {HTMLTemplateElement} */ (document.querySelector('#player-template'));
 const wakeInput = /** @type {HTMLInputElement} */ (document.querySelector('#keep-awake'));
@@ -78,9 +82,6 @@ const identityBackgroundChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (
 const chooseIdentitiesButton = /** @type {HTMLButtonElement} */ (document.querySelector('#choose-identities'));
 const restart = /** @type {HTMLDialogElement} */ (document.querySelector('#restart'));
 const announcer = /** @type {HTMLParagraphElement} */ (document.querySelector('#announcer'));
-const portraitQuery = window.matchMedia('(orientation: portrait)');
-const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const defaultStyle = ios?.game ? 'glass' : 'material';
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
 // tile. Each row first drops words and marks: on the near row the identity's name, the turn chip's word "Turn" and the
 // hint's "Pass it on" (leaving the untap symbol and "T" with the round), then the identity's symbol where the indicator
@@ -130,18 +131,7 @@ const iconPaths = {
   'caret-right': 'M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z',
   play: 'M234.49,111.07,90.41,22.94A20,20,0,0,0,60,39.87V216.13a20,20,0,0,0,30.41,16.93l144.08-88.13a19.82,19.82,0,0,0,0-33.86ZM84,208.85V47.15L216.16,128Z',
 };
-
-let game = loadGame(() => (android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey)), currentLandscapeAngle());
 let selectedPlayerCount = game.scores.length;
-let lock;
-let requestingLock = false;
-// The open board mode (BoardMode in js/logic/data.js), or null at rest. Only setBoardMode changes it.
-/** @type {BoardMode} */
-let boardMode = null;
-// While an editing mode is open: every change made in it, newest last, so it can be undone or discarded,
-// and the life totals when it opened.
-let edits = /** @type {Edit[] | null} */ (null);
-let editStartScores = [];
 let announceTimer;
 const pendingAnnouncements = new Map();
 // How many auto-drop steps each badge row has taken, board-wide. A new game starts again from none. Past its drops, a
@@ -158,40 +148,9 @@ let die;
 let stopRoll;
 // Every held counter button, so several players can hold buttons at the same time.
 const activePresses = new Set();
-// Turn steps, newest last, so holding the turn chip or the pill steps back exactly, restoring any pools the step
-// emptied. Not saved: after a relaunch, a hold steps back by the play order instead.
-let turnSteps = [];
 // "Who goes first?" waits until settings has closed, then opens.
 let askFirst = false;
 let shuffleTimer;
-// Turn reminders showing on each tile, by player: designation kind → its timer. Not saved.
-const reminders = new Map();
-// Who held each designation when an editing mode opened, so saving it can remind a new initiative holder to venture.
-let editStartHolders = {};
-// Pools cleared with the eraser in the last 5 seconds, by player, so "Undo clear" can put them back. Not saved.
-const clearedPools = new Map();
-
-// Read the size directly. Media queries can lag a resize in WebKit.
-function isPortraitWindow() {
-  return window.innerHeight > window.innerWidth;
-}
-
-function normalizeAngle(angle) {
-  return ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
-}
-
-// The angle the OS has turned the screen clockwise from the device's natural orientation.
-function readScreen() {
-  const { angle, type } = window.screen.orientation;
-  return { angle: normalizeAngle(angle), landscape: type.startsWith('landscape') };
-}
-
-// The screen angle that shows the board upright in landscape, so the seats can stay fixed to the device.
-/** @returns {QuarterTurn} */
-function currentLandscapeAngle() {
-  const { angle, landscape } = readScreen();
-  return /** @type {QuarterTurn} */ (landscape ? angle : (angle + 90) % 360);
-}
 
 function boardTurn() {
   let turn = (game.landscapeAngle - readScreen().angle + 360) % 360;
@@ -670,47 +629,6 @@ function fitStrips() {
   return strips.some(strip => tileOf(strip).dataset.strip === 'fold-inline');
 }
 
-function saveGame() {
-  const snapshot = JSON.stringify(game);
-  if (android) android.writeGame(snapshot);
-  else if (ios) ios.game.postMessage(snapshot);
-  else {
-    try { localStorage.setItem(storageKey, snapshot); }
-    catch { /* The current game still works if browser storage is disabled. */ }
-  }
-}
-
-async function syncWakeLock() {
-  if (android) {
-    android.keepAwake(game.keepAwake);
-    return;
-  }
-  if (ios) {
-    ios.keepAwake.postMessage(game.keepAwake);
-    return;
-  }
-  if (!game.keepAwake || document.hidden) {
-    if (lock) await lock.release();
-    return;
-  }
-  if (lock || requestingLock) return;
-  try {
-    requestingLock = true;
-    // Outside a secure context there is no navigator.wakeLock; that throws here and is caught like a refusal.
-    const acquired = await navigator.wakeLock.request('screen');
-    if (game.keepAwake && !document.hidden) {
-      lock = acquired;
-      acquired.addEventListener('release', () => { lock = undefined; }, { once: true });
-    } else {
-      await acquired.release();
-    }
-  } catch {
-    // A browser or device may decline a screen wake lock.
-  } finally {
-    requestingLock = false;
-  }
-}
-
 function cancelPresses() {
   for (const press of [...activePresses]) press.end();
 }
@@ -793,13 +711,6 @@ function bindCounter(button, adjust, label) {
   });
 }
 
-// A light tick for each counted change. Phones follow their own system haptics settings.
-function haptic() {
-  if (android) android.haptic?.();
-  else if (ios) ios.haptic?.postMessage(null);
-  else navigator.vibrate?.(8);
-}
-
 // Announce totals once a burst of changes settles, instead of on every step of a hold. Each player's news is
 // read in seat order, and describe() runs when it's read, so it gives the settled value.
 /**
@@ -819,11 +730,6 @@ function announce(index, kind, describe) {
 
 function announceLife(index) {
   announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
-}
-
-// Android's back gesture only needs the page while a dialog or board mode is open.
-function syncBackHandling() {
-  android?.setBackHandling?.(boardMode !== null || document.querySelector('dialog[open]') !== null);
 }
 
 /**
@@ -1684,7 +1590,7 @@ function chooseFirst(index) {
   clearTimeout(shuffleTimer);
   game.turn.first = index;
   game.turn.active = index;
-  turnSteps = [];
+  turnSteps.length = 0;
   saveGame();
   haptic();
   board.dataset.picked = '';
@@ -2050,10 +1956,7 @@ function setBoardMode(mode) {
   for (const player of board.children) player.removeAttribute('data-lit');
   // Opening mana mode settles any "Undo clear": the cleared pool stays empty.
   if (mode === 'mana') endUndoClears();
-  boardMode = mode;
-  edits = editingModes.includes(mode) ? [] : null;
-  editStartScores = [...game.scores];
-  editStartHolders = Object.fromEntries(designationKinds.map(kind => [kind, game[kind]]));
+  openBoardMode(mode);
   [...board.children].forEach((player, index) => {
     player.querySelector('.controls').inert = mode !== null;
     player.querySelector('.rotate-seat').hidden = mode !== 'rotate';
@@ -2191,7 +2094,7 @@ function startGame(playerCount, startingLife) {
   game.monarch = null;
   game.initiative = null;
   clearReminders();
-  turnSteps = [];
+  turnSteps.length = 0;
   for (const { timer } of clearedPools.values()) clearTimeout(timer);
   clearedPools.clear();
   game.startingLife = startingLife;
@@ -2445,16 +2348,7 @@ for (const choice of styleChoices.children) {
     compactGroups.forEach(fitCompactSwitches);
   });
 }
-
-// Reduce Transparency on iOS, whose WebKit has no prefers-reduced-transparency: LifePodApp.swift injects
-// window.initialReduceTransparency before the page loads and calls window.setReduceTransparency when it changes. Glass
-// treats data-reduce-transparency like the media query, with solid surfaces.
-/**
- * @param {boolean | undefined} reduce
- */
-function setReduceTransparency(reduce) {
-  document.documentElement.toggleAttribute('data-reduce-transparency', reduce === true);
-}
+// The iOS app passes Reduce Transparency in before the page loads, and calls this whenever it changes.
 window.setReduceTransparency = setReduceTransparency;
 setReduceTransparency(window.initialReduceTransparency);
 
@@ -2614,7 +2508,7 @@ for (const choice of turnChoices.children) {
     const was = game.turns;
     if (mode === was) return;
     game.turns = mode;
-    turnSteps = [];
+    turnSteps.length = 0;
     if (was !== 'off' && mode !== 'off') game.turn.active = null;
     // Turn reminders are only for Turn by turn.
     if (mode !== 'turns') clearReminders();
@@ -2827,7 +2721,7 @@ document.addEventListener('keydown', (event) => {
 wakeInput.addEventListener('change', () => {
   game.keepAwake = wakeInput.checked;
   saveGame();
-  syncWakeLock();
+  syncWakeLock(() => game.keepAwake);
 });
 // The counter switches are saved at once and stay on across launches and new games.
 for (const tracker of trackers) {
@@ -2852,7 +2746,7 @@ for (const tracker of trackers) {
 for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', maybeAskFirst);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();
-  else if (!android && !ios) syncWakeLock();
+  else if (!android && !ios) syncWakeLock(() => game.keepAwake);
 });
 window.screen.orientation.addEventListener('change', syncBoardTurn);
 window.addEventListener('resize', syncBoardTurn);
@@ -2883,5 +2777,5 @@ applyStyle();
 syncBoardTurn();
 renderBoard();
 syncPill();
-syncWakeLock();
+syncWakeLock(() => game.keepAwake);
 syncBackHandling();
