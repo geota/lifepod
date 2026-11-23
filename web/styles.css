@@ -870,23 +870,31 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .rotate-seat:active { background: var(--press-overlay); }
 .rotate-seat:focus-visible { outline-offset: -3px; }
 
-/* Board modes other than seat rotation swap the life controls for a layer facing the tile's player. It keeps
-   22px clear on its far side, where the centre controls reach up to 18px into the tiles next to them (more on
-   tablets, where the pill grows). */
+/* Board modes other than seat rotation swap the life controls for a layer facing the tile's player. It keeps clear
+   of the centre pill only on the edges the pill reaches (app.js measures them into --clear-far, --clear-end,
+   --clear-near and --clear-start), and its content is centred in what's left: the map, the cells, the swatches, or the
+   identity preview over its toggles. A hint takes the space on the far side of the content, so it doesn't push the
+   content off-centre; only where that space is shorter than the hint does the content give way toward the near edge. */
 .board[data-mode]:not([data-mode="rotate"]) .controls { visibility: hidden; }
 .mode-layer {
   position: absolute;
   inset: 0;
   z-index: 2;
   display: grid;
-  place-content: center;
+  grid-template-rows: 1fr auto auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  /* Content taller than the layer overflows both ways evenly, as it did before the hint had a row of its own. */
+  align-content: center;
   justify-items: center;
-  gap: 6px;
-  padding: max(calc(var(--setup-button) / 2 - 2px), var(--clear-far, 0px) - 4px) max(6px, var(--clear-end, 0px)) max(4px, var(--clear-near, 0px)) max(6px, var(--clear-start, 0px));
+  padding: max(4px, var(--clear-far, 0px)) calc(6px + var(--clear-end, 0px)) max(4px, var(--clear-near, 0px)) calc(6px + var(--clear-start, 0px));
   text-align: center;
 }
+.mode-layer > * { grid-row: 2; }
+.mode-layer > .layer-hint { grid-row: 1; align-self: end; margin-bottom: 6px; }
+.mode-layer > .identity { grid-row: 3; margin-top: 6px; }
 .mode-layer[hidden] { display: none; }
-.layer-hint { font-size: clamp(.75rem, calc(3.6 * var(--u)), max(.875rem, 14 * var(--grow))); font-weight: var(--weight-semibold); color: var(--text-soft); }
+.board { --hint-size: clamp(.75rem, calc(3.6 * var(--u)), max(.875rem, 14 * var(--grow))); }
+.layer-hint { font-size: var(--hint-size); font-weight: var(--weight-semibold); line-height: 1.2; color: var(--text-soft); }
 /* Mode hints show only where every tile has room: ub ≥ 200 and ui ≥ 240. */
 .board:is([data-narrow], [data-short]) .layer-hint { display: none; }
 
@@ -895,7 +903,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
    full colour, shows its owner ("P2") in the seat colour in place of the dot, and can't be chosen. The grid fits
    under the hint and clear of the check mark, and every swatch stays at least 44px. */
 .colour-picker {
-  --hint-space: 26px;
+  /* The hint's line and its 6px gap. */
+  --hint-space: calc(var(--hint-size) * 1.2 + 6px);
   --swatch-size: clamp(44px, min((var(--ui, 400px) - 24px) / 4, (var(--ub, 400px) - var(--setup-button) / 2 - 14px - var(--hint-space)) / 3), 60 * var(--grow));
   display: flex;
   align-items: center;
@@ -921,17 +930,18 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .swatch .owner { color: var(--seat); font-size: max(14px, var(--swatch-size) * .24); font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
 /* Narrow tiles, such as 6 players on a phone, tighten the layer and drop the hint. */
 .board[data-narrow] .mode-layer {
-  padding: max(calc(var(--setup-button) / 2 - 4px), var(--clear-far, 0px) - 4px) max(4px, var(--clear-end, 0px)) max(1px, var(--clear-near, 0px)) max(4px, var(--clear-start, 0px));
+  padding: max(1px, var(--clear-far, 0px) - 4px) calc(4px + var(--clear-end, 0px)) max(1px, var(--clear-near, 0px)) calc(4px + var(--clear-start, 0px));
 }
 .board[data-narrow] .colour-picker { --swatch-size: 44px; }
 .board[data-narrow] .swatches { gap: 3px; }
 /* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches fit. */
 /* On narrow or short boards the swatches are 44px, and each face lays them out in the grid that fits it: 4 × 3, or
    3 × 4 on a face narrower than four swatches, such as a rotated seat in a short tile (app.js sets --swatch-columns).
-   The layer keeps clear of the pill only on the edges it reaches, so the grid can use the rest of the face. */
+   The layer keeps clear of the pill only on the edges it reaches, and centres the grid in the rest of the face; along
+   an axis where the grid doesn't fit there, it may reach 6px into the clearance (app.js sets --swatch-pad). */
 .swatches { grid-template-columns: repeat(var(--swatch-columns, 4), var(--swatch-size)); }
 .board:is([data-narrow], [data-short]) .mode-layer:has(.colour-picker) {
-  padding: max(1px, var(--clear-far, 0px) - 6px) max(1px, var(--clear-end, 0px) - 6px) max(1px, var(--clear-near, 0px) - 6px) max(1px, var(--clear-start, 0px) - 6px);
+  padding: var(--swatch-pad, max(1px, var(--clear-far, 0px) - 6px) max(1px, var(--clear-end, 0px) - 6px) max(1px, var(--clear-near, 0px) - 6px) max(1px, var(--clear-start, 0px) - 6px));
 }
 .board[data-short] .colour-picker { --swatch-size: 44px; }
 .board[data-short] .swatches { gap: 3px; }
@@ -1112,6 +1122,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   color: var(--seat);
   font-size: clamp(1rem, calc(5 * var(--u)), max(1.5rem, 24 * var(--grow)));
   font-weight: var(--weight-heavy);
+  /* One size on every tile: a narrow face lets it reach into its layer's padding rather than squeeze it. */
+  white-space: nowrap;
 }
 .first-go .icon { width: 1.1em; height: 1.1em; }
 .first-go:active { background: var(--cell-pressed); }
@@ -1137,7 +1149,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .badges.far {
   position: absolute;
   z-index: 2;
-  top: max(calc(var(--setup-button) / 2 + 2px), var(--clear-far, 0px));
+  top: max(calc(8 * var(--grow)), var(--clear-far, 0px));
   left: calc(4px + var(--clear-start, 0px));
   right: calc(4px + var(--clear-end, 0px));
   font-size: var(--far-badge-size, var(--badge-size));
@@ -1159,9 +1171,6 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .board[data-drop~="name"] .badges.near .ci-chip .id-name, .board[data-drop~="name"] .turn-word, .board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol,
 .board[data-drop~="identity"] .badges.near .ci-chip, .board[data-drop~="sword"] .badges.far .sword { display: none; }
 .board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
-/* A sideways tile's far edge runs along a seam through the middle of the board, so its row starts at the reader's
-   left, away from the centre. */
-.player:is([data-edge="left"], [data-edge="right"]) .badges.far { justify-content: flex-start; }
 .chip {
   display: inline-flex;
   align-items: center;

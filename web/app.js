@@ -310,16 +310,18 @@ function syncBoardTurn() {
 //
 // The centre pill never covers a total, a glyph or a badge (design/polish/FINAL-REVIEW.md #1 and #2). It sits on a seam
 // that the tiles' far rows face: upright along the middle seam with 2 players, and otherwise on the horizontal seam
-// through the middle of the board, kept to the columns whose seats are split into two rows. Any face edge it still
-// reaches past, such as a rotated seat's near row or one end, gets the far row's clearance, and --ui and --ub are what
-// each face has left inside its clearances, so tile content is sized to fit them.
+// through the middle of the board, kept to the columns whose seats are split into two rows. Only the face edges it
+// actually reaches past get a clearance (--clear-far and so on), and a face the pill doesn't reach, such as the end seat
+// at 3 or 5 players, keeps none: its rows and mode layers are centred in the whole face. --ui and --ub are what each
+// face has left inside its clearances, so tile content is sized to fit them.
 function measureBoard() {
   const faces = [...board.querySelectorAll('.player-face')];
   // A new player count is measured once its tiles are drawn.
   if (faces.length !== game.scores.length || !board.clientWidth || !board.clientHeight) return;
   const size = Math.max(...[...boardControls.querySelectorAll('.pill-button')].map(button => button.offsetWidth));
   const pill = placePill(size);
-  // The far row already keeps this clear of the board's middle.
+  // Tile content is sized as if every far edge kept this much clear, the pill's half and 2px, so a far edge the pill
+  // reaches costs only what it reaches past that.
   const farClear = size / 2 + 2;
   const usable = faces.map((face) => {
     const player = /** @type {HTMLElement} */ (face.parentElement);
@@ -384,7 +386,7 @@ function placePill(size) {
 }
 
 // The clearance a face needs from the pill on each of its edges. Where the pill reaches into a tile past two edges (at
-// a corner), clearing the edge it reaches least far past is enough, and the far edge already has its clearance.
+// a corner), clearing the edge it reaches least far past is enough, and the far edge costs least (measureBoard).
 function centreClearance(player, face, pill, farClear) {
   const clear = { far: 0, end: 0, near: 0, start: 0 };
   const tile = { left: player.offsetLeft - board.offsetLeft, top: player.offsetTop - board.offsetTop };
@@ -441,6 +443,14 @@ function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
     const swatchHeight = face.offsetHeight - swatchPad('far') - swatchPad('near');
     const swatches = tight ? swatchColumns.find(count => swatchSpan(count) <= swatchWidth + 0.5 && swatchSpan(12 / count) <= swatchHeight + 0.5) ?? 4 : 4;
     player.style.setProperty('--swatch-columns', swatches);
+    // The grid is centred in what the clearances leave, 1px in from each side, wherever it fits there; only along an axis
+    // where it doesn't does it reach into the clearance.
+    const pads = (low, high, span, size) => (span <= size - clear[low] - clear[high] - 2 + 0.5 ? [clear[low] + 1, clear[high] + 1] : [swatchPad(low), swatchPad(high)]);
+    if (tight) {
+      const [start, end] = pads('start', 'end', swatchSpan(swatches), face.offsetWidth);
+      const [far, near] = pads('far', 'near', swatchSpan(12 / swatches), face.offsetHeight);
+      player.style.setProperty('--swatch-pad', `${far}px ${end}px ${near}px ${start}px`);
+    } else player.style.removeProperty('--swatch-pad');
     // The width the face leaves inside its clearances. The grids may reach into the layers' small default padding.
     const room = face.offsetWidth - clear.start - clear.end + 0.5;
     player.style.setProperty('--cell-columns', 3 * cell + 20 <= room ? 3 : 2);

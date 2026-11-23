@@ -161,6 +161,14 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 - Tile CSS uses `u = var(--ui) / 100` in place of `cqi`: `--control-size: clamp(44px, 18u, 74 × grow)`, glyphs `clamp(1.75rem, 12u, …)`, badges `clamp(.78rem, 3.6u, …)` and so on.
 - The total's size is `min(clamp(2rem, 19vmin, max(7rem, 112 × grow)), (ui − 2·control − 2·gap − 8px) × 1.5 / board-digits)`.
 
+**Centring (added 22 November 2026):**
+
+- A tile keeps clear of the centre pill only on the face edges the pill actually reaches, as `measureBoard()` measures them (`--clear-far`, `--clear-end`, `--clear-near`, `--clear-start`). A face the pill doesn't reach, such as the end seat at 3 or 5 players, keeps no clearance at all.
+- Everything else is centred in what's left: the far row along its edge (no longer started at the reader's left on a sideways seat), and each mode layer's content (the commander damage map, the counter and mana cells, the swatches, the identity preview over its toggles, "Me first").
+- A mode's hint sits on the far side of its content, so it doesn't push the content off-centre. Only where that side is shorter than the hint does the content give way toward the near edge.
+- On narrow or short boards the swatches are centred too, and reach up to 6px into a clearance only along an axis where their grid doesn't fit otherwise.
+- `tests/centring.test.mjs` checks the far row and every layer at 2–6 players, with seats turned three ways, at 952 × 427 and 568 × 320.
+
 **What changes:**
 
 - Totals are already equal on phones, because of the 19vmin cap.
