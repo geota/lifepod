@@ -1651,15 +1651,36 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
 .segmented > button[aria-pressed="true"] { border-color: var(--segment-chosen-fill); border-radius: var(--segment-chosen); background: var(--segment-chosen-fill); color: var(--segment-chosen-ink); box-shadow: var(--segment-chosen-shadow); }
 .segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
-/* Tile colours (DESIGN-AUDIT S2): a segment per set, each with a strip of that set's tiles for players 1–4 over its
-   name, so the choice shows what it does. Each tile is its panel with a rim, as on the board. The colours are written
-   by design/polish/tiles7.mjs. */
-.tile-sets > button { flex-direction: column; gap: 5px; padding-block: 7px 6px; }
-.tile-strip { display: flex; gap: 3px; }
-.tile-strip > span { width: 14px; height: 14px; border-radius: 4px; background: var(--strip-1); box-shadow: inset 0 0 0 1.5px var(--strip-1-rim); }
-.tile-strip > :nth-child(2) { background: var(--strip-2); box-shadow: inset 0 0 0 1.5px var(--strip-2-rim); }
-.tile-strip > :nth-child(3) { background: var(--strip-3); box-shadow: inset 0 0 0 1.5px var(--strip-3-rim); }
-.tile-strip > :nth-child(4) { background: var(--strip-4); box-shadow: inset 0 0 0 1.5px var(--strip-4-rim); }
+/* Tile colours (DESIGN-AUDIT S2; the owner's "colour bands", P2): each segment is filled with four vertical bands, the
+   panels of the tiles players 1–4 get in its set (ids 0–3; players 1 and 2 in the top row, 3 and 4 in the bottom), with
+   a 4px foot of each band's rim along the bottom, which tells dark sets' bands apart, and the set's name over them in
+   near-white with a shadow. The chosen set has a solid accent ring, 3px with a 2px dark gap inside it; the foot moves up
+   inside the ring. Only --strip-1…4 and --strip-1…4-rim name colours, and design/polish/tiles7.mjs writes them for
+   each set below, so a set is just data: its button in index.html and its line here. The rules use the id so that the
+   pressed and hover layers, which other segments draw as a background image, go over the bands instead of replacing
+   them. */
+#tile-set-choices > button {
+  --band-state: transparent;
+  --foot-at: 0px;
+  min-height: max(var(--tap-min), 52px);
+  border: 0;
+  background:
+    linear-gradient(var(--band-state), var(--band-state)),
+    linear-gradient(90deg, var(--strip-1-rim) 25%, var(--strip-2-rim) 0 50%, var(--strip-3-rim) 0 75%, var(--strip-4-rim) 0) 0 calc(100% - var(--foot-at)) / 100% 4px no-repeat,
+    linear-gradient(90deg, var(--strip-1) 25%, var(--strip-2) 0 50%, var(--strip-3) 0 75%, var(--strip-4) 0);
+  color: var(--text);
+  text-shadow: 0 1px 2px #000c, 0 0 6px #0008;
+  box-shadow: none;
+}
+#tile-set-choices > button:active { --band-state: var(--state-pressed); }
+#tile-set-choices > button[aria-pressed="true"] { --foot-at: 5px; box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 0 5px var(--background); }
+/* Five sets or more where the section is narrow: two rows, three over two (or three over three), each row filling the
+   width, rather than five segments too narrow for their names. */
+@container settings-section (max-width: 359.98px) {
+  #tile-set-choices:has(> :nth-child(5)) { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #tile-set-choices:has(> :nth-child(5)) > button { grid-column: span 2; border-radius: var(--segment-inner); }
+  #tile-set-choices:has(> :nth-child(5):last-child) > :nth-child(n + 4) { grid-column: span 3; }
+}
 .tile-sets > [data-set="classic"] { --strip-1: #2f432f; --strip-1-rim: #556e4e; --strip-2: #2c4352; --strip-2-rim: #517187; --strip-3: #432a27; --strip-3-rim: #7b4f44; --strip-4: #342b41; --strip-4-rim: #655179; }
 .tile-sets > [data-set="soft"] { --strip-1: #2d4633; --strip-1-rim: #4f7658; --strip-2: #20454f; --strip-2-rim: #3a7584; --strip-3: #462828; --strip-3-rim: #7d4d4d; --strip-4: #2e2f48; --strip-4-rim: #565880; }
 .tile-sets > [data-set="jewel"] { --strip-1: #204421; --strip-1-rim: #447038; --strip-2: #15425b; --strip-2-rim: #347096; --strip-3: #4b211d; --strip-3-rim: #8a402e; --strip-4: #35244a; --strip-4-rim: #69458a; }
@@ -2085,6 +2106,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   :is(.close, .secondary, .nav-row, .switch-row, .segmented > button:not([aria-pressed="true"]), .dice-picker button:not([aria-pressed="true"]), .k-value, .k-stop):hover {
     background-image: linear-gradient(var(--state-hover), var(--state-hover));
   }
+  #tile-set-choices > button:not([aria-pressed="true"]):hover { --band-state: var(--state-hover); }
   .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button:hover::before { content: none; }
   .save-button:hover::before { background: var(--accent-pressed); }
   :is(.primary, .k-commit):hover { background: var(--accent-pressed); }
