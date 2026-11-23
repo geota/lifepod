@@ -26,17 +26,19 @@ import {
  * @returns {number[]}
  */
 export function fitColors(saved, count) {
+  /** @type {(number | null)[]} */
   const colors = [];
   for (let index = 0; index < count; index++) {
     const colour = Array.isArray(saved) ? saved[index] : undefined;
+    /** @type {boolean} */
     const valid = Number.isInteger(colour) && colour >= 0 && colour < swatches.length && !colors.includes(colour);
     colors.push(valid ? colour : null);
   }
   for (let index = 0; index < count; index++) {
     if (colors[index] !== null) continue;
-    colors[index] = [index, ...swatches.keys()].find(colour => !colors.includes(colour));
+    colors[index] = /** @type {number} */ ([index, ...swatches.keys()].find(colour => !colors.includes(colour)));
   }
-  return colors;
+  return /** @type {number[]} */ (colors);
 }
 
 // One count per player. Anything that isn't a whole number from 0 to the maximum starts at 0.
@@ -92,6 +94,7 @@ export function fitIdentities(saved, count) {
  * @returns {IdentitySettings}
  */
 function fitIdentitySettings(saved) {
+  /** @type {Record<IdentityPart, boolean>} */
   const defaults = { indicator: true, symbol: false, name: true };
   const show = /** @type {IdentitySettings['show']} */ (Object.fromEntries(identityParts.map(part =>
     [part, typeof saved?.show?.[part] === 'boolean' ? saved.show[part] : defaults[part]])));
@@ -145,7 +148,7 @@ export function fitTurn(saved, count) {
 
 // Which trackers are on. Each is off unless it was saved as exactly true.
 /**
- * @param {unknown} [saved]
+ * @param {any} [saved]
  * @returns {Trackers}
  */
 function fitTrackers(saved) {
@@ -154,7 +157,7 @@ function fitTrackers(saved) {
 
 // Which reminders are on. Each is on unless it was saved as exactly false.
 /**
- * @param {unknown} [saved]
+ * @param {any} [saved]
  * @returns {Reminders}
  */
 function fitReminders(saved) {

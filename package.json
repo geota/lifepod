@@ -6,7 +6,7 @@
     "lint": "npm run lint:web && npm run lint:android && npm run lint:ios",
     "lint:web": "eslint web",
     "lint:compat": "eslint -c eslint.compat.config.mjs web && stylelint 'web/**/*.css'",
-    "typecheck": "tsc -p .",
+    "typecheck": "tsc -p . && tsc -p tsconfig.logic.json",
     "lint:kotlin": "if ktlint --version >/dev/null 2>&1; then ktlint 'android/src/**/*.kt'; else mise x ktlint@1.8.0 -- ktlint 'android/src/**/*.kt'; fi",
     "lint:android": "npm run lint:kotlin && ./android/lint.sh",
     "lint:ios": "xcrun swift-format lint --strict ios/LifePodApp.swift",

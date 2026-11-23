@@ -41,7 +41,12 @@ export function seatRow(index) {
 }
 
 // The board's seats as rows and columns of the landscape grid, with the cells each seat spans, for count players.
-/** @param {number} count */
+// rows and columns are typed any only because render/modes.js passes them to style.setProperty as numbers; once it passes
+// String(rows), they can be number.
+/**
+ * @param {number} count
+ * @returns {{ rows: any, columns: any, areas: Map<number, { top: number, bottom: number, left: number, right: number }> }}
+ */
 export function seatGrid(count) {
   const rows = seatLayouts[count].map(row => row.split(' ').map(seat => Number(seat.split('-')[1]) - 1));
   const areas = new Map();
@@ -56,6 +61,14 @@ export function seatGrid(count) {
 
 // Where a board cell lands in a tile's own frame, which is turned clockwise by angle. Drawing the map there
 // makes it match the table from every seat.
+/**
+ * @param {number} angle
+ * @param {number} rows
+ * @param {number} columns
+ * @param {number} row
+ * @param {number} column
+ * @returns {[number, number]}
+ */
 export function toFace(angle, rows, columns, row, column) {
   if (angle === 90) return [columns - 1 - column, row];
   if (angle === 180) return [rows - 1 - row, columns - 1 - column];
@@ -101,11 +114,19 @@ export function hasMana(game, index) {
 // ---- Out of the game ------------------------------------------------------------------------------------------------
 
 // Close to losing: a warning from 15 commander damage or 7 poison, and out at 21 or 10.
+/**
+ * @param {number} value
+ * @param {number} warning
+ * @param {number} lethal
+ */
 export function dangerLevel(value, warning, lethal) {
   return value >= lethal ? 'out' : value >= warning ? 'warn' : '';
 }
 
-/** @param {Game} game */
+/**
+ * @param {Game} game
+ * @param {number} index
+ */
 export function isOut(game, index) {
   return outReason(game, index) !== null;
 }
@@ -141,7 +162,7 @@ export function playOrder(game) {
 export function nextTurn(game) {
   const { active, first } = game.turn;
   const order = playOrder(game);
-  const position = order.indexOf(active);
+  const position = order.indexOf(/** @type {number} */ (active));
   let next = active;
   let crossed = false;
   for (let step = 1; step <= order.length; step++) {
@@ -161,7 +182,7 @@ export function nextTurn(game) {
 export function previousTurn(game) {
   const { active, first } = game.turn;
   const order = playOrder(game);
-  const position = order.indexOf(active);
+  const position = order.indexOf(/** @type {number} */ (active));
   let previous = active;
   let crossed = false;
   for (let step = 1; step <= order.length; step++) {
@@ -209,6 +230,7 @@ export function turnBack(game) {
 }
 
 // A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
+/** @param {number} count */
 export function randomBelow(count) {
   const limit = Math.floor(0x100000000 / count) * count;
   const value = new Uint32Array(1);
@@ -257,9 +279,14 @@ function handsOnByItself(game) {
 // Who takes a designation when its holder leaves the game (CR 726.4 and 727.4): the active player, or, if the active
 // player is the one leaving or has already left, the next player in turn order who is still in. Nobody can take the
 // monarch if everyone else has left, and the game goes on without one; the initiative always has a holder, so it stays.
-/** @param {Game} game */
+/**
+ * @param {Game} game
+ * @param {DesignationKind} kind
+ * @param {number} leaver
+ */
 function heir(game, kind, leaver) {
-  const { active } = game.turn;
+  // Only called once somebody's turn has started (handsOnByItself).
+  const active = /** @type {number} */ (game.turn.active);
   if (active !== leaver && !isOut(game, active)) return active;
   const order = playOrder(game);
   const position = order.indexOf(active);
@@ -289,7 +316,11 @@ export function leavingTransfers(game, wasOut) {
 
 // Whether an out player's tile should ask for its designation to be passed on: they hold it, someone is still in to take
 // it, and the hint is on.
-/** @param {Game} game */
+/**
+ * @param {Game} game
+ * @param {DesignationKind} kind
+ * @param {number} index
+ */
 export function needsPassing(game, kind, index) {
   return game.reminders.passOn && game[kind] === index && isOut(game, index) && game.scores.some((_, player) => player !== index && !isOut(game, player));
 }
@@ -307,7 +338,7 @@ export function needsPassing(game, kind, index) {
 export function applyEdit(game, edit, direction) {
   // Every edit but a designation's has a delta, mana's a colour and commander damage's an attacker.
   const delta = /** @type {number} */ (edit.delta);
-  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += delta * direction;
+  if (countKinds.includes(edit.kind)) game[/** @type {CountKind} */ (edit.kind)][edit.index] += delta * direction;
   else if (edit.kind === 'mana') game.pools[edit.index][/** @type {number} */ (edit.colour)] += delta * direction;
   else if (edit.kind === 'damage') {
     // Commander damage is damage, so the defender loses the same life in the same save.
@@ -408,6 +439,7 @@ export function editPlayers(edit) {
 // ---- Words for screen readers ---------------------------------------------------------------------------------------
 
 // How a screen reader hears an identity, such as "Selesnya, colour identity white, green", whatever the chip shows.
+/** @param {string} identity */
 export function identityText(identity) {
   if (!identity) return 'no colour identity';
   return `${identityNames[identity]}, colour identity ${[...identity].map(id => /** @type {{ id: string, name: string }} */ (identityColours.find(colour => colour.id === id)).name).join(', ')}`;
