@@ -110,7 +110,8 @@ test('chromium: Shuffle tile colours each game is off by default, saved, and che
 // With the shuffle on, each new game gives every player a random, distinct swatch from the active set, each from a
 // different colour family (six per set, so up to six players get one each), from crypto.getRandomValues: with a seeded
 // stand-in, one seed always deals the same run, another deals a different one, and the run varies game to game.
-test('chromium: shuffled colours are unique, one per family, random, and from the crypto RNG', { timeout: 60000 }, async (t) => {
+// About 60 new games through the UI, each opening two dialogs behind their 350ms tap guard, so it gets a long timeout.
+test('chromium: shuffled colours are unique, one per family, random, and from the crypto RNG', { timeout: 180000 }, async (t) => {
   const deal = async (seed, tiles, players, games) => {
     const page = await openPage(t, chromium, { before: seededRandom(seed), game: savedGame(players, { shuffleColours: true, tileColours: tiles }) });
     const dealt = [];
