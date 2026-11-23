@@ -1,3 +1,4 @@
+import { autoEmptyPools, clearPool, endUndoClears, spendMana, undoClear } from './js/actions/mana.js';
 import { clearReminders, dismissReminder, remind, turnStarted } from './js/actions/reminders.js';
 import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { requestFit, resetDrops } from './js/layout/fit.js';
@@ -7,11 +8,11 @@ import {
 } from './js/layout/settings.js';
 import {
   badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, designations, discardMessages, doneLabels, editingModes,
-  firstBeat, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, shuffleTick, shuffleTicks, tileSetOrder,
-  tileSets, trackers, undoClearTime,
+  firstBeat, maxCount, maxRound, maxStartingLife, playerCounts, shuffleTick, shuffleTicks, tileSetOrder, tileSets,
+  trackers,
 } from './js/logic/data.js';
 import {
-  applyEdit, editPlayers, hasMana, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow,
+  applyEdit, editPlayers, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow,
   trackedDesignations,
 } from './js/logic/rules.js';
 import {
@@ -191,17 +192,6 @@ function handOnLeavers(wasOut) {
   if (transfers.length) saveGame();
 }
 
-// Empties every pool when the turn passes, if that's switched on, and returns what it emptied so a step back can put
-// it back. The turn passing also ends any "Undo clear": the pool would have emptied anyway.
-function autoEmptyPools() {
-  if (!game.manaPool || !game.autoEmpty) return null;
-  endUndoClears();
-  if (!game.pools.some((_, index) => hasMana(game, index))) return null;
-  const emptied = game.pools.map(pool => [...pool]);
-  game.pools = fitPools([], game.scores.length);
-  return emptied;
-}
-
 // Shows a turn step on every tile and the pill, saves it at once and announces it.
 function showTurn() {
   const turnFocus = document.activeElement?.matches('.turn-chip');
@@ -342,58 +332,6 @@ function shuffleFirst() {
 function stepMana(index, colour, delta) {
   const next = game.pools[index][colour] + delta;
   if (next >= 0 && next <= maxCount) commitEdit({ kind: 'mana', index, colour, delta });
-}
-
-// Spending from the strip saves at once and has no undo: add it back in mana mode.
-function spendMana(index, colour) {
-  if (game.pools[index][colour] === 0) return;
-  game.pools[index][colour] -= 1;
-  saveGame();
-  haptic();
-  renderBadges(index);
-  syncPill();
-  announcePool(index);
-}
-
-// The eraser empties the pool and leaves "Undo clear" in the strip's place for 5 seconds.
-function clearPool(index) {
-  if (!hasMana(game, index)) return;
-  endUndoClear(index);
-  const pool = game.pools[index];
-  game.pools[index] = fitCounts([], manaColours.length);
-  clearedPools.set(index, { pool, timer: setTimeout(() => endUndoClear(index), undoClearTime) });
-  saveGame();
-  haptic();
-  renderBadges(index);
-  syncPill();
-  announce(index, 'mana', () => `Player ${index + 1}, mana pool cleared`);
-}
-
-function undoClear(index) {
-  const cleared = clearedPools.get(index);
-  if (!cleared) return;
-  clearTimeout(cleared.timer);
-  clearedPools.delete(index);
-  cleared.pool.forEach((amount, colour) => {
-    game.pools[index][colour] = Math.min(maxCount, game.pools[index][colour] + amount);
-  });
-  saveGame();
-  haptic();
-  renderBadges(index);
-  syncPill();
-  announcePool(index);
-}
-
-function endUndoClear(index) {
-  const cleared = clearedPools.get(index);
-  if (!cleared) return;
-  clearTimeout(cleared.timer);
-  clearedPools.delete(index);
-  renderBadges(index);
-}
-
-function endUndoClears() {
-  for (const index of [...clearedPools.keys()]) endUndoClear(index);
 }
 
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
