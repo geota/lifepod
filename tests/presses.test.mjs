@@ -41,6 +41,8 @@ async function checkStripBurst(t, engine) {
     assert.equal(await tile(page, 1).locator('.strip-spend[data-colour="U"]').getAttribute('aria-disabled'), 'true', 'the spent colour says it can’t be spent');
     await page.clock.runFor(stripHoldTime - 1);
     assert.match((await strips(page))[0], /U0/, 'still in place just before the strip reflows');
+    // Neither the strip's row nor the totals that make room for it move while it's being tapped.
+    assert.deepEqual(await tile(page, 1).locator('.strip-spend[data-colour="U"]').boundingBox(), blue, `${what}: the spent colour hasn't moved`);
     await page.clock.runFor(1);
     assert.equal((await strips(page))[0], after, `${what}: the strip reflows once the taps stop`);
     // Taps resume as normal once it has reflowed.

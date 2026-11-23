@@ -114,8 +114,8 @@ const seeds = {
   }),
 };
 
-// Mana floating in every pool, one to four colours, on the busiest board: the strip at the far edge beside commander
-// damage on every tile.
+// Mana floating in every pool, one to four colours, on the busiest board: the strip on its own row above the near row
+// on every tile.
 seeds.floating = count => ({
   ...seeds.everything(count),
   pools: Array.from({ length: count }, (_, i) => [[0, 2, 0, 0, 0, 0], [1, 0, 0, 3, 0, 0], [0, 0, 2, 1, 4, 0], [2, 1, 0, 3, 0, 1]][i % 4]),
@@ -374,7 +374,7 @@ function audit() {
     glyphs: '.controls button .icon',
     near: '.badges.near > *',
     far: '.badges.far > *',
-    strip: '.mana-strip > *',
+    strip: '.mana-strip > *, .mana-far > *',
     // A turn reminder sits above the near edge, clear of the total and the glyphs, or takes the near edge for its 3 seconds.
     reminder: '.reminders > *',
     layer: '.mode-layer button, .mode-layer .layer-hint, .mode-layer .identity-preview > *, .mode-layer .map-cell',
@@ -430,9 +430,9 @@ function audit() {
     if (spread > 0.5) add('uniform', `${key} differs between tiles: ${shown.map(px).join(' / ')}`);
   }
   facts.sizes = Object.fromEntries(Object.entries(sizesBy).map(([k, v]) => [k, [...new Set(v.filter(x => x !== null).map(px))]]).filter(([, v]) => v.length));
-  // While a pool has mana, its strip sits at the far edge, with commander damage (SPEC.md §9), and must leave both badge
-  // rows in place: list the counts and chips that don't show, and a strip nearer the near edge than the far edge. A
-  // strip folded into one chip must say that it opens mana mode (a caret). Commander damage is checked below.
+  // While a pool has mana, its strip has a row of its own directly above the near row (SPEC.md §9), and must leave both
+  // badge rows in place: list the counts and chips that don't show, and a strip on its row that isn't just above the
+  // near row or shares a line with a badge. A strip folded into one chip must say that it opens mana mode (a caret).
   const game = JSON.parse(localStorage.getItem('lifepod-game'));
   // A turn reminder that takes its tile's near edge (data-reminder="over", on tiles too short to show it above) hides the
   // near row and the strip on purpose for its 3 seconds, so their checks skip that tile.
@@ -449,18 +449,23 @@ function audit() {
       if (hidden.length) add('hidden', `P${index + 1} mana strip hides ${hidden.join(', ')}`);
       const turnChip = player.querySelector('.turn-chip');
       if (turnChip && !visible(turnChip)) add('hidden', `P${index + 1} mana strip hides the turn chip (${turnChip.className})`);
-      // A strip that can't fit at the far edge folds into a chip there or at the end of the near row.
-      const folded = ['fold', 'near'].includes(player.dataset.strip);
+      // A strip too wide for its row folds into a chip there, and where the row can't fit, the chip goes under the far row
+      // or, the last resort, ends the near row.
+      const folded = ['fold', 'far', 'near'].includes(player.dataset.strip);
       const chip = [...player.querySelectorAll('.strip-chip')].find(visible);
       if (folded && !chip) add('hidden', `P${index + 1} folded mana strip shows no chip`);
       if (chip && !chip.querySelector('.icon[data-icon="caret-right"], .icon[data-icon="undo"]')) add('hidden', `P${index + 1} folded mana strip has no cue that it opens mana mode`);
       if (!folded && !visible(player.querySelector('.mana-strip'))) add('hidden', `P${index + 1} mana strip doesn't show`);
       const shownStrip = [player.querySelector('.mana-strip'), chip].find(el => el && visible(el));
-      if (shownStrip) {
-        const centre = el => { const b = rect(el); return [(b.left + b.right) / 2, (b.top + b.bottom) / 2]; };
-        const away = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-        const at = centre(shownStrip);
-        if (player.dataset.strip !== 'near' && away(at, centre(player.querySelector('.far-edge'))) > away(at, centre(player.querySelector('.near-edge')))) add('place', `P${index + 1} mana strip sits by the near edge, not the far edge`);
+      if (shownStrip && ['row', 'fold'].includes(player.dataset.strip)) {
+        // In the face's own coordinates, unturned: the strip's row ends just above the near row, and no badge shares it.
+        const face = player.querySelector('.player-face');
+        const local = (el) => { let top = 0; for (let node = el; node && node !== face; node = node.offsetParent) top += node.offsetTop; return { top, bottom: top + el.offsetHeight }; };
+        const strip = local(player.querySelector('.mana-strip'));
+        const chips = [...player.querySelectorAll('.badges.near > *, .badges.far > *')].filter(visible).map(local);
+        const nearTop = Math.min(...[...player.querySelectorAll('.badges.near > *')].filter(visible).map(chip => local(chip).top));
+        if (Number.isFinite(nearTop) && (strip.bottom > nearTop + 0.5 || nearTop - strip.bottom > 3)) add('place', `P${index + 1} mana strip isn't just above the near row (${px(strip.bottom)} against ${px(nearTop)})`);
+        if (chips.some(chip => chip.top < strip.bottom - 0.5 && strip.top < chip.bottom - 0.5)) add('place', `P${index + 1} mana strip shares a line with a badge`);
       }
     });
   }

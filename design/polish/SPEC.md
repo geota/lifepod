@@ -174,6 +174,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 - Totals are already equal on phones, because of the 19vmin cap.
 - The differences today are in the glyphs (the 5-player end seat's ± is 46px against 34px elsewhere on a phone) and on tablets (the end seat's total is 195px against 191px).
 - **A three-digit total shrinks every total together** (decided). Uniformity is the owner's rule, and totals of 100 or more are rare. Only the target (952 × 427) keeps full size with three digits. With 6 players a 100 shrinks every total from 68px to 52px at 640 × 360, and from 61px to 40px at 568 × 320, by the formula above.
+- **Floating mana shrinks every total together too**, where its row needs the room, and moves each total toward its far row, to no less than two thirds of its size (§9).
 
 **Board units by size**, measured on the current app: `ui` × `ub` is the smallest tile face, then the life total and the badge type.
 
@@ -216,7 +217,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 - **Shrinking is measured, not estimated.** Text doesn't shrink exactly in proportion to its type (gaps, padding and rounding don't), so the type starts from a proportional estimate and steps down 0.25px at a time, measured again after each step, until every row fits or it reaches 9px. (WebKit left a busy row 2–4px wider than its tile with the estimate alone.)
 - **Levels are board-wide.** The busiest tile decides for every tile, so the board stays uniform. That's the same principle as §3.1, and it stops names flickering on one tile while staying on another.
 - **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game or a change of Badge size. Counters ticking up and down by one can't make names blink.
-- The steps are set as `data-drop` tokens on each tile's `.near-edge` (`name`, `symbol`, `wrap`) and `.far-edge` (`sword`, `wrap-far`, and `strip-wrap` for the mana strip, §9), and CSS hides the matching parts there; `--near-badge-size` and `--far-badge-size` on the same edges shrink the type. `#board`'s `data-drop` lists every token taken, for the tests; nothing styles from it.
+- The steps are set as `data-drop` tokens on each tile's `.near-edge` (`name`, `symbol`, `wrap`) and `.far-edge` (`sword`, `wrap-far`), and CSS hides the matching parts there; `--near-badge-size` and `--far-badge-size` on the same edges shrink the type. `#board`'s `data-drop` lists every token taken, for the tests; nothing styles from it.
 - **A larger Badge size never draws a row smaller** (FINAL.md U1). Its taller chips can make a second line cover the total where a smaller size's doesn't, so the row shrinks on one line instead and can land below the smaller size's full type. When a side has to shrink, the fit tries again from each smaller size's full type (`--near-full-size`, `--far-full-size`) while that's larger, and keeps whichever draws the largest type.
 
 **What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent), measured in Chromium with Roboto:
@@ -250,7 +251,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 |---|---|
 | Mode hints ("Tap +1 · hold −1", "Your tile colour") | `ub ≥ 200` and `ui ≥ 240`, as today. Shown on the target; hidden at 640 × 360 and below with 6 players. |
 | Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2, or two to a row where three don't fit. |
-| Mana strip | Never dropped, and its type never shrinks. It takes the first of its three places (§9) that fits, wrapping toward the total (`strip-wrap`) where that folds fewer strips. |
+| Mana strip | Never dropped, and its type never shrinks. It has a row of its own above the near row, and folds into its chip where the strip doesn't fit there (§9). The life total gives way for that row first, to no less than two thirds of its size. |
 | Settings header | Fixed at the top of the full-screen settings page; it tightens to 4px padding under 360px tall (SETTINGS-SPEC.md §3). |
 | Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. |
 
@@ -405,12 +406,31 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 - **At rest:**
   - A tile shows a strip **only while its pool has mana**, and only the colours it holds: for example (R)3 (C)1 [eraser].
   - **Both badge rows always stay** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place).
-  - **The strip sits at the far edge, with commander damage** (moved there on 22 November 2026, at the owner's request): the two most used operations are together and the tile is balanced, with the near row at the player's edge and commander damage and mana at the far edge.
   - **Commander damage always has the far row to itself** (the owner's rule, 23 November 2026): mana never shares its line, displaces it or pushes it sideways.
-  - **The strip's type never shrinks**, so every symbol stays legible on its 44px target. Overflow loses detail by folding instead.
-  - It takes the first place that fits clear of the total, the glyphs, the "Out" tag, the near row and the pill: its own line just under the far row, toward the total, wrapping onto a second line there if needed; folded into one chip (the pool, and a caret › that says it opens mana mode, the full-size picker) on its own line under the far row; or that chip at the end of the near row, by the player. With no commander damage it takes the far row's place.
-  - As built: on the phones checked (952 × 427 and 568 × 320, 3 to 6 players) the gap between the far row and the total is shorter than a 44px line, so the chip goes to the near row there; a 1366 × 1024 tablet and the 3- and 5-player end seats keep the full strip under commander damage.
-  - *As built:* the strip has three places, below the far row, folded there, and folded on the near row, all at full type, and one step, wrapping toward the total (`strip-wrap`, `layout/fit.js`), taken where it folds fewer strips. Its level is board-wide, with the same 15% hysteresis as the badge rows, and only the strips that need it fold.
+  - **Floating mana has a row of its own, directly above the near row** (the owner's rule, 23 November 2026, replacing the strip under commander damage and the chip at the end of the near row): two bottom rows, mana over the player's own badges, between them and the total. Mana never shares a line with another badge, whether it shows as the strip or folded into its chip.
+  - **The strip's type never shrinks**, so every symbol stays legible on its 44px target. Overflow loses detail by folding instead, and the folded chip keeps the near row's full type, so its pips never shrink either.
+  - **The life total gives way first.** To make room for the mana row, every total on the board shrinks alike (one size per board, §3.1), and each moves toward its far row, with its − and +, as little as that needs. Tiles whose far rows share a line move theirs alike, so a board row's totals stay in line. The totals stay 2px clear of every row and of the mana.
+  - **The floor is two thirds of the total's own size** (never below 2rem). That's what a three-digit total already costs on the 568 × 320 stress size (61px to 40px, §3.1), the smallest total the board accepts elsewhere. Keeping a strip's spend buttons may cost the total only a quarter of its size; past that the strip folds, and the chip may cost it a third.
+  - Each tile's mana takes the first place that fits clear of the total, the glyphs, the "Out" tag, both rows and the pill:
+    1. **The strip on its row**, where it fits across the row at full type and the totals stay at three quarters of their size or more.
+    2. **Folded on its row**: one chip, the pool and a caret › that says it opens mana mode (the full-size picker), where the totals stay at two thirds or more.
+    3. **Fallback: the chip under the far row**, 2px under commander damage, in the far row's full type, where the totals at their floor can't make room for a row by the player but can for this chip. Seen with a Larger Badge size at 852 × 393 (4 players) and 568 × 320 or 320 × 568 (3 and 4 players).
+    4. **Last resort: the chip ends the near row**, as before, where even the fallback can't fit at the floor. Seen only on the most crowded small boards: every counter, the monarch, the initiative and the turn chip at 5 or 6 players on 568 × 320 or 320 × 568, where the near row already takes two lines.
+  - Only the tiles that need it fold or fall back, so a short pool elsewhere keeps its spend buttons.
+  - *As built* (`layout/fit.js`, `fitStrips` and `fitScore`): the rows are fitted around totals at their own size, with every strip on its row; a strip wider than its row folds; then the totals are fitted around the mana, and the tile whose mana would take them below what its place allows takes its next place, one round per layout. The totals' size is `--score-size` and each tile's lift `--score-lift`, both on the tile's `.controls`, so a fit restyles only the controls (PERFORMANCE.md P10). With no mana floating, nothing is written and the totals are as §3.1 sizes them. Where turn reminders can show (§13), the totals also keep clear of the line a reminder takes over the near edge on a short tile, since a reminder lasts only seconds and the totals don't move for it.
+  - *As built*, a busy board (Turn by turn, the identity chip with its name, poison, tax, energy, the monarch, commander damage from every opponent, all six colours on every tile), at the default Badge size:
+
+    | Screen | Players | Mana | Life total |
+    |---|---|---|---|
+    | 952 × 427 (target) | 3 / 4 | strip | 81 → 76 / 74px |
+    | | 5 / 6 | strip | 81px, unchanged |
+    | 852 × 393 | 3 / 4 | strip | 75 → 63 / 60px |
+    | | 5 / 6 | folded (the 5-player end seat keeps its strip) | 75px, unchanged |
+    | 640 × 360 | 3 / 4 | strip | 68 → 54px |
+    | | 5 / 6 | folded (the 5-player end seat keeps its strip) | 68px, unchanged |
+    | 568 × 320 (stress) | 3–6 | folded (the 3- and 5-player end seats keep their strips) | 61 → 57 (3–4 players) / 58px (5–6) |
+    | 1366 × 1024 | 3–6 | strip | 195 / 191px, unchanged |
+
   - The turn chip stays in the near row, so it never meets the strip.
   - Strip items are 44px tall:
     - **Tap a symbol to spend 1** of that colour. It saves at once. A colour that reaches 0 keeps its place, dimmed, until 800ms after the strip's last tap, then the strip reflows, so a quick extra tap can't land on whatever would have slid under the finger. The tile's − and + ignore touches for that time too.

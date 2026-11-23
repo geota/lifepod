@@ -52,11 +52,12 @@
     <section class="player">
       <div class="player-face">
         <span class="watermark" aria-hidden="true"></span>
-        <!-- The far edge: commander damage, then the mana strip while a pool has mana, toward the total. The badge rows are
-             labelled groups rather than lists, since some of their chips are buttons, which a list can't hold. -->
+        <!-- The far edge: commander damage. Under it, only where a tile has no room for a mana row by the player, the mana
+             pool's folded chip. The badge rows are labelled groups rather than lists, since some of their chips are buttons,
+             which a list can't hold. -->
         <div class="far-edge">
           <div class="badges far" role="group" aria-label="Commander damage" hidden></div>
-          <div class="mana-strip" role="group" aria-label="Mana pool" hidden></div>
+          <div class="mana-far" role="group" aria-label="Mana pool" hidden></div>
         </div>
         <div class="controls">
           <button type="button" class="subtract"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a12,12,0,0,1-12,12H40a12,12,0,0,1,0-24H216A12,12,0,0,1,228,128Z"/></svg></button>
@@ -65,9 +66,11 @@
           <span class="out-tag" aria-hidden="true">Out</span>
           <span class="rotate-badge" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg></span>
         </div>
-        <!-- The near edge: the near badge row. A turn reminder sits above it. -->
+        <!-- The near edge: the mana strip while a pool has mana, on its own row, then the near badge row. A turn reminder
+             sits above them. -->
         <div class="near-edge">
           <div class="reminders"></div>
+          <div class="mana-strip" role="group" aria-label="Mana pool" hidden></div>
           <div class="badges near" role="group" aria-label="Status" hidden></div>
         </div>
         <div class="mode-layer" hidden></div>

@@ -72,7 +72,7 @@ Settings → **Reminders** has three switches, all on by default.
 
 Turn on **Mana pool** in Settings → **Track** to keep floating mana. The center controls gain the tap symbol, with a dot while any pool has mana. Tap it and every tile shows six circles, white, blue, black, red, green and colourless, each with its mana symbol over the amount: tap to add one, hold to take one away, with Undo, the check mark and ✕ as for counters.
 
-At rest, a tile with mana shows a strip at its far edge, on its own line under commander damage, with just the colours it holds: tap a symbol to spend one, or the eraser to empty the pool, which leaves **Undo clear** for 5 seconds. The strip never covers a life total, its − and +, the near row or the center controls, and its symbols never shrink. Where it runs out of room it wraps toward the total if there's space; otherwise it folds into one chip that shows the pool and opens mana mode, on its own line under commander damage or at the end of the player's own row. Only the tiles that need it fold.
+At rest, a tile with mana shows a strip on a row of its own, just above the player's own row of badges, with just the colours it holds: tap a symbol to spend one, or the eraser to empty the pool, which leaves **Undo clear** for 5 seconds. The strip never shares a line with another badge, never covers a life total, its − and + or the center controls, and its symbols never shrink. To make room for it, the life totals get smaller and move toward commander damage, all alike and never below two thirds of their size. Where the strip is too wide for its row, or would take the totals smaller than three quarters of their size, it folds into one chip that shows the pool and opens mana mode, on the same row. Only the tiles that need it fold. On a very crowded small board with no room for that row, the chip sits under commander damage, or as a last resort at the end of the player's own row.
 
 With Turns on, **Empty mana pools when the turn passes** (on by default) empties every pool on each round or turn step, and stepping back restores what it emptied. A new game empties every pool.
 
@@ -94,7 +94,7 @@ Colours carry over to new games and player-count changes, unless **Shuffle tile 
 
 **Tile colours** in Settings → **Table** picks the set the twelve colours come from, each shown as bands of its first four tiles' colours: **Classic** (the original twelve), **Soft**, **Jewel** or **Clear**, the default. In every set, players 1 to 6 start on six well-spread colours, and each player keeps their colour family when the set changes. The setting saves at once.
 
-**Badge size** in Settings → **Table**, **Default**, **Large** or **Larger**, makes the badge rows along both edges and the mana strip bigger: their chips, counts, icons and colour indicator. A row grows only as far as fits between its edge and the life total, so on a small board it may stay at the default size. A larger size never draws a row smaller than a smaller size would on the same board. It saves at once.
+**Badge size** in Settings → **Table**, **Default**, **Large** or **Larger**, makes the badge rows along both edges and the mana strip bigger: their chips, counts, icons and colour indicator. A row grows only as far as fits between its edge and the life total, so on a small board it may stay at the default size. While mana floats, the totals may get smaller to make room for its row, as they do at the default size. A larger size never draws a row smaller than a smaller size would on the same board. It saves at once.
 
 ## Style
 

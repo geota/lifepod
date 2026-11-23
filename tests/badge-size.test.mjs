@@ -99,7 +99,20 @@ test('chromium: Large and Larger scale the badge rows and the mana strip, and no
       assert.ok(Math.abs(drawn[part] / base[part] - scale) < 0.03, `${size}: ${part} is ${scale}× (${drawn[part]} against ${base[part]})`);
     }
     assert.ok(Math.abs(drawn.chip / base.chip - scale) < 0.06, `${size}: a chip is ${scale}× as tall (${drawn.chip} against ${base.chip})`);
-    assert.deepEqual([drawn.cell, drawn.total], [base.cell, base.total], `${size}: counter cells and totals keep their size`);
+    assert.equal(drawn.cell, base.cell, `${size}: counter cells keep their size`);
+  }
+  // The totals keep their size too, unless a mana row needs the room: then they give way first (design/polish/SPEC.md
+  // §9), to no less than two thirds of it.
+  const totals = [];
+  for (const size of sizes) {
+    await seedGame(page, busyGame(4, size, { manaPool: false }));
+    totals.push(await page.locator('.score').first().evaluate(score => parseFloat(getComputedStyle(score).fontSize)));
+  }
+  assert.deepEqual(totals, Array(3).fill(totals[0]), 'with no mana floating, totals keep their size');
+  for (const size of sizes) {
+    await seedGame(page, busyGame(4, size));
+    const total = await page.locator('.score').first().evaluate(score => parseFloat(getComputedStyle(score).fontSize));
+    assert.ok(total <= totals[0] && total >= totals[0] * 2 / 3 - 0.1, `${size}: with mana floating, a total gives way to no less than two thirds (${total}px of ${totals[0]}px)`);
   }
 });
 

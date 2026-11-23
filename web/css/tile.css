@@ -252,6 +252,9 @@
   min-width: 0;
   font-size: clamp(2rem, 19vmin, max(7rem, 112 * var(--grow)));
   font-size: min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2)));
+  /* Where a tile's mana row needs the room, fit.js shrinks every total alike (--score-size on each tile's .controls,
+     design/polish/SPEC.md §9), no smaller than its floor. */
+  font-size: var(--score-size, min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2))));
   line-height: 1;
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
@@ -294,6 +297,9 @@
   /* An end of the face the centre pill reaches past (a rotated seat) keeps clear of it, as the far row does. app.js
      sets --clear-far, --clear-end, --clear-near and --clear-start on each tile from where the pill is. */
   padding-inline: var(--clear-start, 0px) var(--clear-end, 0px);
+  /* The face centres the controls; --score-lift (fit.js) moves them that far toward the far row, where a mana row by the
+     player needs the room. A margin moves them without making .controls the − and + touch areas' containing block. */
+  margin-block-end: calc(2 * var(--score-lift, 0px));
 }
 .controls button {
   display: grid;

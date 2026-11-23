@@ -310,7 +310,9 @@ for (const [name, engine] of Object.entries(engines)) {
       const page = await openPage(t, engine, { viewport: { width: 568, height: 320 }, native, nativeOptions: { textScale: 2.5 }, game: busyGame() });
       const large = await sizes(page);
       assert.equal(large.label, base.label * 2, 'settings type doubles, the most it grows');
-      assert.equal(large.total, base.total, 'the board keeps its fitted type');
+      // The badge rows grow as far as Larger, and the totals give way only to make room for P1's mana row, never below
+      // two thirds of their size (design/polish/SPEC.md §9).
+      assert.ok(large.total <= base.total && large.total >= base.total * 2 / 3 - 0.1, `the board keeps its fitted type (${large.total}px against ${base.total}px)`);
       await button(page, 'Settings').click();
       const body = await page.locator('#settings-body').evaluate(node => ({ scrolls: node.scrollHeight > node.clientHeight, overflow: getComputedStyle(node).overflowY }));
       assert.deepEqual(body, { scrolls: true, overflow: 'auto' }, 'settings scrolls');
