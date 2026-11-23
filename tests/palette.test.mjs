@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { chromium } from 'playwright-core';
-import { contrast } from '../design/counters/oklch.mjs';
+import { contrast, hexToRgb, rgbToOklch } from '../design/counters/oklch.mjs';
+
+// web/js/logic/data.js imports nothing, so Node loads it as a module from its text (the repo's package.json has no
+// "type", and the app's .js files are browser modules).
+const { tileSets, topRowPlayers } = await import(`data:text/javascript,${encodeURIComponent(readFileSync(new URL('../web/js/logic/data.js', import.meta.url), 'utf8'))}`);
 import { openPage, seedGame, test, token } from './helpers.mjs';
 
 // The twelve tile palettes (design/polish/SPEC.md §5) are the ones design/counters/palette.mjs generated and checked,
@@ -101,5 +105,49 @@ test('chromium: every tile colour set is tiles7.mjs’s and passes the contrast 
         }
       }
     }
+  }
+});
+
+// The default seats (DESIGN-AUDIT M1): players 1–6 start on swatch ids 0–5, and in every set those are spread round the
+// hue circle rather than six neighbours. At every player count from 2 to 6, the closest two default tiles (the OKLab
+// difference of the panels plus half the seat colours, each player in their own row, as tiles7.mjs measures tiles) are
+// at least as far apart as Classic's closest default pair, its six-player table.
+test('node: the default seats are well spread in every tile colour set', () => {
+  const ids = Object.keys(sets.today.set);
+  const lab = (hex) => {
+    const [L, C, H] = rgbToOklch(hexToRgb(hex));
+    return [L, C * Math.cos(H * Math.PI / 180), C * Math.sin(H * Math.PI / 180)];
+  };
+  const difference = (a, b) => Math.hypot(...a.map((value, at) => value - b[at]));
+  const tile = (set, player) => set[ids[player]][topRowPlayers.includes(player) ? 'top' : 'bottom'];
+  const closest = (set, players) => {
+    let least = Infinity;
+    for (let a = 0; a < players; a++) {
+      for (let b = a + 1; b < players; b++) {
+        const one = tile(set, a), other = tile(set, b);
+        least = Math.min(least, Math.hypot(difference(lab(one.panel), lab(other.panel)), 0.5 * difference(lab(one.seat), lab(other.seat))));
+      }
+    }
+    return least;
+  };
+  const floor = Math.min(...[2, 3, 4, 5, 6].map(players => closest(sets.today.set, players)));
+  assert.ok(floor > 0.05, `Classic's six default seats are ${floor.toFixed(3)} apart`);
+  for (const source of ['today', 'soft', 'jewel', 'clear']) {
+    for (const players of [2, 3, 4, 5, 6]) {
+      const least = closest(sets[source].set, players);
+      assert.ok(least >= floor, `${source}, ${players} players: the closest default seats are ${least.toFixed(3)} apart, at least Classic's ${floor.toFixed(3)}`);
+    }
+  }
+});
+
+// Each id keeps its colour family in every set, and the app's names and shuffle families are tiles7.mjs's.
+test('node: the tile sets name their swatches and families as tiles7.mjs does', () => {
+  for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
+    assert.deepEqual(tileSets[setting].names, sets[source].names, `${setting}: the names`);
+    assert.deepEqual(tileSets[setting].families, sets[source].families, `${setting}: the families`);
+    assert.equal(new Set(tileSets[setting].families).size, 6, `${setting}: six families, one per seat at six players`);
+    // The first three default seats are a green, sky and coral in every set.
+    assert.ok(['Sage', 'Jade'].includes(tileSets[setting].names[0]), `${setting}: id 0 is a green`);
+    assert.deepEqual(tileSets[setting].names.slice(1, 3), ['Sky', 'Coral'], `${setting}: ids 1 and 2 are sky and coral`);
   }
 });

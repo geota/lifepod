@@ -674,7 +674,7 @@ for (const [name, engine] of Object.entries(engines)) {
     // The swatches take the set's names.
     await button(page, 'Clear').tap();
     await button(page, 'Choose tile colours on the board').tap();
-    assert.equal(await page.locator('.player:nth-child(1) .swatch').first().getAttribute('aria-label'), 'Coral', 'Clear names its first swatch Coral');
+    assert.equal(await page.locator('.player:nth-child(1) .swatch').first().getAttribute('aria-label'), 'Jade', 'Clear names its first swatch Jade');
     await button(page, 'Done choosing colours').tap();
     await reload(page);
     assert.equal((await tiles()).set, 'clear', 'the set survives a reload');

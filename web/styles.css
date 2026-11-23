@@ -542,33 +542,34 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 
 /* Tile colour sets (design/polish/TILES.md), the Tile colours setting: app.js sets data-tiles on <html>. The :root
    palettes above are Classic; each set below replaces all 96 tokens under the same swatch ids, so a player's colour
-   carries over between sets. Generated and checked by design/polish/tiles7.mjs (tiles7.json): on every panel the life
-   total is at least 9:1, small text 7.6:1, the life-out red 4.79:1 and the seat colour 7.35:1. Clear is the default. */
+   carries over between sets, and each id keeps its colour family in every set, so the default seats (ids 0–5) are
+   spread. Written and checked by design/polish/tiles7.mjs (tiles7.json): on every panel the life total is at least
+   9:1, small text 7.6:1, the life-out red 4.79:1 and the seat colour 7.35:1. Clear is the default. */
 [data-tiles="soft"] {
-  --sage-top-panel: #553635; --sage-top-rim: #8d5c5b; --sage-top-seat: #ffd1d0; --sage-top-button: #402827;
-  --sage-bottom-panel: #462828; --sage-bottom-rim: #7d4d4d; --sage-bottom-seat: #fecbca; --sage-bottom-button: #331c1c;
-  --sky-top-panel: #493020; --sky-top-rim: #7f573e; --sky-top-seat: #fac7a8; --sky-top-button: #352215;
-  --sky-bottom-panel: #3b2314; --sky-bottom-rim: #704930; --sky-bottom-seat: #f6c3a4; --sky-bottom-button: #29170b;
-  --coral-top-panel: #4a3d22; --coral-top-rim: #7c693e; --coral-top-seat: #f4dba8; --coral-top-button: #372e19;
-  --coral-bottom-panel: #3c3015; --coral-bottom-rim: #6d592f; --coral-bottom-seat: #efd7a3; --coral-bottom-button: #2c220d;
-  --violet-top-panel: #343a1e; --violet-top-rim: #5e673b; --violet-top-seat: #cedaa5; --violet-top-button: #252914;
-  --violet-bottom-panel: #272d11; --violet-bottom-rim: #50582d; --violet-bottom-seat: #cad6a1; --violet-bottom-button: #1a1e09;
-  --amber-top-panel: #2d4633; --amber-top-rim: #4f7658; --amber-top-seat: #bcecc6; --amber-top-button: #213425;
-  --amber-bottom-panel: #203826; --amber-bottom-rim: #406749; --amber-bottom-seat: #b8e8c2; --amber-bottom-button: #16291a;
+  --sage-top-panel: #2d4633; --sage-top-rim: #4f7658; --sage-top-seat: #bcecc6; --sage-top-button: #213425;
+  --sage-bottom-panel: #203826; --sage-bottom-rim: #406749; --sage-bottom-seat: #b8e8c2; --sage-bottom-button: #16291a;
+  --sky-top-panel: #20454f; --sky-top-rim: #3a7584; --sky-top-seat: #a7ebfd; --sky-top-button: #17343b;
+  --sky-bottom-panel: #123741; --sky-bottom-rim: #2a6574; --sky-bottom-seat: #a3e6f9; --sky-bottom-button: #0a282f;
+  --coral-top-panel: #553635; --coral-top-rim: #8d5c5b; --coral-top-seat: #ffd1d0; --coral-top-button: #402827;
+  --coral-bottom-panel: #462828; --coral-bottom-rim: #7d4d4d; --coral-bottom-seat: #fecbca; --coral-bottom-button: #331c1c;
+  --violet-top-panel: #3b3c57; --violet-top-rim: #656790; --violet-top-seat: #d8dbfe; --violet-top-button: #2c2d41;
+  --violet-bottom-panel: #2e2f48; --violet-bottom-rim: #565880; --violet-bottom-seat: #d3d6ff; --violet-bottom-button: #212135;
+  --amber-top-panel: #4a3d22; --amber-top-rim: #7c693e; --amber-top-seat: #f4dba8; --amber-top-button: #372e19;
+  --amber-bottom-panel: #3c3015; --amber-bottom-rim: #6d592f; --amber-bottom-seat: #efd7a3; --amber-bottom-button: #2c220d;
   --teal-top-panel: #173e39; --teal-top-rim: #306e66; --teal-top-seat: #9de3d8; --teal-top-button: #0e2d29;
   --teal-bottom-panel: #07312c; --teal-bottom-rim: #1f5f57; --teal-bottom-seat: #99dfd4; --teal-bottom-button: #03211e;
-  --rose-top-panel: #20454f; --rose-top-rim: #3a7584; --rose-top-seat: #a7ebfd; --rose-top-button: #17343b;
-  --rose-bottom-panel: #123741; --rose-bottom-rim: #2a6574; --rose-bottom-seat: #a3e6f9; --rose-bottom-button: #0a282f;
+  --rose-top-panel: #513544; --rose-top-rim: #885c72; --rose-top-seat: #fecee6; --rose-top-button: #3d2733;
+  --rose-bottom-panel: #432836; --rose-bottom-rim: #774d63; --rose-bottom-seat: #ffc7e3; --rose-bottom-button: #311c27;
   --indigo-top-panel: #24394d; --indigo-top-rim: #446586; --indigo-top-seat: #b1d8ff; --indigo-top-button: #182838;
   --indigo-bottom-panel: #172b3f; --indigo-bottom-rim: #355676; --indigo-bottom-seat: #abd4fd; --indigo-bottom-button: #0d1d2c;
-  --slate-top-panel: #3b3c57; --slate-top-rim: #656790; --slate-top-seat: #d8dbfe; --slate-top-button: #2c2d41;
-  --slate-bottom-panel: #2e2f48; --slate-bottom-rim: #565880; --slate-bottom-seat: #d3d6ff; --slate-bottom-button: #212135;
-  --copper-top-panel: #3f3047; --copper-top-rim: #70577c; --copper-top-seat: #e5c6f5; --copper-top-button: #2e2134;
-  --copper-bottom-panel: #322339; --copper-bottom-rim: #60486c; --copper-bottom-seat: #e1c2f0; --copper-bottom-button: #221628;
-  --olive-top-panel: #513544; --olive-top-rim: #885c72; --olive-top-seat: #fecee6; --olive-top-button: #3d2733;
-  --olive-bottom-panel: #432836; --olive-bottom-rim: #774d63; --olive-bottom-seat: #ffc7e3; --olive-bottom-button: #311c27;
-  --orchid-top-panel: #373b40; --orchid-top-rim: #60676e; --orchid-top-seat: #d0d9e3; --orchid-top-button: #282b2f;
-  --orchid-bottom-panel: #2a2e32; --orchid-bottom-rim: #51585f; --orchid-bottom-seat: #ccd5de; --orchid-bottom-button: #1c2023;
+  --slate-top-panel: #373b40; --slate-top-rim: #60676e; --slate-top-seat: #d0d9e3; --slate-top-button: #282b2f;
+  --slate-bottom-panel: #2a2e32; --slate-bottom-rim: #51585f; --slate-bottom-seat: #ccd5de; --slate-bottom-button: #1c2023;
+  --copper-top-panel: #493020; --copper-top-rim: #7f573e; --copper-top-seat: #fac7a8; --copper-top-button: #352215;
+  --copper-bottom-panel: #3b2314; --copper-bottom-rim: #704930; --copper-bottom-seat: #f6c3a4; --copper-bottom-button: #29170b;
+  --olive-top-panel: #343a1e; --olive-top-rim: #5e673b; --olive-top-seat: #cedaa5; --olive-top-button: #252914;
+  --olive-bottom-panel: #272d11; --olive-bottom-rim: #50582d; --olive-bottom-seat: #cad6a1; --olive-bottom-button: #1a1e09;
+  --orchid-top-panel: #3f3047; --orchid-top-rim: #70577c; --orchid-top-seat: #e5c6f5; --orchid-top-button: #2e2134;
+  --orchid-bottom-panel: #322339; --orchid-bottom-rim: #60486c; --orchid-bottom-seat: #e1c2f0; --orchid-bottom-button: #221628;
 }
 [data-tiles="jewel"] {
   --sage-top-panel: #204421; --sage-top-rim: #447038; --sage-top-seat: #cef293; --sage-top-button: #16331a;
@@ -597,30 +598,30 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   --orchid-bottom-panel: #491054; --orchid-bottom-rim: #7f328f; --orchid-bottom-seat: #f5c7ff; --orchid-bottom-button: #35093e;
 }
 [data-tiles="clear"] {
-  --sage-top-panel: #5f2524; --sage-top-rim: #a14542; --sage-top-seat: #ffc9c4; --sage-top-button: #471a19;
-  --sage-bottom-panel: #501717; --sage-bottom-rim: #8f3534; --sage-bottom-seat: #ffc3be; --sage-bottom-button: #3a0e0e;
-  --sky-top-panel: #572504; --sky-top-rim: #964613; --sky-top-seat: #fec2a4; --sky-top-button: #401902;
-  --sky-bottom-panel: #451a00; --sky-bottom-rim: #833903; --sky-bottom-seat: #ffbc9a; --sky-bottom-button: #301000;
-  --coral-top-panel: #4b3e01; --coral-top-rim: #7e6a04; --coral-top-seat: #f4de87; --coral-top-button: #382e01;
-  --coral-bottom-panel: #3c3100; --coral-bottom-rim: #6d5b01; --coral-bottom-seat: #efda83; --coral-bottom-button: #2b2301;
-  --violet-top-panel: #333824; --violet-top-rim: #5c6544; --violet-top-seat: #ccd8af; --violet-top-button: #242818;
-  --violet-bottom-panel: #262b17; --violet-bottom-rim: #4e5636; --violet-bottom-seat: #c8d3ab; --violet-bottom-button: #191d0d;
-  --amber-top-panel: #184939; --amber-top-rim: #2d7b61; --amber-top-seat: #9df3d2; --amber-top-button: #11372a;
-  --amber-bottom-panel: #063b2c; --amber-bottom-rim: #196c53; --amber-bottom-seat: #98efce; --amber-bottom-button: #032b1f;
+  --sage-top-panel: #184939; --sage-top-rim: #2d7b61; --sage-top-seat: #9df3d2; --sage-top-button: #11372a;
+  --sage-bottom-panel: #063b2c; --sage-bottom-rim: #196c53; --sage-bottom-seat: #98efce; --sage-bottom-button: #032b1f;
+  --sky-top-panel: #124054; --sky-top-rim: #266e8f; --sky-top-seat: #aae1ff; --sky-top-button: #0b2f3f;
+  --sky-bottom-panel: #013246; --sky-bottom-rim: #115f7f; --sky-bottom-seat: #9fdeff; --sky-bottom-button: #012332;
+  --coral-top-panel: #5f2524; --coral-top-rim: #a14542; --coral-top-seat: #ffc9c4; --coral-top-button: #471a19;
+  --coral-bottom-panel: #501717; --coral-bottom-rim: #8f3534; --coral-bottom-seat: #ffc3be; --coral-bottom-button: #3a0e0e;
+  --violet-top-panel: #352556; --violet-top-rim: #624997; --violet-top-seat: #d0c0ff; --violet-top-button: #24183e;
+  --violet-bottom-panel: #281847; --violet-bottom-rim: #543a87; --violet-bottom-seat: #ccbbff; --violet-bottom-button: #1a0c31;
+  --amber-top-panel: #4b3e01; --amber-top-rim: #7e6a04; --amber-top-seat: #f4de87; --amber-top-button: #382e01;
+  --amber-bottom-panel: #3c3100; --amber-bottom-rim: #6d5b01; --amber-bottom-seat: #efda83; --amber-bottom-button: #2b2301;
   --teal-top-panel: #033d44; --teal-top-rim: #046d79; --teal-top-seat: #6ee6f7; --teal-top-button: #002c31;
   --teal-bottom-panel: #012f34; --teal-bottom-rim: #065d67; --teal-bottom-seat: #69e2f3; --teal-bottom-button: #001f24;
-  --rose-top-panel: #124054; --rose-top-rim: #266e8f; --rose-top-seat: #aae1ff; --rose-top-button: #0b2f3f;
-  --rose-bottom-panel: #013246; --rose-bottom-rim: #115f7f; --rose-bottom-seat: #9fdeff; --rose-bottom-button: #012332;
+  --rose-top-panel: #5a2c50; --rose-top-rim: #964c86; --rose-top-seat: #feccf1; --rose-top-button: #44203c;
+  --rose-bottom-panel: #4b1e42; --rose-bottom-rim: #853d76; --rose-bottom-seat: #ffc5f0; --rose-bottom-button: #371430;
   --indigo-top-panel: #2e2f60; --indigo-top-rim: #5456a4; --indigo-top-seat: #c8cefe; --indigo-top-button: #202047;
   --indigo-bottom-panel: #222151; --indigo-bottom-rim: #464693; --indigo-bottom-seat: #c3c9fe; --indigo-bottom-button: #15153a;
-  --slate-top-panel: #352556; --slate-top-rim: #624997; --slate-top-seat: #d0c0ff; --slate-top-button: #24183e;
-  --slate-bottom-panel: #281847; --slate-bottom-rim: #543a87; --slate-bottom-seat: #ccbbff; --slate-bottom-button: #1a0c31;
-  --copper-top-panel: #493263; --copper-top-rim: #7b57a4; --copper-top-seat: #e6d5fe; --copper-top-button: #37254b;
-  --copper-bottom-panel: #3b2554; --copper-bottom-rim: #6c4794; --copper-bottom-seat: #e3d0fe; --copper-bottom-button: #2b193e;
-  --olive-top-panel: #5a2c50; --olive-top-rim: #964c86; --olive-top-seat: #feccf1; --olive-top-button: #44203c;
-  --olive-bottom-panel: #4b1e42; --olive-bottom-rim: #853d76; --olive-bottom-seat: #ffc5f0; --olive-bottom-button: #371430;
-  --orchid-top-panel: #452338; --orchid-top-rim: #7d4667; --orchid-top-seat: #f9b2db; --orchid-top-button: #311727;
-  --orchid-bottom-panel: #37162b; --orchid-bottom-rim: #6d3758; --orchid-bottom-seat: #f4aed6; --orchid-bottom-button: #250c1b;
+  --slate-top-panel: #452338; --slate-top-rim: #7d4667; --slate-top-seat: #f9b2db; --slate-top-button: #311727;
+  --slate-bottom-panel: #37162b; --slate-bottom-rim: #6d3758; --slate-bottom-seat: #f4aed6; --slate-bottom-button: #250c1b;
+  --copper-top-panel: #572504; --copper-top-rim: #964613; --copper-top-seat: #fec2a4; --copper-top-button: #401902;
+  --copper-bottom-panel: #451a00; --copper-bottom-rim: #833903; --copper-bottom-seat: #ffbc9a; --copper-bottom-button: #301000;
+  --olive-top-panel: #333824; --olive-top-rim: #5c6544; --olive-top-seat: #ccd8af; --olive-top-button: #242818;
+  --olive-bottom-panel: #262b17; --olive-bottom-rim: #4e5636; --olive-bottom-seat: #c8d3ab; --olive-bottom-button: #191d0d;
+  --orchid-top-panel: #493263; --orchid-top-rim: #7b57a4; --orchid-top-seat: #e6d5fe; --orchid-top-button: #37254b;
+  --orchid-bottom-panel: #3b2554; --orchid-bottom-rim: #6c4794; --orchid-bottom-seat: #e3d0fe; --orchid-bottom-button: #2b193e;
 }
 
 /* app.js gives each tile, swatch and colour dot a data-colour and data-row, which pick its palette. */

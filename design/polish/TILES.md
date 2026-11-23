@@ -31,7 +31,20 @@
 | **Deep rows** | Today's hues, with the bottom row 0.05 darker. The two sides of the table differ by lightness as well as hue, which colour-blind players can see. | [tiles-deep.png](renders/tiles-deep.png) |
 | **Clear** (colour-blind friendly) | Chosen by search: twelve hue, lightness and chroma combinations that keep every pair of tiles as far apart as possible under normal, deuteranope and protanope vision at once, in the same row and across rows. It has more spread in lightness and fewer near-identical greens. | [tiles-clear.png](renders/tiles-clear.png) |
 
-**Clear's colours, in order:** Coral, Copper, Olive, Lime, Jade, Cyan, Sky, Indigo, Violet, Orchid, Pale plum, Deep plum. The names are working names.
+**Clear's colours, in hue order:** Coral, Copper, Olive, Lime, Jade, Cyan, Sky, Indigo, Violet, Orchid, Pale plum, Deep plum. The names are working names.
+
+**Swatch ids by family (DESIGN-AUDIT M1, after the build).** Soft and Clear were first placed on the swatch ids in hue order, so the default seats (ids 0–5, players 1–6) were six neighbours: a fresh install showed four dark, warm tiles. `tiles7.mjs` now makes them in hue order and then places each on the id whose Classic colour is in the same family, so every id keeps its family in all four sets and the default seats are spread:
+
+| id | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Classic, Jewel | Sage | Sky | Coral | Violet | Amber | Teal | Rose | Indigo | Slate | Copper | Olive | Orchid |
+| Soft | Jade | Sky | Coral | Violet | Olive | Teal | Plum | Azure | Slate | Copper | Lime | Orchid |
+| Clear | Jade | Sky | Coral | Violet | Olive | Cyan | Pale plum | Indigo | Deep plum | Copper | Lime | Orchid |
+
+- Clear has no neutral, so its slate is the deep plum. The audit's table put Orchid on 6 and Deep plum on 11; this one keeps Orchid on Classic's orchid (11) and the pale plum on rose (6), which are nearer in hue. Ids 0–5 are the audit's.
+- The palettes themselves, and so every check below, are unchanged. Saved games keep their ids, so a player on Soft or Clear may see their colour change family once.
+- `tests/palette.test.mjs` checks that at every player count from 2 to 6, the closest two default seats in every set are at least as far apart as Classic's closest default pair (0.051): Clear's are 0.079 and Soft's 0.063 (they were 0.046 and 0.039).
+- **Families.** For Settings → Table → *Shuffle tile colours each game*, `tiles7.mjs` also splits each set into six look-alike families, by search: the grouping whose closest two swatches in different families are furthest apart. A shuffled game gives each seat a different family while it can, so six players get one of each. They're in `tiles7.json` and `tileSets` in `web/js/logic/data.js`.
 
 ## Checks
 
