@@ -4,8 +4,8 @@
 
 import {
   badgeSizeOrder, clockwiseEdges, countKinds, defaultTileSet, identityBackgrounds, identityColours, identityParts,
-  identitySettingsVersion, manaColours, maxCount, maxRound, playerCounts, quarterTurns, reminderKinds, styleOrder,
-  swatches, tileSetOrder, trackers, turnModes,
+  identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, quarterTurns, reminderKinds,
+  styleOrder, swatches, tileSetOrder, trackers, turnModes,
 } from './data.js';
 
 /** @typedef {import('./data.js').BadgeSize} BadgeSize */
@@ -167,7 +167,7 @@ function fitReminders(saved) {
  * Arrays indexed by player have one entry per seat, in seat order, and scores.length is the player count.
  *
  * @typedef {object} Game
- * @property {number} startingLife A whole number of at least 1.
+ * @property {number} startingLife A whole number from 1 to maxStartingLife.
  * @property {number[]} scores Each player's life total.
  * @property {number[]} rotations Each seat's quarter turns, 0 to 3, an index into clockwiseEdges.
  * @property {boolean} keepAwake
@@ -210,6 +210,10 @@ function fitReminders(saved) {
 
 // The saved game that read() returns, as JSON, checked field by field; or the defaults, with the board upright at
 // landscapeAngle, when there's no save or read() throws. read is the platform's (state/platform.js).
+//
+// Each field falls back on its own (AGENTS.md: never reset the game). A starting life outside 1 to maxStartingLife is
+// 40, and a score that isn't a safe integer is the starting life. Only scores whose length isn't a player count leave no
+// board to fit the per-player fields to: they start the default 4-player board, and the settings are still kept.
 /**
  * @param {() => string | null | undefined} read
  * @param {QuarterTurn} landscapeAngle
@@ -229,28 +233,34 @@ export function loadGame(read, landscapeAngle) {
     const snapshot = read();
     // With no save, this parses null as null or throws on undefined, and both mean the defaults.
     const saved = JSON.parse(/** @type {string} */ (snapshot));
-    if (!saved || !Array.isArray(saved.scores) || !playerCounts.includes(saved.scores.length) ||
-        !saved.scores.every(Number.isSafeInteger) || !Number.isSafeInteger(saved.startingLife) || saved.startingLife < 1) {
-      return defaults;
-    }
-    const rotations = saved.scores.map((_, index) => {
-      const turn = saved.rotations?.[index];
+    if (!saved || typeof saved !== 'object') return defaults;
+    const startingLife = Number.isSafeInteger(saved.startingLife) && saved.startingLife >= 1 && saved.startingLife <= maxStartingLife
+      ? saved.startingLife : defaults.startingLife;
+    // The per-player fields, read only when the scores say how many players they were saved for.
+    const board = Array.isArray(saved.scores) && playerCounts.includes(saved.scores.length) ? saved : {};
+    const count = board.scores?.length ?? defaults.scores.length;
+    const scores = Array.from({ length: count }, (_, index) => {
+      const score = board.scores?.[index];
+      return Number.isSafeInteger(score) ? score : startingLife;
+    });
+    const rotations = scores.map((_, index) => {
+      const turn = board.rotations?.[index];
       return Number.isInteger(turn) && turn >= 0 && turn < clockwiseEdges.length ? turn : 0;
     });
-    const landscapeAngle = quarterTurns.includes(saved.landscapeAngle) ? saved.landscapeAngle : defaults.landscapeAngle;
     return {
-      startingLife: saved.startingLife, scores: saved.scores, rotations, keepAwake: saved.keepAwake !== false, landscapeAngle,
-      colors: fitColors(saved.colors, saved.scores.length),
+      startingLife, scores, rotations, keepAwake: saved.keepAwake !== false,
+      landscapeAngle: quarterTurns.includes(saved.landscapeAngle) ? saved.landscapeAngle : defaults.landscapeAngle,
+      colors: fitColors(board.colors, count),
       counters: fitTrackers(saved.counters),
-      .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts(saved[kind], saved.scores.length)]))),
-      identities: fitIdentities(saved.identities, saved.scores.length),
+      .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts(board[kind], count)]))),
+      identities: fitIdentities(board.identities, count),
       identity: fitIdentitySettings(saved.identity),
-      commanderDamage: fitDamage(saved.commanderDamage, saved.scores.length),
+      commanderDamage: fitDamage(board.commanderDamage, count),
       manaPool: saved.manaPool === true,
       autoEmpty: saved.autoEmpty !== false,
-      pools: fitPools(saved.pools, saved.scores.length),
+      pools: fitPools(board.pools, count),
       turns: turnModes.includes(saved.turns) ? saved.turns : 'off',
-      turn: fitTurn(saved.turn, saved.scores.length),
+      turn: fitTurn(board.turn, count),
       // A save from before the setting, or with an unknown set, gets the default.
       tileColours: tileSetOrder.includes(saved.tileColours) ? saved.tileColours : defaultTileSet,
       // Off unless it was saved as exactly true, so a save from before the setting keeps its colours.
@@ -261,8 +271,8 @@ export function loadGame(read, landscapeAngle) {
       // unknown style, gets it too.
       style: styleOrder.includes(saved.style) ? saved.style : null,
       // A seat that isn't on the board, or anything that isn't a seat, means nobody holds it.
-      monarch: fitSeat(saved.monarch, saved.scores.length),
-      initiative: fitSeat(saved.initiative, saved.scores.length),
+      monarch: fitSeat(board.monarch, count),
+      initiative: fitSeat(board.initiative, count),
       reminders: fitReminders(saved.reminders),
     };
   } catch {
