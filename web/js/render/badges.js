@@ -31,10 +31,10 @@ import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark
  * @property {(mode: BoardMode) => void} setBoardMode
  */
 /** @type {BadgeActions} */
-let actions;
+let badgeActions;
 /** @param {BadgeActions} handlers */
 export function setBadgeActions(handlers) {
-  actions = handlers;
+  badgeActions = handlers;
 }
 
 // Redraws the holders' near rows: whether an out holder's tile asks to pass it on depends on who else is still in.
@@ -56,7 +56,7 @@ function reminderChip(index, kind) {
   chip.type = 'button';
   chip.dataset.designation = kind;
   chip.setAttribute('aria-label', `${reminderText[kind]}. Dismiss`);
-  bindTap(chip, () => actions.dismissReminder(index, kind));
+  bindTap(chip, () => badgeActions.dismissReminder(index, kind));
   return chip;
 }
 
@@ -70,7 +70,7 @@ function turnChips(index) {
   if (turns === 'rounds' && first === index) {
     const chip = element('button', 'chip turn-chip round-chip', icon('flag'), String(round));
     chip.setAttribute('aria-label', `Round ${round}. Next round`);
-    bindStep(chip, actions.stepTurn, actions.stepBack);
+    bindStep(chip, badgeActions.stepTurn, badgeActions.stepBack);
     chips.push(chip);
   } else if (turns === 'turns') {
     if (active === index || (active === null && !isOut(game, index))) {
@@ -80,8 +80,8 @@ function turnChips(index) {
         : element('button', 'chip turn-chip start-chip', manaIcon('untap'), 'Start');
       chip.setAttribute('aria-label', active === index ? `Player ${index + 1}'s turn, round ${round}. Pass the turn`
         : `Start Player ${index + 1}'s turn`);
-      if (active === index) bindStep(chip, actions.stepTurn, actions.stepBack);
-      else bindTap(chip, () => actions.startTurn(index));
+      if (active === index) bindStep(chip, badgeActions.stepTurn, badgeActions.stepBack);
+      else bindTap(chip, () => badgeActions.startTurn(index));
       chips.push(chip);
     }
     if (first === index) {
@@ -103,7 +103,7 @@ function stripItems(index) {
     const undo = element('button', 'strip-undo', icon('undo'), 'Undo clear');
     undo.type = 'button';
     undo.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
-    bindTap(undo, () => actions.undoClear(index));
+    bindTap(undo, () => badgeActions.undoClear(index));
     return [undo, stripChip(index)];
   }
   const items = manaColours.flatMap((colour, at) => {
@@ -116,13 +116,13 @@ function stripItems(index) {
     spend.type = 'button';
     spend.dataset.colour = colour.id;
     spend.setAttribute('aria-label', `Player ${index + 1}, ${amount} ${colour.name} mana. Spend one`);
-    bindTap(spend, () => actions.spendMana(index, at));
+    bindTap(spend, () => badgeActions.spendMana(index, at));
     return [spend];
   });
   const eraser = element('button', 'strip-clear', icon('eraser'));
   eraser.type = 'button';
   eraser.setAttribute('aria-label', `Clear Player ${index + 1}'s mana pool`);
-  bindTap(eraser, () => actions.clearPool(index));
+  bindTap(eraser, () => badgeActions.clearPool(index));
   return [...items, eraser, stripChip(index)];
 }
 
@@ -133,7 +133,7 @@ function stripChip(index) {
   if (clearedPools.has(index)) {
     chip = element('button', 'chip strip-chip', icon('undo'), 'Undo');
     chip.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
-    bindTap(chip, () => actions.undoClear(index));
+    bindTap(chip, () => badgeActions.undoClear(index));
   } else {
     // One colour and its amount, or several colours' symbols stacked before the pool's total, so the chip stays short.
     const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
@@ -147,7 +147,7 @@ function stripChip(index) {
       : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
     chip = element('button', 'chip strip-chip', ...parts, icon('caret-right'));
     chip.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(game, index)}. Open mana`);
-    bindTap(chip, () => actions.setBoardMode('mana'));
+    bindTap(chip, () => badgeActions.setBoardMode('mana'));
   }
   chip.type = 'button';
   return chip;
@@ -161,7 +161,7 @@ function designationChip({ kind, label, name, still }, index) {
     chip.type = 'button';
     chip.dataset.designation = kind;
     chip.setAttribute('aria-label', `Player ${index + 1} is out and ${still}. Pass ${name} on in counters`);
-    bindTap(chip, () => actions.setBoardMode('counters'));
+    bindTap(chip, () => badgeActions.setBoardMode('counters'));
     return chip;
   }
   const chip = element('span', 'chip designation-chip', designationIcon(kind), visuallyHidden(label));
