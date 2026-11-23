@@ -112,19 +112,22 @@ for (const [name, engine] of Object.entries(engines)) {
     const game = { startingLife: 40, scores: [40, 33, 27, 38], counters: { poison: true }, turns: 'rounds' };
     const page = await openPage(t, engine, { game: { ...game, style: 'material' } });
     const material = await readSurfaces(page);
-    const accent = await token(page, '--accent');
+    const [accent, materialChosen] = await Promise.all([token(page, '--accent'), token(page, '--chosen-fill')]);
     await seedGame(page, { ...game, style: 'glass' });
     const glass = await readSurfaces(page);
     // Glass's own colours, read with Glass in use.
-    const [raised, thumb, thumbInk, sliderThumb] = await Promise.all(['--raised', '--thumb', '--thumb-ink', '--slider-thumb-fill'].map(name => token(page, name)));
+    const [raised, glassChosen, sliderThumb] = await Promise.all(['--raised', '--chosen-fill', '--slider-thumb-fill'].map(name => token(page, name)));
 
-    // Material: solid chrome, no blur, filled rows and segments, the accent on the chosen segment and die.
+    // Material: solid chrome, no blur, filled rows and segments, the accent tint on the chosen segment and die.
     assert.equal(material.pill.filter, 'none');
     assert.equal(alpha(material.pill.background), 1);
     assert.equal(material.dice.filter, 'none');
     assert.equal(material.settings.head.filter, 'none');
     assert.equal(material.settings.head.overBody, false, 'the Material header is its own row');
-    assert.equal(material.settings.segments.chosen, accent, 'the chosen segment is the lime accent');
+    assert.equal(material.settings.segments.chosen, materialChosen, 'the chosen segment is the accent tint');
+    assert.notEqual(materialChosen, accent, 'not the solid accent');
+    assert.equal(material.settings.segments.ink, accent, 'with accent text');
+    assert.equal(material.dice.chosen, materialChosen, 'so is the chosen die');
     assert.deepEqual(material.settings.switch, ['36px', '20px']);
 
     // Glass: the dice dialog and the settings header are the surface at 68% over an 18px blur, with a light edge. The
@@ -145,13 +148,15 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal(alpha(glass.settings.row.background), 0, 'rows share their card');
     assert.match(glass.settings.row.divider, /inset/, 'rows are split by hairlines');
     assert.equal(glass.settings.row.radius, '0px');
-    // iOS controls: a 40 × 24 switch; a segmented track with a neutral thumb, not the accent; a round white slider thumb.
+    // iOS controls: a 40 × 24 switch; a segmented track whose thumb is the accent tint, mixed over the track rather than
+    // the card, not the accent; a round white slider thumb.
     assert.deepEqual(glass.settings.switch, ['40px', '24px']);
     assert.equal(glass.settings.segments.track, raised, 'the segments sit in one track, a raised control');
-    assert.equal(glass.settings.segments.chosen, thumb, 'the chosen segment is a neutral thumb');
-    assert.notEqual(thumb, accent, 'which is not the accent');
-    assert.equal(glass.settings.segments.ink, thumbInk);
-    assert.equal(glass.dice.chosen, thumb, 'so is the chosen die');
+    assert.equal(glass.settings.segments.chosen, glassChosen, 'the chosen segment is a thumb in the accent tint');
+    assert.notEqual(glassChosen, accent, 'which is not the accent');
+    assert.notEqual(glassChosen, materialChosen, 'mixed over the track, not the card');
+    assert.equal(glass.settings.segments.ink, accent);
+    assert.equal(glass.dice.chosen, glassChosen, 'so is the chosen die');
     assert.deepEqual(glass.settings.thumb, ['28px', '28px', '50%', sliderThumb]);
     // The tiles and the life halves are the same in both styles.
     assert.deepEqual(glass.tile, material.tile, 'tiles and life halves don’t change');
@@ -209,6 +214,93 @@ for (const [name, engine] of Object.entries(engines)) {
         assert.ok(groups.ends.every(end => !end.covers), 'material: no rows have hairlines to cover');
         assert.equal(groups.oneList, false, 'material: the board actions sit side by side');
       }
+    }
+  });
+}
+
+// Accent L3, "tint" (the owner's pick): a chosen segment, the chosen die and a slider's fill are tints of the accent,
+// and solid accent is kept for Done, switches that are on and the focus ring. A chosen segment's text is the accent at
+// 4.5:1 or more on its tint. The tint alone is only about 1.5:1 against the segments beside it, so its 1px accent ring
+// carries the boundary (WCAG 1.4.11): 3:1 or more against an unselected segment and against what's just outside it.
+// Colours are composited in a canvas, so the ring's 45% alpha counts as drawn.
+function accentLook(page) {
+  return page.evaluate(() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const ctx = /** @type {CanvasRenderingContext2D} */ (canvas.getContext('2d', { willReadFrequently: true }));
+    const paint = (...layers) => {
+      ctx.clearRect(0, 0, 1, 1);
+      for (const layer of layers) {
+        ctx.fillStyle = layer;
+        ctx.fillRect(0, 0, 1, 1);
+      }
+      return [...ctx.getImageData(0, 0, 1, 1).data].slice(0, 3);
+    };
+    const css = (selector, pseudo) => getComputedStyle(document.querySelector(selector), pseudo);
+    const card = css('#settings-table').backgroundColor;
+    const behind = [card, css('#turn-choices').backgroundColor];
+    const chosen = css('#turn-choices button[aria-pressed="true"]');
+    const other = css('#turn-choices button[aria-pressed="false"]');
+    const ring = chosen.boxShadow.match(/^(?:rgba?|color|oklab|oklch|lab|lch)\([^)]*\)/)?.[0] ?? 'transparent';
+    const done = css('#save-setup');
+    const tick = css('#players-track .k-tick[data-filled]');
+    return {
+      tint: paint(...behind, chosen.backgroundColor),
+      ink: paint(...behind, chosen.backgroundColor, chosen.color),
+      ring: paint(...behind, chosen.backgroundColor, ring),
+      ringWidth: chosen.boxShadow.match(/0px 0px 0px (\d+(?:\.\d+)?px) inset/)?.[1],
+      other: paint(...behind, other.backgroundColor),
+      outside: paint(...behind),
+      done: paint(card, done.backgroundColor),
+      doneInk: paint(card, done.backgroundColor, done.color),
+      switchOn: paint(card, css('#keep-awake + .switch').backgroundColor),
+      sliderFill: paint(card, css('#players-track .k-fill').backgroundColor),
+      sliderTrack: paint(card, css('#players-track', '::before').backgroundColor),
+      thumb: paint(card, css('#players-track .k-thumb').backgroundColor),
+      tick: { colour: paint(tick.backgroundColor), opacity: tick.opacity },
+      accent: paint(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()),
+    };
+  });
+}
+const luminance = rgb => rgb.map((channel) => {
+  const c = channel / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}).reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (a, b) => {
+  const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (high + 0.05) / (low + 0.05);
+};
+const sameColour = (a, b) => a.every((channel, i) => Math.abs(channel - b[i]) <= 1);
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: chosen values are an accent tint with a 3:1 ring, and only commits and switches are solid accent`, async (t) => {
+    for (const style of ['material', 'glass']) {
+      const page = await openPage(t, engine, { game: { startingLife: 40, scores: [40, 40, 40, 40], keepAwake: true, style } });
+      await button(page, 'Settings').tap();
+      const look = await accentLook(page);
+      assert.ok(!sameColour(look.tint, look.accent), `${style}: the chosen segment isn't solid accent (${look.tint})`);
+      assert.ok(sameColour(look.done, look.accent), `${style}: Done is solid accent (${look.done})`);
+      assert.ok(contrast(look.doneInk, look.done) >= 7, `${style}: Done's ink at ${contrast(look.doneInk, look.done).toFixed(2)}:1`);
+      assert.ok(sameColour(look.switchOn, look.accent), `${style}: a switch that's on is solid accent (${look.switchOn})`);
+      const ink = contrast(look.ink, look.tint);
+      assert.ok(sameColour(look.ink, look.accent) && ink >= 4.5, `${style}: the chosen text is the accent at ${ink.toFixed(2)}:1 on the tint`);
+      assert.equal(look.ringWidth, '1px', `${style}: a 1px ring`);
+      for (const [where, colour] of [['an unselected segment', look.other], ['what is just outside it', look.outside]]) {
+        const ratio = contrast(look.ring, colour);
+        assert.ok(ratio >= 3, `${style}: the ring against ${where} at ${ratio.toFixed(2)}:1`);
+      }
+      assert.ok(contrast(look.tint, look.other) < 3, `${style}: the tint alone doesn't carry the boundary, which is why the ring is there`);
+      // Sliders: a muted fill and filled ticks in the accent at 60%; the thumb is the accent in Material, white in Glass.
+      assert.ok(!sameColour(look.sliderFill, look.accent) && !sameColour(look.sliderFill, look.sliderTrack), `${style}: the slider fill is a muted accent (${look.sliderFill})`);
+      assert.ok(sameColour(look.tick.colour, look.accent) && Number(look.tick.opacity) === 0.6, `${style}: filled ticks are the accent at 60%`);
+      assert.ok(sameColour(look.thumb, style === 'glass' ? [255, 255, 255] : look.accent), `${style}: the thumb (${look.thumb})`);
+      if (style === 'material') {
+        const fill = contrast(look.sliderFill, look.sliderTrack);
+        assert.ok(fill >= 3, `material: the fill against the track at ${fill.toFixed(2)}:1`);
+      } else {
+        const thumb = contrast(look.thumb, look.sliderTrack);
+        assert.ok(thumb >= 3, `glass: the white thumb carries the value at ${thumb.toFixed(2)}:1 on the track`);
+      }
+      await page.close();
     }
   });
 }
