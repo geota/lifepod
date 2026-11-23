@@ -24,15 +24,15 @@ import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badg
 import { setModeActions } from './js/render/modes.js';
 import { syncPill } from './js/render/pill.js';
 import { renderScore } from './js/render/tile.js';
-import {
-  android, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency, syncWakeLock,
-} from './js/state/platform.js';
+import { android, ios, portraitQuery, setReduceTransparency, syncWakeLock } from './js/state/platform.js';
 import { boardMode, editStartHolders, game, saveGame, syncBackHandling, turnSteps } from './js/state/state.js';
 import {
-  board, cancelButton, countersButton, damageButton, diceButton, discardDialog, element, icon, manaButton,
-  roundBackButton, roundButton, saveButton, setupButton, shuffleButton, undoButton,
+  board, cancelButton, countersButton, damageButton, discardDialog, element, icon, manaButton, roundBackButton,
+  roundButton, saveButton, setupButton, shuffleButton, undoButton,
 } from './js/ui/dom.js';
 import { bindStep, bindTap, cancelPresses } from './js/ui/press.js';
+
+import './js/sheets/dice.js';
 
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
 /** @typedef {import('./js/logic/data.js').Reminders} Reminders */
@@ -40,11 +40,6 @@ import { bindStep, bindTap, cancelPresses } from './js/ui/press.js';
 /** @typedef {import('./js/logic/data.js').TurnMode} TurnMode */
 
 const wakeInput = /** @type {HTMLInputElement} */ (document.querySelector('#keep-awake'));
-const diceDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#dice'));
-const diceStage = /** @type {HTMLDivElement} */ (document.querySelector('#dice-stage'));
-const dicePicker = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#dice-picker'));
-const diceRoll = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-roll'));
-const diceResult = /** @type {HTMLParagraphElement} */ (document.querySelector('#dice-result'));
 const rotateSeatsButton = /** @type {HTMLButtonElement} */ (document.querySelector('#rotate-seats'));
 const tileColoursButton = /** @type {HTMLButtonElement} */ (document.querySelector('#tile-colours'));
 const settingsForm = /** @type {HTMLFormElement} */ (document.querySelector('#settings-form'));
@@ -69,9 +64,6 @@ const restart = /** @type {HTMLDialogElement} */ (document.querySelector('#resta
 let selectedPlayerCount = game.scores.length;
 // Settings' starting life, before Done applies it. selectedPlayerCount above is the same for players.
 let selectedLife = game.startingLife;
-let diceSides = 20;
-let die;
-let stopRoll;
 
 // Settings (design/polish/SETTINGS-SPEC.md). Players and starting life wait for Done: a change to either is a pending
 // new game (P1), which Done, renamed "Start new game", or a board action starts. ✕, Escape and Android back drop it.
@@ -522,57 +514,6 @@ restart.addEventListener('close', () => {
     startGame(game.scores.length, game.startingLife);
     settings.close();
   }
-  syncBackHandling();
-});
-
-// Shows the chosen die without a result. A roll in progress stops.
-function showDie(sides) {
-  stopRoll?.();
-  stopRoll = undefined;
-  diceSides = sides;
-  die = window.lifePodDice.stageDie(sides);
-  die.showIdle();
-  diceStage.replaceChildren(die.shadow, die.die);
-  diceRoll.textContent = `Roll d${sides}`;
-  diceResult.textContent = '';
-  for (const choice of dicePicker.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === sides));
-}
-
-// Taps during a roll are ignored, so every roll shows its result.
-function rollDie() {
-  if (stopRoll) return;
-  diceResult.textContent = '';
-  const sides = diceSides;
-  stopRoll = window.lifePodDice.roll(die, {
-    reducedMotion: reducedMotion.matches,
-    onLand(result) {
-      haptic();
-      diceResult.textContent = `Rolled ${result} on a d${sides}`;
-    },
-    done() { stopRoll = undefined; },
-  });
-}
-
-for (const sides of window.lifePodDice.sides) {
-  const choice = document.createElement('button');
-  choice.type = 'button';
-  choice.value = String(sides);
-  choice.append(window.lifePodDice.icon(sides), `d${sides}`);
-  choice.addEventListener('click', () => {
-    if (!stopRoll) showDie(sides);
-  });
-  dicePicker.append(choice);
-}
-diceButton.addEventListener('click', () => {
-  showDie(diceSides);
-  diceDialog.showModal();
-  syncBackHandling();
-});
-diceStage.addEventListener('click', rollDie);
-diceRoll.addEventListener('click', rollDie);
-diceDialog.querySelector('[data-close]').addEventListener('click', () => diceDialog.close());
-diceDialog.addEventListener('close', () => {
-  showDie(diceSides);
   syncBackHandling();
 });
 
