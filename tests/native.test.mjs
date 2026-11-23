@@ -71,6 +71,20 @@ test('node: every file the page loads is served by the Android and iOS apps and 
   assert.match(read('.github/workflows/ci.yml'), /name: Bundle offline web app\n\s+working-directory: web\n\s+run: zip -r -X "\$RUNNER_TEMP\/lifepod-web\.zip" \.\n/);
 });
 
+// The page's CSP (AGENTS.md, "Invariants"): every fetch directive is 'self', the app's own origin, or 'none'. Both apps
+// serve the page from a real origin (lifepod://app/, https://appassets.androidplatform.net/) and the tests over http, so
+// nothing needs file:, and a network source such as https:, http:, data:, blob: or * would let the page reach outside it.
+test('node: the CSP loads nothing but the app\'s own files', () => {
+  const csp = read('web/index.html').match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)[1];
+  const directives = Object.fromEntries(csp.split(';').map(part => part.trim().split(/\s+/)).map(([name, ...sources]) => [name, sources]));
+  assert.deepEqual(directives, {
+    'default-src': ["'none'"], 'script-src': ["'self'"], 'style-src': ["'self'"], 'font-src': ["'self'"], 'img-src': ["'self'"],
+    'base-uri': ["'none'"], 'form-action': ["'none'"],
+  });
+  // Neither app injects a policy of its own.
+  for (const source of [kotlin, swift]) assert.doesNotMatch(source, /Content-Security-Policy/);
+});
+
 test('node: the bridge names match the Android and iOS wrappers', () => {
   // Android: the interface's name, its methods, and the methods the page calls.
   assert.match(kotlin, /addJavascriptInterface\(GameBridge\(\), "LifePodAndroid"\)/);

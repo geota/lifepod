@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { chromium, webkit } from 'playwright-core';
-import { appFile, button, openPage, scores, test } from './helpers.mjs';
+import { button, openPage, scores, test } from './helpers.mjs';
 import { startServer } from '../scripts/serve.mjs';
 
 // The test harness itself: every test file registers its tests through it, the test server serves web/ and nothing
@@ -74,8 +74,7 @@ test('node: the test server serves web/ and the test fonts, read-only, on 127.0.
 
 // The app is ES modules (web/app.js and web/js/), which the tests load over http as the apps serve them from their own
 // schemes: a tap still counts and saves, with no errors or policy violations. Browsers run no module script from
-// file://, so a page opened from a file draws no board at all rather than half of one; the README's browser preview
-// serves web/ over http instead.
+// file://, so the README's browser preview serves web/ over http too.
 async function checkModules(t, engine) {
   const page = await openPage(t, engine, { font: 'system' });
   assert.equal(new URL(page.url()).protocol, 'http:');
@@ -85,14 +84,10 @@ async function checkModules(t, engine) {
   await button(page, 'Add one life to Player 1').tap();
   assert.deepEqual(await scores(page), [41, 40, 40, 40]);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')).scores[0]), 41, 'and saves');
-
-  const file = await openPage(t, engine, { url: appFile, font: 'system' });
-  assert.equal(new URL(file.url()).protocol, 'file:');
-  assert.equal(await file.locator('#board .player').count(), 0, 'from file://, the modules never run');
 }
 
-test('chromium: the app runs as modules over http, and not from file://', t => checkModules(t, chromium));
-test('webkit: the app runs as modules over http, and not from file://', t => checkModules(t, webkit));
+test('chromium: the app runs as modules over http', t => checkModules(t, chromium));
+test('webkit: the app runs as modules over http', t => checkModules(t, webkit));
 
 // Chromium pages get the pinned test font, so text measures the same on every machine.
 test('chromium: pages measure their text in the pinned Roboto', async (t) => {

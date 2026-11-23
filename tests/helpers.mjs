@@ -38,9 +38,6 @@ export const engines = { chromium, webkit };
 
 // ---- Where the app is -----------------------------------------------------------------------------------------------
 
-// The app as a file, for the test that checks it doesn't run from file://, where browsers block module scripts.
-export const appFile = new URL('../web/index.html', import.meta.url).href;
-
 // `npm test` runs one server for every file (scripts/serve.mjs, started by tests/server.mjs). A file run on its own
 // starts one the first time it opens a page.
 let server;
