@@ -817,3 +817,17 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(await cut(), [], 'still no label is cut short');
   });
 }
+
+// The Keep awake row fills its card like the other rows, so its switch sits at the card's edge (docs/review/FINAL.md U2;
+// it was capped from when it shared Game's footer with New game).
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the Keep awake row fills its card`, async (t) => {
+    for (const style of ['material', 'glass']) {
+      const page = await openPage(t, engine, { viewport: { width: 952, height: 427 }, style });
+      await button(page, 'Settings').tap();
+      const [row, foot] = await page.locator('.fs-awake').evaluate(node => [node.getBoundingClientRect().width, node.parentElement.getBoundingClientRect().width]);
+      assert.ok(Math.abs(row - foot) < 1, `${style}: the row is ${row}px in its ${foot}px footer`);
+      await page.close();
+    }
+  });
+}

@@ -336,7 +336,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.fs-gamefoot > .fs-awake { flex: 1 1 calc(11 * var(--rem)); max-width: calc(18 * var(--rem)); min-height: 48px; }
+.fs-gamefoot > .fs-awake { flex: 1 1 calc(11 * var(--rem)); min-height: 48px; }
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
 .fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
