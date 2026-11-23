@@ -707,7 +707,13 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
    (ui ≥ 264). */
 .board {
   --u: calc(var(--ui, 400px) / 100);
-  --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
+  /* A hundredth of --ub, for the badges' height budget. */
+  --ub-unit: calc(var(--ub, 400px) / 100);
+  /* Badges are sized from both of a tile's dimensions (DESIGN-AUDIT S1): from its width, 3.6u as before, and up to 5u
+     where the tile's height leaves room (4.4 hundredths of --ub), so a tall tablet tile's counts grow instead of
+     leaving most of the tile empty. A phone tile is short, so its height never lifts it past 3.6u, and the cap still
+     holds phones at 16px. Auto-drop gives way as before where a row runs out of width. */
+  --badge-size: clamp(.78125rem, max(calc(3.6 * var(--u)), min(calc(5 * var(--u)), calc(4.4 * var(--ub-unit)))), max(1rem, 16 * var(--grow)));
   /* Settings → Table → Badge size scales the badge rows and the mana strip: their chips, counts, icons and the colour
      indicator (data-badge-size on #board). A row grows no taller than fits between its edge and the total on every
      tile (app.js measures --far-room and --near-room), and never below the default. A larger system text size
@@ -1209,11 +1215,13 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 }
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) :is(.badges, .near-edge, .far-edge) { display: none; }
 /* The far edge stacks the far row over the mana strip, while a pool has mana, 4px in from the tile's sides, 8px from
-   its far edge or clear of the pill where the pill reaches it. */
+   its far edge or clear of the pill where the pill reaches it. app.js sets --far-offset to the deepest clearance among
+   the tiles whose far edges share a line, so a board row's far rows line up, and adds --space-4 from the upright pill
+   with 2 players. */
 .far-edge {
   position: absolute;
   z-index: 3;
-  top: max(calc(8 * var(--grow)), var(--clear-far, 0px));
+  top: max(calc(8 * var(--grow)), var(--far-offset, 0px));
   left: calc(4px + var(--clear-start, 0px));
   right: calc(4px + var(--clear-end, 0px));
   display: flex;
@@ -1237,9 +1245,11 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   pointer-events: none;
 }
 .badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--near-row-size)); }
-.board[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .board[data-drop~="name"] .turn-word,
-.board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .board[data-drop~="sword"] .badges.far .sword { display: none; }
-.board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
+/* Each tile's edges carry their side's tokens (fit.js writes them there rather than on #board, so a step restyles only
+   the rows): .near-edge the near row's, .far-edge the far row's and the strip's. */
+.near-edge[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .near-edge[data-drop~="name"] .turn-word,
+.near-edge[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .far-edge[data-drop~="sword"] .badges.far .sword { display: none; }
+.near-edge[data-drop~="wrap"] .badges.near, .far-edge[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1282,8 +1292,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .turn-chip:focus-visible, .strip-chip:focus-visible { outline-offset: 2px; }
 /* Once "Turn" gives way, the round keeps a "T" (T12), so the untap symbol doesn't read as a letter. The chip tightens
    a little to make room for it. */
-.board[data-drop~="name"] .turn-round::before { content: 'T'; letter-spacing: -.02em; }
-.board[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
+.near-edge[data-drop~="name"] .turn-round::before { content: 'T'; letter-spacing: -.02em; }
+.near-edge[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
 .chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
 .chip.flag-chip .icon { width: .95em; height: .95em; }
 /* The monarch and the initiative at rest: the holder's crown or castle, round like the flag. A holder who is out and
@@ -1296,8 +1306,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .pass-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
 .pass-chip:active { background: var(--cell-pressed); }
 .pass-chip:focus-visible { outline-offset: 2px; }
-.board[data-drop~="name"] .pass-chip .pass-word { display: none; }
-.board[data-drop~="name"] .pass-chip { padding-inline: .38em; }
+.near-edge[data-drop~="name"] .pass-chip .pass-word { display: none; }
+.near-edge[data-drop~="name"] .pass-chip { padding-inline: .38em; }
 /* Turn reminders (Settings → Reminders): "Monarch: draw a card" or "Initiative: venture into Undercity", facing the
    player, for 3 seconds or until tapped. In the turn chip's language: the tile's button fill and a ring in the seat
    colour, with the crown or castle in the seat colour. app.js puts them on their own line above the near edge where
@@ -1351,11 +1361,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Floating mana at rest (design/polish/SPEC.md §9): while a pool has mana, a strip shows each colour it holds and its
    amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a 44px-tall
    target at least 44px wide, on a 32px capsule. It sits at the far edge, under commander damage and toward the total,
-   so the two most used counts are together, and both badge rows always stay. app.js puts each strip in the first place
-   that fits clear of the life total, the − and + glyphs, the near row and the pill (data-strip on the tile): below, on
-   its own line under the far row; inline, at the end of the far row's line; fold, one chip that shows the pool and
-   opens mana mode, on its own line; or fold-inline, that chip at the end of the far row. --strip-size shrinks the type
-   and strip-wrap lets a strip below grow toward the total onto a second line. */
+   so the two most used counts are together, and both badge rows always stay. Commander damage keeps the far row to
+   itself, and the strip's type never shrinks, so every symbol stays legible on a 44px target. app.js puts each strip in
+   the first place that fits clear of the life total, the − and + glyphs, the near row and the pill (data-strip on the
+   tile): below, on its own line under the far row, where strip-wrap lets it grow toward the total onto a second line;
+   fold, one chip that shows the pool and opens mana mode, on its own line there; or near, that chip at the end of the
+   near row, by the player. */
 .mana-strip {
   position: relative;
   z-index: 1;
@@ -1377,19 +1388,14 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* The capsule is 32px tall, and grows to the targets' 44px with a larger Badge size, so the symbols stay inside it. */
 .mana-strip::before { position: absolute; inset: clamp(0px, calc(22px - .8em), 6px) 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
 .mana-strip[hidden] { display: none; }
-.board[data-drop~="strip-wrap"] .player[data-strip="below"] .mana-strip { flex-wrap: wrap; }
-/* Inline: the far row, then the strip, on one line whose targets reach 2px from the tile's edge (or from the pill's
-   clearance, where the pill reaches it). */
-/* The line is the targets' 44px, and the far row, centred on it, keeps the pill's clearance at any Badge size (1.7em is
-   the row's height: the far edge takes the row's type). */
-.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--clear-far, 0px) - clamp(0px, (var(--tap-min) - 1.7em) / 2, 6px)); }
-.player[data-strip="inline"] .badges.far { flex: 1 1 0; min-width: 0; align-self: center; }
-.player[data-strip="inline"] .mana-strip { order: 1; }
-/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line under the far row.
-   Where even that can't fit, the strip hides and the same chip ends the far row (fold-inline). */
-.player[data-strip="fold-inline"] .mana-strip, .badges.far > .strip-chip { display: none; }
-.player[data-strip="fold-inline"] .badges.far > .strip-chip { display: inline-flex; }
+.player[data-strip="below"] .far-edge[data-drop~="strip-wrap"] .mana-strip { flex-wrap: wrap; }
+/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, the full-size picker, on its own
+   line under the far row. Where even that can't fit, the strip hides and the same chip ends the near row (near), where
+   it takes the near row's type and gives way with it like any other chip. */
+.player[data-strip="near"] .mana-strip, .badges.near > .strip-chip { display: none; }
+.player[data-strip="near"] .badges.near > .strip-chip { display: inline-flex; }
 .strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--far-row-size)); }
+.badges.near > .strip-chip { font-size: 1em; }
 .player[data-strip="fold"] .mana-strip { padding: 0; }
 .player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
 .player[data-strip="fold"] .mana-strip > .strip-chip { display: inline-flex; }
@@ -1418,6 +1424,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   line-height: 1;
 }
 .mana-strip > button:not(.chip):active { background: var(--wash); }
+/* A colour spent to 0 keeps its place while the strip is being tapped, dimmed, until the strip reflows. */
+.mana-strip > .strip-spend[aria-disabled="true"] { opacity: var(--disabled-opacity); }
 .mana-strip .pip { --pip-size: 1.25em; }
 .mana-strip > button.strip-clear { color: var(--text-soft); }
 .strip-clear .icon { width: 1.05em; height: 1.05em; }

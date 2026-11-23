@@ -129,12 +129,12 @@ async function checkSizes(t, engine, style, names) {
         assert.deepEqual(await tileProblems(page, { parts: '.badges .chip' }), [], `${view}: no badge under the centre controls`);
         if (Math.min(...size) >= smallestRealPhone) {
           const drops = await page.locator('#board').evaluate(node => [node.dataset.drop ?? '',
-            node.style.getPropertyValue('--near-badge-size'), node.style.getPropertyValue('--far-badge-size'),
-            [...node.querySelectorAll('.badges.far > .strip-chip')].some(chip => chip.checkVisibility())]);
+            node.querySelector('.near-edge').style.getPropertyValue('--near-badge-size'), node.querySelector('.far-edge').style.getPropertyValue('--far-badge-size'),
+            [...node.querySelectorAll('.badges.near > .strip-chip')].some(chip => chip.checkVisibility())]);
           // With every counter on, the identity names may go on the smallest real phones (design/polish/SPEC.md §3.2,
-          // a typical 6-player game at 640 × 360), and the sword where a folded mana strip ends the far row, but nothing
-          // else does and no type shrinks.
-          const allowed = ['name', ...(drops[3] ? ['sword'] : [])];
+          // a typical 6-player game at 640 × 360), and the near row may wrap where a folded mana strip ends it (commander
+          // damage keeps the far row to itself, §9), but nothing else does and no type shrinks.
+          const allowed = ['name', ...(drops[3] ? ['wrap'] : [])];
           assert.ok(drops[0].split(' ').filter(Boolean).every(token => allowed.includes(token)), `${view}: at most the identity names give way (${drops[0]})`);
           assert.deepEqual(drops.slice(1, 3), ['', ''], `${view}: badge rows keep their full type`);
         }

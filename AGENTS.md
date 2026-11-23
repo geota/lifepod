@@ -25,11 +25,11 @@ For a new type, add it to `MIME_TYPES` in `MainActivity.kt` and `mimeTypes` in `
 The page is native ES modules, with no bundler or build step. `index.html` loads `dice.js`, a classic script that sets `window.lifePodDice`, then `app.js`, its one module script, which imports the rest from `web/js/`. Module scripts run once the document is parsed, in import order. Browsers don't run them from `file://`, so the tests, the design scripts and `npm run preview` serve `web/` over http (`scripts/serve.mjs`, the one static server), and the apps serve it from their own origins. Imports run one way, from the first folder here to the last:
 
 - `logic/`: `data.js` (the fixed tables, limits and timings, and the small types they define), `save.js` (the save format, `loadGame` and the `fit*` checks) and `rules.js` (the game's rules as functions of a game: who is out, play order, the designations' handoffs, applying an edit). No DOM and no state.
-- `ui/`: `dom.js` (the board's fixed elements, `element()`, the icons) and `press.js` (`bindTap`, `bindCounter`, `bindSeat`, `bindStep`). DOM, but no app state.
-- `state/`: `platform.js` (every call to a native bridge, or the browser's stand-in, and the screen) and `state.js` (the game, `saveGame`, and what isn't saved: the board mode and its edits, turn steps, reminders, cleared pools).
+- `ui/`: `dom.js` (the board's fixed elements, `element()`, the icons, and `syncChildren`, which keeps a row's keyed children in place) and `press.js` (`bindTap`, `bindCounter`, `bindSeat`, `bindStep`). DOM, but no app state.
+- `state/`: `platform.js` (every call to a native bridge, or the browser's stand-in, and the screen) and `state.js` (the game, `saveGame`, and what isn't saved: the board mode and its edits, turn steps, reminders, cleared pools, strips being tapped).
 - `layout/`: measuring and fitting: `board.js` (the seats, the pill's place, the one tile size), `fit.js` (badge rows and mana strips) and `settings.js` (the settings page's columns and fields).
 - `render/`: drawing what the state says: `tile.js`, `badges.js`, `modes.js`, `pill.js`, `announce.js` and `appearance.js`.
-- `actions/`: what a press changes, saves and redraws: `board.js` (the tiles, life, a new game), `edits.js`, `mana.js`, `mode.js` (board modes and "Who goes first?"), `turns.js` and `reminders.js`.
+- `actions/`: what a press changes, saves and redraws: `commit.js` (`commit()`, which saves and redraws in one call after a change), `dialog.js` (`showDialog`, which every dialog opens through), `board.js` (the tiles, life, a new game), `edits.js`, `mana.js`, `mode.js` (board modes and "Who goes first?"), `turns.js` and `reminders.js`.
 - `sheets/`: the settings page (`settings.js`, `options.js`, `slider.js`) and the dice sheet, which wire their controls as they load.
 - `app.js`: wires the pill's other buttons, back and Escape, the window and the fonts, and boots.
 

@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -38,6 +39,13 @@ class MainActivity : Activity() {
 
     // Registered only while the page has a dialog or seat rotation to close, so the system handles back otherwise.
     private var backCallback: Any? = null
+
+    // Shown instead of the tracker when its renderer keeps dying as the page loads.
+    private var crashNotice: LinearLayout? = null
+
+    // When the tracker last loaded, and how many times in a row its renderer has died soon after.
+    private var trackerLoadedAt = 0L
+    private var quickRestarts = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,24 +84,36 @@ class MainActivity : Activity() {
 
     private fun webViewIsCurrent(): Boolean = (installedWebViewMajor() ?: MIN_WEBVIEW_MAJOR) >= MIN_WEBVIEW_MAJOR
 
-    // English only, like the page, and build.sh compiles no R class, so the text is written here.
-    @Suppress("SetTextI18n")
     private fun showUpdateNotice() {
+        updateNotice =
+            showNotice(
+                "LifePod needs a newer Android System WebView, version $MIN_WEBVIEW_MAJOR or later. " +
+                    "Update Android System WebView (or Chrome) from Google Play, then come back to LifePod.",
+                "Open Google Play",
+            ) { openWebViewInPlay() }
+    }
+
+    // A native message with one button, in place of the tracker. English only, like the page, and build.sh compiles no
+    // R class, so the text is written here.
+    @Suppress("SetTextI18n")
+    private fun showNotice(
+        text: String,
+        action: String,
+        onAction: () -> Unit,
+    ): LinearLayout {
         val density = resources.displayMetrics.density
         val gap = (24 * density).toInt()
         val message =
             TextView(this).apply {
-                text =
-                    "LifePod needs a newer Android System WebView, version $MIN_WEBVIEW_MAJOR or later. " +
-                    "Update Android System WebView (or Chrome) from Google Play, then come back to LifePod."
+                this.text = text
                 setTextColor(Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
                 gravity = Gravity.CENTER
             }
-        val openPlay =
+        val button =
             Button(this).apply {
-                text = "Open Google Play"
-                setOnClickListener { openWebViewInPlay() }
+                this.text = action
+                setOnClickListener { onAction() }
             }
         val notice =
             LinearLayout(this).apply {
@@ -102,11 +122,11 @@ class MainActivity : Activity() {
                 setPadding(gap, gap, gap, gap)
                 addView(message)
                 val wrapContent = LinearLayout.LayoutParams.WRAP_CONTENT
-                addView(openPlay, LinearLayout.LayoutParams(wrapContent, wrapContent).apply { topMargin = gap })
+                addView(button, LinearLayout.LayoutParams(wrapContent, wrapContent).apply { topMargin = gap })
             }
         val matchParent = FrameLayout.LayoutParams.MATCH_PARENT
         root.addView(notice, FrameLayout.LayoutParams(matchParent, matchParent))
-        updateNotice = notice
+        return notice
     }
 
     // Opens the WebView provider's page in the Play Store app, or in a browser where there is no Play Store. The app
@@ -157,15 +177,36 @@ class MainActivity : Activity() {
             }
         val matchParent = FrameLayout.LayoutParams.MATCH_PARENT
         root.addView(webView, FrameLayout.LayoutParams(matchParent, matchParent))
+        trackerLoadedAt = SystemClock.elapsedRealtime()
         webView.loadUrl(START_URL)
     }
 
     // A WebView whose renderer has gone can't be used again. Replace it and reload, as iOS does when its web
-    // content process ends. The game is saved on every change, so the new page carries on where the old one was.
+    // content process ends. The game is saved on every change, so the new page carries on where the old one was. A
+    // renderer that dies again and again soon after loading would restart forever, so after MAX_QUICK_RESTARTS in a row
+    // the tracker stays closed and a native message offers to try again.
     private fun replaceTracker() {
         setBackHandling(false)
         root.removeView(webView)
         webView.destroy()
+        val quick = SystemClock.elapsedRealtime() - trackerLoadedAt < QUICK_RESTART_MS
+        quickRestarts = if (quick) quickRestarts + 1 else 0
+        if (quickRestarts < MAX_QUICK_RESTARTS) {
+            showTracker()
+            return
+        }
+        crashNotice =
+            showNotice(
+                "LifePod's page keeps stopping as it opens. Your game is saved. Try again, or restart your phone if it " +
+                    "keeps happening.",
+                "Try again",
+            ) { retryTracker() }
+    }
+
+    private fun retryTracker() {
+        crashNotice?.let { root.removeView(it) }
+        crashNotice = null
+        quickRestarts = 0
         showTracker()
     }
 
@@ -182,7 +223,7 @@ class MainActivity : Activity() {
     // Android 12L and earlier deliver back presses here instead of to an OnBackInvokedCallback.
     @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION", "GestureBackNavigation")
     override fun onBackPressed() {
-        if (!::webView.isInitialized) return super.onBackPressed()
+        if (!::webView.isInitialized || crashNotice != null) return super.onBackPressed()
         webView.evaluateJavascript(CLOSE_DIALOG) { handled ->
             if (handled != "true") super.onBackPressed()
         }
@@ -202,7 +243,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        if (::webView.isInitialized) {
+        if (::webView.isInitialized && crashNotice == null) {
             (webView.parent as? FrameLayout)?.removeView(webView)
             webView.destroy()
         }
@@ -307,6 +348,11 @@ class MainActivity : Activity() {
         // in step with the Chrome entry of browserslist in package.json.
         const val MIN_WEBVIEW_MAJOR = 129
         const val WEBVIEW_PACKAGE = "com.google.android.webview"
+
+        // A renderer that dies within QUICK_RESTART_MS of loading counts as dying on load; after MAX_QUICK_RESTARTS
+        // such deaths in a row the tracker stops restarting. Keep these in step with ios/LifePodApp.swift.
+        const val QUICK_RESTART_MS = 10_000L
+        const val MAX_QUICK_RESTARTS = 3
 
         // The types of file the app serves from web/, by extension; keep it in step with mimeTypes in
         // ios/LifePodApp.swift. Scripts are text/javascript: the WebView runs a module script only with a JavaScript

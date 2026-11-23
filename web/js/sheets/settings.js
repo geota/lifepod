@@ -3,6 +3,7 @@
 // leave for a board mode. Importing this module wires it and the pill's setup button.
 
 import { startGame } from '../actions/board.js';
+import { showDialog } from '../actions/dialog.js';
 import { setBoardMode } from '../actions/mode.js';
 import {
   keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody, syncSettingsCue,
@@ -188,11 +189,10 @@ function openSettings() {
   renderBadgeSizeSetting();
   renderStyleSetting();
   placeSettingsSections();
-  settings.showModal();
+  showDialog(settings);
   // Settings always open at the top.
   settingsBody.scrollTop = 0;
   syncSettingsCue();
-  syncBackHandling();
 }
 setupButton.addEventListener('click', () => {
   if (boardMode) {
@@ -259,8 +259,7 @@ restartButton.addEventListener('click', () => {
   document.querySelector('#restart-resets').replaceChildren(...resetList().map(item => element('li', '', item)));
   document.querySelector('#restart-keeps').textContent = game.shuffleColours ? 'Settings and seats stay.' : 'Settings, seats and tile colours stay.';
   restart.returnValue = 'cancel';
-  restart.showModal();
-  syncBackHandling();
+  showDialog(restart);
 });
 restart.addEventListener('close', () => {
   if (restart.returnValue === 'restart') {

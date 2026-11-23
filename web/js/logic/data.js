@@ -157,6 +157,9 @@ export const maxRound = 999;
 // How long a hold takes to register on the turn chip and the pill's round button, and how long "Undo clear" stays.
 export const holdDelay = 500;
 export const undoClearTime = 5000;
+// A mana strip keeps its buttons where they are for this long after its last tap, so a quick extra tap lands on what it
+// was aimed at (docs/review/DEEP-DIVE.md D1).
+export const stripHoldTime = 800;
 // "Who goes first?": the shuffle lights tiles in turn for about 0.8s, and the chosen tile shows "Goes first" for a beat.
 export const shuffleTick = 90;
 export const shuffleTicks = 9;

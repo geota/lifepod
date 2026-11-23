@@ -10,13 +10,14 @@ import { announceMode, announceModeEnd, clearAnnouncements, seatName } from '../
 import { renderBadges } from '../render/badges.js';
 import { renderModeLayer } from '../render/modes.js';
 import { syncPill } from '../render/pill.js';
-import { renderScore } from '../render/tile.js';
 import { haptic, reducedMotion } from '../state/platform.js';
 import {
-  boardMode, editStartHolders, edits, game, openBoardMode, saveGame, syncBackHandling, turnSteps,
+  boardMode, editStartHolders, edits, game, openBoardMode, syncBackHandling, turnSteps,
 } from '../state/state.js';
 import { board, boardControls, discardDialog, icon, setupButton } from '../ui/dom.js';
 import { cancelPresses } from '../ui/press.js';
+import { commit } from './commit.js';
+import { showDialog } from './dialog.js';
 import { endUndoClears } from './mana.js';
 import { turnStarted } from './reminders.js';
 
@@ -49,7 +50,7 @@ export function chooseFirst(index) {
   game.turn.first = index;
   game.turn.active = index;
   turnSteps.length = 0;
-  saveGame();
+  commit();
   haptic();
   board.dataset.picked = '';
   [...board.children].forEach((player, seat) => player.toggleAttribute('data-lit', seat === index));
@@ -163,15 +164,13 @@ export function cancelEditing() {
   document.querySelector('#discard-message').textContent = discardMessages[boardMode]
     + (moved.length ? ` So ${moved.length > 1 ? 'do' : 'does'} ${moved.join(' and ')}.` : '');
   discardDialog.returnValue = 'keep';
-  discardDialog.showModal();
-  syncBackHandling();
+  showDialog(discardDialog);
 }
 
 export function discardEdits() {
   const changes = /** @type {Edit[]} */ (edits);
   while (changes.length) applyEdit(game, /** @type {Edit} */ (changes.pop()), -1);
-  game.scores.forEach((_, index) => renderScore(index));
-  saveGame();
+  commit({ scores: 'all' });
   setBoardMode(null);
   // What the discarded changes said is no longer true.
   clearAnnouncements();

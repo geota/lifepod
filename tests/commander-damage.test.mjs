@@ -287,8 +287,8 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
   assert.deepEqual(await load(game), [
     { out: false, chips: [`14 commander damage from Player 2 plain ${sky.seat} ${sky.rim} ring`] },
     { out: true, chips: [`21 commander damage from Player 4 out ${red} ${red} ring`, `6 poison plain ${text} no ring`] },
-    { out: false, chips: [`15 commander damage from Player 1 warn ${amber} ${amber} ring`, `7 poison warn ${amber} no ring`] },
-    { out: true, chips: [`20 commander damage from Player 2 warn ${amber} ${amber} ring`, `10 poison out ${red} ${red} ring`] },
+    { out: false, chips: [`15 commander damage from Player 1, 6 from lethal warn ${amber} ${amber} ring`, `7 poison, 3 from lethal warn ${amber} no ring`] },
+    { out: true, chips: [`20 commander damage from Player 2, 1 from lethal warn ${amber} ${amber} ring`, `10 poison out ${red} ${red} ring`] },
   ]);
   // With their switches off, the counts don't show and don't knock anyone out.
   const off = await load({ ...game, counters: { commander: false, poison: false } });

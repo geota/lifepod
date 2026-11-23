@@ -98,3 +98,40 @@ export function resetZoom() {
 export function visuallyHidden(text) {
   return element('span', 'visually-hidden', text);
 }
+
+/**
+ * One child of a row kept by syncChildren: its key, how to make its node, and how to bring that node up to date.
+ *
+ * @typedef {object} Keyed
+ * @property {string} key
+ * @property {() => HTMLElement} create
+ * @property {(node: HTMLElement) => void} [update]
+ */
+
+// Brings a row's children in line with a list of keyed items (docs/review/DEEP-DIVE.md §2.2). A node whose key is still
+// listed is kept and updated in place, so a finger pressing it or keyboard focus on it survives the redraw. New keys get
+// new nodes, gone keys lose theirs, and nodes move only where the order changed. A focused node that has to move gets
+// its focus back.
+/**
+ * @param {Element} row
+ * @param {Keyed[]} items
+ */
+export function syncChildren(row, items) {
+  const kept = new Map([.../** @type {HTMLCollectionOf<HTMLElement>} */ (row.children)].map(node => [node.dataset.key, node]));
+  const nodes = items.map(({ key, create, update }) => {
+    let node = kept.get(key);
+    if (node) kept.delete(key);
+    else {
+      node = create();
+      node.dataset.key = key;
+    }
+    update?.(node);
+    return node;
+  });
+  for (const node of kept.values()) node.remove();
+  const focused = document.activeElement;
+  nodes.forEach((node, at) => {
+    if (row.children[at] !== node) row.insertBefore(node, row.children[at] ?? null);
+  });
+  if (focused instanceof HTMLElement && focused !== document.activeElement && nodes.includes(focused)) focused.focus({ preventScroll: true });
+}

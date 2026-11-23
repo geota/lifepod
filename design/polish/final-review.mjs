@@ -448,7 +448,8 @@ function audit() {
       if (hidden.length) add('hidden', `P${index + 1} mana strip hides ${hidden.join(', ')}`);
       const turnChip = player.querySelector('.turn-chip');
       if (turnChip && !visible(turnChip)) add('hidden', `P${index + 1} mana strip hides the turn chip (${turnChip.className})`);
-      const folded = ['fold', 'fold-inline'].includes(player.dataset.strip);
+      // A strip that can't fit at the far edge folds into a chip there or at the end of the near row.
+      const folded = ['fold', 'near'].includes(player.dataset.strip);
       const chip = [...player.querySelectorAll('.strip-chip')].find(visible);
       if (folded && !chip) add('hidden', `P${index + 1} folded mana strip shows no chip`);
       if (chip && !chip.querySelector('.icon[data-icon="caret-right"], .icon[data-icon="undo"]')) add('hidden', `P${index + 1} folded mana strip has no cue that it opens mana mode`);
@@ -458,7 +459,7 @@ function audit() {
         const centre = el => { const b = rect(el); return [(b.left + b.right) / 2, (b.top + b.bottom) / 2]; };
         const away = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
         const at = centre(shownStrip);
-        if (away(at, centre(player.querySelector('.far-edge'))) > away(at, centre(player.querySelector('.near-edge')))) add('place', `P${index + 1} mana strip sits by the near edge, not the far edge`);
+        if (player.dataset.strip !== 'near' && away(at, centre(player.querySelector('.far-edge'))) > away(at, centre(player.querySelector('.near-edge')))) add('place', `P${index + 1} mana strip sits by the near edge, not the far edge`);
       }
     });
   }

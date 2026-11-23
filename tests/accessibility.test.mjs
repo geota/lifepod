@@ -69,7 +69,7 @@ for (const [name, engine] of Object.entries(engines)) {
       assert.equal(await tile(page, 2).locator('.turn-chip').getAttribute('aria-label'), "Turn 3. Player 2's turn, pass it");
       assert.equal(await tile(page, 4).locator('.pass-chip').getAttribute('aria-label'),
         'Pass it on: Player 4 is out and still has the initiative. Give the initiative to someone in counters');
-      assert.match(await tile(page, 1).locator('.badges.far .strip-chip').getAttribute('aria-label'), /^5 mana\. Player 1's pool: 1 blue, 3 red, 1 colourless\. Open mana$/);
+      assert.match(await tile(page, 1).locator('.badges.near .strip-chip').getAttribute('aria-label'), /^5 mana\. Player 1's pool: 1 blue, 3 red, 1 colourless\. Open mana$/);
       for (const [entry, layer] of [['Counters', 'counters'], ['Commander damage', 'damage'], ['Mana pool', 'mana']]) {
         await button(page, entry).click();
         assert.equal(await mode(page), layer);
@@ -350,4 +350,16 @@ test('chromium: settings and the dialogs zoom, the board doesn\'t, and closing o
   await page.keyboard.press('Escape');
   await eventually(() => page.locator('meta[name="viewport"]').getAttribute('content'), `${viewport}, maximum-scale=1`, 'closing settings zooms back out');
   await eventually(() => page.locator('meta[name="viewport"]').getAttribute('content'), viewport, 'then zoom is allowed again');
+});
+
+// ACCESSIBILITY.md L4: close to lethal is said as well as shown in amber.
+test('chromium: a count close to lethal says how far it is', async (t) => {
+  const page = await openPage(t, engines.chromium, {
+    game: {
+      startingLife: 40, scores: [40, 40, 40, 40], counters: { commander: true, poison: true }, poison: [8, 0, 0, 0],
+      commanderDamage: [[0, 18, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    },
+  });
+  assert.equal(await tile(page, 1).locator('.badges.near .chip[data-kind="poison"]').textContent(), '8 poison, 2 from lethal');
+  assert.equal(await tile(page, 1).locator('.badges.far .chip.damage').textContent(), '18 commander damage from Player 2, 3 from lethal');
 });
