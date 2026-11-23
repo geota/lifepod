@@ -14,6 +14,7 @@
     "test": "node --test --test-global-setup=tests/server.mjs",
     "preview": "node scripts/preview.mjs",
     "store:images": "node store/render.mjs",
+    "screenshots:readme": "node scripts/readme-screenshots.mjs",
     "font:subset": "node scripts/subset-mana.mjs"
   },
   "devDependencies": {
