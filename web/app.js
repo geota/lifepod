@@ -2990,6 +2990,20 @@ function renderBadgeSizeSetting() {
   badgeSizeSlider.render();
 }
 
+// Compact switch rows (styles.css) put their label over the mark and the switch where a row is too narrow for all three
+// on one line. Container queries cover the usual widths; this catches whatever they miss with the font and style in
+// use: a group with a label cut short stacks every row. It's checked whenever the settings body changes size, as when
+// settings opens or the window turns (the body, a scroller, doesn't change size when its rows stack, so its observer
+// can't loop), when the fonts arrive, and when the style changes, which changes the rows inside a group of the same
+// size.
+const compactGroups = [.../** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('#settings :is(.compact-switches, .tracker-grid)'))];
+function fitCompactSwitches(group) {
+  group.removeAttribute('data-stacked');
+  const labels = [.../** @type {NodeListOf<HTMLElement>} */ (group.querySelectorAll('.nav-label'))];
+  group.toggleAttribute('data-stacked', labels.some(label => label.offsetWidth && label.scrollWidth > label.clientWidth + 0.5));
+}
+new ResizeObserver(() => compactGroups.forEach(fitCompactSwitches)).observe(settingsBody);
+
 // Style: saved the moment it's picked, after which it wins over the platform's default.
 const styleChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#style-choices'));
 const currentStyle = () => game.style ?? defaultStyle;
@@ -3006,6 +3020,7 @@ for (const choice of styleChoices.children) {
     saveGame();
     applyStyle();
     renderStyleSetting();
+    compactGroups.forEach(fitCompactSwitches);
   });
 }
 

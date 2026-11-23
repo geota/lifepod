@@ -1617,6 +1617,18 @@ input:checked + .switch::after {
 .compact-switches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 .compact-switch { gap: 6px; padding-inline: 8px 6px; }
 .compact-switch > .ci { font-size: 16px; }
+/* The container queries cover the usual widths. app.js stacks a group (data-stacked) whose label would still be cut
+   short in its row, whatever the font and the style's switch and gaps (Glass's are wider). */
+.compact-switches[data-stacked] .compact-switch, .tracker-grid[data-stacked] .compact-switch {
+  display: grid;
+  grid-template-columns: auto auto;
+  place-content: center;
+  place-items: center;
+  gap: 4px 10px;
+  padding: 6px 4px;
+}
+:is(.compact-switches, .tracker-grid)[data-stacked] .compact-switch > .nav-label { grid-row: 1; grid-column: 1 / -1; }
+:is(.compact-switches, .tracker-grid)[data-stacked] .compact-switch .switch { margin-inline-start: 0; }
 @container settings-section (max-width: 459.98px) {
   .compact-switches .compact-switch {
     display: grid;

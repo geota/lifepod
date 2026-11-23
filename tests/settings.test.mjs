@@ -683,3 +683,25 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal((await tiles()).set, 'clear', 'an unknown set gets Clear');
   });
 }
+
+// ---- Compact switch rows ---------------------------------------------------------------------------------------------
+
+// A compact switch row whose label wouldn't fit beside its mark and switch, whatever the font or style (Glass's switch
+// and gaps are wider, and Linux's Roboto measured "Indicator" 1px too wide for its row on an iPad), stacks its label
+// over them, so no label is cut short.
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a compact switch label that would be cut short goes over its switch instead`, async (t) => {
+    const page = await openPage(t, engine, { viewport: { width: 1024, height: 768 }, style: 'glass' });
+    await button(page, 'Settings').tap();
+    const group = page.locator('#identity-show');
+    const cut = () => group.locator('.nav-label').evaluateAll(labels => labels.filter(label => label.scrollWidth > label.clientWidth + 0.5).map(label => label.textContent));
+    assert.deepEqual(await cut(), [], 'no label is cut short');
+    // Larger labels, then a narrower body: the group stacks its rows.
+    await group.evaluate((node) => {
+      for (const label of node.querySelectorAll('.nav-label')) label.style.fontSize = '22px';
+      document.querySelector("#settings-body").style.width = "calc(100% - 2px)";
+    });
+    await eventually(() => group.evaluate(node => node.hasAttribute('data-stacked')), true, 'the group stacks');
+    assert.deepEqual(await cut(), [], 'still no label is cut short');
+  });
+}
