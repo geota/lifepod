@@ -15,7 +15,7 @@ import {
 import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
-import { resetDrops } from './js/layout/fit.js';
+import { layoutStats, loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
 import { compactGroups, fitCompactSwitches } from './js/layout/settings.js';
 import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
@@ -111,23 +111,36 @@ portraitQuery.addEventListener('change', syncBoardTurn);
 if (window.ResizeObserver) new ResizeObserver(measureBoard).observe(board);
 // Identity symbols come from the Mana font. Rows fitted before it loaded were measured with another font's glyphs,
 // so they're fitted again from full size once it has. The board is turned and measured again first: a font can
-// finish loading in the middle of a resize or a rotation, before the board has caught up with the window.
+// finish loading in the middle of a resize or a rotation, before the board has caught up with the window. Chromium
+// fires `loading` and `loadingdone` on every resize without loading anything, so only an event after which more faces
+// have loaded counts (docs/review/PERFORMANCE.md F2); the rest would throw away the drops and refit for nothing.
+let faces = loadedFaces();
+function fontsArrived() {
+  const now = loadedFaces();
+  if (now === faces) return false;
+  faces = now;
+  return true;
+}
 document.fonts?.addEventListener?.('loadingdone', () => {
+  if (!fontsArrived()) return;
   resetDrops();
   syncBoardTurn();
+  requestFit();
   compactGroups.forEach(fitCompactSwitches);
 });
 // WebKit can fire `loading` and never `loadingdone`, so each load also fits the board again once document.fonts.ready
 // settles, keeping the drops it has (the hysteresis decides): a face that arrives late can't leave a mana strip or a
 // badge row placed by another font's measurements, over a total.
 document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(() => {
+  if (!fontsArrived()) return;
   syncBoardTurn();
+  requestFit();
   compactGroups.forEach(fitCompactSwitches);
 }));
 
 // A module's names aren't page globals, so the design scripts (design/polish/final-review.mjs) reach the few internals they
 // drive through ?debug in the URL. The apps never load the page with it.
-if (new URLSearchParams(location.search).has('debug')) window.lifePodDebug = { game, remind };
+if (new URLSearchParams(location.search).has('debug')) window.lifePodDebug = { game, remind, layoutStats };
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.
 setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, undoClear, dismissReminder, setBoardMode });

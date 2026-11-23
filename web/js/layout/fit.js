@@ -1,6 +1,7 @@
 // Fitting the badge rows and the mana strips (design/polish/SPEC.md §3.2 and §9): auto-drop's steps, taken board-wide
 // so every tile matches, the last resorts (wrapping, then shrinking the type), the strips' places, and where a turn
-// reminder sits. requestFit queues one fit for whatever just changed the rows.
+// reminder sits. requestFit queues one fit for whatever just changed the rows, and a fit whose inputs match the last
+// one's is skipped (docs/review/PERFORMANCE.md P3).
 
 import { reminders } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
@@ -37,10 +38,45 @@ const dropSlack = 1.15;
 let dropLevels = { near: 0, far: 0, strip: 0 };
 let wrapFirst = { near: true, far: true };
 let fitQueued = false;
+// What the last fit fitted (fitInputs), so a fit of the same board can be skipped.
+let fitted = '';
+// How many times the board was measured and its rows fitted, and how many fits were skipped, for the tests and the
+// design scripts (?debug in app.js).
+export const layoutStats = { measures: 0, fits: 0, skippedFits: 0 };
 
 // A new game, a new Badge size or a font that has arrived fits the rows again from full size.
 export function resetDrops() {
   dropLevels = { near: 0, far: 0, strip: 0 };
+  fitted = '';
+}
+
+// How many faces the page has loaded so far. A face that arrives changes the text's widths, so it's part of a fit's
+// inputs, and app.js refits on a font event only when this has grown. Faces are counted by what they are, not by
+// their status now: Chromium makes its @font-face faces again on a resize, unloaded for a moment, and that isn't a
+// new font.
+const seenFaces = new Set();
+export function loadedFaces() {
+  for (const face of document.fonts ?? []) {
+    if (face.status === 'loaded') seenFaces.add(`${face.family} ${face.weight} ${face.style} ${face.stretch} ${face.unicodeRange}`);
+  }
+  return seenFaces.size;
+}
+
+// Everything a fit reads, as one string: the window, the loaded faces, the drop levels, the page's, board's and pill's
+// attributes (the board's style carries --ui, --ub and --board-digits, the pill's its place), and each tile's attributes
+// and rows. A row's chips are read with every digit as 0, since chips use tabular figures: 3 → 2 changes no width,
+// while 9 → 10 or a chip that comes or goes does. ARIA attributes change no width either. The last fit's own results
+// (drop tokens, type sizes, the strips' places) are part of it too, so a board left as fitted reads the same.
+function fitInputs() {
+  const attributes = (node, skip = []) => [...node.attributes].filter(({ name }) => !skip.includes(name)).map(({ name, value }) => `${name}=${value}`).join(' ');
+  const rows = html => html.replace(/\saria-[\w-]+="[^"]*"/g, '').replace(/\d/g, '0');
+  const pill = [...boardControls.querySelectorAll('.pill-button')].map(button => (button.hidden ? 0 : 1)).join('');
+  const tiles = [.../** @type {HTMLCollectionOf<HTMLElement>} */ (board.children)].map((player) => {
+    const near = /** @type {HTMLElement} */ (player.querySelector('.badges.near'));
+    return `${attributes(player, ['data-reminder', 'aria-label'])}\n${rows(/** @type {HTMLElement} */ (player.querySelector('.far-edge')).outerHTML)}\n${rows(near.outerHTML)}`;
+  });
+  return [window.innerWidth, window.innerHeight, loadedFaces(), JSON.stringify(dropLevels), JSON.stringify(wrapFirst),
+    attributes(document.documentElement), attributes(board), attributes(boardControls), pill, ...tiles].join('\n');
 }
 
 // styles.css's --grow in pixels: 1 on phones, up to 2 on tablets.
@@ -59,6 +95,11 @@ export function requestFit() {
 // its far row's line takes room from that row, so the far rows are fitted again around it.
 function fitBadgeRows() {
   fitQueued = false;
+  if (fitInputs() === fitted) {
+    layoutStats.skippedFits++;
+    return;
+  }
+  layoutStats.fits++;
   measureBadgeRoom();
   for (const player of board.children) {
     if (player.querySelector('.mana-strip').hidden) delete player.dataset.strip;
@@ -69,6 +110,7 @@ function fitBadgeRows() {
   if (fitStrips()) fitBadgeSide('far');
   // A turn reminder's place depends on how tall the near edge came out.
   for (const index of reminders.keys()) placeReminders(board.children[index]);
+  fitted = fitInputs();
 }
 
 // How large a badge row may grow at a larger Badge size (styles.css): one row, 1.7em tall, between each edge and the
@@ -86,15 +128,17 @@ function measureBadgeRoom() {
     near = Math.min(near, face.offsetHeight - Math.max(edge, clear('near')) - Math.max(...parts.map(part => part.offsetTop + part.offsetHeight)) - 2);
   }
   const set = (property, room) => {
-    if (Number.isFinite(room)) board.style.setProperty(property, `${Math.max(0, Math.floor(room / 1.7 * 10) / 10)}px`);
+    const value = `${Math.max(0, Math.floor(room / 1.7 * 10) / 10)}px`;
+    if (Number.isFinite(room) && board.style.getPropertyValue(property) !== value) board.style.setProperty(property, value);
   };
   set('--far-room', far);
   set('--near-room', near);
 }
 
 function syncDropTokens(levels) {
-  const tokens = Object.keys(dropSteps).flatMap(side => dropTokens(side, levels[side]));
-  if (tokens.length) board.dataset.drop = tokens.join(' ');
+  const tokens = Object.keys(dropSteps).flatMap(side => dropTokens(side, levels[side])).join(' ');
+  if (tokens === (board.dataset.drop ?? '')) return;
+  if (tokens) board.dataset.drop = tokens;
   else delete board.dataset.drop;
 }
 

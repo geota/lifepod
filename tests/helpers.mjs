@@ -95,7 +95,8 @@ ${[['Regular', '1 449'], ['Medium', '450 599'], ['Bold', '600 799'], ['Black', '
 // the board in the middle of a test. The app refits from full size on `loadingdone` (app.js), as it does on a phone
 // when a font arrives, but browsers differ on whether and when that event follows a load (WebKit can fire `loading`
 // and never `loadingdone`), so once every face has loaded this sends it: the board is then fitted with the fonts it
-// will keep, whichever loaded first, and later `loadingdone` events stop before the app (openPage). Then it waits for
+// will keep, whichever loaded first. Later font events reach the app as a phone's do: Chromium fires them on every
+// resize, and the app ignores any after which no more faces have loaded (tests/fitting.test.mjs). Then it waits for
 // two rendering updates, so the ResizeObserver that measures the board (app.js) has seen the page's final layout, even
 // on a busy machine. A ResizeObserver of its own tells it when each has happened: Playwright's clock pauses
 // requestAnimationFrame, but not rendering.
@@ -127,7 +128,6 @@ export async function fontsReady(page) {
     await nextTask();
     await rendered();
     probe.remove();
-    window.lifePodTestFontsSettled = true;
     return faces.filter(face => face.status !== 'loaded').map(face => `${face.family} ${face.weight} ${face.status}`);
   });
   assert.deepEqual(failed, [], 'every font face loads');
@@ -178,13 +178,6 @@ export async function openPage(t, engine, {
   });
   t.after(() => assert.deepEqual(problems, [], 'no script errors or Content Security Policy violations'));
   await page.addInitScript((prefix) => {
-    // Once fontsReady has loaded every face and refitted the board, a browser can still fire `loadingdone` for a face
-    // already loaded (Chromium does the first time text is laid out in it), and the app would refit from full size,
-    // undoing the drops a test has walked to. No face can change any width by then, so the event stops here. This is
-    // registered before app.js's listener, and lets fontsReady's own event through.
-    document.fonts.addEventListener('loadingdone', (event) => {
-      if (event.isTrusted && window.lifePodTestFontsSettled) event.stopImmediatePropagation();
-    });
     document.addEventListener('securitypolicyviolation', (event) => {
       console.error(`${prefix} ${event.effectiveDirective} blocked ${event.blockedURI || 'an inline resource'} in ${event.sourceFile || event.documentURI}`);
     });

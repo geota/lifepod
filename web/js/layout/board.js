@@ -7,7 +7,7 @@ import { restPillButtons, seatGrid, shownCounters, trackedDesignations } from '.
 import { isPortraitWindow, readScreen } from '../state/platform.js';
 import { game } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
-import { growPixel, requestFit } from './fit.js';
+import { growPixel, layoutStats, requestFit } from './fit.js';
 import { keepLifeEditorInView, placeSettingsSections, settings, syncSettingsCue } from './settings.js';
 
 // Colours mode's grids for its twelve 44px swatches on narrow or short boards, in the order a face takes the first that
@@ -41,24 +41,51 @@ export function syncBoardTurn() {
 // actually reaches past get a clearance (--clear-far and so on), and a face the pill doesn't reach, such as the end seat
 // at 3 or 5 players, keeps none: its rows and mode layers are centred in the whole face. --ui and --ub are what each
 // face has left inside its clearances, so tile content is sized to fit them.
+//
+// Everything is read before anything is written, so a measure lays the board out once rather than once per tile, and a
+// measure whose readings match the last one's writes nothing and fits nothing: a resize answered by the
+// ResizeObserver, the resize event and the orientation change measures once (docs/review/PERFORMANCE.md F7).
+/** @typedef {{ player: HTMLElement, face: HTMLElement, edge: string, left: number, top: number, right: number, bottom: number, faceWidth: number, faceHeight: number }} Tile */
+let measured = '';
 export function measureBoard() {
-  const faces = [...board.querySelectorAll('.player-face')];
+  const faces = /** @type {HTMLElement[]} */ ([...board.querySelectorAll('.player-face')]);
   // A new player count is measured once its tiles are drawn.
   if (faces.length !== game.scores.length || !board.clientWidth || !board.clientHeight) return;
-  const size = Math.max(...[...boardControls.querySelectorAll('.pill-button')].map(button => button.offsetWidth));
-  const pill = placePill(size);
+  const buttons = /** @type {HTMLElement[]} */ ([...boardControls.querySelectorAll('.pill-button')]);
+  const size = Math.max(...buttons.map(button => button.offsetWidth));
+  const shown = buttons.filter(button => !button.hidden).length;
+  const area = { width: board.clientWidth, height: board.clientHeight, left: board.offsetLeft, top: board.offsetTop };
+  /** @type {Tile[]} */
+  const tiles = faces.map((face) => {
+    const player = /** @type {HTMLElement} */ (face.parentElement);
+    const left = player.offsetLeft - area.left;
+    const top = player.offsetTop - area.top;
+    return {
+      player, face, edge: player.dataset.edge ?? '', left, top, right: left + player.offsetWidth, bottom: top + player.offsetHeight,
+      faceWidth: face.offsetWidth, faceHeight: face.offsetHeight,
+    };
+  });
+  const grow = growPixel();
+  syncBoardDigits();
+  const readings = JSON.stringify([area, size, shown, restPillButtons(game), grow, game.reminders.gestures,
+    shownCounters(game).length + trackedDesignations(game).length, tiles.map(tile => [tile.edge, tile.left, tile.top, tile.right, tile.bottom, tile.faceWidth, tile.faceHeight])]);
+  if (readings === measured) return;
+  measured = readings;
+  layoutStats.measures++;
+  const pill = placePill(size, shown, area, tiles);
   // Tile content is sized as if every far edge kept this much clear, the pill's half and 2px, so a far edge the pill
   // reaches costs only what it reaches past that.
   const farClear = size / 2 + 2;
-  const usable = faces.map((face) => {
-    const player = /** @type {HTMLElement} */ (face.parentElement);
-    const clear = centreClearance(player, face, pill, farClear);
+  const usable = tiles.map((tile) => {
+    const clear = centreClearance(tile, pill, farClear);
+    return { ...tile, clear, width: tile.faceWidth - clear.start - clear.end, height: tile.faceHeight - clear.near - Math.max(0, clear.far - farClear) };
+  });
+  for (const { player, clear } of usable) {
     for (const edge of faceEdges) {
       if (clear[edge]) player.style.setProperty(`--clear-${edge}`, `${clear[edge]}px`);
       else player.style.removeProperty(`--clear-${edge}`);
     }
-    return { player, face, clear, width: face.offsetWidth - clear.start - clear.end, height: face.offsetHeight - clear.near - Math.max(0, clear.far - farClear) };
-  });
+  }
   const width = Math.min(...usable.map(face => face.width));
   const height = Math.min(...usable.map(face => face.height));
   if (!(width > 0) || !(height > 0)) return;
@@ -67,33 +94,36 @@ export function measureBoard() {
   board.toggleAttribute('data-narrow', width < 240);
   board.toggleAttribute('data-short', height < 200);
   board.toggleAttribute('data-wide', width >= 264);
-  sizeMapSeats(usable, size, width < 240 || height < 200);
-  fitModeGrids(usable, { width, height, size, tight: width < 240 || height < 200 });
-  syncBoardDigits();
+  sizeMapSeats(usable, size, width < 240 || height < 200, grow);
+  fitModeGrids(usable, { width, height, size, grow, tight: width < 240 || height < 200 });
   requestFit();
 }
 
 // Places the pill and returns the box its buttons cover now, in the board's own coordinates. The place is chosen for
 // the pill at its widest, so it doesn't move when a mode opens with fewer buttons.
-function placePill(size) {
-  const shown = [...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length;
-  const width = board.clientWidth;
-  const height = board.clientHeight;
+/**
+ * @param {number} size
+ * @param {number} shown
+ * @param {{ width: number, height: number, left: number, top: number }} area
+ * @param {Tile[]} tiles
+ */
+function placePill(size, shown, area, tiles) {
+  const { width, height } = area;
   const vertical = game.scores.length === 2;
   const widest = Math.max(shown, restPillButtons(game)) * size;
   let x = width / 2;
   const y = height / 2;
   if (!vertical) {
     const [top, bottom] = seatLayouts[game.scores.length].map(row => row.split(' '));
-    const split = top.filter((seat, column) => seat !== bottom[column]).map(seat => board.children[Number(seat.split('-')[1]) - 1]);
-    const start = Math.min(...split.map(tile => tile.offsetLeft - board.offsetLeft));
-    const end = Math.max(...split.map(tile => tile.offsetLeft - board.offsetLeft + tile.offsetWidth));
+    const split = top.filter((seat, column) => seat !== bottom[column]).map(seat => tiles[Number(seat.split('-')[1]) - 1]);
+    const start = Math.min(...split.map(tile => tile.left));
+    const end = Math.max(...split.map(tile => tile.right));
     // At the board's centre where that's on the seam and the pill fits there, otherwise centred on the seam (3 players).
     x = x > start + 1 && x < end - 1 && end - start >= widest ? Math.min(Math.max(x, start + widest / 2), end - widest / 2) : (start + end) / 2;
     x = Math.min(Math.max(x, widest / 2), width - widest / 2);
   }
-  boardControls.style.left = `${board.offsetLeft + x}px`;
-  boardControls.style.top = `${board.offsetTop + y}px`;
+  boardControls.style.left = `${area.left + x}px`;
+  boardControls.style.top = `${area.top + y}px`;
   boardControls.toggleAttribute('data-vertical', vertical);
   const along = shown * size / 2;
   const across = size / 2;
@@ -103,11 +133,13 @@ function placePill(size) {
 
 // The clearance a face needs from the pill on each of its edges. Where the pill reaches into a tile past two edges (at
 // a corner), clearing the edge it reaches least far past is enough, and the far edge costs least (measureBoard).
-function centreClearance(player, face, pill, farClear) {
+/**
+ * @param {Tile} tile
+ * @param {{ left: number, right: number, top: number, bottom: number }} pill
+ * @param {number} farClear
+ */
+function centreClearance(tile, pill, farClear) {
   const clear = { far: 0, end: 0, near: 0, start: 0 };
-  const tile = { left: player.offsetLeft - board.offsetLeft, top: player.offsetTop - board.offsetTop };
-  tile.right = tile.left + player.offsetWidth;
-  tile.bottom = tile.top + player.offsetHeight;
   const left = Math.max(tile.left, pill.left);
   const right = Math.min(tile.right, pill.right);
   const top = Math.max(tile.top, pill.top);
@@ -120,14 +152,14 @@ function centreClearance(player, face, pill, farClear) {
     bottom >= tile.bottom - 0.5 ? tile.bottom - top : null,
     left <= tile.left + 0.5 ? right - tile.left : null,
   ];
-  const turn = faceAngles[player.dataset.edge] / 90;
+  const turn = faceAngles[tile.edge] / 90;
   let best = /** @type {{ edge: string, need: number, cost: number } | null} */ (null);
   depths.forEach((depth, side) => {
     if (depth === null) return;
     const edge = faceEdges[(side - turn + 4) % 4];
     const need = Math.ceil(depth + 2);
     // The share of the face it costs, across that edge.
-    const across = edge === 'far' || edge === 'near' ? face.offsetHeight : face.offsetWidth;
+    const across = edge === 'far' || edge === 'near' ? tile.faceHeight : tile.faceWidth;
     const cost = (edge === 'far' ? Math.max(0, need - farClear) : need) / across;
     if (!best || cost < best.cost) best = { edge, need, cost };
   });
@@ -141,8 +173,7 @@ function centreClearance(player, face, pill, farClear) {
 // 6px less than the clearance there, and 1px from other edges); elsewhere 4 × 3 always fits. Counter and mana cells:
 // three to a row, or two; seven counter cells four to a row. Identity toggles: five in a row where every tile has room (ui ≥ 264), otherwise three, or two.
 // The cell and toggle sizes follow styles.css (.counter-cells, .identity).
-function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
-  const grow = growPixel();
+function fitModeGrids(faces, { width: ui, height: ub, size, grow, tight }) {
   const cell = Math.min(Math.max(44, Math.min((ui - 20) / 3, (ub - 10 - size) / 2)), 92 * grow);
   // Seven counter cells (every counter, the monarch and the initiative) take two rows of four, 6px in from the face's
   // sides, with gaps that close up to 2px (reaching into those 6px) before a cell goes under 44px.
@@ -153,22 +184,22 @@ function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
   else delete board.dataset.cellGrid;
   const toggle = Math.min(Math.max(44, 12 * ui / 100), 72 * grow);
   const swatchSpan = count => count * 44 + (count - 1) * 3;
-  for (const { player, face, clear } of faces) {
+  for (const { player, faceWidth, faceHeight, clear } of faces) {
     const swatchPad = edge => Math.max(1, clear[edge] - 6);
-    const swatchWidth = face.offsetWidth - swatchPad('start') - swatchPad('end');
-    const swatchHeight = face.offsetHeight - swatchPad('far') - swatchPad('near');
+    const swatchWidth = faceWidth - swatchPad('start') - swatchPad('end');
+    const swatchHeight = faceHeight - swatchPad('far') - swatchPad('near');
     const swatches = tight ? swatchColumns.find(count => swatchSpan(count) <= swatchWidth + 0.5 && swatchSpan(12 / count) <= swatchHeight + 0.5) ?? 4 : 4;
     player.style.setProperty('--swatch-columns', swatches);
     // The grid is centred in what the clearances leave, 1px in from each side, wherever it fits there; only along an axis
     // where it doesn't does it reach into the clearance.
     const pads = (low, high, span, size) => (span <= size - clear[low] - clear[high] - 2 + 0.5 ? [clear[low] + 1, clear[high] + 1] : [swatchPad(low), swatchPad(high)]);
     if (tight) {
-      const [start, end] = pads('start', 'end', swatchSpan(swatches), face.offsetWidth);
-      const [far, near] = pads('far', 'near', swatchSpan(12 / swatches), face.offsetHeight);
+      const [start, end] = pads('start', 'end', swatchSpan(swatches), faceWidth);
+      const [far, near] = pads('far', 'near', swatchSpan(12 / swatches), faceHeight);
       player.style.setProperty('--swatch-pad', `${far}px ${end}px ${near}px ${start}px`);
     } else player.style.removeProperty('--swatch-pad');
     // The width the face leaves inside its clearances. The grids may reach into the layers' small default padding.
-    const room = face.offsetWidth - clear.start - clear.end + 0.5;
+    const room = faceWidth - clear.start - clear.end + 0.5;
     player.style.setProperty('--cell-columns', 3 * cell + 20 <= room ? 3 : 2);
     if (wide) {
       // A face too narrow for four takes three, closing its gaps right up if it must, since three rows still fit.
@@ -183,14 +214,13 @@ function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
 
 // Commander damage map seats are one size on every tile (design/polish/FINAL-REVIEW.md #13), the largest that fits every
 // face, whichever way its map is turned: a sideways face draws the table's rows as its columns.
-function sizeMapSeats(faces, size, tight) {
+function sizeMapSeats(faces, size, tight, grow) {
   const { rows, columns } = seatGrid(game.scores.length);
-  const grow = growPixel();
   const gap = 4;
   let seatWidth = Infinity;
   let seatHeight = Infinity;
-  for (const { player, width, height } of faces) {
-    const sideways = faceAngles[player.dataset.edge] % 180 !== 0;
+  for (const { edge, width, height } of faces) {
+    const sideways = faceAngles[edge] % 180 !== 0;
     const across = sideways ? rows : columns;
     const down = sideways ? columns : rows;
     // The map keeps 12px from the face's ends, and its layer's padding and the hint above it, if there is one.
@@ -202,10 +232,13 @@ function sizeMapSeats(faces, size, tight) {
   board.style.setProperty('--seat-height', `${Math.max(44, Math.floor(seatHeight * 10) / 10)}px`);
 }
 
-// The most digits in any total, at least 2. A three-digit total shrinks every total together.
+// The most digits in any total, at least 2. A three-digit total shrinks every total together, which changes the room
+// between each edge and the total, so the badge rows are fitted again (docs/review/SPEC-COMPLIANCE.md B1).
 export function syncBoardDigits() {
   const digits = String(Math.max(2, ...game.scores.map(score => String(score).length)));
-  if (board.style.getPropertyValue('--board-digits') !== digits) board.style.setProperty('--board-digits', digits);
+  if (board.style.getPropertyValue('--board-digits') === digits) return;
+  board.style.setProperty('--board-digits', digits);
+  requestFit();
 }
 
 export function layoutBoard() {
