@@ -77,8 +77,9 @@ function readDrops(page) {
     const rows = side => [...document.querySelectorAll(`.badges.${side}:not([hidden])`)];
     return {
       drop: board.dataset.drop ?? '',
-      near: board.style.getPropertyValue('--near-badge-size'),
-      far: board.style.getPropertyValue('--far-badge-size'),
+      // The fit writes its type sizes on each tile's edges, the same on every tile (web/js/layout/fit.js).
+      near: document.querySelector('.near-edge').style.getPropertyValue('--near-badge-size'),
+      far: document.querySelector('.far-edge').style.getPropertyValue('--far-badge-size'),
       lines: { near: Math.max(0, ...rows('near').map(lines)), far: Math.max(0, ...rows('far').map(lines)) },
       covers: { near: rows('near').some(row => lines(row) > 1 && window.coversTotal(row)), far: rows('far').some(row => lines(row) > 1 && window.coversTotal(row)) },
       problems,
@@ -108,14 +109,15 @@ function wrapWouldCover(page, side) {
   return page.evaluate((side) => {
     const board = document.querySelector('#board');
     const drop = board.dataset.drop ?? '';
-    const size = board.style.getPropertyValue(`--${side}-badge-size`);
+    const edges = [...document.querySelectorAll(`.${side}-edge`)];
+    const size = edges[0].style.getPropertyValue(`--${side}-badge-size`);
     board.dataset.drop = `${drop} ${side === 'near' ? 'wrap' : 'wrap-far'}`.trim();
-    board.style.removeProperty(`--${side}-badge-size`);
+    for (const edge of edges) edge.style.removeProperty(`--${side}-badge-size`);
     const covers = [...document.querySelectorAll(`.badges.${side}:not([hidden])`)]
       .some(row => new Set([...row.children].filter(chip => chip.offsetWidth).map(chip => chip.offsetTop)).size > 1 && window.coversTotal(row));
     if (drop) board.dataset.drop = drop;
     else delete board.dataset.drop;
-    if (size) board.style.setProperty(`--${side}-badge-size`, size);
+    if (size) for (const edge of edges) edge.style.setProperty(`--${side}-badge-size`, size);
     return covers;
   }, side);
 }
@@ -434,8 +436,7 @@ async function checkShrunkRowsFit(t, engine) {
     for (let width = 760; width >= 480; width -= 4) {
       await resize(page, width);
       const found = await page.evaluate(() => {
-        const board = document.querySelector('#board');
-        const shrinking = ['near', 'far'].filter(side => board.style.getPropertyValue(`--${side}-badge-size`));
+        const shrinking = ['near', 'far'].filter(side => document.querySelector(`.${side}-edge`).style.getPropertyValue(`--${side}-badge-size`));
         const wide = [...document.querySelectorAll(shrinking.map(side => `.badges.${side}:not([hidden])`).join(', ') || ':not(*)')].flatMap((row) => {
           const chips = [...row.children].filter(chip => chip.offsetWidth);
           if (new Set(chips.map(chip => chip.offsetTop)).size > 1 || !chips.length) return [];

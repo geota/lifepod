@@ -129,7 +129,7 @@ async function checkSizes(t, engine, style, names) {
         assert.deepEqual(await tileProblems(page, { parts: '.badges .chip' }), [], `${view}: no badge under the centre controls`);
         if (Math.min(...size) >= smallestRealPhone) {
           const drops = await page.locator('#board').evaluate(node => [node.dataset.drop ?? '',
-            node.style.getPropertyValue('--near-badge-size'), node.style.getPropertyValue('--far-badge-size'),
+            node.querySelector('.near-edge').style.getPropertyValue('--near-badge-size'), node.querySelector('.far-edge').style.getPropertyValue('--far-badge-size'),
             [...node.querySelectorAll('.badges.far > .strip-chip')].some(chip => chip.checkVisibility())]);
           // With every counter on, the identity names may go on the smallest real phones (design/polish/SPEC.md §3.2,
           // a typical 6-player game at 640 × 360), and the sword where a folded mana strip ends the far row, but nothing
