@@ -5,7 +5,7 @@
 **About the mock-ups:**
 
 - Drawn by [glass.mjs](glass.mjs) on the committed app (ff0cbf0) with the Graphite chrome.
-- The working copy of `web/` was mid-build and didn't load, so `LIFEPOD_APP` points the renders at a clean export. [lib.mjs](lib.mjs) explains it.
+- The working copy of `web/` was mid-build and didn't load, so `LIFEPOD_APP` points the renders at a clean export: a copy of `web/`, the folder or its `index.html` (`serveApp` in [scripts/serve.mjs](../../scripts/serve.mjs)).
 - Each crop's caption is a **measurement**:
   1. The pill's icons are hidden.
   2. The backdrop under the pill is screenshotted.

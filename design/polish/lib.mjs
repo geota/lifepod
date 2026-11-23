@@ -2,9 +2,10 @@
 // and JS, and compose labelled comparison strips. Nothing here changes web/.
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { serveApp } from '../serve.mjs';
+import { serveApp } from '../../scripts/serve.mjs';
 
-// The app over http (design/serve.mjs); LIFEPOD_APP points the renders at another copy of web/.
+// The app over http (serveApp in scripts/serve.mjs). LIFEPOD_APP points the renders at another copy of web/: the folder,
+// or its index.html.
 let server;
 
 export const outDir = fileURLToPath(new URL('./renders/', import.meta.url));

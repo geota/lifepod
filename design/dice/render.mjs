@@ -1,24 +1,16 @@
 // Renders design/dice/renders/*.png with the repo's playwright-core Chromium.
 // Run from the repo root: node design/dice/render.mjs
-import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { startServer } from '../../scripts/serve.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
-const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const server = createServer(async (req, res) => {
-  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
-  try {
-    const body = await readFile(join(root, path));
-    res.writeHead(200, { 'content-type': types[extname(path)] ?? 'application/octet-stream' });
-    res.end(body);
-  } catch { res.writeHead(404); res.end(); }
-}).listen(0, '127.0.0.1');
-await new Promise(r => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}`;
+// The repo root over http (scripts/serve.mjs), for the mock-ups beside the app.
+const server = await startServer({ web: root });
+const base = server.origin;
 await mkdir(outDir, { recursive: true });
 
 const browser = await chromium.launch();
@@ -79,5 +71,5 @@ await app({ width: 320, height: 568, name: 'sheet-320x568-idle.png', sheet: true
 await app({ width: 1024, height: 768, name: 'sheet-1024x768.png', sheet: true, result: 12, sides: 12 });
 await app({ width: 768, height: 1024, name: 'sheet-768x1024.png', sheet: true, result: 8, sides: 8 });
 await browser.close();
-server.close();
+await server.close();
 console.log('rendered to', outDir);

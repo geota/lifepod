@@ -1,25 +1,17 @@
 // Renders design/counters/renders/: one PNG per scene in frames/, then the comparison strips OPTIONS.md shows.
 // Run from the repo root: node design/counters/render.mjs [scene-or-strip ...]
-import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { mkdir } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { startServer } from '../../scripts/serve.mjs';
 import scenes, { strips } from './scenes.js';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
-const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.png': 'image/png', '.svg': 'image/svg+xml' };
-const server = createServer(async (req, res) => {
-  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
-  try {
-    const body = await readFile(join(root, path));
-    res.writeHead(200, { 'content-type': types[extname(path)] ?? 'application/octet-stream', 'cache-control': 'no-store' });
-    res.end(body);
-  } catch { res.writeHead(404); res.end(); }
-}).listen(0, '127.0.0.1');
-await new Promise(r => server.once('listening', r));
-const base = `http://127.0.0.1:${server.address().port}/design/counters/preview.html`;
+// The repo root over http (scripts/serve.mjs), for the mock-ups beside the app.
+const server = await startServer({ web: root });
+const base = `${server.origin}/design/counters/preview.html`;
 await mkdir(join(outDir, 'frames'), { recursive: true });
 
 const only = process.argv.slice(2);
@@ -59,6 +51,6 @@ for (const name of Object.keys(strips)) {
   await page.close();
 }
 await browser.close();
-server.close();
+await server.close();
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 console.log('rendered to', outDir);
