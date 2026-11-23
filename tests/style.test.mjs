@@ -131,14 +131,14 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(material.settings.switch, ['36px', '20px']);
 
     // Glass: the dice dialog and the settings header are the surface at 68% over an 18px blur, with a light edge. The
-    // board's pill has the edge and highlight but no blur, at a denser 90%, so the seams don't read through it (DESIGN-AUDIT
-    // S10).
+    // board's pill has the edge and highlight but no blur, over a solid tint, so the seams don't read through it
+    // (DESIGN-AUDIT S10, docs/review/FINAL.md U4).
     for (const [part, surface] of [['dice dialog', glass.dice], ['settings header', glass.settings.head]]) {
       assert.equal(surface.filter, 'blur(18px) saturate(1.3)', `the ${part} is frosted`);
       assert.ok(Math.abs(alpha(surface.background) - 0.68) < 0.01, `the ${part} is tinted at 68% (${surface.background})`);
     }
     assert.equal(glass.pill.filter, 'none', 'the pill isn\'t blurred');
-    assert.ok(Math.abs(alpha(glass.pill.background) - 0.9) < 0.01, `the pill is tinted at 90% (${glass.pill.background})`);
+    assert.equal(alpha(glass.pill.background), 1, `the pill's tint is solid (${glass.pill.background})`);
     assert.equal(glass.pill.edge, '1px', 'the pill has a light edge');
     assert.equal(glass.dice.edge, '1px', 'the dialog has a light edge');
     assert.equal(glass.settings.head.overBody, true, 'the settings header floats over the body, which scrolls under it');

@@ -242,7 +242,8 @@
   --switch-thumb-shadow: none;
 
   /* Slider: a 16px track with a muted accent fill (the accent at 42% over the track), notches as dots, filled ones in
-     the accent at 60%, and a 4px accent bar handle ringed in the card's colour. */
+     the accent at 60%, and a 4px accent bar handle ringed 6px wide in the card's colour. The ring covers the track's
+     rounded end, 8px past each end stop, so at the minimum or the maximum no track shows beyond the handle. */
   --slider-track: 16px;
   --slider-track-fill: var(--raised);
   --slider-fill: color-mix(in oklab, var(--accent) 42%, var(--slider-track-fill));
@@ -250,7 +251,7 @@
   --slider-thumb-height: 36px;
   --slider-thumb-radius: 2px;
   --slider-thumb-fill: var(--accent);
-  --slider-thumb-ring: 0 0 0 4px var(--surface);
+  --slider-thumb-ring: 0 0 0 6px var(--surface);
   --tick-width: 2px;
   --tick-height: 2px;
   --tick-stop-width: 4px;
@@ -273,9 +274,9 @@
 
   --glass-tint: #1b1c1ead;
   /* The board's pill isn't blurred (DESIGN-AUDIT S10): over the dark tiles a blur showed nothing but the seams, and it
-     costs the GPU during hold-repeat. A denser tint, 90%, keeps the seams and the active tile's ring from reading
-     through, with the glass edge and highlight. Settings and the dialogs keep the blur. */
-  --pill-tint: #1b1c1ee6;
+     costs the GPU during hold-repeat. Its tint is solid, with the glass edge and highlight: even at 90% the seams and
+     the active tile's ring read faintly through it (docs/review/FINAL.md U4). Settings and the dialogs keep the blur. */
+  --pill-tint: #1b1c1e;
   --glass-filter: blur(18px) saturate(1.3);
   --glass-edge: 1px;
   --glass-edge-color: #ffffff1f;
