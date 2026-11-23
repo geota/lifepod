@@ -18,6 +18,7 @@ import {
 import {
   fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, normalizeIdentity,
 } from './js/logic/save.js';
+import { announce, announceDesignation, announceLife, announcePool, clearAnnouncements } from './js/render/announce.js';
 import {
   android, currentLandscapeAngle, defaultStyle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency,
   syncWakeLock,
@@ -35,7 +36,6 @@ import { bindCounter, bindSeat, bindStep, bindTap, cancelPresses } from './js/ui
 
 /** @typedef {import('./js/logic/data.js').BoardMode} BoardMode */
 /** @typedef {import('./js/logic/data.js').CountKind} CountKind */
-/** @typedef {import('./js/logic/data.js').Designation} Designation */
 /** @typedef {import('./js/logic/data.js').DesignationKind} DesignationKind */
 /** @typedef {import('./js/logic/rules.js').Edit} Edit */
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
@@ -73,8 +73,6 @@ const identityBackgroundChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (
 const chooseIdentitiesButton = /** @type {HTMLButtonElement} */ (document.querySelector('#choose-identities'));
 const restart = /** @type {HTMLDialogElement} */ (document.querySelector('#restart'));
 let selectedPlayerCount = game.scores.length;
-let announceTimer;
-const pendingAnnouncements = new Map();
 // The pill's buttons now and at rest, as last measured.
 let pillShape = '';
 // Settings' starting life, before Done applies it. selectedPlayerCount above is the same for players.
@@ -85,27 +83,6 @@ let stopRoll;
 // "Who goes first?" waits until settings has closed, then opens.
 let askFirst = false;
 let shuffleTimer;
-
-// Announce totals once a burst of changes settles, instead of on every step of a hold. Each player's news is
-// read in seat order, and describe() runs when it's read, so it gives the settled value.
-/**
- * @param {number} index The player, or -1 for the whole table.
- * @param {string} kind
- * @param {() => string} describe
- */
-function announce(index, kind, describe) {
-  pendingAnnouncements.set(`${index} ${kind}`, { index, describe });
-  clearTimeout(announceTimer);
-  announceTimer = setTimeout(() => {
-    announcer.textContent = [...pendingAnnouncements.values()].sort((a, b) => a.index - b.index)
-      .map(item => item.describe()).join('. ');
-    pendingAnnouncements.clear();
-  }, 700);
-}
-
-function announceLife(index) {
-  announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
-}
 
 function paintColours() {
   [...board.children].forEach((player, index) => {
@@ -463,12 +440,6 @@ function renderPassHints() {
   for (const kind of designationKinds) if (game[kind] !== null) renderBadges(game[kind]);
 }
 
-// Says who holds a designation now, once a burst of changes settles.
-function announceDesignation(kind) {
-  const { name, role } = /** @type {Designation} */ (designations.find(designation => designation.kind === kind));
-  announce(-1, kind, () => (game[kind] === null ? `Nobody has ${name}` : `Player ${game[kind] + 1} ${role}`));
-}
-
 // A counter cell: a circle with the counter's icon over its count. A tap adds one, and holding takes one away
 // with repeats, as on the commander damage map. A visually hidden button beside it takes one away for keyboards
 // and screen readers.
@@ -814,10 +785,6 @@ function stepMana(index, colour, delta) {
   if (next >= 0 && next <= maxCount) commitEdit({ kind: 'mana', index, colour, delta });
 }
 
-function announcePool(index) {
-  announce(index, 'mana', () => `Player ${index + 1}, mana pool ${poolText(game, index)}`);
-}
-
 // A mana cell: a circle with the colour's mana symbol over its amount, like a counter cell.
 function buildManaCell(colour, at, index) {
   const pip = element('span', 'pip');
@@ -1157,8 +1124,7 @@ function renderScore(index) {
 
 function renderBoard() {
   cancelPresses();
-  clearTimeout(announceTimer);
-  pendingAnnouncements.clear();
+  clearAnnouncements();
   const players = game.scores.map((_, index) => {
     const player = /** @type {HTMLElement} */ (/** @type {Element} */ (playerTemplate.content.firstElementChild).cloneNode(true));
     const name = `Player ${index + 1}`;
