@@ -6,7 +6,7 @@ import { resetDrops } from '../layout/fit.js';
 import { clockwiseEdges, countKinds, tileSets } from '../logic/data.js';
 import { isOut, leavingTransfers, outPlayers, shuffledColours } from '../logic/rules.js';
 import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from '../logic/save.js';
-import { announceDesignation, announceLife, clearAnnouncements } from '../render/announce.js';
+import { announce, announceDesignation, announceLife, clearAnnouncements } from '../render/announce.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
 import { syncPill } from '../render/pill.js';
 import { paintColours, renderScore } from '../render/tile.js';
@@ -110,6 +110,7 @@ export function startGame(playerCount, startingLife) {
   syncBoardTurn();
   renderBoard();
   syncPill();
+  announce(-1, 'game', () => `New game, ${playerCount} players at ${startingLife} life`);
   setAskFirst(game.turns !== 'off');
   maybeAskFirst();
 }

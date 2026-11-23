@@ -81,9 +81,14 @@
   --weight-medium: 500;
   --weight-semibold: 650;
   --weight-heavy: 750;
-  --type-title: 1.375rem;
-  --type-label: .875rem;
-  --type-small: .8125rem;
+  /* The system's text size (Dynamic Type on iOS, the font scale on Android), from 1 to 2, which the apps pass in
+     (setTextScale in js/state/platform.js). Settings and dialogs size their type in --rem, which grows with it; the
+     board keeps its own fitted type, and the badge rows grow a little (--badge-scale). */
+  --text-scale: 1;
+  --rem: calc(1rem * var(--text-scale));
+  --type-title: calc(1.375 * var(--rem));
+  --type-label: calc(.875 * var(--rem));
+  --type-small: calc(.8125 * var(--rem));
 
   --space-1: 4px;
   --space-2: 8px;
@@ -153,7 +158,7 @@
   /* What covers the divider under a group's last row (nothing here, where rows have no dividers), and the narrowest a
      board action gets before the actions take a line each. */
   --group-end: transparent;
-  --action-min: 12rem;
+  --action-min: calc(12 * var(--rem));
 
   /* Segmented choice: separate filled segments; the chosen one is the accent. */
   --segment-track: transparent;
@@ -705,12 +710,13 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
   /* Settings → Table → Badge size scales the badge rows and the mana strip: their chips, counts, icons and the colour
      indicator (data-badge-size on #board). A row grows no taller than fits between its edge and the total on every
-     tile (app.js measures --far-room and --near-room), and never below the default. */
-  --badge-scale: 1;
+     tile (app.js measures --far-room and --near-room), and never below the default. A larger system text size
+     (--text-scale) grows them as far as Larger, whatever Badge size says (ACCESSIBILITY.md H1). */
+  --badge-scale: clamp(1, var(--text-scale), 1.4);
   --far-row-size: max(var(--badge-size), min(calc(var(--badge-size) * var(--badge-scale)), var(--far-room, 100vmax)));
   --near-row-size: max(var(--badge-size), min(calc(var(--badge-size) * var(--badge-scale)), var(--near-room, 100vmax)));
 }
-.board[data-badge-size="large"] { --badge-scale: 1.2; }
+.board[data-badge-size="large"] { --badge-scale: clamp(1.2, var(--text-scale), 1.4); }
 .board[data-badge-size="larger"] { --badge-scale: 1.4; }
 
 .player-face {
@@ -1121,6 +1127,24 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
 .counter-cell:is(:active, [data-pressed]) { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .counter-cell:has(+ .counter-remove:focus-visible) { outline: var(--focus-ring); outline-offset: 3px; }
+.map-cell:has(+ .map-remove:focus-visible), .counter-cell:has(+ .counter-remove:focus-visible) { position: relative; outline-style: dashed; }
+/* The hidden "Remove one" buttons ring their cell like "Add one" does, so while one has keyboard focus the ring is dashed
+   and a "−1" tab sits on the cell's corner: Enter will take one away (ACCESSIBILITY.md M6). */
+.map-cell:has(+ .map-remove:focus-visible)::after, .counter-cell:has(+ .counter-remove:focus-visible)::after {
+  content: '−1';
+  position: absolute;
+  inset-block-start: -9px;
+  inset-inline-end: -9px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: var(--weight-heavy);
+  letter-spacing: normal;
+  line-height: 1.35;
+  pointer-events: none;
+}
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
@@ -1503,6 +1527,7 @@ dialog {
   box-shadow: var(--shadow-dialog);
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
+  font-size: var(--rem);
   overscroll-behavior: contain;
 }
 dialog::backdrop { background: var(--scrim); }
@@ -1518,7 +1543,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .sheet h2 { text-wrap: balance; }
 .sheet-note { color: var(--muted); font-size: var(--type-small); }
 .privacy-text { display: grid; gap: var(--space-2); max-width: 34em; color: var(--muted); overflow-wrap: anywhere; }
-.privacy-text h4 { margin: var(--space-2) 0 0; font-size: .875rem; color: var(--text); }
+.privacy-text h4 { margin: var(--space-2) 0 0; font-size: calc(.875 * var(--rem)); color: var(--text); }
 .privacy-text h4:first-child { margin-top: 0; }
 .sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
 
@@ -1532,7 +1557,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
   color: var(--text);
   font-weight: var(--weight-semibold);
 }
-.close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: 1.125rem; }
+.close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: calc(1.125 * var(--rem)); }
 .primary, .secondary { padding: 0 var(--space-5); }
 .primary { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); }
 .primary:active { background: var(--accent-pressed); }
@@ -1573,6 +1598,9 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .switch-row:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* A long switch label, such as auto-empty's, wraps rather than being cut short. */
 .wide-switch .nav-label { white-space: normal; line-height: 1.2; }
+/* Labels outside the fitted compact groups, and those in a group already stacked, wrap rather than end in an ellipsis
+   under larger text or the WCAG text-spacing overrides (ACCESSIBILITY.md L7). */
+:is(.fs-action, .reminder-grid .compact-switch, [data-stacked] .compact-switch) > .nav-label { white-space: normal; line-height: 1.2; }
 /* A row on its own has no divider, and a group's last row covers its own (Glass: DESIGN-AUDIT S10), however many
    columns the group has and whichever rows are hidden. */
 .wide-switch { --row-divider: transparent; }
@@ -1604,7 +1632,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
   border-radius: var(--segment-inner);
   background: var(--segment-fill);
   color: var(--text-soft);
-  font-size: .9375rem;
+  font-size: calc(.9375 * var(--rem));
   font-weight: var(--weight-semibold);
   line-height: 1.15;
   text-align: center;
@@ -1753,11 +1781,11 @@ dialog.fs[data-flipped] { transform: rotate(180deg); }
   -webkit-backdrop-filter: var(--glass-filter);
   backdrop-filter: var(--glass-filter);
 }
-.fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: 1.25rem; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+.fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: calc(1.25 * var(--rem)); letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .fs-head .close .icon { width: 18px; height: 18px; }
-.fs-done { flex: none; font-size: 1rem; font-weight: var(--weight-heavy); white-space: nowrap; }
+.fs-done { flex: none; font-size: calc(1 * var(--rem)); font-weight: var(--weight-heavy); white-space: nowrap; }
 /* New game sits beside Done, always one tap away (it hides while a new game is pending, when Done starts it). */
-.fs-head .fs-newgame { flex: none; padding-inline: var(--space-4); font-size: 1rem; white-space: nowrap; }
+.fs-head .fs-newgame { flex: none; padding-inline: var(--space-4); font-size: calc(1 * var(--rem)); white-space: nowrap; }
 .fs-newgame[hidden] { display: none; }
 .fs-body {
   position: relative;
@@ -1784,16 +1812,16 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 /* One column: a label sits beside its control when the card has room (480px), otherwise above it. In two columns each
    label stays above its control. */
 @container settings-section (min-width: 480px) {
-  .fs-content:not([data-columns]) .setting-row:not(.k-row, :has(> .compact-switches)) { grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-2); }
+  .fs-content:not([data-columns]) .setting-row:not(.k-row, :has(> .compact-switches)) { grid-template-columns: calc(7.5 * var(--rem)) minmax(0, 1fr); gap: var(--space-2); }
 }
 .fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 /* Reminders: two to a line where each row has room for its whole label, otherwise one. */
-.fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
+.fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, calc(13 * var(--rem))), 1fr)); }
 .fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--action-min)), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; }
+.fs-gamefoot > .fs-awake { flex: 1 1 calc(11 * var(--rem)); max-width: calc(18 * var(--rem)); min-height: 48px; }
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
 .fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
@@ -1819,8 +1847,8 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
    other half from its padding. */
 @media (max-width: 400px) {
   .fs-head { --head-side: .5; gap: 6px; padding-inline: calc(var(--space-3) - var(--head-margin) / 2); }
-  .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: .9375rem; line-height: 1.1; white-space: normal; }
-  .fs-head .fs-newgame { padding-inline: 12px; font-size: .9375rem; }
+  .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: calc(.9375 * var(--rem)); line-height: 1.1; white-space: normal; }
+  .fs-head .fs-newgame { padding-inline: 12px; font-size: calc(.9375 * var(--rem)); }
   /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
   .fs-head:has(> .fs-newgame:not([hidden])) h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .fs-head:has(> .fs-newgame:not([hidden])) #settings-flip { margin-inline-start: auto; }
@@ -1855,7 +1883,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   border-radius: var(--radius-full);
   background: none;
   color: var(--text-soft);
-  font-size: .9375rem;
+  font-size: calc(.9375 * var(--rem));
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
@@ -1893,7 +1921,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   border-radius: var(--button-radius);
   background: var(--control-fill);
   color: var(--text);
-  font-size: 1.125rem;
+  font-size: calc(1.125 * var(--rem));
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -1948,7 +1976,8 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   letter-spacing: -.03em;
   line-height: 1;
 }
-.dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
+/* Three to a row at the default text size; larger text (--rem) fits fewer to a row rather than crowding them. */
+.dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(4.25 * var(--rem))), 1fr)); gap: var(--space-1); }
 .dice-picker button {
   display: flex;
   align-items: center;
@@ -1966,11 +1995,11 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 }
 .dice-picker button[aria-pressed="true"] { border-color: var(--pick-fill); background: var(--pick-fill); color: var(--pick-ink); }
 .dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
-.dice-roll { grid-area: roll; min-height: 48px; font-size: 1.0625rem; }
+.dice-roll { grid-area: roll; min-height: 48px; font-size: calc(1.0625 * var(--rem)); }
 @media (orientation: landscape) {
   #dice { width: fit-content; max-width: calc(100% - 32px); }
   #dice .dice-sheet {
-    grid-template-columns: auto minmax(212px, 260px);
+    grid-template-columns: auto minmax(212px, max(260px, calc(16.25 * var(--rem))));
     grid-template-rows: auto 1fr auto;
     grid-template-areas: "stage header" "stage picker" "stage roll";
     /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the grid gap, not multi-column layout, which the partial note is about. */

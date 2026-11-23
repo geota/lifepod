@@ -3,7 +3,7 @@
 
 import { maxCount, maxRound } from '../logic/data.js';
 import { nextTurn, previousTurn } from '../logic/rules.js';
-import { announce } from '../render/announce.js';
+import { announce, seatName } from '../render/announce.js';
 import { renderBadges } from '../render/badges.js';
 import { syncPill } from '../render/pill.js';
 import { haptic } from '../state/platform.js';
@@ -23,7 +23,7 @@ function showTurn() {
   // A turn chip passed from the keyboard is gone, so focus moves to the chip that now has the turn.
   if (turnFocus && !document.activeElement?.matches('.turn-chip')) board.querySelector('.active-chip, .turn-chip')?.focus();
   const { active, round } = game.turn;
-  announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `Player ${active + 1}'s turn, round ${round}` : `Round ${round}`));
+  announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `${seatName(active)}'s turn, round ${round}` : `Round ${round}`));
 }
 
 function recordStep(before, emptied) {

@@ -145,8 +145,12 @@ class MainActivity : Activity() {
                     javaScriptEnabled = true
                     allowFileAccess = false
                     allowContentAccess = false
+                    // The board is a multi-touch surface, so pinch and double-tap never zoom it. The system font size
+                    // reaches the page through GameBridge.textScale instead of the WebView's text zoom, which would
+                    // scale the fitted board too: settings and dialogs grow their type with it (ACCESSIBILITY.md H1).
                     setSupportZoom(false)
                     builtInZoomControls = false
+                    textZoom = 100
                 }
                 addJavascriptInterface(GameBridge(), "LifePodAndroid")
                 webViewClient = LocalWebViewClient()
@@ -233,6 +237,10 @@ class MainActivity : Activity() {
         fun setBackHandling(enabled: Boolean) {
             runOnUiThread { this@MainActivity.setBackHandling(enabled) }
         }
+
+        // Settings → Display → Font size. A change recreates the activity, which loads the page again.
+        @JavascriptInterface
+        fun textScale(): Float = resources.configuration.fontScale
     }
 
     private inner class LocalWebViewClient : WebViewClient() {

@@ -88,6 +88,20 @@ export function setReduceTransparency(reduce) {
   document.documentElement.toggleAttribute('data-reduce-transparency', reduce === true);
 }
 
+// The system's text size, as a scale of the default (ACCESSIBILITY.md H1): Dynamic Type on iOS, which LifePodApp.swift
+// injects as window.initialTextScale and passes to window.setTextScale when it changes, and the font scale on Android,
+// which the bridge reports (the WebView's own text zoom is off, so it can't scale the fitted board). Settings and
+// dialogs grow their type with it (--text-scale in styles.css), up to twice the size; smaller sizes keep the default.
+/** @returns {number | undefined} */
+export function systemTextScale() {
+  return android ? android.textScale?.() : window.initialTextScale;
+}
+/** @param {number | undefined} scale */
+export function setTextScale(scale) {
+  const clamped = Number.isFinite(scale) ? Math.min(2, Math.max(1, /** @type {number} */ (scale))) : 1;
+  document.documentElement.style.setProperty('--text-scale', String(clamped));
+}
+
 // The saved game's JSON, from wherever the platform keeps it: null or undefined before the first save.
 export function readSavedGame() {
   return android ? android.readGame() : ios ? window.initialGame : localStorage.getItem(storageKey);

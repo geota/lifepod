@@ -22,6 +22,7 @@ const settingsForm = /** @type {HTMLFormElement} */ (document.querySelector('#se
 const settingsFlip = /** @type {HTMLButtonElement} */ (document.querySelector('#settings-flip'));
 const settingsDone = /** @type {HTMLButtonElement} */ (document.querySelector('#save-setup'));
 const settingsPending = /** @type {HTMLParagraphElement} */ (document.querySelector('#settings-pending'));
+const settingsStatus = /** @type {HTMLParagraphElement} */ (document.querySelector('#settings-status'));
 const restartButton = /** @type {HTMLButtonElement} */ (document.querySelector('#restart-button'));
 const playerChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#player-choices'));
 const lifePresets = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#life-presets'));
@@ -75,7 +76,8 @@ const lifeSlider = notchedSlider({
     selectedLife = life;
     renderSettings();
   },
-  describe: life => `Starting life ${life}`,
+  // The slider is named "Starting life" already, so its value is just the number.
+  describe: life => `${life} life`,
 });
 
 function renderSettings() {
@@ -88,12 +90,31 @@ function renderSettings() {
   const pending = settingsChangeGame();
   settingsDone.textContent = pending ? 'Start new game' : 'Done';
   restartButton.hidden = pending;
-  // The pending line is a live region, so it's kept in the page (visually hidden while empty) and only rewritten when
-  // its words change.
-  const words = pending ? `Starts a new game with ${selectedPlayerCount} players at ${selectedLife} life when you leave settings.` : '';
+  // The pending line says what Done will do. ✕, Escape and back keep the current game.
+  const words = pending ? `Starts a new game with ${selectedPlayerCount} players at ${selectedLife} life when you press Start new game.` : '';
   if (settingsPending.textContent !== words) settingsPending.replaceChildren(...(pending ? [icon('play'), element('span', '', words)] : []));
   settingsPending.toggleAttribute('data-empty', !pending);
+  // Screen readers hear it once the slider settles, rather than with every step's value.
+  sayLater(pending ? `${words} Close keeps the current game.` : '');
   syncSettingsCue();
+}
+
+// The settings page's live region (#settings-status): a message 700ms after the last change, like the board's
+// announcer, and only when it says something new. say() speaks at once, for the life field's error.
+let statusTimer;
+let lastSaid = '';
+/** @param {string} words */
+function say(words) {
+  clearTimeout(statusTimer);
+  lastSaid = words;
+  settingsStatus.textContent = words;
+}
+/** @param {string} words */
+function sayLater(words) {
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => {
+    if (words !== lastSaid) say(words);
+  }, 700);
 }
 
 // The inline life editor: the number turns into a field with the numeric keyboard and a ✓. Enter (Android), ✓, Done in
@@ -110,10 +131,21 @@ function openLifeEditor() {
 function closeLifeEditor(commit, refocus) {
   if (lifeEditor.hidden) return;
   const typed = lifeInput.value.trim();
+  const valid = /^\d{1,3}$/.test(typed) && Number(typed) >= 1;
+  // Enter or ✓ with something that isn't a life keeps the field open and says why (WCAG 3.3.1). Leaving the field, or
+  // settings, puts the last value back.
+  if (commit && refocus && !valid) {
+    lifeInput.setAttribute('aria-invalid', 'true');
+    say('Starting life is a whole number from 1 to 999');
+    lifeInput.focus();
+    lifeInput.select();
+    return;
+  }
+  lifeInput.removeAttribute('aria-invalid');
   // Hidden first: hiding the field blurs it, and its focusout calls back in.
   lifeEditor.hidden = true;
   lifeEdit.hidden = false;
-  if (commit && /^\d{1,3}$/.test(typed) && Number(typed) >= 1) selectedLife = Number(typed);
+  if (commit && valid) selectedLife = Number(typed);
   settings.style.removeProperty('--keyboard');
   renderSettings();
   placeSettingsSections();
@@ -179,6 +211,7 @@ settingsFlip.addEventListener('click', () => {
 });
 settings.addEventListener('close', () => {
   closeLifeEditor(false, false);
+  say('');
   settings.removeAttribute('data-flipped');
   syncBackHandling();
 });

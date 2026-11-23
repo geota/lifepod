@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <!-- Icons: Phosphor Icons, Bold weight (the flags, the experience graduation cap and the initiative castle turret are Fill weight), MIT License, Copyright (c) 2020 Phosphor Icons. https://phosphoricons.com -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <!-- Zoom stays on (WCAG 1.4.4): the board turns pinches and double taps away itself (touch-action in styles.css), so
+       only settings and the dialogs zoom, and closing one puts the scale back (resetZoom in js/ui/dom.js). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111213">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; font-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
   <title>LifePod</title>
@@ -44,9 +46,10 @@
     <section class="player">
       <div class="player-face">
         <span class="watermark" aria-hidden="true"></span>
-        <!-- The far edge: commander damage, then the mana strip while a pool has mana, toward the total. -->
+        <!-- The far edge: commander damage, then the mana strip while a pool has mana, toward the total. The badge rows are
+             labelled groups rather than lists, since some of their chips are buttons, which a list can't hold. -->
         <div class="far-edge">
-          <div class="badges far" role="list" aria-label="Commander damage" hidden></div>
+          <div class="badges far" role="group" aria-label="Commander damage" hidden></div>
           <div class="mana-strip" role="group" aria-label="Mana pool" hidden></div>
         </div>
         <div class="controls">
@@ -59,7 +62,7 @@
         <!-- The near edge: the near badge row. A turn reminder sits above it. -->
         <div class="near-edge">
           <div class="reminders"></div>
-          <div class="badges near" role="list" aria-label="Counters" hidden></div>
+          <div class="badges near" role="group" aria-label="Status" hidden></div>
         </div>
         <div class="mode-layer" hidden></div>
       </div>
@@ -115,8 +118,9 @@
                 <span class="setting-label" id="life-label">Starting life</span>
                 <div class="k-val">
                   <button class="k-value" type="button" id="life-edit"><span id="life-value"></span><span class="k-edit"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M230.14,70.54,185.46,25.85a20,20,0,0,0-28.29,0L33.86,149.17A19.85,19.85,0,0,0,28,163.31V208a20,20,0,0,0,20,20H92.69a19.86,19.86,0,0,0,14.14-5.86L230.14,98.82a20,20,0,0,0,0-28.28ZM91,204H52V165l84-84,39,39ZM192,103,153,64l18.34-18.34,39,39Z"/></svg></span></button>
+                  <span class="visually-hidden" id="life-error">Starting life is a whole number from 1 to 999</span>
                   <span class="k-value k-editor" id="life-editor" hidden>
-                    <input type="text" id="life-input" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" maxlength="3" autocomplete="off" spellcheck="false" aria-labelledby="life-label">
+                    <input type="text" id="life-input" inputmode="numeric" pattern="[0-9]*" enterkeyhint="done" maxlength="3" autocomplete="off" spellcheck="false" aria-labelledby="life-label" aria-describedby="life-error">
                     <button class="k-commit" type="button" id="life-commit" aria-label="Set starting life"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></button>
                   </span>
                 </div>
@@ -129,7 +133,10 @@
                   <div class="k-track" id="life-track" role="slider" tabindex="0" aria-labelledby="life-label" aria-valuemin="1" aria-valuemax="999"><span class="k-fill"></span><span class="k-ticks"></span><span class="k-thumb"></span></div>
                 </div>
               </div>
-              <p class="fs-pending" id="settings-pending" aria-live="polite" data-empty></p>
+              <p class="fs-pending" id="settings-pending" data-empty></p>
+              <!-- What screen readers hear about the pending game and the life field, once a burst of slider steps settles
+                   (settings.js). The line above shows the same words. -->
+              <p class="visually-hidden" id="settings-status" aria-live="polite"></p>
               <div class="fs-gamefoot">
                 <label class="switch-row compact-switch fs-awake">
                   <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M116,36V32a12,12,0,0,1,24,0v4a12,12,0,0,1-24,0Zm80,92a68,68,0,1,1-68-68A68.07,68.07,0,0,1,196,128Zm-24,0a44,44,0,1,0-44,44A44.05,44.05,0,0,0,172,128ZM51.51,68.49a12,12,0,1,0,17-17l-4-4a12,12,0,0,0-17,17Zm0,119-4,4a12,12,0,0,0,17,17l4-4a12,12,0,1,0-17-17ZM196,72a12,12,0,0,0,8.49-3.51l4-4a12,12,0,0,0-17-17l-4,4A12,12,0,0,0,196,72Zm8.49,115.51a12,12,0,0,0-17,17l4,4a12,12,0,0,0,17-17ZM48,128a12,12,0,0,0-12-12H32a12,12,0,0,0,0,24h4A12,12,0,0,0,48,128Zm80,80a12,12,0,0,0-12,12v4a12,12,0,0,0,24,0v-4A12,12,0,0,0,128,208Zm96-92h-4a12,12,0,0,0,0,24h4a12,12,0,0,0,0-24Z"/></svg><span class="nav-label">Keep awake</span>

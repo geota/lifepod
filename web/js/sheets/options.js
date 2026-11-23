@@ -14,7 +14,7 @@ import { outPlayers, trackedDesignations } from '../logic/rules.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from '../render/appearance.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
 import { syncPill } from '../render/pill.js';
-import { renderScore } from '../render/tile.js';
+import { paintColours, renderScore } from '../render/tile.js';
 import { syncWakeLock } from '../state/platform.js';
 import { game, saveGame, turnSteps } from '../state/state.js';
 import { notchedSlider } from './slider.js';
@@ -60,6 +60,8 @@ function setTileColours(set) {
   game.tileColours = set;
   saveGame();
   applyTileColours();
+  // Each set names its colours for itself, and the tiles' regions are named for their colour.
+  paintColours();
   renderTileSetting();
 }
 for (const choice of tileSetChoices.children) choice.addEventListener('click', () => setTileColours(choice.dataset.set));
