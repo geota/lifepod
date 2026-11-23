@@ -191,9 +191,11 @@ function buildCounterCell({ kind, phrase }, index) {
 }
 
 // A designation cell: the crown or castle in a circle like a counter's. A tap gives it to this player, or clears it
-// from its holder. The holder's cell fills with their seat colour.
+// from its holder. The holder's cell fills with their seat colour and shows a check (styles.css).
 function buildDesignationCell({ kind }, index) {
-  const cell = element('button', 'counter-cell designation-cell', designationIcon(kind));
+  const check = element('span', 'toggle-check', icon('check'));
+  check.setAttribute('aria-hidden', 'true');
+  const cell = element('button', 'counter-cell designation-cell', designationIcon(kind), check);
   cell.type = 'button';
   cell.dataset.designation = kind;
   bindTap(cell, () => modeActions.toggleDesignation(kind, index));

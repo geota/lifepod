@@ -11,6 +11,8 @@
   color-scheme: dark;
 
   --danger-text: #ffc7b2;
+  /* A destructive button (Discard, Start new game): the danger text on a coral-tinted fill. */
+  --danger-fill: color-mix(in oklab, #f49993 16%, #242528);
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
   /* Close to losing: amber text from 15 commander damage or 7 poison, at least 6:1 on its tinted chip. */
@@ -148,6 +150,10 @@
   --row-column-gap: 6px;
   --row-divider: transparent;
   --row-inset: 12px;
+  /* What covers the divider under a group's last row (nothing here, where rows have no dividers), and the narrowest a
+     board action gets before the actions take a line each. */
+  --group-end: transparent;
+  --action-min: 12rem;
 
   /* Segmented choice: separate filled segments; the chosen one is the accent. */
   --segment-track: transparent;
@@ -161,7 +167,8 @@
   /* The dice picker's chosen die, and an identity toggle's ring when it's on. */
   --pick-fill: var(--chosen-fill);
   --pick-ink: var(--chosen-ink);
-  --toggle-ring: var(--chosen-fill);
+  /* On the player tiles the chrome's accent stays off (DESIGN-AUDIT N2): a light ring, and the check in the seat colour. */
+  --toggle-ring: var(--text);
 
   /* Floating chrome: the pill, the settings header and dialogs. Solid in Material, so no backdrop filter, no edge, and
      the header is its own row above the settings body (--head-overlay 0). */
@@ -180,8 +187,9 @@
   /* Pressed controls keep their size (Glass shrinks them a little). */
   --press-scale: 1;
 
-  /* Motion: 200ms emphasised easing; none under reduced motion. */
+  /* Motion: 200ms emphasised easing, for presses too; none under reduced motion. */
   --ease: cubic-bezier(.2, 0, 0, 1);
+  --ease-press: var(--ease);
   --motion: .2s;
 
   /* Shape: one corner scale (Material's 8, 16, 22, 24 and 28px, then full capsules). Buttons, switches and the chosen
@@ -254,12 +262,16 @@
   --scrim: #111213b3;
 
   --glass-tint: #1b1c1ead;
+  /* The board's pill isn't blurred (DESIGN-AUDIT S10): over the dark tiles a blur showed nothing but the seams, and it
+     costs the GPU during hold-repeat. A denser tint, 90%, keeps the seams and the active tile's ring from reading
+     through, with the glass edge and highlight. Settings and the dialogs keep the blur. */
+  --pill-tint: #1b1c1ee6;
   --glass-filter: blur(18px) saturate(1.3);
   --glass-edge: 1px;
   --glass-edge-color: #ffffff1f;
   --glass-highlight: inset 0 1px 0 #ffffff22;
 
-  --pill-background: var(--glass-tint);
+  --pill-background: var(--pill-tint);
   --pill-edge: var(--glass-edge);
   --pill-edge-color: var(--glass-edge-color);
   --pill-shadow: var(--glass-highlight), 0 1px 3px #0009, 0 6px 18px #0007;
@@ -281,6 +293,9 @@
   --row-column-gap: var(--space-4);
   --row-divider: var(--border);
   --row-inset: 2px;
+  /* No hairline under a group's last row, and the board actions as one full-width list, a row each. */
+  --group-end: var(--card-fill);
+  --action-min: 100%;
 
   /* Segmented choice: one track with the chosen segment as a raised thumb; the accent is kept for Done and switches. */
   --segment-track: var(--raised);
@@ -298,9 +313,10 @@
   --pick-ink: var(--thumb-ink);
   --toggle-ring: var(--text);
 
-  /* Pressed shrinks to 96% under the 10% layer. Motion is springy, 250ms with a gentle overshoot. */
+  /* Pressed shrinks to 96% under the 10% layer, on a 250ms spring with a gentle overshoot. Everything else (fades, the
+     switch thumb) keeps Material's easing, where an overshoot means nothing (DESIGN-AUDIT N5). */
   --press-scale: .96;
-  --ease: cubic-bezier(.3, 1.35, .55, 1);
+  --ease-press: cubic-bezier(.3, 1.35, .55, 1);
   --motion: .25s;
 
   /* Shape: capsule buttons, 20px cards, 30px dialogs, 12px map seats and swatches. */
@@ -358,6 +374,12 @@
     --dialog-fill: var(--surface);
     --head-fill: var(--surface);
   }
+}
+
+/* Under 360px tall (568 × 320), a floating header would take a fifth of the page and blur the labels under it, so
+   Glass's header is its own solid row there, as Material's is (DESIGN-AUDIT S10). */
+@media (max-height: 359.98px) {
+  [data-style="glass"] { --head-fill: var(--surface); --head-radius: 0px; --head-margin: 0px; --head-shadow: none; --head-overlay: 0; }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -444,8 +466,6 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   border-radius: var(--radius-full);
   background: var(--pill-background);
   box-shadow: var(--pill-shadow);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
 }
 .pill-button {
   position: relative;
@@ -478,7 +498,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   content: '';
   background: var(--border);
 }
-.pill-button::before { transition: transform var(--motion) var(--ease); }
+.pill-button::before { transition: transform var(--motion) var(--ease-press); }
 .pill-button:active::before { background: var(--state-pressed); transform: scale(var(--press-scale)); }
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
@@ -542,33 +562,34 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 
 /* Tile colour sets (design/polish/TILES.md), the Tile colours setting: app.js sets data-tiles on <html>. The :root
    palettes above are Classic; each set below replaces all 96 tokens under the same swatch ids, so a player's colour
-   carries over between sets. Generated and checked by design/polish/tiles7.mjs (tiles7.json): on every panel the life
-   total is at least 9:1, small text 7.6:1, the life-out red 4.79:1 and the seat colour 7.35:1. Clear is the default. */
+   carries over between sets, and each id keeps its colour family in every set, so the default seats (ids 0–5) are
+   spread. Written and checked by design/polish/tiles7.mjs (tiles7.json): on every panel the life total is at least
+   9:1, small text 7.6:1, the life-out red 4.79:1 and the seat colour 7.35:1. Clear is the default. */
 [data-tiles="soft"] {
-  --sage-top-panel: #553635; --sage-top-rim: #8d5c5b; --sage-top-seat: #ffd1d0; --sage-top-button: #402827;
-  --sage-bottom-panel: #462828; --sage-bottom-rim: #7d4d4d; --sage-bottom-seat: #fecbca; --sage-bottom-button: #331c1c;
-  --sky-top-panel: #493020; --sky-top-rim: #7f573e; --sky-top-seat: #fac7a8; --sky-top-button: #352215;
-  --sky-bottom-panel: #3b2314; --sky-bottom-rim: #704930; --sky-bottom-seat: #f6c3a4; --sky-bottom-button: #29170b;
-  --coral-top-panel: #4a3d22; --coral-top-rim: #7c693e; --coral-top-seat: #f4dba8; --coral-top-button: #372e19;
-  --coral-bottom-panel: #3c3015; --coral-bottom-rim: #6d592f; --coral-bottom-seat: #efd7a3; --coral-bottom-button: #2c220d;
-  --violet-top-panel: #343a1e; --violet-top-rim: #5e673b; --violet-top-seat: #cedaa5; --violet-top-button: #252914;
-  --violet-bottom-panel: #272d11; --violet-bottom-rim: #50582d; --violet-bottom-seat: #cad6a1; --violet-bottom-button: #1a1e09;
-  --amber-top-panel: #2d4633; --amber-top-rim: #4f7658; --amber-top-seat: #bcecc6; --amber-top-button: #213425;
-  --amber-bottom-panel: #203826; --amber-bottom-rim: #406749; --amber-bottom-seat: #b8e8c2; --amber-bottom-button: #16291a;
+  --sage-top-panel: #2d4633; --sage-top-rim: #4f7658; --sage-top-seat: #bcecc6; --sage-top-button: #213425;
+  --sage-bottom-panel: #203826; --sage-bottom-rim: #406749; --sage-bottom-seat: #b8e8c2; --sage-bottom-button: #16291a;
+  --sky-top-panel: #20454f; --sky-top-rim: #3a7584; --sky-top-seat: #a7ebfd; --sky-top-button: #17343b;
+  --sky-bottom-panel: #123741; --sky-bottom-rim: #2a6574; --sky-bottom-seat: #a3e6f9; --sky-bottom-button: #0a282f;
+  --coral-top-panel: #553635; --coral-top-rim: #8d5c5b; --coral-top-seat: #ffd1d0; --coral-top-button: #402827;
+  --coral-bottom-panel: #462828; --coral-bottom-rim: #7d4d4d; --coral-bottom-seat: #fecbca; --coral-bottom-button: #331c1c;
+  --violet-top-panel: #3b3c57; --violet-top-rim: #656790; --violet-top-seat: #d8dbfe; --violet-top-button: #2c2d41;
+  --violet-bottom-panel: #2e2f48; --violet-bottom-rim: #565880; --violet-bottom-seat: #d3d6ff; --violet-bottom-button: #212135;
+  --amber-top-panel: #4a3d22; --amber-top-rim: #7c693e; --amber-top-seat: #f4dba8; --amber-top-button: #372e19;
+  --amber-bottom-panel: #3c3015; --amber-bottom-rim: #6d592f; --amber-bottom-seat: #efd7a3; --amber-bottom-button: #2c220d;
   --teal-top-panel: #173e39; --teal-top-rim: #306e66; --teal-top-seat: #9de3d8; --teal-top-button: #0e2d29;
   --teal-bottom-panel: #07312c; --teal-bottom-rim: #1f5f57; --teal-bottom-seat: #99dfd4; --teal-bottom-button: #03211e;
-  --rose-top-panel: #20454f; --rose-top-rim: #3a7584; --rose-top-seat: #a7ebfd; --rose-top-button: #17343b;
-  --rose-bottom-panel: #123741; --rose-bottom-rim: #2a6574; --rose-bottom-seat: #a3e6f9; --rose-bottom-button: #0a282f;
+  --rose-top-panel: #513544; --rose-top-rim: #885c72; --rose-top-seat: #fecee6; --rose-top-button: #3d2733;
+  --rose-bottom-panel: #432836; --rose-bottom-rim: #774d63; --rose-bottom-seat: #ffc7e3; --rose-bottom-button: #311c27;
   --indigo-top-panel: #24394d; --indigo-top-rim: #446586; --indigo-top-seat: #b1d8ff; --indigo-top-button: #182838;
   --indigo-bottom-panel: #172b3f; --indigo-bottom-rim: #355676; --indigo-bottom-seat: #abd4fd; --indigo-bottom-button: #0d1d2c;
-  --slate-top-panel: #3b3c57; --slate-top-rim: #656790; --slate-top-seat: #d8dbfe; --slate-top-button: #2c2d41;
-  --slate-bottom-panel: #2e2f48; --slate-bottom-rim: #565880; --slate-bottom-seat: #d3d6ff; --slate-bottom-button: #212135;
-  --copper-top-panel: #3f3047; --copper-top-rim: #70577c; --copper-top-seat: #e5c6f5; --copper-top-button: #2e2134;
-  --copper-bottom-panel: #322339; --copper-bottom-rim: #60486c; --copper-bottom-seat: #e1c2f0; --copper-bottom-button: #221628;
-  --olive-top-panel: #513544; --olive-top-rim: #885c72; --olive-top-seat: #fecee6; --olive-top-button: #3d2733;
-  --olive-bottom-panel: #432836; --olive-bottom-rim: #774d63; --olive-bottom-seat: #ffc7e3; --olive-bottom-button: #311c27;
-  --orchid-top-panel: #373b40; --orchid-top-rim: #60676e; --orchid-top-seat: #d0d9e3; --orchid-top-button: #282b2f;
-  --orchid-bottom-panel: #2a2e32; --orchid-bottom-rim: #51585f; --orchid-bottom-seat: #ccd5de; --orchid-bottom-button: #1c2023;
+  --slate-top-panel: #373b40; --slate-top-rim: #60676e; --slate-top-seat: #d0d9e3; --slate-top-button: #282b2f;
+  --slate-bottom-panel: #2a2e32; --slate-bottom-rim: #51585f; --slate-bottom-seat: #ccd5de; --slate-bottom-button: #1c2023;
+  --copper-top-panel: #493020; --copper-top-rim: #7f573e; --copper-top-seat: #fac7a8; --copper-top-button: #352215;
+  --copper-bottom-panel: #3b2314; --copper-bottom-rim: #704930; --copper-bottom-seat: #f6c3a4; --copper-bottom-button: #29170b;
+  --olive-top-panel: #343a1e; --olive-top-rim: #5e673b; --olive-top-seat: #cedaa5; --olive-top-button: #252914;
+  --olive-bottom-panel: #272d11; --olive-bottom-rim: #50582d; --olive-bottom-seat: #cad6a1; --olive-bottom-button: #1a1e09;
+  --orchid-top-panel: #3f3047; --orchid-top-rim: #70577c; --orchid-top-seat: #e5c6f5; --orchid-top-button: #2e2134;
+  --orchid-bottom-panel: #322339; --orchid-bottom-rim: #60486c; --orchid-bottom-seat: #e1c2f0; --orchid-bottom-button: #221628;
 }
 [data-tiles="jewel"] {
   --sage-top-panel: #204421; --sage-top-rim: #447038; --sage-top-seat: #cef293; --sage-top-button: #16331a;
@@ -597,30 +618,30 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   --orchid-bottom-panel: #491054; --orchid-bottom-rim: #7f328f; --orchid-bottom-seat: #f5c7ff; --orchid-bottom-button: #35093e;
 }
 [data-tiles="clear"] {
-  --sage-top-panel: #5f2524; --sage-top-rim: #a14542; --sage-top-seat: #ffc9c4; --sage-top-button: #471a19;
-  --sage-bottom-panel: #501717; --sage-bottom-rim: #8f3534; --sage-bottom-seat: #ffc3be; --sage-bottom-button: #3a0e0e;
-  --sky-top-panel: #572504; --sky-top-rim: #964613; --sky-top-seat: #fec2a4; --sky-top-button: #401902;
-  --sky-bottom-panel: #451a00; --sky-bottom-rim: #833903; --sky-bottom-seat: #ffbc9a; --sky-bottom-button: #301000;
-  --coral-top-panel: #4b3e01; --coral-top-rim: #7e6a04; --coral-top-seat: #f4de87; --coral-top-button: #382e01;
-  --coral-bottom-panel: #3c3100; --coral-bottom-rim: #6d5b01; --coral-bottom-seat: #efda83; --coral-bottom-button: #2b2301;
-  --violet-top-panel: #333824; --violet-top-rim: #5c6544; --violet-top-seat: #ccd8af; --violet-top-button: #242818;
-  --violet-bottom-panel: #262b17; --violet-bottom-rim: #4e5636; --violet-bottom-seat: #c8d3ab; --violet-bottom-button: #191d0d;
-  --amber-top-panel: #184939; --amber-top-rim: #2d7b61; --amber-top-seat: #9df3d2; --amber-top-button: #11372a;
-  --amber-bottom-panel: #063b2c; --amber-bottom-rim: #196c53; --amber-bottom-seat: #98efce; --amber-bottom-button: #032b1f;
+  --sage-top-panel: #184939; --sage-top-rim: #2d7b61; --sage-top-seat: #9df3d2; --sage-top-button: #11372a;
+  --sage-bottom-panel: #063b2c; --sage-bottom-rim: #196c53; --sage-bottom-seat: #98efce; --sage-bottom-button: #032b1f;
+  --sky-top-panel: #124054; --sky-top-rim: #266e8f; --sky-top-seat: #aae1ff; --sky-top-button: #0b2f3f;
+  --sky-bottom-panel: #013246; --sky-bottom-rim: #115f7f; --sky-bottom-seat: #9fdeff; --sky-bottom-button: #012332;
+  --coral-top-panel: #5f2524; --coral-top-rim: #a14542; --coral-top-seat: #ffc9c4; --coral-top-button: #471a19;
+  --coral-bottom-panel: #501717; --coral-bottom-rim: #8f3534; --coral-bottom-seat: #ffc3be; --coral-bottom-button: #3a0e0e;
+  --violet-top-panel: #352556; --violet-top-rim: #624997; --violet-top-seat: #d0c0ff; --violet-top-button: #24183e;
+  --violet-bottom-panel: #281847; --violet-bottom-rim: #543a87; --violet-bottom-seat: #ccbbff; --violet-bottom-button: #1a0c31;
+  --amber-top-panel: #4b3e01; --amber-top-rim: #7e6a04; --amber-top-seat: #f4de87; --amber-top-button: #382e01;
+  --amber-bottom-panel: #3c3100; --amber-bottom-rim: #6d5b01; --amber-bottom-seat: #efda83; --amber-bottom-button: #2b2301;
   --teal-top-panel: #033d44; --teal-top-rim: #046d79; --teal-top-seat: #6ee6f7; --teal-top-button: #002c31;
   --teal-bottom-panel: #012f34; --teal-bottom-rim: #065d67; --teal-bottom-seat: #69e2f3; --teal-bottom-button: #001f24;
-  --rose-top-panel: #124054; --rose-top-rim: #266e8f; --rose-top-seat: #aae1ff; --rose-top-button: #0b2f3f;
-  --rose-bottom-panel: #013246; --rose-bottom-rim: #115f7f; --rose-bottom-seat: #9fdeff; --rose-bottom-button: #012332;
+  --rose-top-panel: #5a2c50; --rose-top-rim: #964c86; --rose-top-seat: #feccf1; --rose-top-button: #44203c;
+  --rose-bottom-panel: #4b1e42; --rose-bottom-rim: #853d76; --rose-bottom-seat: #ffc5f0; --rose-bottom-button: #371430;
   --indigo-top-panel: #2e2f60; --indigo-top-rim: #5456a4; --indigo-top-seat: #c8cefe; --indigo-top-button: #202047;
   --indigo-bottom-panel: #222151; --indigo-bottom-rim: #464693; --indigo-bottom-seat: #c3c9fe; --indigo-bottom-button: #15153a;
-  --slate-top-panel: #352556; --slate-top-rim: #624997; --slate-top-seat: #d0c0ff; --slate-top-button: #24183e;
-  --slate-bottom-panel: #281847; --slate-bottom-rim: #543a87; --slate-bottom-seat: #ccbbff; --slate-bottom-button: #1a0c31;
-  --copper-top-panel: #493263; --copper-top-rim: #7b57a4; --copper-top-seat: #e6d5fe; --copper-top-button: #37254b;
-  --copper-bottom-panel: #3b2554; --copper-bottom-rim: #6c4794; --copper-bottom-seat: #e3d0fe; --copper-bottom-button: #2b193e;
-  --olive-top-panel: #5a2c50; --olive-top-rim: #964c86; --olive-top-seat: #feccf1; --olive-top-button: #44203c;
-  --olive-bottom-panel: #4b1e42; --olive-bottom-rim: #853d76; --olive-bottom-seat: #ffc5f0; --olive-bottom-button: #371430;
-  --orchid-top-panel: #452338; --orchid-top-rim: #7d4667; --orchid-top-seat: #f9b2db; --orchid-top-button: #311727;
-  --orchid-bottom-panel: #37162b; --orchid-bottom-rim: #6d3758; --orchid-bottom-seat: #f4aed6; --orchid-bottom-button: #250c1b;
+  --slate-top-panel: #452338; --slate-top-rim: #7d4667; --slate-top-seat: #f9b2db; --slate-top-button: #311727;
+  --slate-bottom-panel: #37162b; --slate-bottom-rim: #6d3758; --slate-bottom-seat: #f4aed6; --slate-bottom-button: #250c1b;
+  --copper-top-panel: #572504; --copper-top-rim: #964613; --copper-top-seat: #fec2a4; --copper-top-button: #401902;
+  --copper-bottom-panel: #451a00; --copper-bottom-rim: #833903; --copper-bottom-seat: #ffbc9a; --copper-bottom-button: #301000;
+  --olive-top-panel: #333824; --olive-top-rim: #5c6544; --olive-top-seat: #ccd8af; --olive-top-button: #242818;
+  --olive-bottom-panel: #262b17; --olive-bottom-rim: #4e5636; --olive-bottom-seat: #c8d3ab; --olive-bottom-button: #191d0d;
+  --orchid-top-panel: #493263; --orchid-top-rim: #7b57a4; --orchid-top-seat: #e6d5fe; --orchid-top-button: #37254b;
+  --orchid-bottom-panel: #3b2554; --orchid-bottom-rim: #6c4794; --orchid-bottom-seat: #e3d0fe; --orchid-bottom-button: #2b193e;
 }
 
 /* app.js gives each tile, swatch and colour dot a data-colour and data-row, which pick its palette. */
@@ -901,6 +922,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .mode-layer > .layer-hint { grid-row: 1; align-self: end; margin-bottom: 6px; }
 .mode-layer > .identity { grid-row: 3; margin-top: 6px; }
 .mode-layer[hidden] { display: none; }
+/* A board mode fades in over 120ms rather than swapping in one frame, so players across the table see it change. Only
+   opacity moves, so nothing is measured mid-way; reduced motion turns it off with every transition. */
+.mode-layer { transition: opacity .12s var(--ease); }
+@starting-style {
+  .mode-layer { opacity: 0; }
+}
 .board { --hint-size: clamp(.75rem, calc(3.6 * var(--u)), max(.875rem, 14 * var(--grow))); }
 .layer-hint { font-size: var(--hint-size); font-weight: var(--weight-semibold); line-height: 1.2; color: var(--text-soft); }
 /* Mode hints show only where every tile has room: ub ≥ 200 and ui ≥ 240. */
@@ -981,12 +1008,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   border: var(--control-edge) solid var(--control-border);
   border-radius: var(--radius-full);
   background: var(--control-fill);
-  transition: box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
+  transition: box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease-press);
 }
 .identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
-/* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px accent
-   ring, with a check, so the state never rests on colour alone. */
+/* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px light
+   ring, with a check in the seat colour, so the state never rests on colour alone. */
 .identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
 .identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--toggle-ring); }
 .toggle-check {
@@ -998,9 +1025,9 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   width: max(16px, calc(var(--toggle) * .34));
   height: max(16px, calc(var(--toggle) * .34));
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--seat);
   box-shadow: 0 0 0 2px var(--tile-panel);
-  color: var(--ink);
+  color: var(--button);
 }
 .toggle-check .icon { width: 62%; height: 62%; }
 .identity-toggle[aria-pressed="true"] .toggle-check { display: grid; }
@@ -1097,12 +1124,15 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
-/* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it. The holder's
-   cell fills with their seat colour; anyone else's is muted. */
+/* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it, in the seat
+   colour like every counter, so a cell nobody holds reads as one to tap rather than a disabled one (DESIGN-AUDIT S8).
+   The holder's cell fills with their seat colour and gets the identity toggles' check, so it doesn't rest on colour. */
+.designation-cell { position: relative; }
 .designation-cell .icon { font-size: 1.7em; }
-.designation-cell[data-zero] .icon { color: var(--muted); }
 .designation-cell[aria-pressed="true"] { background: var(--seat); color: var(--button); }
 .designation-cell[aria-pressed="true"] .icon { color: var(--button); }
+.designation-cell .toggle-check { --toggle: var(--cell); top: 0; right: 0; }
+.designation-cell[aria-pressed="true"] .toggle-check { display: grid; }
 /* Seven counter cells (every counter, the monarch and the initiative) go four to a row, and the gaps close up to 2px
    before a cell would go under 44px. A face too narrow for four (a turned seat at 568 × 320) takes three to a row with
    its gaps closed up. app.js sets data-cell-grid and each face's --wide-columns and --wide-gap. */
@@ -1113,7 +1143,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   column-gap: var(--wide-gap, var(--cell-gap));
   width: calc(var(--wide-columns, 4) * var(--cell) + (var(--wide-columns, 4) - 1) * var(--wide-gap, var(--cell-gap)));
 }
-.mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); }
+.mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); opacity: .5; }
 
 /* "Who goes first?": Me first on every tile, facing its player. The shuffle lights tiles in turn; the chosen tile
    shows "Goes first" in its seat colour while the others dim. */
@@ -1452,10 +1482,15 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .ci[data-ci="UBRG"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 135deg, #c6553e 135deg 225deg, #3d684b 225deg 315deg, #3b6ba0 315deg); }
 .ci[data-ci="WUBRG"] { background: conic-gradient(#fff 36deg, #3b6ba0 36deg 108deg, #383431 108deg 180deg, #c6553e 180deg 252deg, #3d684b 252deg 324deg, #fff 324deg); }
 
-#discard { width: min(360px, calc(100% - 32px)); }
-#discard h2 { font-size: var(--type-title); letter-spacing: -.022em; }
-#discard-message { color: var(--muted); }
-#discard .discard { color: var(--danger-text); }
+/* The confirmations, Discard and New game (DESIGN-AUDIT S4): one style. The destructive action is a secondary button in
+   the danger tint, and the safe one, which has focus, is the primary. New game lists what resets. */
+dialog.confirm { width: min(380px, calc(100% - 32px)); }
+.confirm h2 { font-size: var(--type-title); letter-spacing: -.022em; }
+.confirm p { color: var(--muted); }
+.secondary.danger { background: var(--danger-fill); color: var(--danger-text); }
+.confirm-body { display: grid; gap: var(--space-1); }
+.confirm-list { display: grid; gap: 2px; margin: 0; padding: 0 0 0 1.25em; color: var(--text-soft); font-size: var(--type-label); }
+.confirm .confirm-keeps { font-size: var(--type-label); }
 
 dialog {
   width: min(420px, calc(100% - 32px));
@@ -1486,7 +1521,6 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .privacy-text h4 { margin: var(--space-2) 0 0; font-size: .875rem; color: var(--text); }
 .privacy-text h4:first-child { margin-top: 0; }
 .sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
-#restart-message { color: var(--muted); }
 
 /* Buttons (direction A): capsules filled one tone above their card, with no outline. The primary button is the one
    accent fill in its view. Pressed lays the 10% state layer over the fill; disabled is 38%. */
@@ -1507,7 +1541,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 }
 :is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: var(--disabled-opacity); }
 /* Pressed buttons and board-mode cells shrink by --press-scale (Glass); Material keeps them full size. */
-:is(.close, .primary, .secondary, .dice-picker button, button.k-value, .k-commit, .counter-cell, .swatch, .map-cell) { transition: transform var(--motion) var(--ease); }
+:is(.close, .primary, .secondary, .dice-picker button, button.k-value, .k-commit, .counter-cell, .swatch, .map-cell) { transition: transform var(--motion) var(--ease-press); }
 :is(.close, .primary, .secondary, .segmented > button, .dice-picker button, button.k-value, .k-commit, .counter-cell, .identity-toggle, .swatch:enabled, .map-cell):active { transform: scale(var(--press-scale)); }
 
 /* Rows: a board action or a switch, filled one tone above the card, 16px corners. In a switch row the whole row toggles
@@ -1530,7 +1564,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
   text-align: start;
   cursor: pointer;
 }
-.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--accent); }
+.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--text-soft); }
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switch-row .switch { margin-inline-start: auto; }
 .switch-row[hidden] { display: none; }
@@ -1539,6 +1573,11 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .switch-row:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* A long switch label, such as auto-empty's, wraps rather than being cut short. */
 .wide-switch .nav-label { white-space: normal; line-height: 1.2; }
+/* A row on its own has no divider, and a group's last row covers its own (Glass: DESIGN-AUDIT S10), however many
+   columns the group has and whichever rows are hidden. */
+.wide-switch { --row-divider: transparent; }
+:is(.fs-gamefoot, .fs-switches, .compact-switches, .fs-actions) { position: relative; }
+:is(.fs-gamefoot, .fs-switches, .compact-switches, .fs-actions)::after { position: absolute; inset: auto 0 0; height: 1px; content: ''; background: var(--group-end); pointer-events: none; }
 .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: var(--space-1); }
 .setting-label { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
 
@@ -1569,12 +1608,25 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
   font-weight: var(--weight-semibold);
   line-height: 1.15;
   text-align: center;
-  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease), transform var(--motion) var(--ease);
+  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease), transform var(--motion) var(--ease-press);
 }
 .segmented > button:first-child { border-radius: var(--segment-outer) var(--segment-inner) var(--segment-inner) var(--segment-outer); }
 .segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
 .segmented > button[aria-pressed="true"] { border-color: var(--segment-chosen-fill); border-radius: var(--segment-chosen); background: var(--segment-chosen-fill); color: var(--segment-chosen-ink); box-shadow: var(--segment-chosen-shadow); }
 .segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
+/* Tile colours (DESIGN-AUDIT S2): a segment per set, each with a strip of that set's tiles for players 1–4 over its
+   name, so the choice shows what it does. Each tile is its panel with a rim, as on the board. The colours are written
+   by design/polish/tiles7.mjs. */
+.tile-sets > button { flex-direction: column; gap: 5px; padding-block: 7px 6px; }
+.tile-strip { display: flex; gap: 3px; }
+.tile-strip > span { width: 14px; height: 14px; border-radius: 4px; background: var(--strip-1); box-shadow: inset 0 0 0 1.5px var(--strip-1-rim); }
+.tile-strip > :nth-child(2) { background: var(--strip-2); box-shadow: inset 0 0 0 1.5px var(--strip-2-rim); }
+.tile-strip > :nth-child(3) { background: var(--strip-3); box-shadow: inset 0 0 0 1.5px var(--strip-3-rim); }
+.tile-strip > :nth-child(4) { background: var(--strip-4); box-shadow: inset 0 0 0 1.5px var(--strip-4-rim); }
+.tile-sets > [data-set="classic"] { --strip-1: #2f432f; --strip-1-rim: #556e4e; --strip-2: #2c4352; --strip-2-rim: #517187; --strip-3: #432a27; --strip-3-rim: #7b4f44; --strip-4: #342b41; --strip-4-rim: #655179; }
+.tile-sets > [data-set="soft"] { --strip-1: #2d4633; --strip-1-rim: #4f7658; --strip-2: #20454f; --strip-2-rim: #3a7584; --strip-3: #462828; --strip-3-rim: #7d4d4d; --strip-4: #2e2f48; --strip-4-rim: #565880; }
+.tile-sets > [data-set="jewel"] { --strip-1: #204421; --strip-1-rim: #447038; --strip-2: #15425b; --strip-2-rim: #347096; --strip-3: #4b211d; --strip-3-rim: #8a402e; --strip-4: #35244a; --strip-4-rim: #69458a; }
+.tile-sets > [data-set="clear"] { --strip-1: #184939; --strip-1-rim: #2d7b61; --strip-2: #124054; --strip-2-rim: #266e8f; --strip-3: #501717; --strip-3-rim: #8f3534; --strip-4: #281847; --strip-4-rim: #543a87; }
 
 /* Switch: 36 × 20. Off is an outlined track with a small thumb; on is the accent with a larger ink thumb, so the shape
    changes as well as the colour. */
@@ -1704,6 +1756,9 @@ dialog.fs[data-flipped] { transform: rotate(180deg); }
 .fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: 1.25rem; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .fs-head .close .icon { width: 18px; height: 18px; }
 .fs-done { flex: none; font-size: 1rem; font-weight: var(--weight-heavy); white-space: nowrap; }
+/* New game sits beside Done, always one tap away (it hides while a new game is pending, when Done starts it). */
+.fs-head .fs-newgame { flex: none; padding-inline: var(--space-4); font-size: 1rem; white-space: nowrap; }
+.fs-newgame[hidden] { display: none; }
 .fs-body {
   position: relative;
   grid-row: calc(2 - var(--head-overlay)) / 3;
@@ -1725,7 +1780,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 /* Sections are cards (direction A): the surface on the page background, no border, 24px corners. */
 .fs-sec { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: var(--card-edge) solid var(--border); border-radius: var(--card-radius); background: var(--card-fill); container: settings-section / inline-size; }
 .fs-sec > h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 2px; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
-.fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--accent); }
+.fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--text-soft); }
 /* One column: a label sits beside its control when the card has room (480px), otherwise above it. In two columns each
    label stays above its control. */
 @container settings-section (min-width: 480px) {
@@ -1734,13 +1789,11 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 /* Reminders: two to a line where each row has room for its whole label, otherwise one. */
 .fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
-.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
+.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--action-min)), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.fs-newgame { min-height: 48px; padding: 0 var(--space-5); font-size: 1rem; }
-.fs-newgame[hidden] { display: none; }
-.fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; margin-inline-start: auto; }
+.fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; }
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
 .fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
@@ -1761,11 +1814,16 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   transition: opacity .15s;
 }
 .scroll-cue[data-more]::before { opacity: 1; }
-/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole. A floating header
-   (Glass) halves its side margin and takes the other half from its padding. */
+/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole, and while New game
+   shows beside Done the title is left to screen readers. A floating header (Glass) halves its side margin and takes the
+   other half from its padding. */
 @media (max-width: 400px) {
   .fs-head { --head-side: .5; gap: 6px; padding-inline: calc(var(--space-3) - var(--head-margin) / 2); }
   .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: .9375rem; line-height: 1.1; white-space: normal; }
+  .fs-head .fs-newgame { padding-inline: 12px; font-size: .9375rem; }
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
+  .fs-head:has(> .fs-newgame:not([hidden])) h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .fs-head:has(> .fs-newgame:not([hidden])) #settings-flip { margin-inline-start: auto; }
 }
 /* Under 360px tall (568 × 320), the header and the cards tighten. */
 @media (max-height: 359.98px) {
@@ -1780,7 +1838,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
    a 16px track with an accent fill, notches as dots and a 4px bar handle. The whole slider takes a tap or a sideways
    drag; a vertical swipe scrolls the page. */
 .k-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'slider slider'; }
-#players-row, #tiles-row, #badge-size-row { grid-template-areas: 'label label' 'slider slider'; }
+#players-row, #badge-size-row { grid-template-areas: 'label label' 'slider slider'; }
 .k-row > .setting-label { grid-area: label; }
 .k-row > .k-slider { grid-area: slider; }
 .k-row > .k-val { grid-area: value; justify-self: end; }
@@ -1802,7 +1860,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   font-variant-numeric: tabular-nums;
 }
 .k-stop[aria-pressed="true"] { color: var(--accent); font-weight: 800; }
-/* A slider whose stops are words (Tile colours, Badge size): each stop is as wide as its word, and the ends keep room for half of one. */
+/* A slider whose stops are words (Badge size): each stop is as wide as its word, and the ends keep room for half of one. */
 .k-words .k-slider { margin: 0 36px; }
 .k-words .k-stop { width: auto; min-width: var(--tap-min); padding: 0 6px; white-space: nowrap; }
 .k-stop:active { background: var(--state-pressed); }
@@ -1811,6 +1869,8 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .k-track::before, .k-fill { position: absolute; top: 50%; height: var(--slider-track); transform: translateY(-50%); border-radius: var(--radius-full); content: ''; }
 .k-track::before { left: -8px; right: -8px; background: var(--slider-track-fill); }
 .k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--slider-fill); }
+/* At the track's start nothing is filled, so no sliver of fill peeks out beside the handle (DESIGN-AUDIT S9). */
+.k-track[data-min] .k-fill { visibility: hidden; }
 .k-ticks { position: absolute; inset: 0; }
 .k-tick { position: absolute; top: 50%; width: var(--tick-width); height: var(--tick-height); transform: translate(-50%, -50%); border-radius: var(--tick-radius); background: var(--tick-fill); }
 .k-tick[data-stop] { width: var(--tick-stop-width); height: var(--tick-stop-height); }
@@ -1874,7 +1934,20 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   user-select: none;
 }
 .dice-stage:active { background: var(--dice-stage-pressed); }
-.dice-stage > svg { grid-area: 1 / 1; width: 74cqmin; height: 74cqmin; overflow: visible; }
+.dice-stage > svg { grid-area: 1 / 1; width: 70cqmin; height: 70cqmin; overflow: visible; }
+/* The result again on the stage's far edge, upside down, for the other side of the table. */
+.dice-echo {
+  grid-area: 1 / 1;
+  align-self: start;
+  margin-top: 2.5cqmin;
+  transform: rotate(180deg);
+  color: var(--text);
+  font-size: 9cqmin;
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
 .dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-1); }
 .dice-picker button {
   display: flex;

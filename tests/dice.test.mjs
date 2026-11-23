@@ -12,6 +12,8 @@ const landsAt = Math.ceil(tumble * 0.78);
 
 const result = page => page.locator('#dice-result').textContent();
 const shownNumber = page => page.locator('.die-number').textContent();
+// The result's second copy on the stage's far edge, for the other side of the table.
+const echo = page => page.locator('#dice-stage .dice-echo').textContent();
 
 async function checkDice(t, engine) {
   const page = await openPage(t, engine, { viewport: { width: 852, height: 393 }, clock: true });
@@ -38,6 +40,7 @@ async function checkDice(t, engine) {
     assert.equal(fill, front, `d${sides}'s front is its --die-front`);
     fronts.add(fill);
     assert.equal(await shownNumber(page), `d${sides}`, `d${sides} names itself before a roll`);
+    assert.equal(await echo(page), '', 'no second copy before a roll');
     for (let roll = 0; roll < 3; roll++) {
       await button(page, `Roll d${sides}`).click();
       await page.clock.runFor(fadeOut - 1);
@@ -47,12 +50,25 @@ async function checkDice(t, engine) {
       assert.equal(die, sides);
       assert.ok(Number(value) >= 1 && Number(value) <= Number(sides), `d${sides} rolled ${value}`);
       assert.equal(await shownNumber(page), value, 'the die shows the announced result');
+      assert.equal(await echo(page), value, 'and the far edge prints it again');
       // Once the roll is done, the next tap rolls again.
       await page.clock.runFor(reducedRoll - fadeOut);
       assert.equal(await shownNumber(page), value, 'the die still shows it when the roll is done');
     }
   }
   assert.equal(fronts.size, 6, `every die has its own colour: ${[...fronts]}`);
+
+  // The second copy is turned to face across the table, above the die, and screen readers hear the result once.
+  const copy = await page.locator('#dice-stage .dice-echo').evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const die = node.parentElement.querySelector('.die-body').getBoundingClientRect();
+    return { transform: getComputedStyle(node).transform, hidden: node.getAttribute('aria-hidden'), clear: box.bottom <= die.top + 1 };
+  });
+  assert.deepEqual(copy, { transform: 'matrix(-1, 0, 0, -1, 0, 0)', hidden: 'true', clear: true });
+  // A new roll clears it until the result lands.
+  await button(page, 'Roll d20').click();
+  assert.equal(await echo(page), '', 'cleared while the roll is in the air');
+  await page.clock.runFor(reducedRoll);
 
   // Tapping the die rolls it too.
   await page.locator('#dice-stage').click();

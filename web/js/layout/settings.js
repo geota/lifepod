@@ -59,7 +59,9 @@ export function placeSettingsSections() {
   focused?.focus({ preventScroll: true });
 }
 
-// A fade along the bottom of the body while there's more below.
+// A fade along the bottom of the body while there's more below: content, not just the page's bottom padding, so it never
+// sits over the last row (DESIGN-AUDIT N6).
 export function syncSettingsCue() {
-  settingsCue.toggleAttribute('data-more', settingsBody.scrollTop + settingsBody.clientHeight < settingsBody.scrollHeight - 1);
+  const padding = parseFloat(getComputedStyle(settingsContent).paddingBottom) + parseFloat(getComputedStyle(settingsBody).paddingBottom);
+  settingsCue.toggleAttribute('data-more', settingsBody.scrollTop + settingsBody.clientHeight < settingsBody.scrollHeight - padding - 1);
 }

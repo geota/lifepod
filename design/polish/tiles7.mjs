@@ -1,5 +1,6 @@
 // Alternative 12-colour tile palette sets (TILES.md), generated in OKLCH and checked against the Graphite chrome.
-// Run from the repo root:  node design/polish/tiles7.mjs     (prints the checks, writes tiles7.json for tiles-render.mjs)
+// Run from the repo root:  node design/polish/tiles7.mjs     (prints the checks, writes tiles7.json for tiles-render.mjs
+// and the Soft, Jewel and Clear blocks in web/styles.css)
 // Exits with an error if a set misses a contrast minimum.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -123,8 +124,20 @@ const hueName = (h, c) => (c < 0.02 ? 'Slate' : ['Rose', 'Coral', 'Copper', 'Amb
 
 // Hue names, with "Deep" or "Pale" when two picks share a name.
 const uniqueNames = spec => { const n = spec.map(p => hueName(p.h, p.c)); return n.map((x, i) => (n.filter(y => y === x).length > 1 ? (spec[i].l <= Math.min(...spec.filter((_, j) => n[j] === x).map(q => q.l)) ? 'Deep ' : 'Pale ') + x.toLowerCase() : x)); };
-const cvdPicks = cvdSearch();
-const softSpec = [...Array.from({ length: 11 }, (_, i) => ({ h: (20 + i * 360 / 11) % 360, l: i % 2 ? 0.335 : 0.368, c: 0.045 })), { h: 250, l: 0.35, c: 0.01 }];
+// Soft's and Clear's palettes are made in hue order, then placed on the swatch ids by colour family (DESIGN-AUDIT M1):
+// each id keeps its Classic family in every set (0 green, 1 sky, 2 coral, 3 violet, 4 amber, 5 teal, 6 rose, 7 indigo,
+// 8 slate, 9 copper, 10 olive, 11 orchid), so players 1–6, who default to ids 0–5, get six spread colours rather than
+// six neighbours, and switching sets keeps each player's colour family. Clear has no neutral, so its slate is the deep
+// plum. byFamily[id] is the hue-order pick that id takes.
+const byFamily = {
+  // Soft, in hue order: Coral, Copper, Olive, Lime, Jade, Teal, Sky, Azure, Violet, Orchid, Plum, Slate.
+  soft: [4, 6, 0, 8, 2, 5, 10, 7, 11, 1, 3, 9],
+  // Clear, in hue order: Coral, Copper, Olive, Lime, Jade, Cyan, Sky, Indigo, Violet, Orchid, Pale plum, Deep plum.
+  clear: [4, 6, 0, 8, 2, 5, 10, 7, 11, 1, 3, 9],
+};
+const inFamilyOrder = (spec, order) => order.map(at => spec[at]);
+const cvdPicks = inFamilyOrder(cvdSearch(), byFamily.clear);
+const softSpec = inFamilyOrder([...Array.from({ length: 11 }, (_, i) => ({ h: (20 + i * 360 / 11) % 360, l: i % 2 ? 0.335 : 0.368, c: 0.045 })), { h: 250, l: 0.35, c: 0.01 }], byFamily.soft);
 const sets = {
   today: { name: 'Today', note: 'The twelve shipped palettes.', set: todaySet, names: ids.map(i => i[0].toUpperCase() + i.slice(1)) },
   soft: {
@@ -146,6 +159,35 @@ const sets = {
 };
 for (const s of Object.values(sets)) s.names ??= ids.map(i => i[0].toUpperCase() + i.slice(1));
 
+// Colour families, for Settings → Table → Shuffle tile colours each game: each set's twelve swatches split into six
+// groups, found by search, so that the closest two swatches in different groups are as far apart as possible (as tiles,
+// in either row). A shuffle gives each seat a different family while it can, so six players get one of each.
+function families(set) {
+  const tile = id => ['top', 'bottom'].map(row => ({ p: lab(hexToRgb(set[id][row].panel)), s: lab(hexToRgb(set[id][row].seat)) }));
+  const tiles = ids.map(tile);
+  const d = tiles.map(a => tiles.map(b => Math.min(...a.flatMap(x => b.map(y => Math.hypot(dE(x.p, y.p), 0.5 * dE(x.s, y.s)))))));
+  const count = 6;
+  const group = Array(ids.length).fill(0);
+  let best = { score: -1, group };
+  const visit = (i, used) => {
+    if (ids.length - i < count - used) return;
+    if (i === ids.length) {
+      if (used !== count) return;
+      let score = Infinity;
+      for (let a = 0; a < ids.length; a++) for (let b = a + 1; b < ids.length; b++) if (group[a] !== group[b]) score = Math.min(score, d[a][b]);
+      if (score > best.score) best = { score, group: [...group] };
+      return;
+    }
+    for (let g = 0; g <= Math.min(used, count - 1); g++) {
+      group[i] = g;
+      visit(i + 1, Math.max(used, g + 1));
+    }
+  };
+  visit(0, 0);
+  return best;
+}
+for (const s of Object.values(sets)) s.families = families(s.set);
+
 const results = {};
 let failed = false;
 for (const [k, s] of Object.entries(sets)) {
@@ -154,7 +196,27 @@ for (const [k, s] of Object.entries(sets)) {
   results[k] = { ...w, pairs, rows: rowsApart(s.set) };
   if (w.life < 9 || w.small < 7.6 || w.lifeOut < 4.79 || w.seat < 7.35) failed = true;
 }
-writeFileSync(fileURLToPath(new URL('./tiles7.json', import.meta.url)), JSON.stringify(Object.fromEntries(Object.entries(sets).map(([k, s]) => [k, { name: s.name, note: s.note, names: s.names, set: s.set }])), null, 1));
+writeFileSync(fileURLToPath(new URL('./tiles7.json', import.meta.url)), JSON.stringify(Object.fromEntries(Object.entries(sets).map(([k, s]) => [k, { name: s.name, note: s.note, names: s.names, families: s.families.group, set: s.set }])), null, 1));
+
+// The app's Soft, Jewel and Clear blocks in web/styles.css (Classic is the :root palettes, which today's set reads), so
+// the shipped tokens are always this script's. palette.test.mjs checks they match tiles7.json.
+const cssPath = fileURLToPath(new URL('../../web/styles.css', import.meta.url));
+const block = (setting, set) => `[data-tiles="${setting}"] {\n${ids.map(id => ['top', 'bottom'].map(row =>
+  `  ${roles.map(role => `--${id}-${row}-${role}: ${set[id][row][role]};`).join(' ')}`).join('\n')).join('\n')}\n}`;
+let shipped = css;
+for (const [setting, source] of [['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
+  shipped = shipped.replace(new RegExp(`\\[data-tiles="${setting}"\\] \\{[^}]*\\}`), block(setting, sets[source].set));
+}
+// The Tile colours control's previews: each set's panel and rim for players 1–4 (ids 0–3; players 1 and 2 sit in the
+// top row, 3 and 4 in the bottom), whichever set is in use.
+const strip = (setting, set) => `.tile-sets > [data-set="${setting}"] { ${[0, 1, 2, 3].map(player => {
+  const palette = set[ids[player]][player < 2 ? 'top' : 'bottom'];
+  return `--strip-${player + 1}: ${palette.panel}; --strip-${player + 1}-rim: ${palette.rim};`;
+}).join(' ')} }`;
+for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
+  shipped = shipped.replace(new RegExp(`\\.tile-sets > \\[data-set="${setting}"\\] \\{[^}]*\\}`), strip(setting, sets[source].set));
+}
+if (shipped !== css) writeFileSync(cssPath, shipped);
 
 console.log('| Set | Life total ≥ 9 | Small text ≥ 7.6 | Life-out red ≥ 4.79 | Seat colour on panel ≥ 7.35 | Warning chip ≥ 4.5 | Closest pair: normal | deuteranope | protanope | tritanope | Across rows, deuteranope |');
 console.log('|---|---|---|---|---|---|---|---|---|---|---|');
@@ -162,6 +224,11 @@ for (const [k, r] of Object.entries(results)) {
   const nm = pair => pair.split('–').map(id => sets[k].names[ids.indexOf(id)]).join('–');
   const p = v => `${r.pairs[v].d.toFixed(3)} (${nm(r.pairs[v].pair)})`;
   console.log(`| ${sets[k].name} | ${r.life.toFixed(2)} | ${r.small.toFixed(2)} | ${r.lifeOut.toFixed(2)} | ${r.seat.toFixed(2)} | ${r.warnChip.toFixed(2)} | ${p('normal')} | ${p('deutan')} | ${p('protan')} | ${p('tritan')} | ${r.rows.toFixed(3)} |`);
+}
+console.log('\nFamilies (the closest pair in different families):');
+for (const s of Object.values(sets)) {
+  const groups = Object.values(Object.groupBy(ids.map((_, i) => i), i => s.families.group[i])).map(g => g.map(i => s.names[i]).join(' · '));
+  console.log(`  ${s.name}: ${groups.join(' | ')} (${s.families.score.toFixed(3)})`);
 }
 console.log('\nClear set:', cvdPicks.map((p, i) => `${sets.clear.names[i]} h${p.h} L${p.l} C${p.c}`).join(', '));
 if (failed) { console.error('a set misses a contrast minimum'); process.exitCode = 1; }

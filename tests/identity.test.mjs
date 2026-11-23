@@ -279,13 +279,16 @@ async function checkMode(t, engine) {
     assert.equal((await saved(page)).identities[3], 'U', 'and keeps the change');
   }
 
-  // A new game keeps every identity.
+  // A new game clears every identity (SPEC §10.2: players choose again for their new decks), and keeps what tiles show.
+  const shown = (await saved(page)).identity;
   await button(page, 'Settings').tap();
   await button(page, 'New game').tap();
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).tap();
   // The restart dialog's close event starts the game, then closes settings.
   await eventually(() => openDialogs(page), [], 'the new game starts');
-  await eventually(async () => (await saved(page)).identities, ['UBRG', 'R', 'WG', android ? 'U' : ''], 'a new game keeps the identities');
+  await eventually(async () => (await saved(page)).identities, ['', '', '', ''], 'a new game clears the identities');
+  assert.deepEqual((await saved(page)).identity, shown, 'and keeps the identity settings');
+  assert.equal(await page.locator('.badges .ci').count(), 0, 'no tile shows an identity chip');
 }
 
 for (const [name, engine] of Object.entries(engines)) {

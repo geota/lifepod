@@ -127,3 +127,10 @@ Worst-case figures. The typical figures are within 0.6 of these, except where th
 - Tinted · 68% surface tint over an 18px blur: 10:1 icons, keeps its shape · `renders/glass-cases.png`
 - Clear · 6% white over a 10px blur: the Liquid Glass look, 4.4:1 worst case, loses its shape over seams · `renders/glass-cases.png`
 - **Recommended: Tinted.**
+
+---
+
+## After the design audit (23 November 2026)
+
+- **The board's pill has no blur.** DESIGN-AUDIT S10 found that over the dark tiles the blurred, 68% pill read as the solid pill with the seam and the active tile's ring running through it, as this page predicted. The audit offered a denser tint or no blur; the build does both, since without the blur a 68% tint would show the seams sharply: the pill keeps Glass's edge and highlight over a 90% tint (`--pill-tint`), and no `backdrop-filter`, which also saves the GPU during hold-repeat. Settings' header and the dialogs keep the blur.
+- **WebKit.** The audit measured the blur only in Chromium, and wasn't sure headless WebKit draws a pill's backdrop blur at all. With the pill unblurred that question no longer touches the board. The settings header and the dialogs were looked at in Playwright's WebKit too: the computed filter is the same as in Chromium (`tests/style.test.mjs` checks it in both engines), and labels scrolling under the header look about as soft as in Chromium, but a screenshot at a 68% tint can't prove the blur is drawn. That still needs a look on an iPhone.

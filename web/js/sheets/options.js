@@ -1,6 +1,6 @@
 // Settings' sections that save the moment they change (design/polish/SETTINGS-SPEC.md): Track's switches, Turns and
-// mana, Reminders, Identity, and Table's keep awake, tile colours, badge size and style, with what each redraws on the
-// board. Importing this module wires them; settings.js renders them as settings opens.
+// mana, Reminders, Identity, and Table's keep awake, tile colours and their shuffle, badge size and style, with what each
+// redraws on the board. Importing this module wires them; settings.js renders them as settings opens.
 
 import { handOnLeavers } from '../actions/board.js';
 import { endUndoClears } from '../actions/mana.js';
@@ -9,7 +9,7 @@ import { clearReminders } from '../actions/reminders.js';
 import { measureBoard } from '../layout/board.js';
 import { requestFit, resetDrops } from '../layout/fit.js';
 import { compactGroups, fitCompactSwitches, settingsBody, syncSettingsCue } from '../layout/settings.js';
-import { badgeSizeOrder, badgeSizes, tileSetOrder, tileSets, trackers } from '../logic/data.js';
+import { badgeSizeOrder, badgeSizes, trackers } from '../logic/data.js';
 import { outPlayers, trackedDesignations } from '../logic/rules.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from '../render/appearance.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
@@ -51,8 +51,10 @@ function renderAllBadges() {
   syncPill();
 }
 
-// Tile colours: saved the moment it changes, like the switches. Swatch ids stay, so every player keeps their colour.
+// Tile colours: a segmented choice, saved the moment it changes, like the switches. Swatch ids stay, so every player
+// keeps their colour. Each segment's strip shows its set's colours for players 1–4 (styles.css, from tiles7.mjs).
 const tileSetChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#tile-set-choices'));
+const shuffleColoursSwitch = /** @type {HTMLInputElement} */ (document.querySelector('#shuffle-colours-switch'));
 function setTileColours(set) {
   if (set === game.tileColours) return;
   game.tileColours = set;
@@ -60,16 +62,15 @@ function setTileColours(set) {
   applyTileColours();
   renderTileSetting();
 }
-const tilesSlider = notchedSlider({
-  root: document.querySelector('#tiles-slider'), min: 0, max: 3, snap: 1, step: 1, page: 1, lowest: 0, highest: 3,
-  get: () => tileSetOrder.indexOf(game.tileColours),
-  set: at => setTileColours(tileSetOrder[at]),
-  describe: at => `${tileSets[tileSetOrder[at]].label} tile colours`,
-});
 for (const choice of tileSetChoices.children) choice.addEventListener('click', () => setTileColours(choice.dataset.set));
+// Shuffle tile colours each game: saved at once, and used by the next new game (startGame).
+shuffleColoursSwitch.addEventListener('change', () => {
+  game.shuffleColours = shuffleColoursSwitch.checked;
+  saveGame();
+});
 export function renderTileSetting() {
   for (const choice of tileSetChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.set === game.tileColours));
-  tilesSlider.render();
+  shuffleColoursSwitch.checked = game.shuffleColours;
 }
 
 // Badge size: saved the moment it changes, like Tile colours. The rows are fitted again from full size, as at a new game.

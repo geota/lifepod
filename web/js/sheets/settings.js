@@ -1,6 +1,6 @@
 // The settings page (design/polish/SETTINGS-SPEC.md): opening and closing it, the Game section's players and starting
-// life, which wait for Done as a pending new game, the life field, the flip, New game, and the buttons that leave for
-// a board mode. Importing this module wires it and the pill's setup button.
+// life, which wait for Done as a pending new game, the life field, the flip, the header's New game, and the buttons that
+// leave for a board mode. Importing this module wires it and the pill's setup button.
 
 import { startGame } from '../actions/board.js';
 import { setBoardMode } from '../actions/mode.js';
@@ -202,10 +202,29 @@ settingsForm.addEventListener('submit', (event) => {
   settings.close();
 });
 
-// New game opens its confirmation over settings. Confirming starts a new game with the same players and life and
-// closes both; cancelling returns to settings. It's hidden while a new game is pending.
+// New game, in the header, opens its confirmation over settings. It lists what resets and what stays (SPEC §10.2),
+// naming only what this game shows. Confirming starts a new game with the same players and life and closes both;
+// Cancel, the default, returns to settings. It's hidden while a new game is pending, when Done starts it.
+/** @returns {string[]} */
+function resetList() {
+  const { counters } = game;
+  const counts = ['poison', 'energy', 'experience', 'rad'].some(kind => counters[kind]);
+  const designations = [counters.monarch && 'monarch', counters.initiative && 'initiative'].filter(Boolean);
+  return [
+    `Life totals, back to ${game.startingLife}`,
+    counts ? (counters.commander ? 'Counters and commander tax' : 'Counters') : counters.commander && 'Commander tax',
+    counters.commander && 'Commander damage',
+    game.manaPool && 'Floating mana',
+    game.turns !== 'off' && 'Turns, back to round 1',
+    designations.length > 0 && `The ${designations.join(' and the ')}`,
+    'Colour identities',
+    game.shuffleColours && 'Tile colours, shuffled',
+  ].filter(item => typeof item === 'string');
+}
 restartButton.addEventListener('click', () => {
-  document.querySelector('#restart-message').textContent = `All players will go back to ${game.startingLife} life.`;
+  document.querySelector('#restart-message').textContent = `For ${game.scores.length} players. This resets:`;
+  document.querySelector('#restart-resets').replaceChildren(...resetList().map(item => element('li', '', item)));
+  document.querySelector('#restart-keeps').textContent = game.shuffleColours ? 'Settings and seats stay.' : 'Settings, seats and tile colours stay.';
   restart.returnValue = 'cancel';
   restart.showModal();
   syncBackHandling();

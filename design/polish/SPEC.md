@@ -438,9 +438,11 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.2 New game
 
-- **Resets:** scores, poison, casts, energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), and the monarch and the initiative (nobody).
+- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and "Undo clear".
 - **Opens** "Who goes first?" if Turns isn't Off.
-- **Keeps:** every setting, colours, identities and rotations (rotations only when the player count is unchanged).
+- **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
+- **Shuffle tile colours each game** (Settings → Table, off by default, `game.shuffleColours`): when on, a new game gives every player a random, distinct swatch instead, from `crypto.getRandomValues` through `randomBelow` (no modulo bias), with each seat in a different colour family of the tile set while families last (`tileSets[…].families`, six per set, found by `design/polish/tiles7.mjs`; TILES.md). `loadGame` keeps it only if it was saved as exactly `true`.
+- **Where:** New game sits in the settings page's fixed header, beside Done. It opens a confirmation in the Discard dialog's style (the destructive **Start new game** in the danger tint, **Cancel** the focused primary), which lists what resets, naming only what this game shows, and what stays. While players or life are changed in Settings it hides, and Done reads **Start new game** and starts it without asking (P1).
 
 ### 10.3 Android back, in order
 

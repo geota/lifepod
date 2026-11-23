@@ -86,6 +86,22 @@ async function checkGiveAndClear(t, engine) {
   await cell(page, 1, 'monarch').tap();
   await cell(page, 1, 'initiative').tap();
   await cell(page, 2, 'initiative').tap();
+  // A cell nobody holds draws its icon in the seat colour, like every counter (DESIGN-AUDIT S8), not greyed out as if
+  // disabled; the holder's cell is filled and carries a check, so it doesn't rest on colour.
+  const looks = await page.locator('.player').evaluateAll(tiles => tiles.slice(0, 2).map((tile) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--seat)';
+    tile.querySelector('.mode-layer').append(probe);
+    const seat = getComputedStyle(probe).color;
+    probe.remove();
+    return [...tile.querySelectorAll('.designation-cell')].map(node => [node.dataset.designation, node.getAttribute('aria-pressed'),
+      getComputedStyle(node.querySelector('.icon')).color === seat ? 'seat icon' : 'other icon',
+      getComputedStyle(node.querySelector('.toggle-check')).display === 'none' ? 'no check' : 'check']);
+  }));
+  assert.deepEqual(looks, [
+    [['monarch', 'true', 'other icon', 'check'], ['initiative', 'false', 'seat icon', 'no check']],
+    [['monarch', 'false', 'seat icon', 'no check'], ['initiative', 'true', 'other icon', 'check']],
+  ]);
   await button(page, 'Save').tap();
   assert.deepEqual(await holders(page), { monarch: 0, initiative: 1 });
   assert.deepEqual(await chips(page), [['monarch'], ['initiative'], [], []], 'the holder’s near row shows the crown or the castle');

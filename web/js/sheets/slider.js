@@ -1,4 +1,4 @@
-// Settings' notched sliders: Players, Starting life, Tile colours and Badge size.
+// Settings' notched sliders: Players, Starting life and Badge size.
 
 import { settings } from '../layout/settings.js';
 import { element } from '../ui/dom.js';
@@ -85,6 +85,7 @@ export function notchedSlider({ root, min, max, snap, step, page, lowest, highes
     render() {
       const value = get();
       track.style.setProperty('--p', at(value));
+      track.toggleAttribute('data-min', value <= min);
       track.setAttribute('aria-valuenow', String(value));
       track.setAttribute('aria-valuetext', describe(value));
       for (const tick of ticks.children) tick.toggleAttribute('data-filled', Number(tick.dataset.value) <= value);

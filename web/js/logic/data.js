@@ -34,16 +34,34 @@ export const playerCounts = Object.keys(seatLayouts).map(Number);
 // below names them for itself.
 export const swatches = ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid'].map(id => ({ id }));
 export const topRowPlayers = [0, 1, 4];
-// Tile colour sets (design/polish/TILES.md), in the Tile colours slider's order: the same twelve swatch ids in each, so a
-// player's colour carries over, with each set's own names for screen readers. Classic is the original twelve; Clear,
-// the default, keeps tiles apart for colour-blind players. styles.css holds each set's palettes under data-tiles.
+// Tile colour sets (design/polish/TILES.md), in the Tile colours control's order: the same twelve swatch ids in each, so
+// a player's colour carries over, with each set's own names for screen readers. Classic is the original twelve; Clear,
+// the default, keeps tiles apart for colour-blind players. styles.css holds each set's palettes under data-tiles. Each id
+// keeps its colour family in every set (DESIGN-AUDIT M1), so the default seats, ids 0–5, are spread round the hue
+// circle in each. families groups each set's swatches into six look-alike families (tiles7.mjs finds them), which a
+// shuffled new game keeps apart.
+/** @typedef {{ label: string, names: string[], families: number[] }} TileSetInfo */
+/** @type {Record<TileSet, TileSetInfo>} */
 export const tileSets = {
-  classic: { label: 'Classic', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'] },
-  soft: { label: 'Soft', names: ['Coral', 'Copper', 'Olive', 'Lime', 'Jade', 'Teal', 'Sky', 'Azure', 'Violet', 'Orchid', 'Plum', 'Slate'] },
-  jewel: { label: 'Jewel', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'] },
-  clear: { label: 'Clear', names: ['Coral', 'Copper', 'Olive', 'Lime', 'Jade', 'Cyan', 'Sky', 'Indigo', 'Violet', 'Orchid', 'Pale plum', 'Deep plum'] },
+  classic: {
+    label: 'Classic', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'],
+    families: [0, 1, 2, 3, 2, 0, 4, 5, 1, 2, 0, 4],
+  },
+  soft: {
+    label: 'Soft', names: ['Jade', 'Sky', 'Coral', 'Violet', 'Olive', 'Teal', 'Plum', 'Azure', 'Slate', 'Copper', 'Lime', 'Orchid'],
+    families: [0, 1, 2, 1, 3, 0, 2, 1, 4, 3, 5, 1],
+  },
+  jewel: {
+    label: 'Jewel', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'],
+    families: [0, 1, 2, 3, 2, 0, 4, 5, 1, 2, 0, 4],
+  },
+  clear: {
+    label: 'Clear', names: ['Jade', 'Sky', 'Coral', 'Violet', 'Olive', 'Cyan', 'Pale plum', 'Indigo', 'Deep plum', 'Copper', 'Lime', 'Orchid'],
+    families: [0, 1, 2, 3, 4, 1, 3, 3, 3, 2, 5, 3],
+  },
 };
-export const tileSetOrder = Object.keys(tileSets);
+export const tileSetOrder = /** @type {TileSet[]} */ (Object.keys(tileSets));
+/** @type {TileSet} */
 export const defaultTileSet = 'clear';
 // The Style setting (design/polish/STYLE.md): direction A, Material, or direction B, Glass. styles.css holds each as
 // tokens under data-style. Until the player picks one, the iOS app (its game message handler) starts on Glass, and
