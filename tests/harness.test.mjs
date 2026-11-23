@@ -74,7 +74,7 @@ test('node: the test server serves web/ and the test fonts, read-only, on 127.0.
 
 // The app is ES modules (web/app.js and web/js/), which the tests load over http as the apps serve them from their own
 // schemes: a tap still counts and saves, with no errors or policy violations. Browsers run no module script from
-// file://, so the README's browser preview serves web/ over http too.
+// file://, so the browser preview (docs/DEVELOPING.md) serves web/ over http too.
 async function checkModules(t, engine) {
   const page = await openPage(t, engine, { font: 'system' });
   assert.equal(new URL(page.url()).protocol, 'http:');

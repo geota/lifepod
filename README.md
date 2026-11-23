@@ -4,120 +4,111 @@
 
 # LifePod
 
-**An ad-free, offline life counter for tabletop games.**
+**An offline, ad-free life counter for Magic: The Gathering on Android, iPhone and iPad.**
 
 [![CI](https://github.com/geota/lifepod/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/geota/lifepod/actions/workflows/ci.yml)
-[![Android: Kotlin](https://img.shields.io/badge/Android-Kotlin-7F52FF?logo=kotlin&logoColor=white)](android/)
-[![iOS: Swift](https://img.shields.io/badge/iOS-Swift-F05138?logo=swift&logoColor=white)](ios/)
-[![Web: JavaScript](https://img.shields.io/badge/Web-JavaScript-F7DF1E?logo=javascript&logoColor=333333)](web/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+<a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.maceiras.lifepod%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fgeota%2Flifepod%22%2C%22author%22%3A%22geota%22%2C%22name%22%3A%22LifePod%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%7D%22%7D"><img alt="Get it on Obtainium" height="56" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" /></a>
+<a href="https://github.com/geota/lifepod/releases"><img alt="Get it on GitHub" height="56" src="https://raw.githubusercontent.com/andOTP/andOTP/master/assets/badges/get-it-on-github.png" /></a>
+
+<a href="screenshots/readme/hero.png"><img src="screenshots/readme/hero.png" width="800" alt="Four players around a phone in landscape: each tile faces its player, with commander damage, tax, poison and colour identity along its edges" /></a>
 
 </div>
 
-A fresh install opens with four players at 40 life. Tap **−** or **+** to adjust a total by one, or hold to make a larger change. Each sign marks its half of the tile, so a tap anywhere on the left half of your tile subtracts and anywhere on the right half adds; the half you press lights up in your colour while your finger is down. A tap counts as soon as your finger touches the screen, and several players can tap or hold at the same time. A total at 0 or below turns red. Every tile draws its total, signs and badges at the same size, the largest that fits the smallest tile, so a three-digit total shrinks every total together.
+## Features
 
-## Screenshots
+### Life and table
 
-<div align="center">
-<a href="screenshots/board.png"><img src="screenshots/board.png" width="385" alt="Four-player landscape board with two seats facing each long side" /></a>
-<a href="screenshots/six-players.png"><img src="screenshots/six-players.png" width="385" alt="Six-player landscape board with three seats facing each long side" /></a>
-<br />
-<sub>Four players · Six players</sub>
-</div>
-
-<div align="center">
-<a href="screenshots/three-players.png"><img src="screenshots/three-players.png" width="385" alt="Three-player board with one seat facing each long side and a larger seat facing the right end" /></a>
-<a href="screenshots/five-players.png"><img src="screenshots/five-players.png" width="385" alt="Five-player board with two seats facing each long side and a larger seat facing the right end" /></a>
-<br />
-<sub>Three players · Five players</sub>
-</div>
-
-[Dice](screenshots/dice.png) · [Settings](screenshots/setup.png) · [Custom seat rotation](screenshots/rotate-seats.png)
-
-## At the table
-
-Set the phone in the middle of the table in landscape. The seats stay fixed to the device: if the screen turns to portrait or upside down, the board turns back so every total stays in front of its player. Each new game treats the current landscape as upright. The app itself turns with the phone, so the system bars and the swipe-home gesture stay at the bottom edge as you hold it. With two players, the seats face opposite short ends. With four or six, two or three seats face each long side. With three or five, one or two seats face each long side and one larger seat faces the right end. Each player reads **−** on the left and **+** on the right from their seat.
-
-Tap the die in the center to roll a d4, d6, d8, d10, d12 or d20. Each die is drawn in its own shape, and every roll comes from the device's cryptographic random number generator, so no face is favoured.
-
-Tap the sliders beside it to open **Settings**, a full-screen page in sections: **Game**, **Track**, **Identity**, **Table**, **Reminders** and **About**, in two columns on a landscape phone and one on narrow screens. It faces the phone rather than the board; the turn button in its header flips it round for a player across the table. **Players** is a slider from 2 to 6 and **Starting life** a slider from 10 to 60 with stops at 20, 30 and 40: tap a number or drag, and arrow keys work too. Tap the life total beside it to type any whole number from 1 to 999. Changing players or starting life doesn't take effect until you leave: **Done** becomes **Start new game**, and a line says what will happen. ✕ or Android back leaves without starting it. **New game**, beside **Done** at the top of Settings, restarts with the same players and life. It asks first and lists what resets: life totals, every counter and commander tax, commander damage, floating mana, turns (back to round 1, with "Who goes first?" again if Turns is on), the monarch and the initiative, and colour identities. Every setting, the seats' rotations and the tile colours stay; **Cancel** is the default. **Keep awake** is on by default. Everything else in Settings saves the moment you change it, and scores and settings are saved between launches. **About** has the privacy summary and credits.
-
-Choose **Rotate seats** in Settings → **Table**, then tap a tile to turn it 90° clockwise. Tap the center check mark or press back when finished. Rotation choices carry over when restarting with the same player count.
-
-Turn on **Commander**, **Poison**, **Energy**, **Experience** or **Rad** in Settings → **Track** to track commander damage and tax, poison, energy, experience or rad counters. All are off by default, save the moment you switch them, and stay as you set them across launches and new games. With any of them on, a counters button joins the center controls. Tap it and each tile shows a circle for each counter that's on, in the order poison, commander tax (+2 per cast, under Mana's commander symbol), energy, experience and rad, three to a row, each with its icon over the count, facing its player. Tap a circle to add one; hold it to take one away, repeating while you hold. While counters are open, the center shows Undo, a check mark and ✕: Undo steps back one change at a time, the check mark saves, and ✕ discards every change made since opening, asking first if there are any. Android back works like ✕. At rest, a row along each player's own edge shows their colour identity chip, then poison, tax, energy, experience and rad, each only when set. Starting a new game resets the counts and keeps the switches and colours.
-
-With **Commander** on, a sword joins the center controls too. Tap it and every tile becomes a map of the table: each opponent's seat sits where that player sits, in their tile colour, and shows the commander damage their commander has dealt you. A seat at 0 is outlined in that player's colour, and it fills with their colour once they have hit you. Tap an opponent's seat to add 1 commander damage and take 1 life in the same step. Hold a seat to take 1 away, repeating while you hold. Your own seat shows your life and the change, such as "28 −6". Undo, the check mark and ✕ work as they do for counters. At rest, a row along each tile's far edge starts with a sword and shows the commander damage taken from each opponent, largest first, each as a small piece of that opponent's tile: their panel and rim, with the number in their colour. Amber text warns at 15 commander damage from one commander or 7 poison. At 21 or 10 the badge turns red with a thin ring, and the life total turns red. If a badge row ever runs out of room, the same thing gives way on every tile. Along the far edge the sword goes first; along the near edge the identity names and the word "Turn" go first, then the identity symbol if the colour indicator also shows. Then the row takes a second line, and only then does its type shrink, to a 9px floor; where a second line would cover a life total, the type shrinks first and the row wraps last. Counts, the crown, the castle, the identity chip and its colour indicator are never hidden, and anything that gave way comes back only when there's room to spare.
-
-Set **Turns** in Settings → **Track** to follow the game's turns: **Off** (the default), **Rounds** or **Turn by turn**. Each new game while Turns is on, and switching Turns on in a game with nobody first, opens "Who goes first?": tap **Me first** on your tile, tap the center shuffle to pick at random, or ✕ to skip. Play goes clockwise on screen, which is passing to the left, whatever the seat rotations. With **Rounds**, the first player's flag shows the round: tap it as each round starts, or hold it to go back one. With **Turn by turn**, the active player's tile lifts toward their colour inside a ring, and their row leads with the untap symbol and "Turn 3": tap it when your turn ends and play passes to the next player who isn't out, with the round going up when play comes back round to the first player, who keeps a small flag. Hold it to step back one turn. If nobody's turn has started, every tile of a player who is still in has a Start chip until someone starts theirs. Either way, the round leads the center controls, printed twice so both sides of the table can read it, and works like the chip, so anyone can step the game on. Turn steps save at once. Off hides everything about turns and keeps it for when you switch back on.
-
-Turn on **Monarch** or **Initiative** in Settings → **Track** to follow the monarch (a crown) and the initiative (a castle). Both are off by default and save the moment they change. Nobody holds either until an effect says so: in counters mode each tile gets a crown cell and a castle cell after the counters (seven cells go four to a row). Tap one to give it to that player, which takes it from whoever had it, or tap the holder's own cell to clear it; Undo, the check mark and ✕ work as for counters. At rest the holder's own edge shows the crown or the castle; these never give way when a row runs out of room. Commander damage is combat damage, so adding it to the monarch makes the attacker the monarch, and the same for the initiative, in the same step: Undo or ✕ takes both back. When a holder goes out with **Turn by turn** on and somebody's turn started, the rules hand it on (CR 726.4 and 727.4): the active player takes it, or, if the active player is the one going out or is already out, the next player in turn order who is still in. If nobody else is in, the game goes on with no monarch, and the initiative stays put. Otherwise an out holder's tile shows **Pass it on**, which opens counters mode, until someone takes it there. A new game clears both.
-
-Settings → **Reminders** has three switches, all on by default. **Turn reminders**, shown while the monarch or the initiative is on and Turns is Turn by turn, puts "Monarch: draw a card" on the monarch's tile as they pass the turn, and "Initiative: venture into Undercity" on the initiative holder's tile as their turn starts or when they take it mid-turn, facing them, for 3 seconds or until tapped. Where a tile is too short to show it above its own edge clear of the total, the reminder takes that edge for those seconds. **Pass-it-on hints**, shown while either is on, controls the Pass it on chip. **Gesture hints** controls the "Tap +1 · hold −1" and "Tap your colours" lines in counters, mana, commander damage and identity modes.
-
-Turn on **Mana pool** in Settings → **Track** to keep floating mana. The center controls gain the tap symbol, with a dot while any pool has mana. Tap it and every tile shows six circles, white, blue, black, red, green and colourless, each with its mana symbol over the amount: tap to add one, hold to take one away, with Undo, the check mark and ✕ as for counters. At rest, a tile with mana shows a strip at its far edge, just under commander damage, with just the colours it holds: tap a symbol to spend one, or the eraser to empty the pool, which leaves **Undo clear** for 5 seconds. Both rows of badges stay. The strip never covers a life total or its − and +, and commander damage keeps its row to itself: where the strip runs out of room it wraps, and a pool that still can't fit folds into one button that shows it and opens mana mode, under commander damage or, on phones, at the end of the player's own row of badges. With Turns on, **Empty mana pools when the turn passes** (on by default) empties every pool on each round or turn step, and stepping back restores what it emptied. A new game empties every pool.
-
-Choose **Colours** in Settings → **Table** to change tile colours. Every tile shows twelve swatches facing its player, so everyone can pick at once. No two players can have the same colour: a swatch another player has shows who has it, such as P2, in place of its dot, and can't be picked. Tap the center check mark or press back when finished. Colours carry over to new games and player-count changes, unless **Shuffle tile colours each game** in Settings → **Table** is on (it's off by default): then each new game deals every player a random colour from the set, keeping look-alike colours apart. **Tile colours** in Settings → **Table** picks the set the twelve colours come from, each shown in bands of its first four tiles' colours: **Classic** (the original twelve), **Soft**, **Jewel** or **Clear**, the default, chosen to keep every pair of tiles apart for red-green colour-blind players too. In every set, players 1 to 6 start on six well-spread colours, and each player keeps their colour family when the set changes. The setting saves at once. **Badge size** in Settings → **Table**, **Default**, **Large** or **Larger**, makes the badge rows along both edges and the mana strip bigger: their chips, counts, icons and colour indicator. A row grows only as far as fits between its edge and the life total, so on a small board it may stay at the default size, and it saves at once.
-
-**Style** in Settings → **Table** sets the look of every control in the app: **Material**, filled tonal controls in Android's current style, or **Glass**, in the style of iOS 26, with frosted glass on the Settings header and dialogs over solid grouped lists, glass-edged centre controls, iOS switches and segmented controls. The tiles and their − and + look the same in both, and Tile colours is separate. The iPhone and iPad app starts on Glass, and Android and the browser preview on Material, until you pick one; your pick is saved and stays. Glass draws solid surfaces instead of glass when the system asks for reduced transparency (Reduce Transparency on iOS) or the device can't blur, and solid surfaces with an outline when it asks for more contrast. Glass's presses shrink with a spring, and nothing moves when the device asks for reduced motion.
-
-Use **Identity** in Settings for colour identity, in any game, with or without Commander. **Show on tiles** has a switch each for the card-style colour **Indicator**, the identity's **Symbol** and its **Name**, in any mix, for the chip that leads each player's own edge; the default is indicator and name. The symbol is the colour's mana symbol, the Ravnica guild, the Khans clan, the Streets of New Capenna family for a shard, the colour pie for all five colours, or for four colours the colour pie with the missing colour faded. Names are the guild, clan and shard names, Mono-white to Mono-green, the Nephilim names for four colours (Glint-Eye, Dune-Brood, Ink-Treader, Witch-Maw and Yore-Tiller) and WUBRG. **Background** is **Symbol** (the default), which puts the identity's symbol faintly behind the life total of each tile with an identity and leaves the rings on the rest; **Default**, the rings on every tile; or **Off**, no background at all. Turning everything off hides identity without clearing anyone's choice. These save the moment they change. **Choose identities** turns every tile into five mana-symbol toggles facing its player, under a preview of the identity's indicator, symbol and name: any mix of white, blue, black, red and green, left empty for a colourless commander. Each choice saves at once; tap the center check mark or press back when finished. Colours, Rotate seats and Choose identities close Settings and start straight away, starting a pending new game first. A new game clears every identity, so players choose again for their new decks.
-
-## Install on Android
+- 2 to 6 players, starting at any life total from 1 to 999.
+- Tap either half of your tile for −1 or +1, or hold for bigger steps. Several players can tap at once.
+- Every seat faces its player, and the board stays put when the phone turns.
+- Rotate any seat to fit your table.
+- Roll a d4, d6, d8, d10, d12 or d20 from the device's secure random number generator.
+- **New game**, in the Settings header, resets life, counters, commander damage, mana, turns, the monarch and the initiative, and identities. Settings and seats stay.
+- Keeps the screen awake and saves the game between launches.
 
 <p align="center">
-  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22dev.maceiras.lifepod%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fgeota%2Flifepod%22%2C%22author%22%3A%22geota%22%2C%22name%22%3A%22LifePod%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%7D%22%7D"><img alt="Get it on Obtainium" height="56" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" /></a>
-  <a href="https://github.com/geota/lifepod/releases"><img alt="Get it on GitHub" height="56" src="https://raw.githubusercontent.com/andOTP/andOTP/master/assets/badges/get-it-on-github.png" /></a>
+  <img src="screenshots/readme/dice.png" width="400" alt="The dice sheet with a d20 and the six dice to pick from" />
 </p>
 
-LifePod supports **Android 11 and later** with Android System WebView 129 or later, which Google Play keeps updated; on an older WebView the app asks you to update it. The Obtainium badge imports `dev.maceiras.lifepod` with **Include prereleases** enabled. You can also add `https://github.com/geota/lifepod` manually in [Obtainium](https://github.com/ImranR98/Obtainium/releases) with the same setting. Obtainium can install LifePod once a GitHub prerelease contains the signed `lifepod.apk`.
+### Commander and counters
 
-Before the first prerelease, download the `lifepod-android` artifact from a successful [CI run](https://github.com/geota/lifepod/actions/workflows/ci.yml), unzip it, and open `lifepod-debug.apk` on your phone. Debug builds are signed with the committed, non-secret `android/debug.keystore`, so each newer debug build installs over the last one and keeps the saved game.
+- Commander damage on a map of the table: one tap adds the damage and takes the life.
+- Commander tax, poison, energy, experience and rad counters. Turn on only the ones you use.
+- Amber warnings at 15 commander damage or 7 poison, red at 21 or 10.
+- Undo, save or discard every edit.
 
-### Build locally
+<p align="center">
+  <img src="screenshots/readme/commander-damage.png" width="400" alt="Commander damage mode: each opponent's seat in their colour with the damage they have dealt" />
+  <img src="screenshots/readme/counters.png" width="400" alt="Counters mode: poison, commander tax, energy, experience and rad circles, with the monarch's crown and the initiative's castle" />
+</p>
 
-The debug APK is built at `android/build/lifepod-debug.apk`. Copy it to an Android 11 or newer phone and open it to install. With a device connected and USB debugging enabled, you can also install it using `adb install -r android/build/lifepod-debug.apk`.
+### Turns and the monarch
 
-To rebuild, install JDK 21, Kotlin 2.2.x (`kotlinc`), Android SDK Platform 36, and Android SDK Build-Tools 36.1.0. Set `ANDROID_HOME` to the SDK directory and run `./android/build.sh` from this directory. To also build the App Bundle that Google Play requires, download [bundletool](https://github.com/google/bundletool/releases) and set `LIFE_POD_BUNDLETOOL` to its jar.
+- Track turns by round or turn by turn, with the active player's tile lit up.
+- "Who goes first?": tap your tile, or shuffle to pick at random.
+- The monarch and the initiative, passed on by the rules when the holder is out.
+- Reminders to draw for the monarch and venture into the Undercity.
 
-The build shrinks the Kotlin code with R8, using `android/proguard-rules.pro`, and then `android/check-bridge.sh` makes sure the page's bridge methods survived. Builds signed with the debug key are debuggable, so you can inspect the page from `chrome://inspect` on a connected computer. Release-signed builds aren't.
+<p align="center">
+  <img src="screenshots/readme/turn.png" width="400" alt="The active player's tile with a Turn 6 chip, the crown, colour identity, a poison warning and a mana chip" />
+</p>
 
-## iOS
+### Mana and identity
 
-Open `ios/LifePod.xcodeproj` in Xcode and run the **LifePod** target on a simulator or device running iOS 18 or later. Version tags upload to TestFlight once the App Store Connect key is set; see [RELEASING.md](RELEASING.md). For a physical device, select your development team under **Signing & Capabilities** first. In the Debug configuration, Safari's **Develop** menu can inspect the page; Release builds can't be inspected. Both apps bundle the UI in `web/` and use their platform’s screen-awake and local storage APIs.
+- A floating mana pool per player, spent from a strip on the tile. On small tiles it folds into one chip that opens the pool. It can empty as each turn passes.
+- Colour identity for each player, shown as the card indicator, the guild, clan or shard symbol, and its name.
 
-## Browser preview
+<p align="center">
+  <img src="screenshots/readme/mana.png" width="400" alt="Mana mode: white, blue, black, red, green and colourless circles with their amounts" />
+  <img src="screenshots/readme/identity.png" width="400" alt="Choosing a colour identity: five mana toggles under the preview Ink-Treader" />
+</p>
 
-Run `npm run preview` and open http://127.0.0.1:8080/ to try the tracker on your computer (`PORT=…` picks another port). The page is ES modules, which browsers don't run from a file, so opening `web/index.html` directly shows no board. The preview uses browser storage and requests a screen wake lock where supported.
+### Look and accessibility
 
-## Lint
+- Two styles: Material, or Glass in the style of iOS 26.
+- Four tile colour sets, shown as colour bands; optional shuffle each game. No two players share a colour.
+- Three badge sizes for the rows along each tile's edges.
+- Settings and dialogs follow the system text size and can be zoomed.
+- Nothing moves with reduced motion. Glass turns solid for reduced transparency, and adds outlines for more contrast.
+- Every touch target is at least 44 px.
 
-Run `npm run check` before committing. It runs, in order: `lint:web` (ESLint), `lint:compat`, `typecheck` (TypeScript over `web/`), `lint:kotlin` (ktlint, through mise when it isn't on the path), `lint:ios` (swift-format) and `npm test`, and needs the tools below plus the Playwright browsers. It leaves out Android Lint, which needs the Android SDK; run `npm run lint:android` for that.
+<p align="center">
+  <img src="screenshots/readme/tile-colours.png" width="400" alt="Picking a tile colour: twelve swatches, with the ones other players hold marked P1, P2 and P4" />
+  <img src="screenshots/readme/ipad-glass.png" width="400" alt="Six players on a 13-inch iPad in the Glass style" />
+</p>
 
-`npm run lint:compat` checks `web/` against the oldest browsers LifePod supports, listed in `browserslist` in `package.json`: iOS 18 (WKWebView) and the Android System WebView, as Chrome 129 and later. `eslint.compat.config.mjs` uses `eslint-plugin-compat` and a list of newer JavaScript APIs the plugin misses. `stylelint.config.mjs` uses `stylelint-no-unsupported-browser-features`. Both list the findings that are only warnings for now.
+The full guide to every control is in [docs/GUIDE.md](docs/GUIDE.md).
 
-Install ktlint, Kotlin (`kotlinc`), Android SDK Command-line Tools 23.0 (for Android Lint), and full Xcode for `swift-format`. Then run `npm ci` and `npm run lint` from the project root. Android Lint runs without Gradle through `android/lint.sh`, which describes the app in a lint project file; `android/lint.xml` lists the checks LifePod deliberately ignores and why. Run `npm run lint:web`, `npm run lint:android`, or `npm run lint:ios` to check one platform.
+## Install
 
-Run `npx playwright-core install chromium webkit` and `npm test` to check seat placement and facing as the screen turns each way, simultaneous taps and holds by several players, and that the board fits and scales from a 320 × 568 phone through foldables to a 13-inch iPad. The smallest real phone the design targets is 360 × 640; 320 × 568 is kept as a stress test.
+- **Android 11 or later**, with Android System WebView 129 or later: the Obtainium badge above adds LifePod with **Include prereleases** on. Or download `lifepod.apk` from [GitHub releases](https://github.com/geota/lifepod/releases).
+- **iPhone and iPad, iOS 18 or later:** build it from Xcode (below). Tagged versions go to TestFlight as a private beta.
+- **Browser:** run it locally with `npm run preview` (below).
 
-## Shared code
+## Build and test
 
-`web/` contains the interface, seat layouts, rotations, scoring, and saved-game format, as native ES modules with no build step: `app.js` is the entry and `web/js/` holds the modules, layered as AGENTS.md describes. Android and iOS bundle the whole folder and serve it to their web view from inside the app: Android at `https://appassets.androidplatform.net/` and iOS at `lifepod://app/`, with no network access. Either app serves any file in `web/` with an allowed extension (html, css, js or mjs, json, png, svg, woff2 or txt), so a new file needs no native change. Their Kotlin and Swift wrappers handle native screen-awake behavior, local storage, and fullscreen presentation. Browser preview uses the equivalent browser APIs. App icons, build settings, and package metadata live in the platform projects.
+```sh
+npm ci
+npx playwright-core install chromium webkit
+npm run check     # lint, type check and every test
+npm run preview   # http://127.0.0.1:8080/
+```
 
-## GitHub Actions
+- **Android:** `./android/build.sh` writes `android/build/lifepod-debug.apk` (JDK 21, Kotlin 2.2, Android SDK 36).
+- **iOS:** open `ios/LifePod.xcodeproj` in Xcode and run the **LifePod** target.
 
-[CI](.github/workflows/ci.yml) runs lint, browser seating tests, and builds for pull requests and pushes to `main`. Each successful run produces a static web ZIP of all of `web/`, a debug-signed Android APK and App Bundle, and an iOS Simulator ZIP. CI also compiles the iPhone target with signing disabled.
-
-A version tag such as `v0.1.0-alpha.1` publishes a GitHub prerelease with the signed APK, and uploads the App Bundle to Google Play once its secrets are set. [RELEASING.md](RELEASING.md) has the commands for creating the keys and secrets.
+Setup, linting, tests and CI are in [docs/DEVELOPING.md](docs/DEVELOPING.md), signing and store uploads in [RELEASING.md](RELEASING.md), and code conventions in [AGENTS.md](AGENTS.md).
 
 ## Privacy
 
-LifePod collects no data. See the [privacy policy](PRIVACY.md).
+LifePod works offline. The Android app has no internet permission, and neither app makes network requests. There are no accounts, ads, analytics or tracking, and the game is saved only on your device. See the [privacy policy](PRIVACY.md).
 
-## License
+## License and credits
 
-LifePod's own code is under the [MIT License](LICENSE). That covers the code only: the Mana font keeps its own SIL Open Font License ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)), and the mana, colour indicator, guild, clan and family symbols belong to Wizards of the Coast.
+LifePod's code is under the [MIT License](LICENSE).
 
-## Credits
+The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)). The mana, colour indicator, guild, clan and family symbols belong to Wizards of the Coast.
 
 LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
-
-The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, bundled under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)). `web/fonts/mana.woff2` is a subset of Mana 1.18 with only the symbols LifePod draws, made by [`scripts/subset-mana.mjs`](scripts/subset-mana.mjs) from the original release in `design/fonts/`.

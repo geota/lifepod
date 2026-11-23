@@ -52,4 +52,4 @@ Go through this before asking for review, beside [AGENTS.md](../AGENTS.md). Each
 
 **Docs**
 
-- [ ] The README describes what players see. SPEC or SETTINGS-SPEC has an "as built" note if the build differs. AGENTS.md's Modules section matches any moved file.
+- [ ] [GUIDE.md](GUIDE.md) describes what players see, and the README's feature list still matches. SPEC or SETTINGS-SPEC has an "as built" note if the build differs. AGENTS.md's Modules section matches any moved file.

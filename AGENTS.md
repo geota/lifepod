@@ -1,6 +1,6 @@
 # Notes for AI-assisted changes
 
-LifePod is one offline web page in `web/`, wrapped by a Kotlin WebView app (`android/`) and a SwiftUI WKWebView app (`ios/`). There's no build step for the web code. `design/polish/SPEC.md` describes how the board behaves, and `README.md` has the rules players see.
+LifePod is one offline web page in `web/`, wrapped by a Kotlin WebView app (`android/`) and a SwiftUI WKWebView app (`ios/`). There's no build step for the web code. `design/polish/SPEC.md` describes how the board behaves, [docs/GUIDE.md](docs/GUIDE.md) has the rules players see, and [docs/DEVELOPING.md](docs/DEVELOPING.md) covers setup, builds, tests and CI. The README keeps a short feature list.
 
 Run `npm run check` before every commit. It runs ESLint, the compatibility lint, the type check, ktlint, swift-format and every test. There's no commit hook, so nothing else runs them before CI. For Android changes, also run `npm run lint:android` and `./android/build.sh`.
 
