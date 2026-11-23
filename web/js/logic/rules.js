@@ -1,0 +1,285 @@
+// The game's rules, as pure functions of a game (the Game in save.js) and their arguments: the seat grid, who is out and
+// why, play order and the next and previous turn, the monarch's and the initiative's handoffs, and applying an editing
+// mode's edits forwards and back. No DOM and no state of their own.
+
+import {
+  commanderLethal, countKinds, counterKinds, designations, identityColours, identityNames, manaColours, playOrders,
+  poisonLethal, seatLayouts, topRowPlayers,
+} from './data.js';
+
+/** @typedef {import('./data.js').CountKind} CountKind */
+/** @typedef {import('./data.js').DesignationKind} DesignationKind */
+/** @typedef {import('./save.js').Game} Game */
+
+/**
+ * One change made in an editing mode (damage, counters or mana), kept until the mode closes so it can be undone.
+ *
+ * @typedef {object} Edit
+ * @property {CountKind | 'mana' | 'damage' | 'designation'} kind
+ * @property {number} index The player it changes: the defender, for commander damage.
+ * @property {number} [delta] How much it adds, or takes away when negative.
+ * @property {number} [attacker] For commander damage, whose commander dealt it.
+ * @property {number} [colour] For mana, an index into manaColours.
+ * @property {Transfer[]} [transfers] Designations it moved, in order.
+ */
+/**
+ * @typedef {object} Transfer
+ * @property {DesignationKind} kind
+ * @property {number | null} from
+ * @property {number | null} to
+ */
+
+// ---- Seats ----------------------------------------------------------------------------------------------------------
+
+/**
+ * @param {number} index
+ * @returns {'top' | 'bottom'}
+ */
+export function seatRow(index) {
+  return topRowPlayers.includes(index) ? 'top' : 'bottom';
+}
+
+// The board's seats as rows and columns of the landscape grid, with the cells each seat spans, for count players.
+/** @param {number} count */
+export function seatGrid(count) {
+  const rows = seatLayouts[count].map(row => row.split(' ').map(seat => Number(seat.split('-')[1]) - 1));
+  const areas = new Map();
+  rows.forEach((row, y) => row.forEach((player, x) => {
+    const area = areas.get(player) ?? { top: y, bottom: y, left: x, right: x };
+    areas.set(player, {
+      top: Math.min(area.top, y), bottom: Math.max(area.bottom, y), left: Math.min(area.left, x), right: Math.max(area.right, x),
+    });
+  }));
+  return { rows: rows.length, columns: rows[0].length, areas };
+}
+
+// Where a board cell lands in a tile's own frame, which is turned clockwise by angle. Drawing the map there
+// makes it match the table from every seat.
+export function toFace(angle, rows, columns, row, column) {
+  if (angle === 90) return [columns - 1 - column, row];
+  if (angle === 180) return [rows - 1 - row, columns - 1 - column];
+  if (angle === 270) return [column, rows - 1 - row];
+  return [row, column];
+}
+
+// ---- What's tracked -------------------------------------------------------------------------------------------------
+
+// The counters that are on, in order.
+/** @param {Game} game */
+export function shownCounters(game) {
+  return counterKinds.filter(counter => game.counters[counter.tracker]);
+}
+
+// The designations that are on, in order: the monarch, then the initiative.
+/** @param {Game} game */
+export function trackedDesignations(game) {
+  return designations.filter(({ kind }) => game.counters[kind]);
+}
+
+// Counters mode has something to show: a counter or a designation is on.
+/** @param {Game} game */
+export function hasCountersMode(game) {
+  return shownCounters(game).length > 0 || trackedDesignations(game).length > 0;
+}
+
+// How many buttons the pill holds at rest: the round, commander damage, counters and mana when they're on, then dice
+// and setup.
+/** @param {Game} game */
+export function restPillButtons(game) {
+  return 2 + Number(game.turns !== 'off') + Number(game.counters.commander) + Number(hasCountersMode(game)) + Number(game.manaPool);
+}
+
+/**
+ * @param {Game} game
+ * @param {number} index
+ */
+export function hasMana(game, index) {
+  return game.pools[index].some(amount => amount > 0);
+}
+
+// ---- Out of the game ------------------------------------------------------------------------------------------------
+
+// Close to losing: a warning from 15 commander damage or 7 poison, and out at 21 or 10.
+export function dangerLevel(value, warning, lethal) {
+  return value >= lethal ? 'out' : value >= warning ? 'warn' : '';
+}
+
+/** @param {Game} game */
+export function isOut(game, index) {
+  return outReason(game, index) !== null;
+}
+
+// Why a player is out: 'life' at 0 or below, then 'poison' at 10, then 'commander' at 21 commander damage, or null.
+/**
+ * @param {Game} game
+ * @param {number} index
+ * @returns {keyof typeof import('./data.js').outLabels | null}
+ */
+export function outReason(game, index) {
+  if (game.scores[index] <= 0) return 'life';
+  if (game.counters.poison && game.poison[index] >= poisonLethal) return 'poison';
+  if (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) return 'commander';
+  return null;
+}
+
+/** @param {Game} game */
+export function outPlayers(game) {
+  return new Set(game.scores.map((_, index) => index).filter(index => isOut(game, index)));
+}
+
+// ---- Turns ----------------------------------------------------------------------------------------------------------
+
+/** @param {Game} game */
+export function playOrder(game) {
+  return playOrders[game.scores.length];
+}
+
+// Turn by turn, from the active player: the next player in play order who isn't out (or, with everyone else out, the
+// last one tried), and whether play passed the first player's seat on the way, which starts a new round.
+/** @param {Game} game */
+export function nextTurn(game) {
+  const { active, first } = game.turn;
+  const order = playOrder(game);
+  const position = order.indexOf(active);
+  let next = active;
+  let crossed = false;
+  for (let step = 1; step <= order.length; step++) {
+    const player = order[(position + step) % order.length];
+    if (player === first) crossed = true;
+    if (!isOut(game, player) || step === order.length) {
+      next = player;
+      break;
+    }
+  }
+  return { next, crossed };
+}
+
+// The same, stepping back: the previous player in play order who isn't out, and whether that goes back past the first
+// player's seat into the round before.
+/** @param {Game} game */
+export function previousTurn(game) {
+  const { active, first } = game.turn;
+  const order = playOrder(game);
+  const position = order.indexOf(active);
+  let previous = active;
+  let crossed = false;
+  for (let step = 1; step <= order.length; step++) {
+    if (order[(position - step + 1 + order.length) % order.length] === first) crossed = true;
+    const player = order[(position - step + order.length) % order.length];
+    if (!isOut(game, player) || step === order.length) {
+      previous = player;
+      break;
+    }
+  }
+  return { previous, crossed };
+}
+
+// A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
+export function randomBelow(count) {
+  const limit = Math.floor(0x100000000 / count) * count;
+  const value = new Uint32Array(1);
+  do crypto.getRandomValues(value); while (value[0] >= limit);
+  return value[0] % count;
+}
+
+// ---- The monarch and the initiative ---------------------------------------------------------------------------------
+
+// Whose designations pass on by themselves when their holder leaves the game: only in Turn by turn, once somebody's turn
+// has started, since the rules start from the active player.
+/** @param {Game} game */
+function handsOnByItself(game) {
+  return game.turns === 'turns' && game.turn.active !== null;
+}
+
+// Who takes a designation when its holder leaves the game (CR 726.4 and 727.4): the active player, or, if the active
+// player is the one leaving or has already left, the next player in turn order who is still in. Nobody can take the
+// monarch if everyone else has left, and the game goes on without one; the initiative always has a holder, so it stays.
+/** @param {Game} game */
+function heir(game, kind, leaver) {
+  const { active } = game.turn;
+  if (active !== leaver && !isOut(game, active)) return active;
+  const order = playOrder(game);
+  const position = order.indexOf(active);
+  for (let step = 1; step < order.length; step++) {
+    const player = order[(position + step) % order.length];
+    if (player !== leaver && !isOut(game, player)) return player;
+  }
+  return kind === 'monarch' ? null : leaver;
+}
+
+// The handoffs that are due now that a change has put players out who weren't out before (wasOut): each designation
+// whose holder has just left the game moves to its heir, when designations pass on by themselves. Otherwise the out
+// holder's tile shows a "Pass it on" hint until someone takes it in counters mode.
+/**
+ * @param {Game} game
+ * @param {Set<number>} wasOut
+ */
+export function leavingTransfers(game, wasOut) {
+  if (!handsOnByItself(game)) return [];
+  return trackedDesignations(game).flatMap(({ kind }) => {
+    const holder = game[kind];
+    if (holder === null || wasOut.has(holder) || !isOut(game, holder)) return [];
+    const to = heir(game, kind, holder);
+    return to === holder ? [] : [{ kind, from: holder, to }];
+  });
+}
+
+// Whether an out player's tile should ask for its designation to be passed on: they hold it, someone is still in to take
+// it, and the hint is on.
+/** @param {Game} game */
+export function needsPassing(game, kind, index) {
+  return game.reminders.passOn && game[kind] === index && isOut(game, index) && game.scores.some((_, player) => player !== index && !isOut(game, player));
+}
+
+// ---- Edits ----------------------------------------------------------------------------------------------------------
+
+// Applies an edit forwards (1) or takes it back (-1). An edit can carry transfers: the monarch or the initiative moving
+// from one player to another (or to nobody) as part of the same change, such as commander damage to the monarch, which
+// is combat damage and makes the attacker the monarch. They're undone with it, last first.
+/**
+ * @param {Game} game
+ * @param {Edit} edit
+ * @param {1 | -1} direction
+ */
+export function applyEdit(game, edit, direction) {
+  // Every edit but a designation's has a delta, mana's a colour and commander damage's an attacker.
+  const delta = /** @type {number} */ (edit.delta);
+  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += delta * direction;
+  else if (edit.kind === 'mana') game.pools[edit.index][/** @type {number} */ (edit.colour)] += delta * direction;
+  else if (edit.kind === 'damage') {
+    // Commander damage is damage, so the defender loses the same life in the same save.
+    game.commanderDamage[edit.index][/** @type {number} */ (edit.attacker)] += delta * direction;
+    game.scores[edit.index] -= delta * direction;
+  }
+  const transfers = edit.transfers ?? [];
+  for (const transfer of direction > 0 ? transfers : [...transfers].reverse()) {
+    game[transfer.kind] = direction > 0 ? transfer.to : transfer.from;
+  }
+}
+
+// Every player an edit shows on: its own, and anyone a designation moved to or from.
+/**
+ * @param {Edit} edit
+ * @returns {number[]}
+ */
+export function editPlayers(edit) {
+  return [...new Set([edit.index, ...(edit.transfers ?? []).flatMap(({ from, to }) => [from, to])])]
+    .filter(index => index !== null && index !== undefined);
+}
+
+// ---- Words for screen readers ---------------------------------------------------------------------------------------
+
+// How a screen reader hears an identity, such as "Selesnya, colour identity white, green", whatever the chip shows.
+export function identityText(identity) {
+  if (!identity) return 'no colour identity';
+  return `${identityNames[identity]}, colour identity ${[...identity].map(id => /** @type {{ id: string, name: string }} */ (identityColours.find(colour => colour.id === id)).name).join(', ')}`;
+}
+
+/**
+ * @param {Game} game
+ * @param {number} index
+ */
+export function poolText(game, index) {
+  const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
+  return held.length ? held.map(({ colour, amount }) => `${amount} ${colour.name}`).join(', ') : 'empty';
+}

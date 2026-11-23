@@ -1,10 +1,15 @@
 import {
-  badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, counterKinds,
-  designationKinds, designations, discardMessages, doneLabels, editingModes, faceAngles, faceEdges, firstBeat,
-  holdDelay, identityColours, identityNames, manaColours, maxCount, maxRound, maxStartingLife, outLabels, playOrders,
-  playerCounts, poisonLethal, poisonWarning, reminderText, reminderTime, seatLayouts, shuffleTick, shuffleTicks,
-  swatches, tileSetOrder, tileSets, topRowPlayers, trackers, undoClearTime,
+  badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, designationKinds,
+  designations, discardMessages, doneLabels, editingModes, faceAngles, faceEdges, firstBeat, holdDelay, identityColours,
+  identityNames, manaColours, maxCount, maxRound, maxStartingLife, outLabels, playerCounts, poisonLethal, poisonWarning,
+  reminderText, reminderTime, seatLayouts, shuffleTick, shuffleTicks, swatches, tileSetOrder, tileSets, trackers,
+  undoClearTime,
 } from './js/logic/data.js';
+import {
+  applyEdit, dangerLevel, editPlayers, hasCountersMode, hasMana, identityText, isOut, leavingTransfers, needsPassing,
+  nextTurn, outPlayers, outReason, playOrder, poolText, previousTurn, randomBelow, restPillButtons, seatGrid, seatRow,
+  shownCounters, toFace, trackedDesignations,
+} from './js/logic/rules.js';
 import {
   fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, loadGame, normalizeIdentity,
 } from './js/logic/save.js';
@@ -13,6 +18,7 @@ import {
 /** @typedef {import('./js/logic/data.js').CountKind} CountKind */
 /** @typedef {import('./js/logic/data.js').Designation} Designation */
 /** @typedef {import('./js/logic/data.js').DesignationKind} DesignationKind */
+/** @typedef {import('./js/logic/rules.js').Edit} Edit */
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
 /** @typedef {import('./js/logic/save.js').IdentitySettings} IdentitySettings */
 /** @typedef {import('./js/logic/data.js').QuarterTurn} QuarterTurn */
@@ -251,12 +257,6 @@ function growPixel() {
   return Math.min(2, Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 430));
 }
 
-// How many buttons the pill holds at rest: the round, commander damage, counters and mana when they're on, then dice
-// and setup.
-function restPillButtons() {
-  return 2 + Number(game.turns !== 'off') + Number(game.counters.commander) + Number(hasCountersMode()) + Number(game.manaPool);
-}
-
 // Places the pill and returns the box its buttons cover now, in the board's own coordinates. The place is chosen for
 // the pill at its widest, so it doesn't move when a mode opens with fewer buttons.
 function placePill(size) {
@@ -264,7 +264,7 @@ function placePill(size) {
   const width = board.clientWidth;
   const height = board.clientHeight;
   const vertical = game.scores.length === 2;
-  const widest = Math.max(shown, restPillButtons()) * size;
+  const widest = Math.max(shown, restPillButtons(game)) * size;
   let x = width / 2;
   const y = height / 2;
   if (!vertical) {
@@ -330,7 +330,7 @@ function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
   const cell = Math.min(Math.max(44, Math.min((ui - 20) / 3, (ub - 10 - size) / 2)), 92 * grow);
   // Seven counter cells (every counter, the monarch and the initiative) take two rows of four, 6px in from the face's
   // sides, with gaps that close up to 2px (reaching into those 6px) before a cell goes under 44px.
-  const wide = shownCounters().length + trackedDesignations().length > 6;
+  const wide = shownCounters(game).length + trackedDesignations(game).length > 6;
   const wideCell = Math.min(Math.max(44, Math.min((ui - 42) / 4, (ub - 10 - size) / 2)), 92 * grow);
   const wideGap = Math.min(10, Math.max(2, (ui - 12 - 4 * wideCell) / 3));
   if (wide) board.dataset.cellGrid = '4';
@@ -368,7 +368,7 @@ function fitModeGrids(faces, { width: ui, height: ub, size, tight }) {
 // Commander damage map seats are one size on every tile (design/polish/FINAL-REVIEW.md #13), the largest that fits every
 // face, whichever way its map is turned: a sideways face draws the table's rows as its columns.
 function sizeMapSeats(faces, size, tight) {
-  const { rows, columns } = seatGrid();
+  const { rows, columns } = seatGrid(game.scores.length);
   const grow = growPixel();
   const gap = 4;
   let seatWidth = Infinity;
@@ -670,14 +670,6 @@ function fitStrips() {
   return strips.some(strip => tileOf(strip).dataset.strip === 'fold-inline');
 }
 
-/**
- * @param {number} index
- * @returns {'top' | 'bottom'}
- */
-function seatRow(index) {
-  return topRowPlayers.includes(index) ? 'top' : 'bottom';
-}
-
 function saveGame() {
   const snapshot = JSON.stringify(game);
   if (android) android.writeGame(snapshot);
@@ -829,12 +821,6 @@ function announceLife(index) {
   announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
 }
 
-// How a screen reader hears an identity, such as "Selesnya, colour identity white, green", whatever the chip shows.
-function identityText(identity) {
-  if (!identity) return 'no colour identity';
-  return `${identityNames[identity]}, colour identity ${[...identity].map(id => /** @type {{ id: string, name: string }} */ (identityColours.find(colour => colour.id === id)).name).join(', ')}`;
-}
-
 // Android's back gesture only needs the page while a dialog or board mode is open.
 function syncBackHandling() {
   android?.setBackHandling?.(boardMode !== null || document.querySelector('dialog[open]') !== null);
@@ -948,28 +934,6 @@ function inColourOf(node, player) {
   node.dataset.colour = swatches[game.colors[player]].id;
   node.dataset.row = seatRow(player);
   return node;
-}
-
-// The board's seats as rows and columns of the landscape grid, with the cells each seat spans.
-function seatGrid() {
-  const rows = seatLayouts[game.scores.length].map(row => row.split(' ').map(seat => Number(seat.split('-')[1]) - 1));
-  const areas = new Map();
-  rows.forEach((row, y) => row.forEach((player, x) => {
-    const area = areas.get(player) ?? { top: y, bottom: y, left: x, right: x };
-    areas.set(player, {
-      top: Math.min(area.top, y), bottom: Math.max(area.bottom, y), left: Math.min(area.left, x), right: Math.max(area.right, x),
-    });
-  }));
-  return { rows: rows.length, columns: rows[0].length, areas };
-}
-
-// Where a board cell lands in a tile's own frame, which is turned clockwise by angle. Drawing the map there
-// makes it match the table from every seat.
-function toFace(angle, rows, columns, row, column) {
-  if (angle === 90) return [columns - 1 - column, row];
-  if (angle === 180) return [rows - 1 - row, columns - 1 - column];
-  if (angle === 270) return [column, rows - 1 - row];
-  return [row, column];
 }
 
 // A map seat: a tap adds one. Holding takes one away once the hold registers, then repeats on the same timing
@@ -1101,7 +1065,7 @@ function bindStep(button, forward, back) {
 // Commander damage mode: a map of the table on every tile, in board coordinates. Each opponent's seat shows
 // the damage their commander has dealt this player; the player's own seat shows their life and its change.
 function buildSeatMap(index) {
-  const { rows, columns, areas } = seatGrid();
+  const { rows, columns, areas } = seatGrid(game.scores.length);
   const angle = faceAngles[board.children[index].dataset.edge];
   const sideways = angle % 180 !== 0;
   const map = element('div', 'seat-map');
@@ -1146,7 +1110,7 @@ function syncSeatMap(index) {
   const life = game.scores[index];
   const change = life - (editStartScores[index] ?? life);
   self.querySelector('strong').textContent = String(life).replace('-', '−');
-  self.querySelector('strong').toggleAttribute('data-out', isOut(index));
+  self.querySelector('strong').toggleAttribute('data-out', isOut(game, index));
   const changeText = self.querySelector('.life-change');
   changeText.textContent = change < 0 ? `−${-change}` : change > 0 ? `+${change}` : 'you';
   changeText.toggleAttribute('data-loss', change < 0);
@@ -1322,57 +1286,6 @@ function renderWatermark(index) {
   player.querySelector('.watermark').replaceChildren(...(shown === 'symbol' ? [identitySymbol(identity)] : []));
 }
 
-/**
- * One change made in an editing mode (damage, counters or mana), kept until the mode closes so it can be undone.
- *
- * @typedef {object} Edit
- * @property {CountKind | 'mana' | 'damage' | 'designation'} kind
- * @property {number} index The player it changes: the defender, for commander damage.
- * @property {number} [delta] How much it adds, or takes away when negative.
- * @property {number} [attacker] For commander damage, whose commander dealt it.
- * @property {number} [colour] For mana, an index into manaColours.
- * @property {Transfer[]} [transfers] Designations it moved, in order.
- */
-/**
- * @typedef {object} Transfer
- * @property {DesignationKind} kind
- * @property {number | null} from
- * @property {number | null} to
- */
-
-// Applies an edit forwards (1) or takes it back (-1). An edit can carry transfers: the monarch or the initiative moving
-// from one player to another (or to nobody) as part of the same change, such as commander damage to the monarch, which
-// is combat damage and makes the attacker the monarch. They're undone with it, last first.
-/**
- * @param {Edit} edit
- * @param {1 | -1} direction
- */
-function applyEdit(edit, direction) {
-  // Every edit but a designation's has a delta, mana's a colour and commander damage's an attacker.
-  const delta = /** @type {number} */ (edit.delta);
-  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += delta * direction;
-  else if (edit.kind === 'mana') game.pools[edit.index][/** @type {number} */ (edit.colour)] += delta * direction;
-  else if (edit.kind === 'damage') {
-    // Commander damage is damage, so the defender loses the same life in the same save.
-    game.commanderDamage[edit.index][/** @type {number} */ (edit.attacker)] += delta * direction;
-    game.scores[edit.index] -= delta * direction;
-  }
-  const transfers = edit.transfers ?? [];
-  for (const transfer of direction > 0 ? transfers : [...transfers].reverse()) {
-    game[transfer.kind] = direction > 0 ? transfer.to : transfer.from;
-  }
-}
-
-// Every player an edit shows on: its own, and anyone a designation moved to or from.
-/**
- * @param {Edit} edit
- * @returns {number[]}
- */
-function editPlayers(edit) {
-  return [...new Set([edit.index, ...(edit.transfers ?? []).flatMap(({ from, to }) => [from, to])])]
-    .filter(index => index !== null && index !== undefined);
-}
-
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
 /**
  * @param {Edit} edit
@@ -1410,9 +1323,9 @@ function showEdit(edit) {
  * @param {Edit} edit
  */
 function commitEdit(edit) {
-  const out = outPlayers();
-  applyEdit(edit, 1);
-  const handoffs = leavingTransfers(out);
+  const out = outPlayers(game);
+  applyEdit(game, edit, 1);
+  const handoffs = leavingTransfers(game, out);
   if (handoffs.length) {
     edit.transfers = [...(edit.transfers ?? []), ...handoffs];
     for (const transfer of handoffs) game[transfer.kind] = transfer.to;
@@ -1424,7 +1337,7 @@ function commitEdit(edit) {
 function undoEdit() {
   const edit = edits?.pop();
   if (!edit) return;
-  applyEdit(edit, -1);
+  applyEdit(game, edit, -1);
   showEdit(edit);
 }
 
@@ -1433,7 +1346,7 @@ function undoEdit() {
 function stepDamage(defender, attacker, delta) {
   const next = game.commanderDamage[defender][attacker] + delta;
   if (next < 0 || next > maxCount) return;
-  const transfers = delta > 0 ? trackedDesignations().filter(({ kind }) => game[kind] === defender)
+  const transfers = delta > 0 ? trackedDesignations(game).filter(({ kind }) => game[kind] === defender)
     .map(({ kind }) => ({ kind, from: defender, to: attacker })) : [];
   commitEdit({ kind: 'damage', index: defender, attacker, delta, transfers });
 }
@@ -1467,63 +1380,10 @@ function designationIcon(kind) {
   return icon(kind === 'monarch' ? 'crown' : 'castle-turret');
 }
 
-// The counters that are on, in order.
-function shownCounters() {
-  return counterKinds.filter(counter => game.counters[counter.tracker]);
-}
-
-// The designations that are on, in order: the monarch, then the initiative.
-function trackedDesignations() {
-  return designations.filter(({ kind }) => game.counters[kind]);
-}
-
-// Counters mode has something to show: a counter or a designation is on.
-function hasCountersMode() {
-  return shownCounters().length > 0 || trackedDesignations().length > 0;
-}
-
-// Whose designations pass on by themselves when their holder leaves the game: only in Turn by turn, once somebody's turn
-// has started, since the rules start from the active player.
-function handsOnByItself() {
-  return game.turns === 'turns' && game.turn.active !== null;
-}
-
-function outPlayers() {
-  return new Set(game.scores.map((_, index) => index).filter(isOut));
-}
-
-// Who takes a designation when its holder leaves the game (CR 726.4 and 727.4): the active player, or, if the active
-// player is the one leaving or has already left, the next player in turn order who is still in. Nobody can take the
-// monarch if everyone else has left, and the game goes on without one; the initiative always has a holder, so it stays.
-function heir(kind, leaver) {
-  const { active } = game.turn;
-  if (active !== leaver && !isOut(active)) return active;
-  const order = playOrder();
-  const position = order.indexOf(active);
-  for (let step = 1; step < order.length; step++) {
-    const player = order[(position + step) % order.length];
-    if (player !== leaver && !isOut(player)) return player;
-  }
-  return kind === 'monarch' ? null : leaver;
-}
-
-// The handoffs that are due now that a change has put players out who weren't out before (wasOut): each designation
-// whose holder has just left the game moves to its heir, when designations pass on by themselves. Otherwise the out
-// holder's tile shows a "Pass it on" hint until someone takes it in counters mode.
-function leavingTransfers(wasOut) {
-  if (!handsOnByItself()) return [];
-  return trackedDesignations().flatMap(({ kind }) => {
-    const holder = game[kind];
-    if (holder === null || wasOut.has(holder) || !isOut(holder)) return [];
-    const to = heir(kind, holder);
-    return to === holder ? [] : [{ kind, from: holder, to }];
-  });
-}
-
 // Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, announces
 // it, and reminds a new initiative holder to venture.
 function handOnLeavers(wasOut) {
-  const transfers = leavingTransfers(wasOut);
+  const transfers = leavingTransfers(game, wasOut);
   for (const transfer of transfers) {
     game[transfer.kind] = transfer.to;
     for (const player of [transfer.from, transfer.to]) if (player !== null) renderBadges(player);
@@ -1542,12 +1402,6 @@ function renderPassHints() {
 function announceDesignation(kind) {
   const { name, role } = /** @type {Designation} */ (designations.find(designation => designation.kind === kind));
   announce(-1, kind, () => (game[kind] === null ? `Nobody has ${name}` : `Player ${game[kind] + 1} ${role}`));
-}
-
-// Whether an out player's tile should ask for its designation to be passed on: they hold it, someone is still in to take
-// it, and the hint is on.
-function needsPassing(kind, index) {
-  return game.reminders.passOn && game[kind] === index && isOut(index) && game.scores.some((_, player) => player !== index && !isOut(player));
 }
 
 // A counter cell: a circle with the counter's icon over its count. A tap adds one, and holding takes one away
@@ -1623,8 +1477,8 @@ function renderModeLayer(player, index) {
     // One circle per counter that's on, in the order poison, tax, energy, experience, rad, then the monarch and the
     // initiative: three to a row, or four when there are seven.
     const cells = element('div', 'counter-cells');
-    for (const counter of shownCounters()) cells.append(...buildCounterCell(counter, index));
-    for (const designation of trackedDesignations()) cells.append(buildDesignationCell(designation, index));
+    for (const counter of shownCounters(game)) cells.append(...buildCounterCell(counter, index));
+    for (const designation of trackedDesignations(game)) cells.append(buildDesignationCell(designation, index));
     layer.append(...gestureHint('Tap +1 · hold −1'), cells);
   } else if (boardMode === 'mana') {
     // Six circles, W U B R G over colourless, three to a row.
@@ -1641,49 +1495,12 @@ function renderModeLayer(player, index) {
   syncSeatMap(index);
 }
 
-// Close to losing: a warning from 15 commander damage or 7 poison, and out at 21 or 10.
-function dangerLevel(value, warning, lethal) {
-  return value >= lethal ? 'out' : value >= warning ? 'warn' : '';
-}
-
-function isOut(index) {
-  return outReason(index) !== null;
-}
-
-// Why a player is out: 'life' at 0 or below, then 'poison' at 10, then 'commander' at 21 commander damage, or null.
-/**
- * @param {number} index
- * @returns {keyof typeof outLabels | null}
- */
-function outReason(index) {
-  if (game.scores[index] <= 0) return 'life';
-  if (game.counters.poison && game.poison[index] >= poisonLethal) return 'poison';
-  if (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) return 'commander';
-  return null;
-}
-
-// A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
-function randomBelow(count) {
-  const limit = Math.floor(0x100000000 / count) * count;
-  const value = new Uint32Array(1);
-  do crypto.getRandomValues(value); while (value[0] >= limit);
-  return value[0] % count;
-}
-
-function playOrder() {
-  return playOrders[game.scores.length];
-}
-
-function hasMana(index) {
-  return game.pools[index].some(amount => amount > 0);
-}
-
 // Empties every pool when the turn passes, if that's switched on, and returns what it emptied so a step back can put
 // it back. The turn passing also ends any "Undo clear": the pool would have emptied anyway.
 function autoEmptyPools() {
   if (!game.manaPool || !game.autoEmpty) return null;
   endUndoClears();
-  if (!game.pools.some((_, index) => hasMana(index))) return null;
+  if (!game.pools.some((_, index) => hasMana(game, index))) return null;
   const emptied = game.pools.map(pool => [...pool]);
   game.pools = fitPools([], game.scores.length);
   return emptied;
@@ -1715,24 +1532,12 @@ function stepTurn() {
   if (game.turns === 'rounds') {
     game.turn.round = Math.min(maxRound, game.turn.round + 1);
   } else {
-    const { active, first } = game.turn;
-    if (active === null) {
+    if (game.turn.active === null) {
       askFirst = true;
       maybeAskFirst();
       return;
     }
-    const order = playOrder();
-    const position = order.indexOf(active);
-    let next = active;
-    let crossed = false;
-    for (let step = 1; step <= order.length; step++) {
-      const player = order[(position + step) % order.length];
-      if (player === first) crossed = true;
-      if (!isOut(player) || step === order.length) {
-        next = player;
-        break;
-      }
-    }
+    const { next, crossed } = nextTurn(game);
     game.turn.active = next;
     if (crossed) game.turn.round = Math.min(maxRound, game.turn.round + 1);
   }
@@ -1856,20 +1661,8 @@ function stepBack() {
     if (game.turn.round === 1) return;
     game.turn.round -= 1;
   } else {
-    const { active, first } = game.turn;
-    if (active === null) return;
-    const order = playOrder();
-    const position = order.indexOf(active);
-    let previous = active;
-    let crossed = false;
-    for (let step = 1; step <= order.length; step++) {
-      if (order[(position - step + 1 + order.length) % order.length] === first) crossed = true;
-      const player = order[(position - step + order.length) % order.length];
-      if (!isOut(player) || step === order.length) {
-        previous = player;
-        break;
-      }
-    }
+    if (game.turn.active === null) return;
+    const { previous, crossed } = previousTurn(game);
     if (crossed && game.turn.round === 1) return;
     game.turn.active = previous;
     if (crossed) game.turn.round -= 1;
@@ -1910,8 +1703,8 @@ function chooseFirst(index) {
 // The centre shuffle picks a random player who isn't out, lighting tiles around the table before landing on them.
 function shuffleFirst() {
   if (boardMode !== 'first' || board.hasAttribute('data-shuffling') || board.hasAttribute('data-picked')) return;
-  const order = playOrder();
-  const live = order.filter(player => !isOut(player));
+  const order = playOrder(game);
+  const live = order.filter(player => !isOut(game, player));
   const candidates = live.length ? live : order;
   const pick = candidates[randomBelow(candidates.length)];
   if (reducedMotion.matches) {
@@ -1959,7 +1752,7 @@ function turnChips(index) {
     bindStep(chip, stepTurn, stepBack);
     chips.push(chip);
   } else if (turns === 'turns') {
-    if (active === index || (active === null && !isOut(index))) {
+    if (active === index || (active === null && !isOut(game, index))) {
       // When the word "Turn" gives way, the round keeps a "T" so the untap symbol doesn't read as a letter.
       const chip = active === index
         ? element('button', 'chip turn-chip active-chip', manaIcon('untap'), element('span', 'turn-word', 'Turn'), element('span', 'turn-round', String(round)))
@@ -1988,13 +1781,8 @@ function stepMana(index, colour, delta) {
   if (next >= 0 && next <= maxCount) commitEdit({ kind: 'mana', index, colour, delta });
 }
 
-function poolText(index) {
-  const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
-  return held.length ? held.map(({ colour, amount }) => `${amount} ${colour.name}`).join(', ') : 'empty';
-}
-
 function announcePool(index) {
-  announce(index, 'mana', () => `Player ${index + 1}, mana pool ${poolText(index)}`);
+  announce(index, 'mana', () => `Player ${index + 1}, mana pool ${poolText(game, index)}`);
 }
 
 // A mana cell: a circle with the colour's mana symbol over its amount, like a counter cell.
@@ -2038,7 +1826,7 @@ function spendMana(index, colour) {
 
 // The eraser empties the pool and leaves "Undo clear" in the strip's place for 5 seconds.
 function clearPool(index) {
-  if (!hasMana(index)) return;
+  if (!hasMana(game, index)) return;
   endUndoClear(index);
   const pool = game.pools[index];
   game.pools[index] = fitCounts([], manaColours.length);
@@ -2127,7 +1915,7 @@ function stripChip(index) {
       ? [element('span', 'summary-item', ...held.map(({ colour }) => pip(colour)), String(held.reduce((sum, { amount }) => sum + amount, 0)))]
       : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
     chip = element('button', 'chip strip-chip', ...parts, icon('caret-right'));
-    chip.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(index)}. Open mana`);
+    chip.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(game, index)}. Open mana`);
     bindTap(chip, () => setBoardMode('mana'));
   }
   chip.type = 'button';
@@ -2137,7 +1925,7 @@ function stripChip(index) {
 // The holder's chip at rest: the crown or the castle. A holder who is out and hasn't handed it on (no Turn by turn
 // turn to start from) gets a "Pass it on" chip instead, which opens counters mode to give it to someone.
 function designationChip({ kind, label, name, still }, index) {
-  if (needsPassing(kind, index)) {
+  if (needsPassing(game, kind, index)) {
     const chip = element('button', 'chip pass-chip', designationIcon(kind), icon('arrow-bend-up-right'), element('span', 'pass-word', 'Pass it on'));
     chip.type = 'button';
     chip.dataset.designation = kind;
@@ -2166,7 +1954,7 @@ function renderBadges(index) {
   // The sword only labels the row: each chip already says whose commander it counts.
   const sword = element('span', 'chip sword', icon('sword'));
   sword.setAttribute('aria-hidden', 'true');
-  const foldedChip = game.manaPool && (hasMana(index) || clearedPools.has(index)) ? stripChip(index) : null;
+  const foldedChip = game.manaPool && (hasMana(game, index) || clearedPools.has(index)) ? stripChip(index) : null;
   far.replaceChildren(...(damage.length ? [sword] : []), ...damage.map(({ amount, attacker }) => {
     const chip = inColourOf(element('span', 'chip damage', String(amount),
       visuallyHidden(` commander damage from Player ${attacker + 1}`)), attacker);
@@ -2182,7 +1970,7 @@ function renderBadges(index) {
   // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
   const strip = player.querySelector('.mana-strip');
   const hadFocus = strip.contains(document.activeElement) ? /** @type {HTMLElement} */ (document.activeElement).dataset.colour ?? '' : null;
-  const floating = game.manaPool && (hasMana(index) || clearedPools.has(index));
+  const floating = game.manaPool && (hasMana(game, index) || clearedPools.has(index));
   strip.replaceChildren(...(floating ? stripItems(index) : []));
   strip.hidden = !floating;
   if (floating) {
@@ -2195,7 +1983,7 @@ function renderBadges(index) {
   const chips = [...turnChips(index)];
   const identity = identityChip(game.identities[index], game.identity.show);
   if (identity) chips.push(identity);
-  for (const { kind } of shownCounters()) {
+  for (const { kind } of shownCounters(game)) {
     const value = game[kind][index];
     if (value === 0) continue;
     const chip = kind === 'casts' ? element('span', 'chip', visuallyHidden('Commander tax '), counterIcon(kind), `+${value * 2}`)
@@ -2205,7 +1993,7 @@ function renderBadges(index) {
     if (level) chip.dataset.level = level;
     chips.push(chip);
   }
-  for (const designation of trackedDesignations()) {
+  for (const designation of trackedDesignations(game)) {
     if (game[designation.kind] === index) chips.push(designationChip(designation, index));
   }
   syncReminderChips(index, /** @type {HTMLElement} */ (near.parentElement).querySelector('.reminders'));
@@ -2227,7 +2015,7 @@ function syncPill() {
   roundButton.hidden = boardMode !== null || game.turns === 'off';
   roundBackButton.hidden = roundButton.hidden;
   damageButton.hidden = boardMode !== null || !game.counters.commander;
-  countersButton.hidden = boardMode !== null || !hasCountersMode();
+  countersButton.hidden = boardMode !== null || !hasCountersMode(game);
   manaButton.hidden = boardMode !== null || !game.manaPool;
   diceButton.hidden = boardMode !== null;
   setupButton.hidden = editing || first;
@@ -2243,9 +2031,9 @@ function syncPill() {
     : active === null ? `Round ${round}. Choose who goes first` : `Round ${round}, Player ${active + 1}'s turn. Pass the turn`);
   roundBackButton.setAttribute('aria-label', game.turns === 'rounds' ? 'Back one round' : 'Back one turn');
   // The tap symbol gets a dot while any pool has mana.
-  manaButton.toggleAttribute('data-floating', game.pools.some((_, index) => hasMana(index)));
+  manaButton.toggleAttribute('data-floating', game.pools.some((_, index) => hasMana(game, index)));
   // The pill's length decides which face edges it reaches, so the board is measured again when it changes.
-  const shape = `${[...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length} ${restPillButtons()}`;
+  const shape = `${[...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length} ${restPillButtons(game)}`;
   if (shape !== pillShape) {
     pillShape = shape;
     measureBoard();
@@ -2312,7 +2100,7 @@ function cancelEditing() {
 
 function discardEdits() {
   const changes = /** @type {Edit[]} */ (edits);
-  while (changes.length) applyEdit(/** @type {Edit} */ (changes.pop()), -1);
+  while (changes.length) applyEdit(game, /** @type {Edit} */ (changes.pop()), -1);
   game.scores.forEach((_, index) => renderScore(index));
   saveGame();
   setBoardMode(null);
@@ -2330,7 +2118,7 @@ function renderScore(index) {
   const value = String(game.scores[index]).replace('-', '−');
   score.value = value;
   // A player who is out says so under the total, and their other badges dim.
-  const out = outReason(index);
+  const out = outReason(game, index);
   score.setAttribute('aria-label', `${game.scores[index]} life${out ? `, ${outLabels[out]}` : ''}`);
   syncBoardDigits();
   score.toggleAttribute('data-out', out !== null);
@@ -2350,11 +2138,11 @@ function renderBoard() {
     function changeLife(delta) {
       const next = game.scores[index] + delta;
       if (!Number.isSafeInteger(next)) return;
-      const out = outPlayers();
+      const out = outPlayers(game);
       game.scores[index] = next;
       renderScore(index);
       // A player who is out has no chip to start a turn, and hands on the monarch and the initiative.
-      if (isOut(index) !== out.has(index)) {
+      if (isOut(game, index) !== out.has(index)) {
         renderBadges(index);
         handOnLeavers(out);
         renderPassHints();
@@ -2853,7 +2641,7 @@ autoEmptySwitch.addEventListener('change', () => {
 // and Turns is Turn by turn, and Pass-it-on hints while either is on; Gesture hints always shows.
 const reminderSwitches = /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#settings-reminders input[data-reminder]'));
 function renderRemindersSection() {
-  const designated = trackedDesignations().length > 0;
+  const designated = trackedDesignations(game).length > 0;
   for (const input of reminderSwitches) {
     input.checked = game.reminders[/** @type {keyof Reminders} */ (input.dataset.reminder)];
     const row = input.closest('.switch-row');
@@ -3046,7 +2834,7 @@ for (const tracker of trackers) {
   const input = /** @type {HTMLInputElement} */ (document.querySelector(`#${tracker}-switch`));
   input.addEventListener('change', () => {
     // Poison and Commander decide who is out, so switching one on can put a holder out of the game.
-    const out = outPlayers();
+    const out = outPlayers(game);
     game.counters[tracker] = input.checked;
     saveGame();
     game.scores.forEach((_, index) => {
