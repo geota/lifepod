@@ -1,3 +1,4 @@
+import { clearReminders, dismissReminder, remind, turnStarted } from './js/actions/reminders.js';
 import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { requestFit, resetDrops } from './js/layout/fit.js';
 import {
@@ -6,8 +7,8 @@ import {
 } from './js/layout/settings.js';
 import {
   badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, designations, discardMessages, doneLabels, editingModes,
-  firstBeat, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, reminderText, reminderTime, shuffleTick,
-  shuffleTicks, tileSetOrder, tileSets, trackers, undoClearTime,
+  firstBeat, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, shuffleTick, shuffleTicks, tileSetOrder,
+  tileSets, trackers, undoClearTime,
 } from './js/logic/data.js';
 import {
   applyEdit, editPlayers, hasMana, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow,
@@ -28,8 +29,7 @@ import {
   android, currentLandscapeAngle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency, syncWakeLock,
 } from './js/state/platform.js';
 import {
-  boardMode, clearedPools, editStartHolders, edits, game, openBoardMode, reminders, saveGame, syncBackHandling,
-  turnSteps,
+  boardMode, clearedPools, editStartHolders, edits, game, openBoardMode, saveGame, syncBackHandling, turnSteps,
 } from './js/state/state.js';
 import {
   announcer, board, boardControls, cancelButton, countersButton, damageButton, diceButton, discardDialog, element, icon,
@@ -38,7 +38,6 @@ import {
 import { bindCounter, bindStep, bindTap, cancelPresses } from './js/ui/press.js';
 
 /** @typedef {import('./js/logic/data.js').BoardMode} BoardMode */
-/** @typedef {import('./js/logic/data.js').DesignationKind} DesignationKind */
 /** @typedef {import('./js/logic/rules.js').Edit} Edit */
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
 /** @typedef {import('./js/logic/data.js').Reminders} Reminders */
@@ -248,11 +247,6 @@ function stepTurn() {
   }
 }
 
-// A turn has just started: its player ventures into Undercity if they have the initiative.
-function turnStarted() {
-  if (game.turns === 'turns' && game.initiative !== null && game.initiative === game.turn.active) remind(game.initiative, 'initiative');
-}
-
 // Turn by turn with nobody's turn yet: a tile's turn chip starts that player's turn, and they go first if nobody has.
 function startTurn(index) {
   const before = { ...game.turn };
@@ -261,37 +255,6 @@ function startTurn(index) {
   recordStep(before, null);
   showTurn();
   turnStarted();
-}
-
-// A turn reminder (Settings → Reminders → Turn reminders), only in Turn by turn: "Monarch: draw a card" or "Initiative:
-// venture into Undercity" on that player's tile, facing them, for 3 seconds or until it's tapped. Screen readers hear it
-// too.
-/**
- * @param {number | null} index
- * @param {DesignationKind} kind
- */
-function remind(index, kind) {
-  if (index === null || game.turns !== 'turns' || !game.reminders.turns || !game.counters[kind]) return;
-  const shown = reminders.get(index) ?? new Map();
-  clearTimeout(shown.get(kind));
-  shown.set(kind, setTimeout(() => dismissReminder(index, kind), reminderTime));
-  reminders.set(index, shown);
-  renderBadges(index);
-  announce(index, `remind ${kind}`, () => `Player ${index + 1}, ${reminderText[kind]}`);
-}
-
-function dismissReminder(index, kind) {
-  const shown = reminders.get(index);
-  if (!shown?.has(kind)) return;
-  clearTimeout(shown.get(kind));
-  shown.delete(kind);
-  if (!shown.size) reminders.delete(index);
-  renderBadges(index);
-}
-
-function clearReminders() {
-  for (const shown of reminders.values()) for (const timer of shown.values()) clearTimeout(timer);
-  reminders.clear();
 }
 
 // One step back: the last step taken, with any pools it emptied, or after a relaunch the previous player in play
