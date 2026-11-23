@@ -4,7 +4,6 @@
 
 import { designationKinds, editingModes } from '../logic/data.js';
 import { loadGame } from '../logic/save.js';
-import { cancelPresses } from '../ui/press.js';
 import { currentLandscapeAngle, readSavedGame, setBackHandling, writeSavedGame } from './platform.js';
 
 /** @typedef {import('../logic/data.js').BoardMode} BoardMode */
@@ -51,13 +50,4 @@ export function saveGame() {
 // Android's back gesture only needs the page while a dialog or board mode is open.
 export function syncBackHandling() {
   setBackHandling(boardMode !== null || document.querySelector('dialog[open]') !== null);
-}
-
-// Every dialog opens through here: a press held on the board ends first, so a hold can't keep counting under the
-// modal (docs/review/DEEP-DIVE.md D3), and Android's back gesture comes to the page while it's open.
-/** @param {HTMLDialogElement} dialog */
-export function showDialog(dialog) {
-  cancelPresses();
-  dialog.showModal();
-  syncBackHandling();
 }

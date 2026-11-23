@@ -2,7 +2,8 @@
 // Importing this module wires the sheet and the pill's dice button.
 
 import { haptic, reducedMotion } from '../state/platform.js';
-import { showDialog, syncBackHandling } from '../state/state.js';
+import { showDialog } from '../actions/dialog.js';
+import { syncBackHandling } from '../state/state.js';
 import { diceButton, element } from '../ui/dom.js';
 
 const diceDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#dice'));

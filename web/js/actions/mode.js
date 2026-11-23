@@ -12,11 +12,12 @@ import { renderModeLayer } from '../render/modes.js';
 import { syncPill } from '../render/pill.js';
 import { haptic, reducedMotion } from '../state/platform.js';
 import {
-  boardMode, editStartHolders, edits, game, openBoardMode, showDialog, syncBackHandling, turnSteps,
+  boardMode, editStartHolders, edits, game, openBoardMode, syncBackHandling, turnSteps,
 } from '../state/state.js';
 import { board, boardControls, discardDialog, icon, setupButton } from '../ui/dom.js';
 import { cancelPresses } from '../ui/press.js';
 import { commit } from './commit.js';
+import { showDialog } from './dialog.js';
 import { endUndoClears } from './mana.js';
 import { turnStarted } from './reminders.js';
 

@@ -3,12 +3,13 @@
 // leave for a board mode. Importing this module wires it and the pill's setup button.
 
 import { startGame } from '../actions/board.js';
+import { showDialog } from '../actions/dialog.js';
 import { setBoardMode } from '../actions/mode.js';
 import {
   keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody, syncSettingsCue,
 } from '../layout/settings.js';
 import { maxStartingLife, playerCounts } from '../logic/data.js';
-import { boardMode, game, showDialog, syncBackHandling } from '../state/state.js';
+import { boardMode, game, syncBackHandling } from '../state/state.js';
 import { element, icon, setupButton } from '../ui/dom.js';
 import {
   renderBadgeSizeSetting, renderIdentitySheet, renderRemindersSection, renderStyleSetting, renderTileSetting,
