@@ -8,10 +8,12 @@ import {
 // clear) and emptying pools when the turn passes.
 
 // Timers in web/js/logic/data.js. A mana cell held for holdDelay takes one away, then one more every 100ms; a turn chip
-// or the round button held for holdDelay steps back once. "Undo clear" lasts undoClearTime. Tests that tap or hold
+// or the round button held for holdDelay steps back once. "Undo clear" lasts undoClearTime. A strip keeps its buttons in
+// place for stripHoldTime after its last tap, then reflows (tests/presses.test.mjs). Tests that tap or hold
 // these pause the page's clock, so a tap can't become a hold and each happens only when the test runs the clock.
 const holdDelay = 500;
 const undoClearTime = 5000;
+const stripHoldTime = 800;
 
 const mode = page => page.locator('#board').getAttribute('data-mode');
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
@@ -107,12 +109,15 @@ async function checkStrip(t, engine) {
 
   // Every near row stays while its pool has mana.
   assert.deepEqual(await nearShown(page), [true, true, true, true], 'every near row stays beside its strip');
-  // Spending saves at once. A colour at 0 leaves the strip, and an empty pool hides it.
+  // Spending saves at once. A colour at 0 leaves the strip once the taps stop, and an empty pool hides it.
   await tile(page, 1).locator('.strip-spend[data-colour="U"]').tap();
+  assert.deepEqual(await strips(page), ['W2 U0 clear', '', 'R3 C1 clear', '']);
+  await page.clock.runFor(stripHoldTime);
   assert.deepEqual(await strips(page), ['W2 clear', '', 'R3 C1 clear', '']);
   assert.deepEqual((await saved(page)).pools[0], [2, 0, 0, 0, 0, 0]);
   await tile(page, 1).locator('.strip-spend[data-colour="W"]').tap();
   await tile(page, 1).locator('.strip-spend[data-colour="W"]').tap();
+  await page.clock.runFor(stripHoldTime);
   assert.deepEqual(await strips(page), ['', '', 'R3 C1 clear', '']);
   assert.deepEqual(await nearShown(page), [true, true, true, true], 'the near rows stay as pools empty');
   assert.equal(await floating(page), true);
@@ -165,6 +170,8 @@ async function checkAutoEmpty(t, engine) {
   await tile(page, 3).locator('.strip-clear').tap();
   assert.deepEqual(await strips(page), ['W2 U1 clear', 'G1 clear', 'undo', '']);
   await page.locator('#round-button').tap();
+  assert.deepEqual(await strips(page), ['', '', 'clear', ''], 'P3’s strip keeps its place while it’s being tapped');
+  await page.clock.runFor(stripHoldTime);
   assert.deepEqual(await strips(page), ['', '', '', '']);
   await page.locator('#round-button').tap();
   await page.locator('#round-button').tap();

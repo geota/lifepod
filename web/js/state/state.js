@@ -39,6 +39,10 @@ export const turnSteps = [];
 export const reminders = new Map();
 // Pools cleared with the eraser in the last 5 seconds, by player, so "Undo clear" can put them back. Not saved.
 export const clearedPools = new Map();
+// Strips being tapped, by player: the colours the strip showed when the taps began, which keep their places (at 0 once
+// spent) until stripHoldTime after the last tap, and that timer. Not saved.
+/** @type {Map<number, { colours: Set<string>, timer: ReturnType<typeof setTimeout> }>} */
+export const stripHolds = new Map();
 
 export function saveGame() {
   writeSavedGame(JSON.stringify(game));

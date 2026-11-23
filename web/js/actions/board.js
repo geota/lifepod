@@ -10,10 +10,11 @@ import { announce, announceDesignation, announceLife, clearAnnouncements } from 
 import { renderBadges, renderPassHints } from '../render/badges.js';
 import { paintColours, renderScore } from '../render/tile.js';
 import { currentLandscapeAngle, haptic, reducedMotion } from '../state/platform.js';
-import { clearedPools, game, turnSteps } from '../state/state.js';
+import { clearedPools, game, stripHolds, turnSteps } from '../state/state.js';
 import { board, playerTemplate } from '../ui/dom.js';
 import { bindCounter, cancelPresses } from '../ui/press.js';
 import { commit } from './commit.js';
+import { endStripHolds } from './mana.js';
 import { maybeAskFirst, setAskFirst } from './mode.js';
 import { clearReminders, remind } from './reminders.js';
 
@@ -56,8 +57,10 @@ export function renderBoard() {
       announceLife(index);
     }
 
-    bindCounter(player.querySelector('.subtract'), () => changeLife(-1), `Subtract one life from ${name}`);
-    bindCounter(player.querySelector('.add'), () => changeLife(1), `Add one life to ${name}`);
+    // While the strip is being tapped, a touch on the life buttons under it is a tap meant for the strip (mana.js).
+    const stripTapped = () => stripHolds.has(index);
+    bindCounter(player.querySelector('.subtract'), () => changeLife(-1), `Subtract one life from ${name}`, stripTapped);
+    bindCounter(player.querySelector('.add'), () => changeLife(1), `Add one life to ${name}`, stripTapped);
     const rotateSeat = player.querySelector('.rotate-seat');
     rotateSeat.setAttribute('aria-label', `Rotate ${name} clockwise`);
     rotateSeat.addEventListener('click', () => {
@@ -98,6 +101,7 @@ export function startGame(playerCount, startingLife) {
   turnSteps.length = 0;
   for (const { timer } of clearedPools.values()) clearTimeout(timer);
   clearedPools.clear();
+  endStripHolds();
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
   // A new game takes the screen's current landscape as upright.

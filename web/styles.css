@@ -1418,6 +1418,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   line-height: 1;
 }
 .mana-strip > button:not(.chip):active { background: var(--wash); }
+/* A colour spent to 0 keeps its place while the strip is being tapped, dimmed, until the strip reflows. */
+.mana-strip > .strip-spend[aria-disabled="true"] { opacity: var(--disabled-opacity); }
 .mana-strip .pip { --pip-size: 1.25em; }
 .mana-strip > button.strip-clear { color: var(--text-soft); }
 .strip-clear .icon { width: 1.05em; height: 1.05em; }

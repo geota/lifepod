@@ -5,7 +5,9 @@ import { appUrl, engines, openPage, saved, savedGame, test } from './helpers.mjs
 // press that a redraw lands in the middle of, and a hold that a dialog opens over. Each press keeps acting on what the
 // finger is on, or stops, but never acts on something that moved under it.
 
-// Timers in web/js/logic/data.js: a turn chip held for holdDelay steps back, and "Undo clear" lasts undoClearTime.
+// Timers in web/js/logic/data.js: a strip keeps its buttons in place for stripHoldTime after its last tap, a turn chip
+// held for holdDelay steps back, and "Undo clear" lasts undoClearTime.
+const stripHoldTime = 800;
 const holdDelay = 500;
 const undoClearTime = 5000;
 
@@ -15,6 +17,50 @@ const debugGame = page => page.evaluate(() => window.lifePodDebug.game);
 const strips = page => page.locator('.mana-strip').evaluateAll(rows => rows.map(row => (row.hidden ? '' : [...row.children]
   .filter(item => !item.matches('.chip') && item.checkVisibility())
   .map(item => (item.matches('.strip-clear') ? 'clear' : item.matches('.strip-undo') ? 'undo' : `${item.dataset.colour}${item.textContent}`)).join(' '))));
+
+// D1: P1 taps their blue (3) four times, one more than they have, at the same spot. Nothing slides under the finger: the
+// fourth tap lands on a spent blue, not on the next colour, the eraser or the life total under the strip. The strip
+// reflows once nobody has tapped it for a moment.
+async function checkStripBurst(t, engine) {
+  const cases = [
+    { pool: [0, 3, 0, 0, 0, 0], after: '', what: 'an empty pool doesn’t uncover the life total' },
+    { pool: [0, 3, 0, 2, 0, 0], after: 'R2 clear', what: 'the next colour doesn’t slide under the finger' },
+    { pool: [2, 3, 0, 0, 0, 0], after: 'W2 clear', what: 'the eraser doesn’t slide under the finger' },
+  ];
+  for (const { pool, after, what } of cases) {
+    const pools = [pool, ...Array(3).fill([0, 0, 0, 0, 0, 0])];
+    const page = await openPage(t, engine, { clock: true, game: savedGame(4, { manaPool: true, pools }) });
+    const blue = await tile(page, 1).locator('.strip-spend[data-colour="U"]').boundingBox();
+    for (let tap = 0; tap < 4; tap++) await page.touchscreen.tap(blue.x + blue.width / 2, blue.y + blue.height / 2);
+    const game = await saved(page);
+    assert.deepEqual(game.pools[0], pool.map((amount, colour) => (colour === 1 ? 0 : amount)), `${what}: only blue is spent`);
+    assert.equal(game.scores[0], 40, `${what}: no life is taken`);
+    assert.deepEqual((await strips(page))[0], pool.map((amount, colour) => (colour === 1 ? 'U0' : amount ? `${'WUBRGC'[colour]}${amount}` : '')).filter(Boolean).concat('clear').join(' '),
+      `${what}: the strip keeps its buttons in place while it's being tapped`);
+    assert.equal(await tile(page, 1).locator('.strip-spend[data-colour="U"]').getAttribute('aria-disabled'), 'true', 'the spent colour says it can’t be spent');
+    await page.clock.runFor(stripHoldTime - 1);
+    assert.match((await strips(page))[0], /U0/, 'still in place just before the strip reflows');
+    await page.clock.runFor(1);
+    assert.equal((await strips(page))[0], after, `${what}: the strip reflows once the taps stop`);
+    // Taps resume as normal once it has reflowed.
+    await page.touchscreen.tap(blue.x + blue.width / 2, blue.y + blue.height / 2);
+    await page.close();
+  }
+}
+
+// D1: a double tap on the eraser clears the pool once: "Undo clear" takes the eraser's place, and the second tap
+// doesn't undo the clear it just made.
+async function checkEraserDoubleTap(t, engine) {
+  const page = await openPage(t, engine, { clock: true, game: savedGame(4, { manaPool: true, pools: [[2, 0, 0, 0, 0, 0], ...Array(3).fill([0, 0, 0, 0, 0, 0])] }) });
+  const eraser = await tile(page, 1).locator('.strip-clear').boundingBox();
+  // "Undo clear" is wider than the eraser, so it lies under wherever the eraser was.
+  for (let tap = 0; tap < 2; tap++) await page.touchscreen.tap(eraser.x + eraser.width / 2, eraser.y + eraser.height / 2);
+  assert.deepEqual((await saved(page)).pools[0], [0, 0, 0, 0, 0, 0], 'the pool stays cleared');
+  assert.equal((await strips(page))[0], 'undo');
+  await page.clock.runFor(stripHoldTime);
+  await tile(page, 1).locator('.strip-undo').tap();
+  assert.deepEqual((await saved(page)).pools[0], [2, 0, 0, 0, 0, 0], 'a later tap on Undo clear still undoes it');
+}
 
 // D2: P1 has the turn and clears their pool, so "Undo clear" shows for 5 seconds. P1 presses Turn just before it ends
 // and lifts just after: the end of "Undo clear" redraws P1's rows, and the turn still passes.
@@ -118,8 +164,24 @@ async function checkFocusThroughRedraws(t, engine) {
   assert.equal(await focused(page), 'P1 active-chip', '"Undo clear" running out hands focus to the turn chip');
 }
 
+// Spending the last mana from the keyboard: focus stays on the spent colour while the strip holds still, then moves to
+// the tile's subtract button when the strip goes, not to the pill.
+async function checkLastManaFocus(t, engine) {
+  const page = await openPage(t, engine, { clock: true, game: savedGame(4, { manaPool: true, pools: [[0, 1, 0, 0, 0, 0], ...Array(3).fill([0, 0, 0, 0, 0, 0])] }) });
+  await tile(page, 1).locator('.strip-spend[data-colour="U"]').focus();
+  await page.keyboard.press('Enter');
+  assert.deepEqual((await saved(page)).pools[0], [0, 0, 0, 0, 0, 0]);
+  assert.equal(await focused(page), 'P1 strip-spend', 'focus stays on the spent colour while the strip holds still');
+  await page.clock.runFor(stripHoldTime);
+  assert.equal((await strips(page))[0], '');
+  assert.equal(await focused(page), 'P1 subtract', 'the strip going hands focus to the tile, not the pill');
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: an extra tap on the mana strip spends nothing else and takes no life`, t => checkStripBurst(t, engine));
+  test(`${name}: a double tap on the eraser doesn't undo the clear`, t => checkEraserDoubleTap(t, engine));
   test(`${name}: a Turn press survives its row redrawing`, t => checkTurnSurvivesRedraw(t, engine));
   test(`${name}: a hold stops when a dialog opens over it`, t => checkHoldUnderDialog(t, engine));
   test(`${name}: keyboard focus stays on chips that survive a redraw, and moves nearby from ones that go`, t => checkFocusThroughRedraws(t, engine));
+  test(`${name}: spending the last mana from the keyboard keeps focus on the tile`, t => checkLastManaFocus(t, engine));
 }

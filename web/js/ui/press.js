@@ -22,12 +22,14 @@ let ignoreClicksUntil = 0;
 // or to Android cancelling touches when several fingers land at once. Holding repeats after a pause.
 // Clicks still handle keyboards and assistive technology.
 // adjust gets how long the press has been held, in milliseconds (0 for a tap or a click).
+// While ignoreTouches() says so, a press from a finger or pointer is ignored, with the click after it.
 /**
  * @param {HTMLElement} button
  * @param {(held: number) => void} adjust
  * @param {string} label
+ * @param {() => boolean} [ignoreTouches]
  */
-export function bindCounter(button, adjust, label) {
+export function bindCounter(button, adjust, label, ignoreTouches) {
   button.setAttribute('aria-label', label);
   const tile = button.closest('.player') ?? button;
   let press;
@@ -38,6 +40,10 @@ export function bindCounter(button, adjust, label) {
   button.addEventListener('pointerdown', (event) => {
     if (event.button !== 0) return;
     pressPointer = event.pointerId;
+    if (ignoreTouches?.()) {
+      ignoreClicksUntil = performance.now() + 800;
+      return;
+    }
     // A new touch ends any earlier press on this button, even if that press never got its pointerup.
     press?.end();
     const current = {

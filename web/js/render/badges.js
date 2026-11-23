@@ -12,7 +12,7 @@ import {
 import {
   dangerLevel, hasMana, isOut, needsPassing, poolText, shownCounters, trackedDesignations,
 } from '../logic/rules.js';
-import { clearedPools, game, reminders } from '../state/state.js';
+import { clearedPools, game, reminders, stripHolds } from '../state/state.js';
 import { board, element, icon, manaIcon, syncChildren, visuallyHidden } from '../ui/dom.js';
 import { bindRelease, bindStep, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark } from './tile.js';
@@ -121,8 +121,14 @@ function turnItems(index) {
   return items;
 }
 
+// Whether a tile's strip shows: while its pool has mana, for 5 seconds after the eraser, and while it's being tapped.
+function stripShows(index) {
+  return game.manaPool && (hasMana(game, index) || clearedPools.has(index) || stripHolds.has(index));
+}
+
 // A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then the eraser. Or
-// "Undo clear" for 5 seconds after the eraser.
+// "Undo clear" for 5 seconds after the eraser. While the strip is being tapped, its colours keep their places, at 0
+// once spent (actions/mana.js), and "Undo clear" ignores taps, so a quick extra tap on the eraser can't undo it.
 /** @returns {Keyed[]} */
 function stripItems(index) {
   if (clearedPools.has(index)) {
@@ -132,14 +138,15 @@ function stripItems(index) {
         const undo = element('button', 'strip-undo', icon('undo'), 'Undo clear');
         undo.type = 'button';
         undo.setAttribute('aria-label', `Undo clear, Player ${index + 1}'s mana pool`);
-        bindTap(undo, () => badgeActions.undoClear(index));
+        bindTap(undo, () => stripHolds.has(index) || badgeActions.undoClear(index));
         return undo;
       },
     }, stripChipItem(index)];
   }
+  const held = stripHolds.get(index)?.colours;
   const spends = manaColours.flatMap((colour, at) => {
     const amount = game.pools[index][at];
-    if (!amount) return [];
+    if (!amount && !held?.has(colour.id)) return [];
     return [{
       key: `spend-${colour.id}`,
       create: () => {
@@ -154,7 +161,10 @@ function stripItems(index) {
       },
       update: (spend) => {
         /** @type {Text} */ (spend.lastChild).data = String(amount);
-        spend.setAttribute('aria-label', `Player ${index + 1}, ${amount} ${colour.name} mana. Spend one`);
+        spend.setAttribute('aria-label', amount ? `Player ${index + 1}, ${amount} ${colour.name} mana. Spend one` : `Player ${index + 1}, no ${colour.name} mana`);
+        // Not disabled, which would drop keyboard focus from it.
+        if (amount) spend.removeAttribute('aria-disabled');
+        else spend.setAttribute('aria-disabled', 'true');
       },
     }];
   });
@@ -182,7 +192,7 @@ function stripChipItem(index) {
         const chip = element('button', 'chip strip-chip', icon('undo'), 'Undo');
         chip.type = 'button';
         chip.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
-        bindTap(chip, () => badgeActions.undoClear(index));
+        bindTap(chip, () => stripHolds.has(index) || badgeActions.undoClear(index));
         return chip;
       },
     };
@@ -309,7 +319,7 @@ function farItems(index) {
       },
     });
   }
-  if (game.manaPool && (hasMana(game, index) || clearedPools.has(index))) items.push(stripChipItem(index));
+  if (stripShows(index)) items.push(stripChipItem(index));
   return items;
 }
 
@@ -372,7 +382,7 @@ export function renderBadges(index) {
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
   // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
   const strip = player.querySelector('.mana-strip');
-  const floating = game.manaPool && (hasMana(game, index) || clearedPools.has(index));
+  const floating = stripShows(index);
   syncChildren(strip, floating ? stripItems(index) : []);
   strip.hidden = !floating;
   if (!floating) delete player.dataset.strip;
