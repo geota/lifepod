@@ -707,7 +707,13 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
    (ui ≥ 264). */
 .board {
   --u: calc(var(--ui, 400px) / 100);
-  --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
+  /* A hundredth of --ub, for the badges' height budget. */
+  --ub-unit: calc(var(--ub, 400px) / 100);
+  /* Badges are sized from both of a tile's dimensions (DESIGN-AUDIT S1): from its width, 3.6u as before, and up to 5u
+     where the tile's height leaves room (4.4 hundredths of --ub), so a tall tablet tile's counts grow instead of
+     leaving most of the tile empty. A phone tile is short, so its height never lifts it past 3.6u, and the cap still
+     holds phones at 16px. Auto-drop gives way as before where a row runs out of width. */
+  --badge-size: clamp(.78125rem, max(calc(3.6 * var(--u)), min(calc(5 * var(--u)), calc(4.4 * var(--ub-unit)))), max(1rem, 16 * var(--grow)));
   /* Settings → Table → Badge size scales the badge rows and the mana strip: their chips, counts, icons and the colour
      indicator (data-badge-size on #board). A row grows no taller than fits between its edge and the total on every
      tile (app.js measures --far-room and --near-room), and never below the default. A larger system text size
@@ -1209,11 +1215,13 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 }
 .badges[hidden], .board[data-mode]:not([data-mode="rotate"]) :is(.badges, .near-edge, .far-edge) { display: none; }
 /* The far edge stacks the far row over the mana strip, while a pool has mana, 4px in from the tile's sides, 8px from
-   its far edge or clear of the pill where the pill reaches it. */
+   its far edge or clear of the pill where the pill reaches it. app.js sets --far-offset to the deepest clearance among
+   the tiles whose far edges share a line, so a board row's far rows line up, and adds --space-4 from the upright pill
+   with 2 players. */
 .far-edge {
   position: absolute;
   z-index: 3;
-  top: max(calc(8 * var(--grow)), var(--clear-far, 0px));
+  top: max(calc(8 * var(--grow)), var(--far-offset, 0px));
   left: calc(4px + var(--clear-start, 0px));
   right: calc(4px + var(--clear-end, 0px));
   display: flex;
@@ -1382,7 +1390,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
    clearance, where the pill reaches it). */
 /* The line is the targets' 44px, and the far row, centred on it, keeps the pill's clearance at any Badge size (1.7em is
    the row's height: the far edge takes the row's type). */
-.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--clear-far, 0px) - clamp(0px, (var(--tap-min) - 1.7em) / 2, 6px)); }
+.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--far-offset, 0px) - clamp(0px, (var(--tap-min) - 1.7em) / 2, 6px)); }
 .player[data-strip="inline"] .badges.far { flex: 1 1 0; min-width: 0; align-self: center; }
 .player[data-strip="inline"] .mana-strip { order: 1; }
 /* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line under the far row.

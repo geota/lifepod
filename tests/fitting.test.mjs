@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { appUrl, engines, fontsReady, openPage, reload, savedGame, test } from './helpers.mjs';
+import { appUrl, engines, faceBoxes, fontsReady, openPage, reload, savedGame, test } from './helpers.mjs';
 
 const { chromium } = engines;
 // A strip keeps its buttons in place for stripHoldTime after its last tap (web/js/logic/data.js).
@@ -136,4 +136,61 @@ async function checkResizeCost(t, engine) {
 test('chromium: a strip tap that changes no width forces no fit', t => checkStripTapCost(t));
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: a resize measures and fits the board once`, t => checkResizeCost(t, engine));
+}
+
+// ---- Where the badge rows sit (docs/review/DESIGN-AUDIT.md S1, S6, S7) -------------------------------------------------
+
+// Commander damage from every opponent and poison on every tile, mana off.
+function damageBoard(count, rotations = Array(count).fill(0)) {
+  return savedGame(count, {
+    rotations, counters: { commander: true, poison: true }, poison: Array(count).fill(3),
+    commanderDamage: Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) => (defender === attacker ? 0 : 4))),
+  });
+}
+
+// S7: at 5 and 6 players, the tiles of a board row line their far rows up at the same depth from their far edge, in
+// the face's own coordinates, whether or not the pill reaches each one.
+async function checkFarRowsAligned(t, engine) {
+  for (const count of [5, 6]) {
+    const page = await openPage(t, engine, { game: damageBoard(count) });
+    const faces = await faceBoxes(page, { far: '.badges.far > .chip' });
+    // The top row faces down and the bottom row up; a sideways end seat stands alone.
+    const rows = new Map();
+    for (const face of faces) rows.set(face.edge, [...(rows.get(face.edge) ?? []), face.far.top]);
+    for (const [edge, tops] of rows) {
+      assert.ok(Math.max(...tops) - Math.min(...tops) <= 1, `${count} players, the ${edge} row: far rows at one depth (${tops.join(', ')})`);
+    }
+    await page.close();
+  }
+}
+
+// S6: with 2 players the far rows keep at least --space-4 (16px) clear of the upright pill, beyond its clearance.
+async function checkSeamGap(t, engine) {
+  const page = await openPage(t, engine, { game: damageBoard(2) });
+  const gaps = await page.evaluate(() => {
+    const pill = document.querySelector('#board-controls').getBoundingClientRect();
+    return [...document.querySelectorAll('.badges.far')].map((row) => {
+      const box = row.getBoundingClientRect();
+      // The left tile's far row sits to the pill's left, the right tile's to its right.
+      return Math.max(pill.left - box.right, box.left - pill.right);
+    });
+  });
+  for (const gap of gaps) assert.ok(gap >= 16, `a far row keeps 16px from the pill (${gap.toFixed(1)}px)`);
+}
+
+// S1: a tall tablet tile sizes its badges from its height too, so at 6 players on an iPad they're larger than a
+// width-only size (3.6 hundredths of the tile's width) would make them.
+async function checkTabletBadges(t, engine) {
+  const page = await openPage(t, engine, { viewport: { width: 1366, height: 1024 }, mobile: false, game: damageBoard(6) });
+  const { size, widthOnly } = await page.evaluate(() => {
+    const board = document.querySelector('#board');
+    return { size: parseFloat(getComputedStyle(document.querySelector('.badges.near')).fontSize), widthOnly: parseFloat(board.style.getPropertyValue('--ui')) * 0.036 };
+  });
+  assert.ok(size > widthOnly * 1.15, `badges grow with a tall tile (${size.toFixed(1)}px against ${widthOnly.toFixed(1)}px)`);
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: far rows line up across a board row at 5 and 6 players`, t => checkFarRowsAligned(t, engine));
+  test(`${name}: with 2 players the far rows keep clear of the pill`, t => checkSeamGap(t, engine));
+  test(`${name}: badges on a tall tablet tile grow with its height`, t => checkTabletBadges(t, engine));
 }

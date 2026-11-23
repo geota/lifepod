@@ -124,7 +124,9 @@ function measureBadgeRoom() {
     const parts = [.../** @type {NodeListOf<HTMLElement>} */ (face.querySelectorAll('.score, .out-tag, .controls button'))].filter(part => part.offsetWidth);
     if (!parts.length) continue;
     const clear = side => parseFloat(player.style.getPropertyValue(`--clear-${side}`)) || 0;
-    far = Math.min(far, Math.min(...parts.map(part => part.offsetTop)) - Math.max(edge, clear('far')) - 2);
+    // The far row sits at its tile's --far-offset (measureBoard), which is at least its own clearance.
+    const farOffset = parseFloat(player.style.getPropertyValue('--far-offset')) || 0;
+    far = Math.min(far, Math.min(...parts.map(part => part.offsetTop)) - Math.max(edge, farOffset) - 2);
     near = Math.min(near, face.offsetHeight - Math.max(edge, clear('near')) - Math.max(...parts.map(part => part.offsetTop + part.offsetHeight)) - 2);
   }
   const set = (property, room) => {
@@ -318,6 +320,7 @@ function fitStrips() {
   const controls = boardControls.getBoundingClientRect();
   const inset = controls.height > controls.width ? controls.width / 8 : controls.height / 8;
   const pill = { left: controls.left + inset, right: controls.right - inset, top: controls.top + inset, bottom: controls.bottom - inset };
+  const seam = boardControls.hasAttribute('data-vertical');
   const tiles = strips.map((strip) => {
     const player = /** @type {HTMLElement} */ (strip.closest('.player'));
     const face = /** @type {HTMLElement} */ (strip.closest('.player-face'));
@@ -351,8 +354,12 @@ function fitStrips() {
   const placeStrips = (slack, wrap) => {
     readTiles();
     let pending = tiles.filter(tile => !((wrap || tile.line * slack <= tile.room + 1) && clear(tile)));
-    placeAll('inline', pending);
-    pending = pending.filter(tile => !(tile.farWidth + (tile.farWidth ? 4 : 0) + tile.line * slack <= tile.room + 1 && clear(tile)));
+    // With 2 players the far rows face the upright pill, so a strip stays on the side of its far row away from the pill
+    // rather than beside it on the row's line (DESIGN-AUDIT S6).
+    if (!seam) {
+      placeAll('inline', pending);
+      pending = pending.filter(tile => !(tile.farWidth + (tile.farWidth ? 4 : 0) + tile.line * slack <= tile.room + 1 && clear(tile)));
+    }
     placeAll('fold', pending);
     // With no far row, the chip's own line is where the end of the far row's line would be.
     const folded = pending.filter(tile => (tile.strip.offsetWidth * slack <= tile.room + 1 && clear(tile)) || tile.far.hidden);

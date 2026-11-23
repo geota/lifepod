@@ -66,8 +66,9 @@ export function measureBoard() {
     };
   });
   const grow = growPixel();
+  const seamGap = parseFloat(getComputedStyle(board).getPropertyValue('--space-4')) || 16;
   syncBoardDigits();
-  const readings = JSON.stringify([area, size, shown, restPillButtons(game), grow, game.reminders.gestures,
+  const readings = JSON.stringify([area, size, shown, seamGap, restPillButtons(game), grow, game.reminders.gestures,
     shownCounters(game).length + trackedDesignations(game).length, tiles.map(tile => [tile.edge, tile.left, tile.top, tile.right, tile.bottom, tile.faceWidth, tile.faceHeight])]);
   if (readings === measured) return;
   measured = readings;
@@ -80,12 +81,15 @@ export function measureBoard() {
     const clear = centreClearance(tile, pill, farClear);
     return { ...tile, clear, width: tile.faceWidth - clear.start - clear.end, height: tile.faceHeight - clear.near - Math.max(0, clear.far - farClear) };
   });
-  for (const { player, clear } of usable) {
+  const farOffsets = farRowOffsets(usable, game.scores.length === 2 ? seamGap : 0);
+  usable.forEach(({ player, clear }, index) => {
     for (const edge of faceEdges) {
       if (clear[edge]) player.style.setProperty(`--clear-${edge}`, `${clear[edge]}px`);
       else player.style.removeProperty(`--clear-${edge}`);
     }
-  }
+    if (farOffsets[index]) player.style.setProperty('--far-offset', `${farOffsets[index]}px`);
+    else player.style.removeProperty('--far-offset');
+  });
   const width = Math.min(...usable.map(face => face.width));
   const height = Math.min(...usable.map(face => face.height));
   if (!(width > 0) || !(height > 0)) return;
@@ -97,6 +101,26 @@ export function measureBoard() {
   sizeMapSeats(usable, size, width < 240 || height < 200, grow);
   fitModeGrids(usable, { width, height, size, grow, tight: width < 240 || height < 200 });
   requestFit();
+}
+
+// How far each tile's far row sits from its far edge (--far-offset), where the pill reaches it (DESIGN-AUDIT S6, S7).
+// The tiles whose far edges lie on one line, such as a board row's tiles facing the seam, all keep the deepest of their
+// clearances, so their far rows line up across the row like their totals rather than stepping around the pill. With 2
+// players, whose far rows face the upright pill along the middle seam, they keep a further gap (--space-4) from it.
+/**
+ * @param {(Tile & { clear: Record<string, number> })[]} tiles
+ * @param {number} gap
+ */
+function farRowOffsets(tiles, gap) {
+  // Where a tile's far edge is on the board: the face's top, turned with the seat.
+  const farLine = ({ edge, left, top, right, bottom }) => `${edge} ${Math.round({ bottom: top, top: bottom, left: right, right: left }[edge] ?? top)}`;
+  /** @type {Map<string, number>} */
+  const deepest = new Map();
+  for (const tile of tiles) deepest.set(farLine(tile), Math.max(deepest.get(farLine(tile)) ?? 0, tile.clear.far));
+  return tiles.map((tile) => {
+    const clear = deepest.get(farLine(tile)) ?? 0;
+    return clear ? clear + gap : 0;
+  });
 }
 
 // Places the pill and returns the box its buttons cover now, in the board's own coordinates. The place is chosen for
