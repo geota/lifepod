@@ -254,17 +254,17 @@ test('webkit: a WKWebView host without the game handler gets the browser fallbac
 });
 
 // Reduce Transparency on iOS: LifePodApp.swift injects it before the page loads and runs its own script when it changes.
-// The app starts on Glass on iOS, whose pill, settings header and dialogs go solid while it's on.
+// The app starts on Glass on iOS, whose settings header and dialogs go solid while it's on (the pill is always solid).
 const reduceScript = enabled => swift.match(/evaluateJavaScript\("(window\.setReduceTransparency.+?)", completionHandler/)[1].replace('\\(enabled)', String(enabled));
-// The pill's fill, and the blur behind the dialogs (the board's pill has none; DESIGN-AUDIT S10).
+// The dialogs' fill and the blur behind them (the board's pill has no blur and a solid tint; DESIGN-AUDIT S10, FINAL.md
+// U4).
 const glassChrome = page => page.evaluate(() => {
-  const pill = getComputedStyle(document.querySelector('#board-controls'), '::before');
   const dialog = getComputedStyle(document.querySelector('#dice'));
   return {
     style: document.documentElement.dataset.style,
     reduce: document.documentElement.hasAttribute('data-reduce-transparency'),
     filter: dialog.webkitBackdropFilter ?? dialog.backdropFilter,
-    opaque: pill.backgroundColor.startsWith('rgb('),
+    opaque: dialog.backgroundColor.startsWith('rgb('),
   };
 });
 
