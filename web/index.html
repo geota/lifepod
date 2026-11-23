@@ -92,6 +92,9 @@
         <button class="close" type="button" id="settings-close" data-close aria-label="Close settings" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
         <h2 id="settings-title">Settings</h2>
         <button class="close" type="button" id="settings-flip" aria-label="Turn settings to face the other side" aria-pressed="false"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,224.49l-24,24a12,12,0,0,1-17-17L171,228H80a28,28,0,0,1-28-28V108a12,12,0,0,1,24,0v92a4,4,0,0,0,4,4h91l-3.52-3.51a12,12,0,0,1,17-17l24,24A12,12,0,0,1,208.49,224.49ZM80,76a12,12,0,0,0,8.49-20.49L85,52h91a4,4,0,0,1,4,4v92a12,12,0,0,0,24,0V56a28,28,0,0,0-28-28H85l3.52-3.52a12,12,0,0,0-17-17l-24,24a12,12,0,0,0,0,17l24,24A12,12,0,0,0,80,76Z"/></svg></button>
+        <!-- New game, one tap from anywhere in settings. It hides while players or life are changed, when Done itself
+             reads "Start new game". -->
+        <button class="secondary fs-newgame" type="button" id="restart-button" aria-haspopup="dialog">New game</button>
         <button class="primary fs-done" type="submit" id="save-setup">Done</button>
       </header>
       <div class="fs-body" id="settings-body">
@@ -128,7 +131,6 @@
               </div>
               <p class="fs-pending" id="settings-pending" aria-live="polite" data-empty></p>
               <div class="fs-gamefoot">
-                <button class="secondary fs-newgame" type="button" id="restart-button">New game</button>
                 <label class="switch-row compact-switch fs-awake">
                   <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M116,36V32a12,12,0,0,1,24,0v4a12,12,0,0,1-24,0Zm80,92a68,68,0,1,1-68-68A68.07,68.07,0,0,1,196,128Zm-24,0a44,44,0,1,0-44,44A44.05,44.05,0,0,0,172,128ZM51.51,68.49a12,12,0,1,0,17-17l-4-4a12,12,0,0,0-17,17Zm0,119-4,4a12,12,0,0,0,17,17l4-4a12,12,0,1,0-17-17ZM196,72a12,12,0,0,0,8.49-3.51l4-4a12,12,0,0,0-17-17l-4,4A12,12,0,0,0,196,72Zm8.49,115.51a12,12,0,0,0-17,17l4,4a12,12,0,0,0,17-17ZM48,128a12,12,0,0,0-12-12H32a12,12,0,0,0,0,24h4A12,12,0,0,0,48,128Zm80,80a12,12,0,0,0-12,12v4a12,12,0,0,0,24,0v-4A12,12,0,0,0,128,208Zm96-92h-4a12,12,0,0,0,0,24h4a12,12,0,0,0,0-24Z"/></svg><span class="nav-label">Keep awake</span>
                   <input type="checkbox" id="keep-awake" role="switch">
@@ -147,19 +149,23 @@
                   <button type="button" data-choice="glass">Glass</button>
                 </div>
               </div>
-              <!-- Tile colours (design/polish/TILES.md): four sets of the same twelve swatches, saved the moment it changes. -->
-              <div class="setting-row k-row k-words" id="tiles-row">
+              <!-- Tile colours (design/polish/TILES.md): four sets of the same twelve swatches, saved the moment it changes.
+                   A segmented choice like Style, each segment showing its set's colours for players 1–4. -->
+              <div class="setting-row" id="tiles-row">
                 <span class="setting-label" id="tiles-label">Tile colours</span>
-                <div class="k-slider" id="tiles-slider">
-                  <div class="k-stops" id="tile-set-choices">
-                    <button class="k-stop" type="button" tabindex="-1" data-value="0" data-set="classic">Classic</button>
-                    <button class="k-stop" type="button" tabindex="-1" data-value="1" data-set="soft">Soft</button>
-                    <button class="k-stop" type="button" tabindex="-1" data-value="2" data-set="jewel">Jewel</button>
-                    <button class="k-stop" type="button" tabindex="-1" data-value="3" data-set="clear">Clear</button>
-                  </div>
-                  <div class="k-track" id="tiles-track" role="slider" tabindex="0" aria-labelledby="tiles-label" aria-valuemin="0" aria-valuemax="3"><span class="k-fill"></span><span class="k-ticks"></span><span class="k-thumb"></span></div>
+                <div class="segmented tile-sets" id="tile-set-choices" role="group" aria-labelledby="tiles-label">
+                  <button type="button" data-set="classic"><span class="tile-strip" aria-hidden="true"><span></span><span></span><span></span><span></span></span>Classic</button>
+                  <button type="button" data-set="soft"><span class="tile-strip" aria-hidden="true"><span></span><span></span><span></span><span></span></span>Soft</button>
+                  <button type="button" data-set="jewel"><span class="tile-strip" aria-hidden="true"><span></span><span></span><span></span><span></span></span>Jewel</button>
+                  <button type="button" data-set="clear"><span class="tile-strip" aria-hidden="true"><span></span><span></span><span></span><span></span></span>Clear</button>
                 </div>
               </div>
+              <!-- Off by default. When on, each new game deals every player a random colour from the set, one per family. -->
+              <label class="switch-row wide-switch" id="shuffle-colours-row">
+                <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M240.49,175.51a12,12,0,0,1,0,17l-24,24a12,12,0,0,1-17-17L203,196h-2.09a76.17,76.17,0,0,1-61.85-31.83L97.38,105.78A52.1,52.1,0,0,0,55.06,84H32a12,12,0,0,1,0-24H55.06a76.17,76.17,0,0,1,61.85,31.83l41.71,58.39A52.1,52.1,0,0,0,200.94,172H203l-3.52-3.51a12,12,0,0,1,17-17Zm-95.62-72.62a12,12,0,0,0,16.93-1.13A52,52,0,0,1,200.94,84H203l-3.52,3.51a12,12,0,0,0,17,17l24-24a12,12,0,0,0,0-17l-24-24a12,12,0,0,0-17,17L203,60h-2.09a76,76,0,0,0-57.2,26A12,12,0,0,0,144.87,102.89Zm-33.74,50.22a12,12,0,0,0-16.93,1.13A52,52,0,0,1,55.06,172H32a12,12,0,0,0,0,24H55.06a76,76,0,0,0,57.2-26A12,12,0,0,0,111.13,153.11Z"/></svg><span class="nav-label">Shuffle tile colours each game</span>
+                <input type="checkbox" id="shuffle-colours-switch" role="switch">
+                <span class="switch" aria-hidden="true"></span>
+              </label>
               <!-- Badge size: the type of the badge rows and the mana strip, saved the moment it changes. -->
               <div class="setting-row k-row k-words" id="badge-size-row">
                 <span class="setting-label" id="badge-size-label">Badge size</span>
@@ -305,25 +311,32 @@
     </form>
   </dialog>
 
-  <dialog id="discard" aria-labelledby="discard-title" aria-describedby="discard-message">
+  <!-- The two confirmations share one style (DESIGN-AUDIT S4): the destructive action in the danger tint, and the safe
+       one as the primary button, which has focus, so Enter, Escape and back all keep things as they are. -->
+  <dialog id="discard" class="confirm" aria-labelledby="discard-title" aria-describedby="discard-message">
     <form class="sheet" method="dialog">
       <h2 id="discard-title"></h2>
       <p id="discard-message"></p>
       <div class="sheet-actions">
-        <button class="secondary discard" type="submit" value="discard">Discard</button>
+        <button class="secondary danger" type="submit" value="discard">Discard</button>
         <button class="primary" type="submit" value="keep" autofocus>Keep editing</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="restart" aria-labelledby="restart-title" aria-describedby="restart-message">
+  <!-- New game's confirmation, over settings: what resets, and what stays. -->
+  <dialog id="restart" class="confirm" aria-labelledby="restart-title" aria-describedby="restart-message restart-resets restart-keeps">
     <form class="sheet" method="dialog">
-      <div class="sheet-header">
-        <h2 id="restart-title">Start a new game?</h2>
-        <button class="close" type="submit" value="cancel" aria-label="Cancel new game" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+      <h2 id="restart-title">Start a new game?</h2>
+      <div class="confirm-body">
+        <p id="restart-message"></p>
+        <ul class="confirm-list" id="restart-resets"></ul>
       </div>
-      <p id="restart-message"></p>
-      <button class="primary" type="submit" value="restart">Start new game</button>
+      <p class="confirm-keeps" id="restart-keeps"></p>
+      <div class="sheet-actions">
+        <button class="secondary danger" type="submit" value="restart">Start new game</button>
+        <button class="primary" type="submit" value="cancel" autofocus>Cancel</button>
+      </div>
     </form>
   </dialog>
 </body>

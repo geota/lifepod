@@ -182,6 +182,35 @@ export function randomBelow(count) {
   return value[0] % count;
 }
 
+// Settings → Table → Shuffle tile colours each game: a random, distinct swatch for each of count players. families is the
+// tile set's (tileSets in data.js): one family number per swatch id. The ids are shuffled uniformly (Fisher–Yates, from
+// below, which is randomBelow's crypto RNG unless a test passes its own), and each seat takes the next id whose family
+// no seat has yet, so the table is spread while families last (six, so up to six players); any seat left takes the next
+// unused id.
+/**
+ * @param {number} count
+ * @param {number[]} families
+ * @param {(count: number) => number} [below]
+ * @returns {number[]}
+ */
+export function shuffledColours(count, families, below = randomBelow) {
+  const order = [...families.keys()];
+  for (let at = order.length - 1; at > 0; at--) {
+    const other = below(at + 1);
+    [order[at], order[other]] = [order[other], order[at]];
+  }
+  const picked = [];
+  const taken = new Set();
+  for (const id of order) {
+    if (picked.length < count && !taken.has(families[id])) {
+      picked.push(id);
+      taken.add(families[id]);
+    }
+  }
+  for (const id of order) if (picked.length < count && !picked.includes(id)) picked.push(id);
+  return picked;
+}
+
 // ---- The monarch and the initiative ---------------------------------------------------------------------------------
 
 // Whose designations pass on by themselves when their holder leaves the game: only in Turn by turn, once somebody's turn

@@ -207,6 +207,15 @@ let shipped = css;
 for (const [setting, source] of [['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
   shipped = shipped.replace(new RegExp(`\\[data-tiles="${setting}"\\] \\{[^}]*\\}`), block(setting, sets[source].set));
 }
+// The Tile colours control's previews: each set's panel and rim for players 1–4 (ids 0–3; players 1 and 2 sit in the
+// top row, 3 and 4 in the bottom), whichever set is in use.
+const strip = (setting, set) => `.tile-sets > [data-set="${setting}"] { ${[0, 1, 2, 3].map(player => {
+  const palette = set[ids[player]][player < 2 ? 'top' : 'bottom'];
+  return `--strip-${player + 1}: ${palette.panel}; --strip-${player + 1}-rim: ${palette.rim};`;
+}).join(' ')} }`;
+for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
+  shipped = shipped.replace(new RegExp(`\\.tile-sets > \\[data-set="${setting}"\\] \\{[^}]*\\}`), strip(setting, sets[source].set));
+}
 if (shipped !== css) writeFileSync(cssPath, shipped);
 
 console.log('| Set | Life total ≥ 9 | Small text ≥ 7.6 | Life-out red ≥ 4.79 | Seat colour on panel ≥ 7.35 | Warning chip ≥ 4.5 | Closest pair: normal | deuteranope | protanope | tritanope | Across rows, deuteranope |');

@@ -3,8 +3,8 @@
 
 import { layoutBoard, syncBoardTurn } from '../layout/board.js';
 import { resetDrops } from '../layout/fit.js';
-import { clockwiseEdges, countKinds } from '../logic/data.js';
-import { isOut, leavingTransfers, outPlayers } from '../logic/rules.js';
+import { clockwiseEdges, countKinds, tileSets } from '../logic/data.js';
+import { isOut, leavingTransfers, outPlayers, shuffledColours } from '../logic/rules.js';
 import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from '../logic/save.js';
 import { announceDesignation, announceLife, clearAnnouncements } from '../render/announce.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
@@ -83,10 +83,12 @@ export function renderBoard() {
  */
 export function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
-  game.colors = fitColors(game.colors, playerCount);
-  // A new game resets the counts and keeps the counter switches, colours and colour identities.
+  // A new game keeps every setting, the seats' rotations (for the same player count) and the tile colours, or deals
+  // each player a random one from the tile set when Shuffle tile colours each game is on (SPEC §10.2). It resets life,
+  // every count, commander damage and the colour identities.
+  game.colors = game.shuffleColours ? shuffledColours(playerCount, tileSets[game.tileColours].families) : fitColors(game.colors, playerCount);
   for (const kind of countKinds) game[kind] = fitCounts([], playerCount);
-  game.identities = fitIdentities(game.identities, playerCount);
+  game.identities = fitIdentities([], playerCount);
   game.commanderDamage = fitDamage([], playerCount);
   // Pools empty, and the game starts at round 1 with nobody first, until "Who goes first?" picks someone.
   game.pools = fitPools([], playerCount);

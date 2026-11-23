@@ -11,6 +11,8 @@
   color-scheme: dark;
 
   --danger-text: #ffc7b2;
+  /* A destructive button (Discard, Start new game): the danger text on a coral-tinted fill. */
+  --danger-fill: color-mix(in oklab, #f49993 16%, #242528);
   /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
   --life-out: #f49993;
   /* Close to losing: amber text from 15 commander damage or 7 poison, at least 6:1 on its tinted chip. */
@@ -1453,10 +1455,15 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .ci[data-ci="UBRG"] { background: conic-gradient(#3b6ba0 45deg, #383431 45deg 135deg, #c6553e 135deg 225deg, #3d684b 225deg 315deg, #3b6ba0 315deg); }
 .ci[data-ci="WUBRG"] { background: conic-gradient(#fff 36deg, #3b6ba0 36deg 108deg, #383431 108deg 180deg, #c6553e 180deg 252deg, #3d684b 252deg 324deg, #fff 324deg); }
 
-#discard { width: min(360px, calc(100% - 32px)); }
-#discard h2 { font-size: var(--type-title); letter-spacing: -.022em; }
-#discard-message { color: var(--muted); }
-#discard .discard { color: var(--danger-text); }
+/* The confirmations, Discard and New game (DESIGN-AUDIT S4): one style. The destructive action is a secondary button in
+   the danger tint, and the safe one, which has focus, is the primary. New game lists what resets. */
+dialog.confirm { width: min(380px, calc(100% - 32px)); }
+.confirm h2 { font-size: var(--type-title); letter-spacing: -.022em; }
+.confirm p { color: var(--muted); }
+.secondary.danger { background: var(--danger-fill); color: var(--danger-text); }
+.confirm-body { display: grid; gap: var(--space-1); }
+.confirm-list { display: grid; gap: 2px; margin: 0; padding: 0 0 0 1.25em; color: var(--text-soft); font-size: var(--type-label); }
+.confirm .confirm-keeps { font-size: var(--type-label); }
 
 dialog {
   width: min(420px, calc(100% - 32px));
@@ -1487,7 +1494,6 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .privacy-text h4 { margin: var(--space-2) 0 0; font-size: .875rem; color: var(--text); }
 .privacy-text h4:first-child { margin-top: 0; }
 .sheet-actions { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
-#restart-message { color: var(--muted); }
 
 /* Buttons (direction A): capsules filled one tone above their card, with no outline. The primary button is the one
    accent fill in its view. Pressed lays the 10% state layer over the fill; disabled is 38%. */
@@ -1576,6 +1582,19 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
 .segmented > button[aria-pressed="true"] { border-color: var(--segment-chosen-fill); border-radius: var(--segment-chosen); background: var(--segment-chosen-fill); color: var(--segment-chosen-ink); box-shadow: var(--segment-chosen-shadow); }
 .segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
+/* Tile colours (DESIGN-AUDIT S2): a segment per set, each with a strip of that set's tiles for players 1–4 over its
+   name, so the choice shows what it does. Each tile is its panel with a rim, as on the board. The colours are written
+   by design/polish/tiles7.mjs. */
+.tile-sets > button { flex-direction: column; gap: 5px; padding-block: 7px 6px; }
+.tile-strip { display: flex; gap: 3px; }
+.tile-strip > span { width: 14px; height: 14px; border-radius: 4px; background: var(--strip-1); box-shadow: inset 0 0 0 1.5px var(--strip-1-rim); }
+.tile-strip > :nth-child(2) { background: var(--strip-2); box-shadow: inset 0 0 0 1.5px var(--strip-2-rim); }
+.tile-strip > :nth-child(3) { background: var(--strip-3); box-shadow: inset 0 0 0 1.5px var(--strip-3-rim); }
+.tile-strip > :nth-child(4) { background: var(--strip-4); box-shadow: inset 0 0 0 1.5px var(--strip-4-rim); }
+.tile-sets > [data-set="classic"] { --strip-1: #2f432f; --strip-1-rim: #556e4e; --strip-2: #2c4352; --strip-2-rim: #517187; --strip-3: #432a27; --strip-3-rim: #7b4f44; --strip-4: #342b41; --strip-4-rim: #655179; }
+.tile-sets > [data-set="soft"] { --strip-1: #2d4633; --strip-1-rim: #4f7658; --strip-2: #20454f; --strip-2-rim: #3a7584; --strip-3: #462828; --strip-3-rim: #7d4d4d; --strip-4: #2e2f48; --strip-4-rim: #565880; }
+.tile-sets > [data-set="jewel"] { --strip-1: #204421; --strip-1-rim: #447038; --strip-2: #15425b; --strip-2-rim: #347096; --strip-3: #4b211d; --strip-3-rim: #8a402e; --strip-4: #35244a; --strip-4-rim: #69458a; }
+.tile-sets > [data-set="clear"] { --strip-1: #184939; --strip-1-rim: #2d7b61; --strip-2: #124054; --strip-2-rim: #266e8f; --strip-3: #501717; --strip-3-rim: #8f3534; --strip-4: #281847; --strip-4-rim: #543a87; }
 
 /* Switch: 36 × 20. Off is an outlined track with a small thumb; on is the accent with a larger ink thumb, so the shape
    changes as well as the colour. */
@@ -1705,6 +1724,9 @@ dialog.fs[data-flipped] { transform: rotate(180deg); }
 .fs-head h2 { flex: 1; min-width: 0; overflow: hidden; font-size: 1.25rem; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .fs-head .close .icon { width: 18px; height: 18px; }
 .fs-done { flex: none; font-size: 1rem; font-weight: var(--weight-heavy); white-space: nowrap; }
+/* New game sits beside Done, always one tap away (it hides while a new game is pending, when Done starts it). */
+.fs-head .fs-newgame { flex: none; padding-inline: var(--space-4); font-size: 1rem; white-space: nowrap; }
+.fs-newgame[hidden] { display: none; }
 .fs-body {
   position: relative;
   grid-row: calc(2 - var(--head-overlay)) / 3;
@@ -1739,9 +1761,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.fs-newgame { min-height: 48px; padding: 0 var(--space-5); font-size: 1rem; }
-.fs-newgame[hidden] { display: none; }
-.fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; margin-inline-start: auto; }
+.fs-gamefoot > .fs-awake { flex: 1 1 11rem; max-width: 18rem; min-height: 48px; }
 /* The pending new game (P1), a live region kept in the page and visually hidden while it's empty. */
 .fs-pending { display: flex; align-items: center; gap: var(--space-2); padding: 10px var(--space-3); border-radius: var(--row-radius); background: color-mix(in oklab, var(--accent) 14%, var(--card-fill)); color: var(--text); font-size: var(--type-label); }
 .fs-pending .icon { flex: none; width: 16px; height: 16px; color: var(--accent); }
@@ -1762,11 +1782,16 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   transition: opacity .15s;
 }
 .scroll-cue[data-more]::before { opacity: 1; }
-/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole. A floating header
-   (Glass) halves its side margin and takes the other half from its padding. */
+/* On the narrowest portrait phones, "Start new game" may take two lines, so the title stays whole, and while New game
+   shows beside Done the title is left to screen readers. A floating header (Glass) halves its side margin and takes the
+   other half from its padding. */
 @media (max-width: 400px) {
   .fs-head { --head-side: .5; gap: 6px; padding-inline: calc(var(--space-3) - var(--head-margin) / 2); }
   .fs-done { max-width: 6.75rem; padding-inline: 12px; font-size: .9375rem; line-height: 1.1; white-space: normal; }
+  .fs-head .fs-newgame { padding-inline: 12px; font-size: .9375rem; }
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- clip-path with inset() on an HTML element works on the floor; the partial notes are about SVG references and unprefixed mask-*. */
+  .fs-head:has(> .fs-newgame:not([hidden])) h2 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .fs-head:has(> .fs-newgame:not([hidden])) #settings-flip { margin-inline-start: auto; }
 }
 /* Under 360px tall (568 × 320), the header and the cards tighten. */
 @media (max-height: 359.98px) {
@@ -1781,7 +1806,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
    a 16px track with an accent fill, notches as dots and a 4px bar handle. The whole slider takes a tap or a sideways
    drag; a vertical swipe scrolls the page. */
 .k-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'slider slider'; }
-#players-row, #tiles-row, #badge-size-row { grid-template-areas: 'label label' 'slider slider'; }
+#players-row, #badge-size-row { grid-template-areas: 'label label' 'slider slider'; }
 .k-row > .setting-label { grid-area: label; }
 .k-row > .k-slider { grid-area: slider; }
 .k-row > .k-val { grid-area: value; justify-self: end; }
@@ -1803,7 +1828,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   font-variant-numeric: tabular-nums;
 }
 .k-stop[aria-pressed="true"] { color: var(--accent); font-weight: 800; }
-/* A slider whose stops are words (Tile colours, Badge size): each stop is as wide as its word, and the ends keep room for half of one. */
+/* A slider whose stops are words (Badge size): each stop is as wide as its word, and the ends keep room for half of one. */
 .k-words .k-slider { margin: 0 36px; }
 .k-words .k-stop { width: auto; min-width: var(--tap-min); padding: 0 6px; white-space: nowrap; }
 .k-stop:active { background: var(--state-pressed); }
@@ -1812,6 +1837,8 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .k-track::before, .k-fill { position: absolute; top: 50%; height: var(--slider-track); transform: translateY(-50%); border-radius: var(--radius-full); content: ''; }
 .k-track::before { left: -8px; right: -8px; background: var(--slider-track-fill); }
 .k-fill { left: -8px; width: calc(var(--p, 0%) + 8px); background: var(--slider-fill); }
+/* At the track's start nothing is filled, so no sliver of fill peeks out beside the handle (DESIGN-AUDIT S9). */
+.k-track[data-min] .k-fill { visibility: hidden; }
 .k-ticks { position: absolute; inset: 0; }
 .k-tick { position: absolute; top: 50%; width: var(--tick-width); height: var(--tick-height); transform: translate(-50%, -50%); border-radius: var(--tick-radius); background: var(--tick-fill); }
 .k-tick[data-stop] { width: var(--tick-stop-width); height: var(--tick-stop-height); }

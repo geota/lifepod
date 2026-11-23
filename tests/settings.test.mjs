@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { backHandling, button, engines, eventually, openPage, reload, saved, scores, seedGame, test, turnScreen } from './helpers.mjs';
+import { readFileSync } from 'node:fs';
+import { backHandling, button, engines, eventually, openPage, reload, saved, savedGame, scores, seedGame, test, turnScreen } from './helpers.mjs';
 
 // The full-screen settings page (design/polish/SETTINGS-SPEC.md) and its controls (design/polish/STYLE.md): layout B,
 // the notched players and life sliders, the inline life editor, the pending new game (P1), the flip (O1), board
@@ -154,7 +155,11 @@ for (const [name, engine] of Object.entries(engines)) {
     await page.keyboard.press('Home');
     await page.keyboard.press('ArrowDown');
     assert.equal((await sliderState(page, 'players')).now, 2, 'never below 2');
+    // At the start of the track nothing is filled, so no sliver of fill shows beside the handle (DESIGN-AUDIT S9).
+    const fill = () => page.locator('#players-track').evaluate(track => [track.hasAttribute('data-min'), getComputedStyle(track.querySelector('.k-fill')).visibility]);
+    assert.deepEqual(await fill(), [true, 'hidden'], 'no fill at the minimum');
     await page.keyboard.press('ArrowUp');
+    assert.deepEqual(await fill(), [false, 'visible'], 'the fill shows above it');
     await page.locator('#save-setup').tap();
     assert.equal((await scores(page)).length, 3, 'Start new game deals the chosen players');
   });
@@ -367,10 +372,22 @@ for (const [name, engine] of Object.entries(engines)) {
     const page = await openPage(t, engine, { native: engine === chromium ? 'android' : undefined });
     await page.locator('.player').first().locator('.add').tap();
     await button(page, 'Settings').tap();
+    // New game is in the fixed header, beside Done, in view at the top of the page.
+    const head = await page.locator('.fs-head').boundingBox();
+    const newGame = await button(page, 'New game').boundingBox();
+    assert.ok(newGame.y >= head.y && newGame.y + newGame.height <= head.y + head.height, 'New game is in the header');
+    assert.equal(await page.locator('#settings-game #restart-button').count(), 0, 'the Game section has no New game of its own');
     await button(page, 'New game').tap();
     await eventually(() => openDialogs(page), ['settings', 'restart'], 'the confirmation opens over settings');
-    assert.equal(await page.locator('#restart-message').textContent(), 'All players will go back to 40 life.');
-    await button(page, 'Cancel new game').tap();
+    // It lists what resets, naming only what this game shows, and what stays.
+    assert.equal(await page.locator('#restart-message').textContent(), 'For 4 players. This resets:');
+    assert.deepEqual(await page.locator('#restart-resets li').allTextContents(), ['Life totals, back to 40', 'Colour identities']);
+    assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings, seats and tile colours stay.');
+    // Discard's style: the destructive action in the danger tint, and Cancel the focused primary.
+    assert.equal(await page.locator('#restart button[value="restart"]').getAttribute('class'), 'secondary danger');
+    assert.equal(await page.locator('#restart button[value="cancel"]').getAttribute('class'), 'primary');
+    assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Cancel', 'Cancel has focus');
+    await button(page, 'Cancel').tap();
     await eventually(() => openDialogs(page), ['settings'], 'cancelling returns to settings');
     if (engine === chromium) {
       // Android back closes the confirmation first, then settings.
@@ -382,6 +399,24 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Start new game').last().tap();
     await eventually(() => openDialogs(page), [], 'confirming closes both');
     assert.deepEqual(await scores(page), [40, 40, 40, 40]);
+  });
+
+  // The list names what this game shows: every tracker on, mana, turns and the shuffle.
+  test(`${name}: New game's confirmation lists everything that resets in a busy game`, async (t) => {
+    const page = await openPage(t, engine, {
+      game: savedGame(4, {
+        counters: { commander: true, poison: true, energy: true, experience: false, rad: false, monarch: true, initiative: true },
+        manaPool: true, turns: 'rounds', shuffleColours: true, startingLife: 30, scores: [30, 30, 30, 30],
+      }),
+    });
+    await button(page, 'Settings').tap();
+    await button(page, 'New game').tap();
+    assert.deepEqual(await page.locator('#restart-resets li').allTextContents(), [
+      'Life totals, back to 30', 'Counters and commander tax', 'Commander damage', 'Floating mana', 'Turns, back to round 1',
+      'The monarch and the initiative', 'Colour identities', 'Tile colours, shuffled',
+    ]);
+    assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings and seats stay.');
+    assert.equal(await page.locator('#restart').getAttribute('aria-describedby'), 'restart-message restart-resets restart-keeps');
   });
 }
 
@@ -497,6 +532,8 @@ for (const [name, engine] of Object.entries(engines)) {
     await toggle('Name');
     await button(page, 'Off').last().tap();
     await toggle('Keep awake');
+    await toggle('Shuffle tile colours each game');
+    assert.equal((await saved(page)).shuffleColours, true, 'Shuffle tile colours each game is saved at once');
     assert.deepEqual((await saved(page)).counters, { commander: true, poison: true, energy: false, experience: false, rad: true, monarch: false, initiative: true });
     const game = await saved(page);
     assert.deepEqual([game.manaPool, game.turns, game.identity.show.name, game.identity.background, game.keepAwake], [true, 'rounds', false, 'off', false]);
@@ -508,7 +545,7 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(checked, {
       Commander: true, Poison: true, Energy: false, Experience: false, Rad: true, 'Mana pool': true, Monarch: false, Initiative: true,
       'Empty mana pools when the turn passes': true, Indicator: true, Symbol: false, Name: false, 'Keep awake': false,
-      'Turn reminders': true, 'Pass-it-on hints': true, 'Gesture hints': true,
+      'Shuffle tile colours each game': true, 'Turn reminders': true, 'Pass-it-on hints': true, 'Gesture hints': true,
     }, 'every switch survives a reload');
   });
 }
@@ -649,18 +686,21 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal(start.set, 'clear', 'an old save gets Clear');
     assert.deepEqual(start.colours, ['rose', 'sky', 'coral', 'violet', 'amber', 'teal']);
     await button(page, 'Settings').tap();
-    assert.deepEqual(await sliderState(page, 'tiles'), { now: 3, text: 'Clear tile colours', at: 1, pinned: '' });
-    assert.deepEqual(await page.locator('#tile-set-choices .k-stop').allTextContents(), ['Classic', 'Soft', 'Jewel', 'Clear']);
+    // A segmented choice, like Style (DESIGN-AUDIT S2), with Clear chosen.
+    const choices = page.locator('#tile-set-choices');
+    assert.equal(await choices.getAttribute('role'), 'group');
+    assert.deepEqual(await choices.locator('button').allTextContents(), ['Classic', 'Soft', 'Jewel', 'Clear']);
+    assert.deepEqual(await choices.locator('button').evaluateAll(buttons => buttons.map(choice => choice.getAttribute('aria-pressed'))), ['false', 'false', 'false', 'true']);
 
-    // Each set, by tap and by key: the same swatch for every player, all different, in that set's colours.
+    // Each set, by tap: the same swatch for every player, all different, in that set's colours.
     const seen = new Set([start.panels.join()]);
     await button(page, 'Classic').tap();
     const classic = await tiles();
     assert.equal(classic.set, 'classic');
     assert.equal((await saved(page)).tileColours, 'classic', 'saved the moment it changes');
-    for (const [key, set] of [['ArrowRight', 'soft'], ['ArrowRight', 'jewel']]) {
-      await page.locator('#tiles-track').focus();
-      await page.keyboard.press(key);
+    assert.equal(await button(page, 'Classic').getAttribute('aria-pressed'), 'true');
+    for (const set of ['soft', 'jewel']) {
+      await choices.locator(`[data-set="${set}"]`).tap();
       assert.equal((await tiles()).set, set);
     }
     for (const state of [classic, await tiles()]) {
@@ -683,6 +723,27 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal((await tiles()).set, 'clear', 'an unknown set gets Clear');
   });
 }
+
+// Each Tile colours segment previews its set: a strip of the tiles players 1–4 get there (their panels, ringed in their
+// rims), whichever set is in use, so the choice shows what it does.
+test('chromium: each Tile colours segment shows its set\'s tiles for players 1–4', async (t) => {
+  const page = await openPage(t, chromium);
+  await button(page, 'Settings').tap();
+  const sets = JSON.parse(readFileSync(new URL('../design/polish/tiles7.json', import.meta.url), 'utf8'));
+  const ids = Object.keys(sets.today.set);
+  for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
+    const strip = await page.locator(`#tile-set-choices [data-set="${setting}"] .tile-strip > span`).evaluateAll(tiles => tiles.map((tile) => {
+      const style = getComputedStyle(tile);
+      return { panel: style.backgroundColor, rim: style.boxShadow };
+    }));
+    const rgb = hex => `rgb(${[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16)).join(', ')})`;
+    assert.deepEqual(strip, [0, 1, 2, 3].map((player) => {
+      const palette = sets[source].set[ids[player]][player < 2 ? 'top' : 'bottom'];
+      return { panel: rgb(palette.panel), rim: `${rgb(palette.rim)} 0px 0px 0px 1.5px inset` };
+    }), `${setting}: players 1–4 in that set`);
+  }
+  assert.equal(await page.locator('#tile-set-choices .tile-strip').first().getAttribute('aria-hidden'), 'true');
+});
 
 // ---- Compact switch rows ---------------------------------------------------------------------------------------------
 

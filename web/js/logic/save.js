@@ -188,6 +188,7 @@ function fitReminders(saved) {
  * @property {TurnMode} turns
  * @property {Turn} turn
  * @property {TileSet} tileColours
+ * @property {boolean} shuffleColours Whether each new game deals every player a random tile colour.
  * @property {BadgeSize} badgeSize The badge rows' and the mana strip's size.
  * @property {Style | null} style null until the player picks one, so the platform's default applies.
  * @property {number | null} monarch The monarch's seat, or null for nobody.
@@ -221,8 +222,8 @@ export function loadGame(read, landscapeAngle) {
     landscapeAngle, colors: fitColors([], 4),
     counters: fitTrackers(), .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)]))),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
-    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, badgeSize: 'default',
-    style: null, monarch: null, initiative: null, reminders: fitReminders(),
+    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, shuffleColours: false,
+    badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(),
   };
   try {
     const snapshot = read();
@@ -252,6 +253,8 @@ export function loadGame(read, landscapeAngle) {
       turn: fitTurn(saved.turn, saved.scores.length),
       // A save from before the setting, or with an unknown set, gets the default.
       tileColours: tileSetOrder.includes(saved.tileColours) ? saved.tileColours : defaultTileSet,
+      // Off unless it was saved as exactly true, so a save from before the setting keeps its colours.
+      shuffleColours: saved.shuffleColours === true,
       // A save from before the setting, or with an unknown size, gets the default.
       badgeSize: badgeSizeOrder.includes(saved.badgeSize) ? saved.badgeSize : 'default',
       // null until the player picks a style, so the platform's default applies; a save from before the setting, or with an
