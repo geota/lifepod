@@ -12,7 +12,7 @@ import {
 import {
   dangerLevel, hasMana, isOut, needsPassing, poolText, shownCounters, trackedDesignations,
 } from '../logic/rules.js';
-import { clearedPools, game, reminders, stripHolds } from '../state/state.js';
+import { clearedPools, game, shownReminders, stripHolds } from '../state/state.js';
 import { board, element, icon, manaIcon, syncChildren, visuallyHidden } from '../ui/dom.js';
 import { bindRelease, bindStep, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark } from './tile.js';
@@ -49,7 +49,7 @@ export function renderPassHints() {
 // The reminders a tile shows, newest last: each a chip in the turn chip's style that a tap dismisses.
 /** @returns {Keyed[]} */
 function reminderItems(index) {
-  return [...(reminders.get(index)?.keys() ?? [])].map(kind => ({ key: `reminder-${kind}`, create: () => reminderChip(index, kind) }));
+  return [...(shownReminders.get(index)?.keys() ?? [])].map(kind => ({ key: `reminder-${kind}`, create: () => reminderChip(index, kind) }));
 }
 
 function reminderChip(index, kind) {

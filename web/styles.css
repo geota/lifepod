@@ -134,20 +134,22 @@
   --ink: #1d2608;
   --scrim: #111213d9;
 
-  /* Fills and edges: controls are filled, not outlined; the chosen one is the accent. */
+  /* Fills and edges: controls are filled, not outlined. A chosen value is a tint of the accent, not the accent: a 20%
+     wash over the card with accent text and a faint accent ring. Solid accent is kept for committing (Done, the pill's
+     save and Done discs, Roll), switches that are on and the focus ring, so the screen's one solid lime is its action. */
   --control-fill: var(--raised);
   --control-edge: 0px;
-  --chosen-fill: var(--accent);
-  --chosen-ink: var(--ink);
+  --chosen-fill: color-mix(in oklab, var(--accent) 20%, var(--card-fill));
+  --chosen-ink: var(--accent);
+  --chosen-ring: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent);
+  --commit-fill: var(--accent);
+  --commit-ink: var(--ink);
   --card-fill: var(--surface);
   --card-edge: 0px;
   --head-fill: var(--surface);
   --dialog-fill: var(--surface);
   --dialog-edge: 0px;
   --dialog-edge-color: var(--border);
-  /* The neutral thumb Glass picks with; Material picks with the accent. */
-  --thumb: var(--chosen-fill);
-  --thumb-ink: var(--chosen-ink);
 
   /* Settings rows: each a filled 16px row, 6px apart. */
   --row-fill: var(--control-fill);
@@ -160,7 +162,7 @@
   --group-end: transparent;
   --action-min: calc(12 * var(--rem));
 
-  /* Segmented choice: separate filled segments; the chosen one is the accent. */
+  /* Segmented choice: separate filled segments; the chosen one is the accent tint, ringed. */
   --segment-track: transparent;
   --segment-track-radius: 0px;
   --segment-pad: 0px;
@@ -168,10 +170,11 @@
   --segment-fill: var(--control-fill);
   --segment-chosen-fill: var(--chosen-fill);
   --segment-chosen-ink: var(--chosen-ink);
-  --segment-chosen-shadow: none;
-  /* The dice picker's chosen die, and an identity toggle's ring when it's on. */
+  --segment-chosen-shadow: var(--chosen-ring);
+  /* The dice picker's chosen die: the same tint as a chosen segment. */
   --pick-fill: var(--chosen-fill);
   --pick-ink: var(--chosen-ink);
+  --pick-shadow: var(--chosen-ring);
   /* On the player tiles the chrome's accent stays off (DESIGN-AUDIT N2): a light ring, and the check in the seat colour. */
   --toggle-ring: var(--text);
 
@@ -236,10 +239,11 @@
   --switch-on-size: 14px;
   --switch-thumb-shadow: none;
 
-  /* Slider: a 16px track with an accent fill, notches as dots, and a 4px bar handle ringed in the card's colour. */
+  /* Slider: a 16px track with a muted accent fill (the accent at 42% over the track), notches as dots, filled ones in
+     the accent at 60%, and a 4px accent bar handle ringed in the card's colour. */
   --slider-track: 16px;
   --slider-track-fill: var(--raised);
-  --slider-fill: var(--accent);
+  --slider-fill: color-mix(in oklab, var(--accent) 42%, var(--slider-track-fill));
   --slider-thumb-width: 4px;
   --slider-thumb-height: 36px;
   --slider-thumb-radius: 2px;
@@ -251,8 +255,8 @@
   --tick-stop-height: 4px;
   --tick-radius: 50%;
   --tick-fill: var(--muted);
-  --tick-filled: var(--ink);
-  --tick-filled-opacity: .55;
+  --tick-filled: var(--accent);
+  --tick-filled-opacity: .6;
 }
 
 /* Direction B, Glass chrome over solid content (design/polish/STYLE.md §3, the Style setting). Only tokens: every
@@ -261,9 +265,8 @@
    stays solid: grouped lists, rows split by hairlines, iOS switches and segmented controls. The palette and its
    contrast minimums are Material's. The fallbacks after this block make the glass solid. */
 [data-style="glass"] {
-  /* A neutral thumb picks a segment or a die: 3.2:1 against the raised track, white ink on it 4.75:1. */
+  /* The neutral grey of the switch's off track and the slider's track: 3.6:1 on the card. */
   --thumb: #707379;
-  --thumb-ink: #fff;
   --scrim: #111213b3;
 
   --glass-tint: #1b1c1ead;
@@ -302,7 +305,9 @@
   --group-end: var(--card-fill);
   --action-min: 100%;
 
-  /* Segmented choice: one track with the chosen segment as a raised thumb; the accent is kept for Done and switches. */
+  /* Segmented choice: one track with the chosen segment as a raised thumb in Material's accent tint, mixed over the
+     track rather than the card, with the accent ring and the thumb's shadow. Solid accent is kept for Done and
+     switches. */
   --segment-track: var(--raised);
   --segment-track-radius: 12px;
   --segment-pad: 2px;
@@ -311,11 +316,8 @@
   --segment-inner: 10px;
   --segment-outer: 10px;
   --segment-chosen: 10px;
-  --segment-chosen-fill: var(--thumb);
-  --segment-chosen-ink: var(--thumb-ink);
-  --segment-chosen-shadow: 0 1px 3px #0008;
-  --pick-fill: var(--thumb);
-  --pick-ink: var(--thumb-ink);
+  --chosen-fill: color-mix(in oklab, var(--accent) 20%, var(--raised));
+  --segment-chosen-shadow: var(--chosen-ring), 0 1px 3px #0008;
   --toggle-ring: var(--text);
 
   /* Pressed shrinks to 96% under the 10% layer, on a 250ms spring with a gentle overshoot. Everything else (fades, the
@@ -342,7 +344,8 @@
   --switch-on-size: 20px;
   --switch-thumb-shadow: 0 1px 3px #0006;
 
-  /* Slider: a 4px track, tick lines and a round white 28px thumb. */
+  /* Slider: a 4px grey track with Material's muted accent fill, tick lines (the accent at 60% where filled) and a round
+     white 28px thumb. */
   --slider-track: 4px;
   --slider-track-fill: var(--thumb);
   --slider-thumb-width: 28px;
@@ -356,8 +359,6 @@
   --tick-stop-height: 12px;
   --tick-radius: 1px;
   --tick-fill: var(--muted);
-  --tick-filled: var(--accent);
-  --tick-filled-opacity: 1;
 }
 /* Glass falls back to solid surfaces where the blur isn't drawn (no backdrop-filter), where the player asked for less
    transparency (the media query on Android and in browsers; on iOS, whose WebKit lacks the query, LifePodApp.swift passes
@@ -508,12 +509,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
 /* While rotating seats or choosing colours or identities, only the Done disc stays. */
-.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--chosen-fill); }
-.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--chosen-ink); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"])::before { background: var(--commit-fill); }
+.board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button { color: var(--commit-ink); }
 .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button::before { content: none; }
 /* Counters mode: Undo, a filled check mark in the middle that saves, and ✕. Undo is dimmed until something changes. */
-.save-button { color: var(--chosen-ink); }
-.save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--chosen-fill); }
+.save-button { color: var(--commit-ink); }
+.save-button::before, .save-button:active::before { inset: var(--pill-inset) 3px; background: var(--commit-fill); }
 .save-button:active::before { background: var(--accent-pressed); }
 #board-controls .save-button::after, #board-controls .save-button:not([hidden]) + .pill-button::after { content: none; }
 .pill-button:disabled { opacity: .38; cursor: default; }
@@ -1567,7 +1568,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 }
 .close { display: grid; place-items: center; width: var(--tap-min); padding: 0; font-size: calc(1.125 * var(--rem)); }
 .primary, .secondary { padding: 0 var(--space-5); }
-.primary { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); }
+.primary { border-color: var(--commit-fill); background: var(--commit-fill); color: var(--commit-ink); }
 .primary:active { background: var(--accent-pressed); }
 :is(.close, .secondary, .nav-row, .switch-row, .segmented > button, .dice-picker button:not([aria-pressed="true"]), .k-value):active {
   background-image: linear-gradient(var(--state-pressed), var(--state-pressed));
@@ -1618,7 +1619,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .setting-label { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
 
 /* Segmented choice: a connected group of equal 44px segments, 8px inner corners and 22px outer ones. The chosen
-   segment is the accent and rounds into a full capsule. */
+   segment is the accent tint, ringed, and rounds into a full capsule. */
 .segmented {
   display: grid;
   grid-auto-flow: column;
@@ -1650,15 +1651,36 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
 .segmented > button[aria-pressed="true"] { border-color: var(--segment-chosen-fill); border-radius: var(--segment-chosen); background: var(--segment-chosen-fill); color: var(--segment-chosen-ink); box-shadow: var(--segment-chosen-shadow); }
 .segmented > button > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; }
-/* Tile colours (DESIGN-AUDIT S2): a segment per set, each with a strip of that set's tiles for players 1–4 over its
-   name, so the choice shows what it does. Each tile is its panel with a rim, as on the board. The colours are written
-   by design/polish/tiles7.mjs. */
-.tile-sets > button { flex-direction: column; gap: 5px; padding-block: 7px 6px; }
-.tile-strip { display: flex; gap: 3px; }
-.tile-strip > span { width: 14px; height: 14px; border-radius: 4px; background: var(--strip-1); box-shadow: inset 0 0 0 1.5px var(--strip-1-rim); }
-.tile-strip > :nth-child(2) { background: var(--strip-2); box-shadow: inset 0 0 0 1.5px var(--strip-2-rim); }
-.tile-strip > :nth-child(3) { background: var(--strip-3); box-shadow: inset 0 0 0 1.5px var(--strip-3-rim); }
-.tile-strip > :nth-child(4) { background: var(--strip-4); box-shadow: inset 0 0 0 1.5px var(--strip-4-rim); }
+/* Tile colours (DESIGN-AUDIT S2; the owner's "colour bands", P2): each segment is filled with four vertical bands, the
+   panels of the tiles players 1–4 get in its set (ids 0–3; players 1 and 2 in the top row, 3 and 4 in the bottom), with
+   a 4px foot of each band's rim along the bottom, which tells dark sets' bands apart, and the set's name over them in
+   near-white with a shadow. The chosen set has a solid accent ring, 3px with a 2px dark gap inside it; the foot moves up
+   inside the ring. Only --strip-1…4 and --strip-1…4-rim name colours, and design/polish/tiles7.mjs writes them for
+   each set below, so a set is just data: its button in index.html and its line here. The rules use the id so that the
+   pressed and hover layers, which other segments draw as a background image, go over the bands instead of replacing
+   them. */
+#tile-set-choices > button {
+  --band-state: transparent;
+  --foot-at: 0px;
+  min-height: max(var(--tap-min), 52px);
+  border: 0;
+  background:
+    linear-gradient(var(--band-state), var(--band-state)),
+    linear-gradient(90deg, var(--strip-1-rim) 25%, var(--strip-2-rim) 0 50%, var(--strip-3-rim) 0 75%, var(--strip-4-rim) 0) 0 calc(100% - var(--foot-at)) / 100% 4px no-repeat,
+    linear-gradient(90deg, var(--strip-1) 25%, var(--strip-2) 0 50%, var(--strip-3) 0 75%, var(--strip-4) 0);
+  color: var(--text);
+  text-shadow: 0 1px 2px #000c, 0 0 6px #0008;
+  box-shadow: none;
+}
+#tile-set-choices > button:active { --band-state: var(--state-pressed); }
+#tile-set-choices > button[aria-pressed="true"] { --foot-at: 5px; box-shadow: inset 0 0 0 3px var(--accent), inset 0 0 0 5px var(--background); }
+/* Five sets or more where the section is narrow: two rows, three over two (or three over three), each row filling the
+   width, rather than five segments too narrow for their names. */
+@container settings-section (max-width: 359.98px) {
+  #tile-set-choices:has(> :nth-child(5)) { grid-auto-flow: row; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #tile-set-choices:has(> :nth-child(5)) > button { grid-column: span 2; border-radius: var(--segment-inner); }
+  #tile-set-choices:has(> :nth-child(5):last-child) > :nth-child(n + 4) { grid-column: span 3; }
+}
 .tile-sets > [data-set="classic"] { --strip-1: #2f432f; --strip-1-rim: #556e4e; --strip-2: #2c4352; --strip-2-rim: #517187; --strip-3: #432a27; --strip-3-rim: #7b4f44; --strip-4: #342b41; --strip-4-rim: #655179; }
 .tile-sets > [data-set="soft"] { --strip-1: #2d4633; --strip-1-rim: #4f7658; --strip-2: #20454f; --strip-2-rim: #3a7584; --strip-3: #462828; --strip-3-rim: #7d4d4d; --strip-4: #2e2f48; --strip-4-rim: #565880; }
 .tile-sets > [data-set="jewel"] { --strip-1: #204421; --strip-1-rim: #447038; --strip-2: #15425b; --strip-2-rim: #347096; --strip-3: #4b211d; --strip-3-rim: #8a402e; --strip-4: #35244a; --strip-4-rim: #69458a; }
@@ -2001,7 +2023,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
-.dice-picker button[aria-pressed="true"] { border-color: var(--pick-fill); background: var(--pick-fill); color: var(--pick-ink); }
+.dice-picker button[aria-pressed="true"] { border-color: var(--pick-fill); background: var(--pick-fill); color: var(--pick-ink); box-shadow: var(--pick-shadow); }
 .dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
 .dice-roll { grid-area: roll; min-height: 48px; font-size: calc(1.0625 * var(--rem)); }
 @media (orientation: landscape) {
@@ -2084,6 +2106,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   :is(.close, .secondary, .nav-row, .switch-row, .segmented > button:not([aria-pressed="true"]), .dice-picker button:not([aria-pressed="true"]), .k-value, .k-stop):hover {
     background-image: linear-gradient(var(--state-hover), var(--state-hover));
   }
+  #tile-set-choices > button:not([aria-pressed="true"]):hover { --band-state: var(--state-hover); }
   .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button:hover::before { content: none; }
   .save-button:hover::before { background: var(--accent-pressed); }
   :is(.primary, .k-commit):hover { background: var(--accent-pressed); }

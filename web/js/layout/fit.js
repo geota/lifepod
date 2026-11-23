@@ -3,7 +3,7 @@
 // reminder sits. requestFit queues one fit for whatever just changed the rows, and a fit whose inputs match the last
 // one's is skipped (docs/review/PERFORMANCE.md P3).
 
-import { reminders } from '../state/state.js';
+import { shownReminders } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
 
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
@@ -43,7 +43,7 @@ let fitQueued = false;
 // What the last fit fitted (fitInputs), so a fit of the same board can be skipped.
 let fitted = '';
 // How many times the board was measured and its rows fitted, and how many fits were skipped, for the tests and the
-// design scripts (?debug in app.js).
+// design scripts, which read it from this module (await import('/js/layout/fit.js') in the page).
 export const layoutStats = { measures: 0, fits: 0, skippedFits: 0 };
 
 // A new game, a new Badge size or a font that has arrived fits the rows again from full size.
@@ -111,7 +111,7 @@ function fitBadgeRows() {
   fitBadgeSide('far');
   if (fitStrips()) fitBadgeSide('near');
   // A turn reminder's place depends on how tall the near edge came out.
-  for (const index of reminders.keys()) placeReminders(board.children[index]);
+  for (const index of shownReminders.keys()) placeReminders(board.children[index]);
   syncBoardDrops();
   fitted = fitInputs();
 }

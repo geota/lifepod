@@ -6,7 +6,7 @@ import { startGame } from '../actions/board.js';
 import { showDialog } from '../actions/dialog.js';
 import { setBoardMode } from '../actions/mode.js';
 import {
-  keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody, syncSettingsCue,
+  keepLifeEditorInView, lifeEditor, placeSettingsSections, settingsBody, settingsDialog, syncSettingsCue,
 } from '../layout/settings.js';
 import { maxStartingLife, playerCounts } from '../logic/data.js';
 import { boardMode, game, syncBackHandling } from '../state/state.js';
@@ -144,7 +144,7 @@ function closeLifeEditor(commit, refocus) {
   lifeEditor.hidden = true;
   lifeEdit.hidden = false;
   if (commit && valid) selectedLife = Number(typed);
-  settings.style.removeProperty('--keyboard');
+  settingsDialog.style.removeProperty('--keyboard');
   renderSettings();
   placeSettingsSections();
   if (refocus) lifeEdit.focus();
@@ -175,12 +175,12 @@ settingsBody.addEventListener('scroll', syncSettingsCue, { passive: true });
 function openSettings() {
   selectedPlayerCount = game.scores.length;
   selectedLife = game.startingLife;
-  settings.removeAttribute('data-flipped');
+  settingsDialog.removeAttribute('data-flipped');
   settingsFlip.setAttribute('aria-pressed', 'false');
   renderSettings();
   renderOptions();
   placeSettingsSections();
-  showDialog(settings);
+  showDialog(settingsDialog);
   // Settings always open at the top.
   settingsBody.scrollTop = 0;
   syncSettingsCue();
@@ -192,18 +192,18 @@ setupButton.addEventListener('click', () => {
   }
   openSettings();
 });
-document.querySelector('#settings-close').addEventListener('click', () => settings.close());
+document.querySelector('#settings-close').addEventListener('click', () => settingsDialog.close());
 // The flip (O1): the page faces the phone, and this turns it to face a player across the table. Opening settings
 // resets it.
 settingsFlip.addEventListener('click', () => {
-  const flipped = !settings.hasAttribute('data-flipped');
-  settings.toggleAttribute('data-flipped', flipped);
+  const flipped = !settingsDialog.hasAttribute('data-flipped');
+  settingsDialog.toggleAttribute('data-flipped', flipped);
   settingsFlip.setAttribute('aria-pressed', String(flipped));
 });
-settings.addEventListener('close', () => {
+settingsDialog.addEventListener('close', () => {
   closeLifeEditor(false, false);
   say('');
-  settings.removeAttribute('data-flipped');
+  settingsDialog.removeAttribute('data-flipped');
   syncBackHandling();
 });
 
@@ -213,7 +213,7 @@ settings.addEventListener('close', () => {
 function leaveSettingsFor(mode) {
   closeLifeEditor(true, false);
   if (settingsChangeGame()) startGame(selectedPlayerCount, selectedLife);
-  settings.close();
+  settingsDialog.close();
   setBoardMode(mode);
 }
 chooseIdentitiesButton.addEventListener('click', () => leaveSettingsFor('identity'));
@@ -223,7 +223,7 @@ settingsForm.addEventListener('submit', (event) => {
   event.preventDefault();
   closeLifeEditor(true, false);
   if (settingsChangeGame()) startGame(selectedPlayerCount, selectedLife);
-  settings.close();
+  settingsDialog.close();
 });
 
 // New game, in the header, opens its confirmation over settings. It lists what resets and what stays (SPEC §10.2),
@@ -255,7 +255,7 @@ restartButton.addEventListener('click', () => {
 restart.addEventListener('close', () => {
   if (restart.returnValue === 'restart') {
     startGame(game.scores.length, game.startingLife);
-    settings.close();
+    settingsDialog.close();
   }
   syncBackHandling();
 });

@@ -16,6 +16,7 @@ import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
+import { fitAllCompactSwitches } from './js/layout/settings.js';
 import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
 import { setBadgeActions } from './js/render/badges.js';
@@ -31,7 +32,6 @@ import {
 } from './js/ui/dom.js';
 import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
-import { fitAllCompactSwitches } from './js/sheets/options.js';
 import './js/sheets/settings.js';
 import './js/sheets/dice.js';
 

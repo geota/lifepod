@@ -4,7 +4,7 @@
 import { reminderText, reminderTime } from '../logic/data.js';
 import { announce } from '../render/announce.js';
 import { renderBadges } from '../render/badges.js';
-import { game, reminders } from '../state/state.js';
+import { game, shownReminders } from '../state/state.js';
 
 /** @typedef {import('../logic/data.js').DesignationKind} DesignationKind */
 
@@ -23,24 +23,24 @@ export function turnStarted() {
  */
 export function remind(index, kind) {
   if (index === null || game.turns !== 'turns' || game.turn.active === null || !game.reminders.turns || !game.counters[kind]) return;
-  const shown = reminders.get(index) ?? new Map();
+  const shown = shownReminders.get(index) ?? new Map();
   clearTimeout(shown.get(kind));
   shown.set(kind, setTimeout(() => dismissReminder(index, kind), reminderTime));
-  reminders.set(index, shown);
+  shownReminders.set(index, shown);
   renderBadges(index);
   announce(index, `remind ${kind}`, () => `Player ${index + 1}, ${reminderText[kind]}`);
 }
 
 export function dismissReminder(index, kind) {
-  const shown = reminders.get(index);
+  const shown = shownReminders.get(index);
   if (!shown?.has(kind)) return;
   clearTimeout(shown.get(kind));
   shown.delete(kind);
-  if (!shown.size) reminders.delete(index);
+  if (!shown.size) shownReminders.delete(index);
   renderBadges(index);
 }
 
 export function clearReminders() {
-  for (const shown of reminders.values()) for (const timer of shown.values()) clearTimeout(timer);
-  reminders.clear();
+  for (const shown of shownReminders.values()) for (const timer of shown.values()) clearTimeout(timer);
+  shownReminders.clear();
 }

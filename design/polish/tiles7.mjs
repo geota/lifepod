@@ -207,15 +207,19 @@ let shipped = css;
 for (const [setting, source] of [['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
   shipped = shipped.replace(new RegExp(`\\[data-tiles="${setting}"\\] \\{[^}]*\\}`), block(setting, sets[source].set));
 }
-// The Tile colours control's previews: each set's panel and rim for players 1–4 (ids 0–3; players 1 and 2 sit in the
-// top row, 3 and 4 in the bottom), whichever set is in use.
+// The Tile colours control's colour bands (styles.css, #tile-set-choices): each set's panel and rim for players 1–4 (ids
+// 0–3; players 1 and 2 sit in the top row, 3 and 4 in the bottom), whichever set is in use. The whole run of
+// .tile-sets > [data-set] lines is written again from bandSets, one line per set in this order, so adding, removing or
+// swapping a set is a change to this list (with its button in index.html and its entry in tileSets in data.js); the
+// control's own rules read only --strip-1…4 and --strip-1…4-rim.
+const bandSets = [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']];
 const strip = (setting, set) => `.tile-sets > [data-set="${setting}"] { ${[0, 1, 2, 3].map(player => {
   const palette = set[ids[player]][player < 2 ? 'top' : 'bottom'];
   return `--strip-${player + 1}: ${palette.panel}; --strip-${player + 1}-rim: ${palette.rim};`;
 }).join(' ')} }`;
-for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
-  shipped = shipped.replace(new RegExp(`\\.tile-sets > \\[data-set="${setting}"\\] \\{[^}]*\\}`), strip(setting, sets[source].set));
-}
+const bandLines = /(?:\.tile-sets > \[data-set="[^"]+"\] \{[^}]*\}\n)+/;
+if (!bandLines.test(shipped)) throw new Error('styles.css has no .tile-sets > [data-set] lines to replace');
+shipped = shipped.replace(bandLines, `${bandSets.map(([setting, source]) => strip(setting, sets[source].set)).join('\n')}\n`);
 if (shipped !== css) writeFileSync(cssPath, shipped);
 
 console.log('| Set | Life total ≥ 9 | Small text ≥ 7.6 | Life-out red ≥ 4.79 | Seat colour on panel ≥ 7.35 | Warning chip ≥ 4.5 | Closest pair: normal | deuteranope | protanope | tritanope | Across rows, deuteranope |');

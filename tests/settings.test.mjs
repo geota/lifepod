@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { readFileSync } from 'node:fs';
-import { backHandling, button, engines, eventually, openPage, reload, saved, savedGame, scores, seedGame, test, turnScreen } from './helpers.mjs';
+import { backHandling, button, engines, eventually, openPage, reload, saved, savedGame, scores, seedGame, test, token, turnScreen } from './helpers.mjs';
 
 // The full-screen settings page (design/polish/SETTINGS-SPEC.md) and its controls (design/polish/STYLE.md): layout B,
 // the notched players and life sliders, the inline life editor, the pending new game (P1), the flip (O1), board
@@ -731,26 +731,70 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 }
 
-// Each Tile colours segment previews its set: a strip of the tiles players 1–4 get there (their panels, ringed in their
-// rims), whichever set is in use, so the choice shows what it does.
-test('chromium: each Tile colours segment shows its set\'s tiles for players 1–4', async (t) => {
-  const page = await openPage(t, chromium);
-  await button(page, 'Settings').tap();
-  const sets = JSON.parse(readFileSync(new URL('../design/polish/tiles7.json', import.meta.url), 'utf8'));
-  const ids = Object.keys(sets.today.set);
-  for (const [setting, source] of [['classic', 'today'], ['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
-    const strip = await page.locator(`#tile-set-choices [data-set="${setting}"] .tile-strip > span`).evaluateAll(tiles => tiles.map((tile) => {
-      const style = getComputedStyle(tile);
-      return { panel: style.backgroundColor, rim: style.boxShadow };
-    }));
+// Each Tile colours segment is its set's colour bands (the owner's P2): four vertical bands, the panels of the tiles
+// players 1–4 get in that set, with a 4px foot of their rims, whichever set is in use, so the choice shows what it does.
+// The chosen set has a solid accent ring, 3px, with a dark 2px gap inside it, and its foot moves up inside the ring. The
+// segments keep their names and 44px targets in both styles, at 320 × 568 and 568 × 320, and with a fifth set (a palette
+// change may add one) they still fit their names.
+const bandLook = page => page.locator('#tile-set-choices > button').evaluateAll(choices => choices.map((choice) => {
+  const style = getComputedStyle(choice);
+  const box = choice.getBoundingClientRect();
+  // The colours the backgrounds draw, in order, without the clear state layer or repeats from two-position stops.
+  const colours = (style.backgroundImage.match(/rgba?\([^)]*\)/g) ?? []).filter(colour => !/,\s*0\)$/.test(colour))
+    .filter((colour, i, all) => colour !== all[i - 1]);
+  return {
+    name: choice.textContent, colours, sizes: style.backgroundSize, positions: style.backgroundPosition, shadow: style.boxShadow,
+    width: box.width, height: box.height, clipped: choice.scrollWidth > choice.clientWidth + 0.5, pressed: choice.getAttribute('aria-pressed'),
+  };
+}));
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: each Tile colours segment is its set's colour bands, and the chosen one has a solid accent ring`, async (t) => {
+    const sets = JSON.parse(readFileSync(new URL('../design/polish/tiles7.json', import.meta.url), 'utf8'));
+    const ids = Object.keys(sets.today.set);
     const rgb = hex => `rgb(${[1, 3, 5].map(at => parseInt(hex.slice(at, at + 2), 16)).join(', ')})`;
-    assert.deepEqual(strip, [0, 1, 2, 3].map((player) => {
-      const palette = sets[source].set[ids[player]][player < 2 ? 'top' : 'bottom'];
-      return { panel: rgb(palette.panel), rim: `${rgb(palette.rim)} 0px 0px 0px 1.5px inset` };
-    }), `${setting}: players 1–4 in that set`);
-  }
-  assert.equal(await page.locator('#tile-set-choices .tile-strip').first().getAttribute('aria-hidden'), 'true');
-});
+    const sources = { classic: 'today', soft: 'soft', jewel: 'jewel', clear: 'clear' };
+    for (const style of ['material', 'glass']) {
+      for (const viewport of [{ width: 952, height: 427 }, { width: 320, height: 568 }, { width: 568, height: 320 }]) {
+        const page = await openPage(t, engine, { viewport, style });
+        await button(page, 'Settings').tap();
+        const [accent, background] = await Promise.all([token(page, '--accent'), token(page, '--background')]);
+        const where = `${style} ${viewport.width}×${viewport.height}`;
+        const looks = await bandLook(page);
+        assert.deepEqual(looks.map(look => look.name), ['Classic', 'Soft', 'Jewel', 'Clear'], `${where}: the segments keep their names`);
+        for (const look of looks) {
+          const source = sets[sources[look.name.toLowerCase()]].set;
+          const palettes = [0, 1, 2, 3].map(player => source[ids[player]][player < 2 ? 'top' : 'bottom']);
+          assert.deepEqual(look.colours, [...palettes.map(palette => rgb(palette.rim)), ...palettes.map(palette => rgb(palette.panel))],
+            `${where} ${look.name}: a foot of the four rims over four bands of players 1–4's panels`);
+          assert.match(look.sizes, /, 100% 4px, /, `${where} ${look.name}: the foot is 4px`);
+          assert.ok(look.width >= 43.5 && look.height >= 43.5, `${where} ${look.name}: a 44px target (${look.width} × ${look.height})`);
+          assert.equal(look.clipped, false, `${where} ${look.name}: the name fits`);
+          if (look.pressed === 'true') {
+            assert.equal(look.shadow, `${accent} 0px 0px 0px 3px inset, ${background} 0px 0px 0px 5px inset`, `${where}: the chosen set has a 3px accent ring and a 2px gap`);
+            assert.match(look.positions, /, 0px calc\(100% - 5px\), |, 0% calc\(100% - 5px\), |, 0px (?:calc\()?100% - 5px/, `${where}: its foot moves up inside the ring`);
+          } else assert.equal(look.shadow, 'none', `${where} ${look.name}: no ring`);
+        }
+        assert.deepEqual(looks.map(look => look.pressed), ['false', 'false', 'false', 'true'], `${where}: Clear is chosen`);
+        // A fifth set: the control wraps to three over two where five wouldn't fit their names, and every segment stays a
+        // whole 44px target that fits its name.
+        await page.evaluate(() => {
+          const group = /** @type {HTMLElement} */ (document.querySelector('#tile-set-choices'));
+          const extra = /** @type {HTMLElement} */ (group.lastElementChild.cloneNode(true));
+          extra.dataset.set = 'night';
+          extra.textContent = 'Night';
+          extra.setAttribute('aria-pressed', 'false');
+          group.append(extra);
+        });
+        const five = await bandLook(page);
+        for (const look of five) {
+          assert.ok(look.width >= 43.5 && look.height >= 43.5, `${where} five sets, ${look.name}: a 44px target (${look.width} × ${look.height})`);
+          assert.equal(look.clipped, false, `${where} five sets, ${look.name}: the name fits`);
+        }
+        await page.close();
+      }
+    }
+  });
+}
 
 // ---- Compact switch rows ---------------------------------------------------------------------------------------------
 

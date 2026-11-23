@@ -9,7 +9,7 @@ import { askFirst, setAskFirst } from '../actions/mode.js';
 import { clearReminders } from '../actions/reminders.js';
 import { measureBoard } from '../layout/board.js';
 import { requestFit, resetDrops } from '../layout/fit.js';
-import { compactGroups, fitCompactSwitches, settingsBody, syncSettingsCue } from '../layout/settings.js';
+import { fitAllCompactSwitches, syncSettingsCue } from '../layout/settings.js';
 import { badgeSizeOrder, badgeSizes, trackers } from '../logic/data.js';
 import { outPlayers, trackedDesignations } from '../logic/rules.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from '../render/appearance.js';
@@ -109,13 +109,6 @@ function renderBadgeSizeSetting() {
   for (const choice of badgeSizeChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.size === game.badgeSize));
   badgeSizeSlider.render();
 }
-// Every compact switch group, checked again whenever the settings body changes size, the fonts arrive, the text size
-// or the style changes (fitCompactSwitches in layout/settings.js).
-export function fitAllCompactSwitches() {
-  compactGroups.forEach(fitCompactSwitches);
-}
-new ResizeObserver(fitAllCompactSwitches).observe(settingsBody);
-
 // Style: saved the moment it's picked, after which it wins over the platform's default.
 const styleChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#style-choices'));
 function renderStyleSetting() {
