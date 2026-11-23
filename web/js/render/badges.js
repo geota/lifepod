@@ -250,6 +250,13 @@ function designationItem({ kind, label, name, still }, index) {
   };
 }
 
+// Close to lethal is said, not only shown in amber (ACCESSIBILITY.md L4): "8 poison, 2 from lethal".
+/**
+ * @param {string} level
+ * @param {number} left
+ */
+const fromLethal = (level, left) => (level === 'warn' ? `, ${left} from lethal` : '');
+
 // A counter's chip: commander tax as "+4" (two per cast), the others as their count, amber or red as poison nears 10.
 /** @returns {Keyed} */
 function counterItem(kind, value) {
@@ -261,9 +268,9 @@ function counterItem(kind, value) {
       return chip;
     },
     update: (chip) => {
-      chip.replaceChildren(...(kind === 'casts' ? [visuallyHidden('Commander tax '), counterIcon(kind), `+${value * 2}`]
-        : [counterIcon(kind), String(value), visuallyHidden(` ${kind}`)]));
       const level = kind === 'poison' ? dangerLevel(value, poisonWarning, poisonLethal) : '';
+      chip.replaceChildren(...(kind === 'casts' ? [visuallyHidden('Commander tax '), counterIcon(kind), `+${value * 2}`]
+        : [counterIcon(kind), String(value), visuallyHidden(` ${kind}${fromLethal(level, poisonLethal - value)}`)]));
       if (level) chip.dataset.level = level;
       else delete chip.dataset.level;
     },
@@ -304,8 +311,8 @@ function farItems(index) {
     create: () => inColourOf(element('span', 'chip damage'), attacker),
     update: (chip) => {
       inColourOf(chip, attacker);
-      chip.replaceChildren(String(amount), visuallyHidden(` commander damage from Player ${attacker + 1}`));
       const level = dangerLevel(amount, commanderWarning, commanderLethal);
+      chip.replaceChildren(String(amount), visuallyHidden(` commander damage from Player ${attacker + 1}${fromLethal(level, commanderLethal - amount)}`));
       if (level) chip.dataset.level = level;
       else delete chip.dataset.level;
     },

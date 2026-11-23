@@ -351,3 +351,15 @@ test('chromium: settings and the dialogs zoom, the board doesn\'t, and closing o
   await eventually(() => page.locator('meta[name="viewport"]').getAttribute('content'), `${viewport}, maximum-scale=1`, 'closing settings zooms back out');
   await eventually(() => page.locator('meta[name="viewport"]').getAttribute('content'), viewport, 'then zoom is allowed again');
 });
+
+// ACCESSIBILITY.md L4: close to lethal is said as well as shown in amber.
+test('chromium: a count close to lethal says how far it is', async (t) => {
+  const page = await openPage(t, engines.chromium, {
+    game: {
+      startingLife: 40, scores: [40, 40, 40, 40], counters: { commander: true, poison: true }, poison: [8, 0, 0, 0],
+      commanderDamage: [[0, 18, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
+    },
+  });
+  assert.equal(await tile(page, 1).locator('.badges.near .chip[data-kind="poison"]').textContent(), '8 poison, 2 from lethal');
+  assert.equal(await tile(page, 1).locator('.badges.far .chip.damage').textContent(), '18 commander damage from Player 2, 3 from lethal');
+});
