@@ -1,3 +1,4 @@
+import { handOnLeavers, renderBoard, startGame } from './js/actions/board.js';
 import {
   chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
 } from './js/actions/edits.js';
@@ -8,35 +9,30 @@ import {
 } from './js/actions/mode.js';
 import { clearReminders, dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
-import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
+import { measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { requestFit, resetDrops } from './js/layout/fit.js';
 import {
   compactGroups, fitCompactSwitches, keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody,
   syncSettingsCue,
 } from './js/layout/settings.js';
 import {
-  badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, maxStartingLife, playerCounts, tileSetOrder, tileSets,
-  trackers,
+  badgeSizeOrder, badgeSizes, maxStartingLife, playerCounts, tileSetOrder, tileSets, trackers,
 } from './js/logic/data.js';
-import { isOut, leavingTransfers, outPlayers, trackedDesignations } from './js/logic/rules.js';
-import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from './js/logic/save.js';
-import { announceDesignation, announceLife, clearAnnouncements } from './js/render/announce.js';
+import { outPlayers, trackedDesignations } from './js/logic/rules.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from './js/render/appearance.js';
 import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badges.js';
 import { setModeActions } from './js/render/modes.js';
 import { syncPill } from './js/render/pill.js';
-import { paintColours, renderScore } from './js/render/tile.js';
+import { renderScore } from './js/render/tile.js';
 import {
-  android, currentLandscapeAngle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency, syncWakeLock,
+  android, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency, syncWakeLock,
 } from './js/state/platform.js';
-import {
-  boardMode, clearedPools, editStartHolders, game, saveGame, syncBackHandling, turnSteps,
-} from './js/state/state.js';
+import { boardMode, editStartHolders, game, saveGame, syncBackHandling, turnSteps } from './js/state/state.js';
 import {
   board, cancelButton, countersButton, damageButton, diceButton, discardDialog, element, icon, manaButton,
-  playerTemplate, roundBackButton, roundButton, saveButton, setupButton, shuffleButton, undoButton,
+  roundBackButton, roundButton, saveButton, setupButton, shuffleButton, undoButton,
 } from './js/ui/dom.js';
-import { bindCounter, bindStep, bindTap, cancelPresses } from './js/ui/press.js';
+import { bindStep, bindTap, cancelPresses } from './js/ui/press.js';
 
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
 /** @typedef {import('./js/logic/data.js').Reminders} Reminders */
@@ -76,101 +72,6 @@ let selectedLife = game.startingLife;
 let diceSides = 20;
 let die;
 let stopRoll;
-
-// Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, announces
-// it, and reminds a new initiative holder to venture.
-function handOnLeavers(wasOut) {
-  const transfers = leavingTransfers(game, wasOut);
-  for (const transfer of transfers) {
-    game[transfer.kind] = transfer.to;
-    for (const player of [transfer.from, transfer.to]) if (player !== null) renderBadges(player);
-    announceDesignation(transfer.kind);
-    if (transfer.kind === 'initiative') remind(transfer.to, 'initiative');
-  }
-  if (transfers.length) saveGame();
-}
-
-function renderBoard() {
-  cancelPresses();
-  clearAnnouncements();
-  const players = game.scores.map((_, index) => {
-    const player = /** @type {HTMLElement} */ (/** @type {Element} */ (playerTemplate.content.firstElementChild).cloneNode(true));
-    const name = `Player ${index + 1}`;
-    player.setAttribute('aria-label', name);
-    const score = player.querySelector('.score');
-
-    function changeLife(delta) {
-      const next = game.scores[index] + delta;
-      if (!Number.isSafeInteger(next)) return;
-      const out = outPlayers(game);
-      game.scores[index] = next;
-      renderScore(index);
-      // A player who is out has no chip to start a turn, and hands on the monarch and the initiative.
-      if (isOut(game, index) !== out.has(index)) {
-        renderBadges(index);
-        handOnLeavers(out);
-        renderPassHints();
-      }
-      if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
-      haptic();
-      announceLife(index);
-      saveGame();
-    }
-
-    bindCounter(player.querySelector('.subtract'), () => changeLife(-1), `Subtract one life from ${name}`);
-    bindCounter(player.querySelector('.add'), () => changeLife(1), `Add one life to ${name}`);
-    const rotateSeat = player.querySelector('.rotate-seat');
-    rotateSeat.setAttribute('aria-label', `Rotate ${name} clockwise`);
-    rotateSeat.addEventListener('click', () => {
-      game.rotations[index] = (game.rotations[index] + 1) % clockwiseEdges.length;
-      layoutBoard();
-      saveGame();
-    });
-    return player;
-  });
-  board.replaceChildren(...players);
-  layoutBoard();
-  paintColours();
-  game.scores.forEach((_, index) => {
-    renderScore(index);
-    renderBadges(index);
-  });
-}
-
-/**
- * @param {number} playerCount
- * @param {number} startingLife
- */
-function startGame(playerCount, startingLife) {
-  if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
-  game.colors = fitColors(game.colors, playerCount);
-  // A new game resets the counts and keeps the counter switches, colours and colour identities.
-  for (const kind of countKinds) game[kind] = fitCounts([], playerCount);
-  game.identities = fitIdentities(game.identities, playerCount);
-  game.commanderDamage = fitDamage([], playerCount);
-  // Pools empty, and the game starts at round 1 with nobody first, until "Who goes first?" picks someone.
-  game.pools = fitPools([], playerCount);
-  game.turn = fitTurn(null, playerCount);
-  // Nobody is the monarch or has the initiative until an effect says so.
-  game.monarch = null;
-  game.initiative = null;
-  clearReminders();
-  turnSteps.length = 0;
-  for (const { timer } of clearedPools.values()) clearTimeout(timer);
-  clearedPools.clear();
-  game.startingLife = startingLife;
-  game.scores = Array(playerCount).fill(startingLife);
-  // A new game takes the screen's current landscape as upright.
-  game.landscapeAngle = currentLandscapeAngle();
-  // A new game starts with every badge at full size.
-  resetDrops();
-  saveGame();
-  syncBoardTurn();
-  renderBoard();
-  syncPill();
-  setAskFirst(game.turns !== 'off');
-  maybeAskFirst();
-}
 
 // Settings (design/polish/SETTINGS-SPEC.md). Players and starting life wait for Done: a change to either is a pending
 // new game (P1), which Done, renamed "Start new game", or a board action starts. ✕, Escape and Android back drop it.
