@@ -6,12 +6,14 @@
 
 const storageKey = 'lifepod-game';
 export const android = window.LifePodAndroid;
-export const ios = window.webkit?.messageHandlers;
+// The iOS app is the WKWebView with LifePodApp's game handler. Another WKWebView host, such as an in-app browser, can
+// have message handlers of its own, and the page then runs as in a browser (DEEP-DIVE D4).
+export const ios = window.webkit?.messageHandlers?.game ? window.webkit.messageHandlers : undefined;
 export const portraitQuery = window.matchMedia('(orientation: portrait)');
 export const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-// The Style setting's default until the player picks one (data.js's styleOrder): Glass in the iOS app, which has the game
-// message handler, and Material on Android and in browsers.
-export const defaultStyle = ios?.game ? 'glass' : 'material';
+// The Style setting's default until the player picks one (data.js's styleOrder): Glass in the iOS app, and Material on
+// Android and in browsers.
+export const defaultStyle = ios ? 'glass' : 'material';
 let lock;
 let requestingLock = false;
 

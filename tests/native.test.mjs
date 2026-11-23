@@ -93,7 +93,7 @@ test('node: the bridge names match the Android and iOS wrappers', () => {
   assert.deepEqual(matches(appJs, /\bandroid\??\.(\w+)/g), sorted(androidMethods), 'the page calls exactly those methods');
 
   // iOS: the message handlers registered and handled, the messages the page posts, and the injected saved game.
-  assert.match(appJs, /const ios = window\.webkit\?\.messageHandlers;/);
+  assert.match(appJs, /const ios = window\.webkit\?\.messageHandlers\?\.game \? window\.webkit\.messageHandlers : undefined;/);
   assert.deepEqual(matches(swift, /controller\.add\(context\.coordinator, name: "(\w+)"\)/g), sorted(iosMessages), 'LifePodApp registers exactly the mocked handlers');
   assert.deepEqual(matches(swift, /case \("(\w+)"/g), sorted(iosMessages), 'and handles each of them');
   assert.deepEqual(matches(appJs, /\bios\??\.(\w+)/g), sorted(iosMessages), 'the page posts exactly those messages');
@@ -233,6 +233,24 @@ test('webkit: the iOS bridge saves and loads, keeps the screen awake and ticks',
   assert.deepEqual((await calls(page, 'keepAwake')).at(-1), [false], 'the switch turns keep awake off');
   await reload(page);
   assert.deepEqual(await calls(page, 'keepAwake'), [[false]], 'and it stays off on the next launch');
+});
+
+// Another WKWebView host, such as an in-app browser, can have message handlers but not LifePodApp's game handler. The page
+// runs there as in a browser, saving to its own storage, rather than throw on every save (DEEP-DIVE D4).
+test('webkit: a WKWebView host without the game handler gets the browser fallbacks', async (t) => {
+  const page = await openPage(t, webkit, {
+    before: p => p.addInitScript(() => {
+      window.otherMessages = [];
+      window.webkit = { messageHandlers: { other: { postMessage: message => window.otherMessages.push(message) } } };
+    }),
+  });
+  await button(page, 'Add one life to Player 1').tap();
+  assert.equal((await scores(page))[0], 41);
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')).scores[0]), 41, 'the game saves to browser storage');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.style), 'material', 'and starts on Material, as in a browser');
+  assert.deepEqual(await page.evaluate(() => window.otherMessages), [], "nothing goes to the host's handler");
+  await reload(page);
+  assert.equal((await scores(page))[0], 41, 'and loads again');
 });
 
 // Reduce Transparency on iOS: LifePodApp.swift injects it before the page loads and runs its own script when it changes.
