@@ -78,12 +78,6 @@ interface Window {
    */
   closeOpenDialog(): boolean;
   lifePodDice: LifePodDice;
-  /** Set by app.js only when the page's URL has ?debug: the internals the design scripts drive. */
-  lifePodDebug?: {
-    game: unknown;
-    remind(index: number | null, kind: 'monarch' | 'initiative'): void;
-    layoutStats: { measures: number; fits: number; skippedFits: number };
-  };
 }
 
 // Lookups by selector. Every element the scripts look up by selector is an HTML element (the inline SVG icons are only

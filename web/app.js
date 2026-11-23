@@ -15,7 +15,7 @@ import {
 import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
-import { layoutStats, loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
+import { loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
 import { compactGroups, fitCompactSwitches } from './js/layout/settings.js';
 import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
@@ -137,10 +137,6 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
   requestFit();
   compactGroups.forEach(fitCompactSwitches);
 }));
-
-// A module's names aren't page globals, so the design scripts (design/polish/final-review.mjs) reach the few internals they
-// drive through ?debug in the URL. The apps never load the page with it.
-if (new URLSearchParams(location.search).has('debug')) window.lifePodDebug = { game, remind, layoutStats };
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.
 setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, undoClear, dismissReminder, setBoardMode });

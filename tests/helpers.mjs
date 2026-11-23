@@ -46,9 +46,6 @@ async function origin() {
   server ??= startServer();
   return (await server).origin;
 }
-export async function appUrl() {
-  return `${await origin()}/index.html`;
-}
 
 // ---- One browser per file -------------------------------------------------------------------------------------------
 
