@@ -4,8 +4,9 @@
    toward the table, holds commander damage, led by a sword in its own circle, and sits clear of the centre
    controls; the near edge (the player's own) holds colour identity, then poison, tax, energy, experience and rad.
    Tight chips keep a busy poison and tax row on one line at 6 players on a 320 × 568 phone. When a row still runs
-   out of room, app.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every tile at once: data-drop
-   tokens on #board hide parts, and --near-badge-size and --far-badge-size shrink the type. */
+   out of room, js/layout/fit.js takes the auto-drop steps (design/polish/SPEC.md §3.2) on every tile at once: data-drop
+   tokens on each tile's .near-edge and .far-edge hide parts, and --near-badge-size and --far-badge-size shrink the
+   type. --near-full-size and --far-full-size hold a smaller Badge size's full type where that draws larger. */
 .badges {
   display: flex;
   flex-wrap: nowrap;
@@ -27,10 +28,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  font-size: var(--far-badge-size, var(--far-row-size));
+  font-size: var(--far-badge-size, var(--far-full-size, var(--far-row-size)));
   pointer-events: none;
 }
-.badges.far { position: relative; align-self: stretch; font-size: var(--far-badge-size, var(--far-row-size)); }
+.badges.far { position: relative; align-self: stretch; font-size: var(--far-badge-size, var(--far-full-size, var(--far-row-size))); }
 /* The near edge holds the near row, 3px in from the tile's sides. It keeps clear of the pill where the pill reaches
    past it (a rotated seat). */
 .near-edge {
@@ -44,7 +45,7 @@
   align-items: center;
   pointer-events: none;
 }
-.badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--near-row-size)); }
+.badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--near-full-size, var(--near-row-size))); }
 /* Each tile's edges carry their side's tokens (fit.js writes them there rather than on #board, so a step restyles only
    the rows): .near-edge the near row's, .far-edge the far row's and the strip's. */
 .near-edge[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .near-edge[data-drop~="name"] .turn-word,
@@ -194,7 +195,7 @@
    it takes the near row's type and gives way with it like any other chip. */
 .player[data-strip="near"] .mana-strip, .badges.near > .strip-chip { display: none; }
 .player[data-strip="near"] .badges.near > .strip-chip { display: inline-flex; }
-.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--far-row-size)); }
+.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--far-full-size, var(--far-row-size))); }
 .badges.near > .strip-chip { font-size: 1em; }
 .player[data-strip="fold"] .mana-strip { padding: 0; }
 .player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
