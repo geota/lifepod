@@ -35,7 +35,7 @@ export function openBoardMode(mode) {
 // emptied. Not saved: after a relaunch, a hold steps back by the play order instead. Cleared in place.
 export const turnSteps = [];
 // Turn reminders showing on each tile, by player: designation kind → its timer. Not saved.
-export const reminders = new Map();
+export const shownReminders = new Map();
 // Pools cleared with the eraser in the last 5 seconds, by player, so "Undo clear" can put them back. Not saved.
 export const clearedPools = new Map();
 // Strips being tapped, by player: the colours the strip showed when the taps began, which keep their places (at 0 once

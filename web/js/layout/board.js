@@ -8,7 +8,7 @@ import { isPortraitWindow, readScreen } from '../state/platform.js';
 import { game } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
 import { growPixel, layoutStats, requestFit } from './fit.js';
-import { keepLifeEditorInView, placeSettingsSections, settings, syncSettingsCue } from './settings.js';
+import { keepLifeEditorInView, placeSettingsSections, settingsDialog, syncSettingsCue } from './settings.js';
 
 // Colours mode's grids for its twelve 44px swatches on narrow or short boards, in the order a face takes the first that
 // fits: 4 × 3, 3 × 4, 6 × 2 and 2 × 6, with 3px gaps.
@@ -24,7 +24,7 @@ function boardTurn() {
 export function syncBoardTurn() {
   document.querySelector('.app').dataset.boardTurn = String(boardTurn());
   measureBoard();
-  if (settings.open) {
+  if (settingsDialog.open) {
     placeSettingsSections();
     syncSettingsCue();
     keepLifeEditorInView();

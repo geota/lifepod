@@ -1,6 +1,6 @@
 // Settings' notched sliders: Players, Starting life and Badge size.
 
-import { settings } from '../layout/settings.js';
+import { settingsDialog } from '../layout/settings.js';
 import { element } from '../ui/dom.js';
 
 // A notched slider (design/polish/STYLE.md §4): a track from min to max whose labelled stops are buttons, so a tap works
@@ -18,7 +18,7 @@ export function notchedSlider({ root, min, max, snap, step, page, lowest, highes
   const valueAt = (x) => {
     const box = track.getBoundingClientRect();
     let along = Math.min(1, Math.max(0, (x - box.left) / box.width));
-    if (settings.hasAttribute('data-flipped')) along = 1 - along;
+    if (settingsDialog.hasAttribute('data-flipped')) along = 1 - along;
     return Math.min(max, Math.max(min, Math.round((min + along * (max - min)) / snap) * snap));
   };
   const stopValue = stop => Number(stop.dataset.value ?? (stop.value || stop.dataset.life));
