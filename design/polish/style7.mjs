@@ -1,8 +1,9 @@
 // Control styling round (STYLE.md; renders/style7-*.png): three style directions and four chrome palettes, drawn on
-// the current app (web/index.html) and the full-screen settings page (layout B, the owner's pick). Nothing in web/
-// changes. Run from the repo root:  node design/polish/style7.mjs [strip ...]
+// the current app (web/index.html) and its full-screen settings page (layout B, the owner's pick, since shipped). Nothing
+// in web/ changes. The committed renders drew settings as a mock-up; a run now lays each direction's CSS over the
+// shipped page (settings-lib.mjs). Run from the repo root:  node design/polish/style7.mjs [strip ...]
 import { launch, close, open, inPage, game, shot, compose } from './lib.mjs';
-import { pageJs, pageCss } from './settings-lib.mjs';
+import { keyboardCss, keyboardJs, settingsJs } from './settings-lib.mjs';
 import { palettes, paletteCss } from './palettes7.mjs';
 
 const only = process.argv.slice(2);
@@ -20,29 +21,6 @@ const seed = game(4, {
   commanderDamage: [[0, 4, 0, 0], [0, 0, 0, 9], [6, 0, 0, 0], [0, 0, 2, 0]],
   manaPool: true, autoEmpty: true, turns: 'turns', turn: { first: 0, active: 1, round: 2 }, identity: { show: { indicator: true, symbol: false, name: true }, background: 'symbol' },
 });
-
-// ---- The notched sliders (shared structure; each direction styles them) ---------------------------------------
-const sliderBase = `
-  .k-row { grid-template-columns: 7.5rem minmax(0, 1fr) auto; grid-template-areas: 'label slider value'; }
-  .k-row > .setting-label { grid-area: label; } .k-row > .k-slider { grid-area: slider; } .k-row > .k-val { grid-area: value; }
-  .fs-columns .fs-sec .k-row, .fs .k-row:has(> .k-val) { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'slider slider'; }
-  .k-slider { position: relative; min-height: 70px; margin: 0 22px; }
-  .k-stops { position: absolute; inset: 0 0 auto 0; height: 44px; }
-  .k-stop { position: absolute; top: 0; width: 44px; height: 44px; padding: 0; transform: translateX(-50%); border: 0; background: none; color: var(--text-soft); font-size: .9375rem; font-weight: 650; font-variant-numeric: tabular-nums; }
-  .k-stop[aria-pressed="true"] { color: var(--text); font-weight: 800; }
-  .k-track { position: absolute; left: 0; right: 0; top: 54px; height: var(--track-h, 8px); transform: translateY(-50%); border-radius: 999px; background: var(--raised); }
-  .k-fill { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p); border-radius: inherit; background: var(--accent); }
-  .k-tick { position: absolute; top: 50%; width: 4px; height: 4px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--muted); }
-  .k-tick.minor { width: 2px; height: 2px; opacity: .7; }
-  .k-fill ~ .k-tick { z-index: 1; }
-  .k-thumb { position: absolute; top: 50%; z-index: 2; transform: translate(-50%, -50%); }
-  .k-value { display: inline-flex; align-items: center; gap: 6px; min-width: 76px; min-height: 44px; padding: 0 10px 0 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--background); color: var(--text); font-size: 1.125rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .k-value .k-edit { display: grid; color: var(--muted); } .k-value .k-edit .icon { width: 14px; height: 14px; }
-  .k-value.editing { padding: 0 4px 0 0; border: 2px solid var(--accent); }
-  .k-value.editing input { width: 64px; min-height: 40px; padding: 0 10px; border: 0; background: none; color: var(--text); font: inherit; caret-color: var(--accent); }
-  .k-commit { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 8px; background: var(--accent); color: var(--ink); }
-  .k-commit .icon { width: 18px; height: 18px; }
-  .mk-keyboard { position: fixed; left: 0; right: 0; bottom: 0; height: 46%; z-index: 9; display: grid; place-items: center; background: #2a2c30; color: #9aa0a8; font: 600 14px/1.3 system-ui; border-top: 1px solid #444; }`;
 
 // ---- Three directions ------------------------------------------------------------------------------------------
 const directions = {
@@ -141,12 +119,13 @@ const recommendedPalette = { A: 'graphite', B: 'midnight', C: 'graphite' };
 
 // Opens the app with a palette and a direction; returns the page.
 async function app(size, dir, pal, extraCss = '') {
-  return open(size, seed, { css: paletteCss(pal) + pageCss + sliderBase + directions[dir].css + extraCss });
+  return open(size, seed, { css: paletteCss(pal) + keyboardCss + directions[dir].css + extraCss });
 }
+// The settings page as it opens, or with the life field open over a keyboard (keyboard: true).
+const settingsPageJs = ({ keyboard = false } = {}) => settingsJs({ lifeEdit: keyboard }) + (keyboard ? keyboardJs : '');
 async function settings(size, dir, pal, opts = {}) {
   const p = await app(size, dir, pal);
-  await p.evaluate(pageJs('columns', { picked: true, sliders: true, ...opts }));
-  if (opts.keyboard) await p.evaluate(() => { const k = document.createElement('div'); k.className = 'mk-keyboard'; k.textContent = 'System number pad (Gboard / iOS): about 46% of a 427px-tall screen'; document.querySelector('dialog.fs').append(k); const b = document.querySelector('.fs-body'); b.style.paddingBottom = '46vh'; const f = document.querySelector('.k-value.editing'); b.scrollTop = f.getBoundingClientRect().top - b.getBoundingClientRect().top + b.scrollTop - 60; document.querySelector('.k-value input')?.focus(); });
+  await p.evaluate(inPage(settingsPageJs(opts)));
   await p.waitForTimeout(150);
   return p;
 }
@@ -162,9 +141,12 @@ async function boardAtRest(size, dir, pal) {
 async function snap(p) { const f = await shot(p); await p.close(); return f; }
 
 const modeJs = [['Counters mode', "setBoardMode('counters')"], ['Commander damage map', "setBoardMode('damage')"], ['Choosing identities', "setBoardMode('identity')"], ['Dice', "document.querySelector('#dice-button').click()"]];
-// The page code the board modes run, for tests/design.test.mjs. The settings frames' pageJs (settings-lib.mjs) mocks
-// markup from before the settings page was built and throws on today's; it isn't covered until that's redone.
-export const snippets = () => Object.fromEntries(modeJs.map(([label, js]) => [label, { seed, js }]));
+// The page code the board modes and the settings frames run, for tests/design.test.mjs.
+export const snippets = () => ({
+  ...Object.fromEntries(modeJs.map(([label, js]) => [label, { seed, js }])),
+  Settings: { seed, js: settingsPageJs() },
+  'Settings, typing a starting life over the keyboard': { seed, js: settingsPageJs({ keyboard: true }) },
+});
 const strips = {};
 for (const [dir, d] of Object.entries(directions)) {
   strips[`style7-${dir.toLowerCase()}`] = async () => {
@@ -193,7 +175,7 @@ strips['style7-palettes'] = async () => {
 };
 
 strips['style7-sliders'] = async () => {
-  const cropRow = async (size, dir, opts, sel = '.fs-sec:first-of-type') => {
+  const cropRow = async (size, dir, opts, sel = '#settings-game') => {
     const p = await settings(size, dir, recommendedPalette[dir], opts);
     const box = await p.locator(sel).first().boundingBox();
     const f = await shot(p, { ...box, pad: 6 });
@@ -204,15 +186,9 @@ strips['style7-sliders'] = async () => {
   for (const dir of ['A', 'B', 'C']) {
     rows.push({ letter: dir, title: directions[dir].title, frames: [caption(fit(await cropRow(T, dir, {}), 520), 'Game section · 952 × 427'), caption(fit(await cropRow(S, dir, {}), 300), '568 × 320')] });
   }
-  const seg = await (async () => {
-    const p = await app(T, 'A', 'graphite');
-    await p.evaluate(pageJs('columns', { picked: true, sliders: false }));
-    await p.waitForTimeout(120);
-    const box = await p.locator('.fs-sec').first().boundingBox();
-    const f = await shot(p, { ...box, pad: 6 }); await p.close(); return f;
-  })();
-  rows.push({ title: 'For comparison: segmented choices (direction A)', frames: [caption(fit(seg, 520), 'Game section · 952 × 427')] });
-  const edit = await snap(await settings(T, 'A', 'graphite', { lifeEdit: true, keyboard: true }));
+  // The round's comparison with segmented choices for players and life is in the committed render; the shipped page has
+  // only the sliders.
+  const edit = await snap(await settings(T, 'A', 'graphite', { keyboard: true }));
   rows.push({ title: 'Tap the number to type one: the inline editor', note: 'The value turns into a field with a numeric keyboard and a ✓; Enter, ✓, tapping elsewhere or closing settings commits; an empty or invalid entry reverts. The keyboard covers about half the landscape screen, so the page scrolls the field into view.', frames: [caption(fit(edit, 520), 'Editing starting life · 952 × 427 (keyboard drawn as a placeholder)')] });
   await compose('style7-sliders', 'Players and starting life as notched sliders', 'Every labelled stop is a 44px tap target, so the slider works by tap as well as by drag (WCAG 2.5.7). Labels sit above the track so a finger never covers them.', rows);
 };

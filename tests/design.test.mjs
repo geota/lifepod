@@ -8,7 +8,7 @@ import { chromium } from 'playwright-core';
 import { appModules, inPage } from '../design/polish/lib.mjs';
 import { openPage, savedGame, test } from './helpers.mjs';
 
-const scripts = ['polish/final-review', 'polish/glass', 'polish/render', 'polish/spec', 'polish/style7', 'polish/tiles-render', 'counters/r4'];
+const scripts = ['polish/final-review', 'polish/glass', 'polish/render', 'polish/settings', 'polish/spec', 'polish/style7', 'polish/tiles-render', 'counters/r4'];
 
 test('node: every app name the design scripts import is still exported by its module', () => {
   for (const [path, names] of Object.entries(appModules)) {
