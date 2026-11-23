@@ -1,6 +1,7 @@
 /* Tile: the Tile colours sets (data-tiles, written by design/polish/tiles7.mjs), each tile's palette, the one size
-   per board, the face, the background and the identity symbol, the total and the life halves, and seat rotation. */
-/* Tile colour sets (design/polish/TILES.md), the Tile colours setting: app.js sets data-tiles on <html>. The :root
+   per board (--u, the badge size), the face, the background and the identity symbols, the total, Out, the life halves
+   and seat rotation. */
+/* Tile colour sets (design/polish/TILES.md), the Tile colours setting: js/render/appearance.js sets data-tiles on <html>. The :root
    palettes above are Classic; each set below replaces all 96 tokens under the same swatch ids, so a player's colour
    carries over between sets, and each id keeps its colour family in every set, so the default seats (ids 0–5) are
    spread. Written and checked by design/polish/tiles7.mjs (tiles7.json): on every panel the life total is at least

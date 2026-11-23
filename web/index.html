@@ -92,10 +92,11 @@
   </dialog>
 
   <!-- Settings (design/polish/SETTINGS-SPEC.md): one full-screen page, facing the phone rather than the board. The header
-       stays put while the body scrolls. Two columns from 620px wide (Game and Table, then Track and Identity), one column
-       below in the order Game, Track, Identity, Table; app.js moves the sections so the reading order matches. Players and
-       starting life are notched sliders (design/polish/STYLE.md §4) and stay pending until Done, which then reads "Start
-       new game". Everything else saves the moment it changes. Every target is at least 44px. -->
+       stays put while the body scrolls. Two columns from 620px wide (Game, Table and Reminders, then Track and Identity),
+       one column below in the order Game, Track, Identity, Table, Reminders; js/layout/settings.js moves the sections so
+       the reading order matches. Players and starting life are notched sliders (design/polish/STYLE.md §4) and stay
+       pending until Done, which then reads "Start new game". Everything else saves the moment it changes. Every target
+       is at least 44px. -->
   <dialog id="settings" class="fs" aria-labelledby="settings-title">
     <form class="fs-frame" id="settings-form" novalidate>
       <header class="fs-head">
