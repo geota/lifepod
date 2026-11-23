@@ -1,6 +1,6 @@
 import {
   badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, designationKinds,
-  designations, discardMessages, doneLabels, editingModes, faceAngles, faceEdges, firstBeat, holdDelay, identityColours,
+  designations, discardMessages, doneLabels, editingModes, faceAngles, faceEdges, firstBeat, identityColours,
   identityNames, manaColours, maxCount, maxRound, maxStartingLife, outLabels, playerCounts, poisonLethal, poisonWarning,
   reminderText, reminderTime, seatLayouts, shuffleTick, shuffleTicks, swatches, tileSetOrder, tileSets, trackers,
   undoClearTime,
@@ -26,6 +26,7 @@ import {
   manaButton, manaIcon, playerTemplate, roundBackButton, roundButton, saveButton, setupButton, shuffleButton,
   undoButton, visuallyHidden,
 } from './js/ui/dom.js';
+import { bindCounter, bindSeat, bindStep, bindTap, cancelPresses } from './js/ui/press.js';
 
 /** @typedef {import('./js/logic/data.js').BoardMode} BoardMode */
 /** @typedef {import('./js/logic/data.js').CountKind} CountKind */
@@ -117,8 +118,6 @@ let selectedLife = game.startingLife;
 let diceSides = 20;
 let die;
 let stopRoll;
-// Every held counter button, so several players can hold buttons at the same time.
-const activePresses = new Set();
 // "Who goes first?" waits until settings has closed, then opens.
 let askFirst = false;
 let shuffleTimer;
@@ -600,88 +599,6 @@ function fitStrips() {
   return strips.some(strip => tileOf(strip).dataset.strip === 'fold-inline');
 }
 
-function cancelPresses() {
-  for (const press of [...activePresses]) press.end();
-}
-
-// A press counts on pointerdown (or, for map seats and turn steps, when it ends), so the click that follows is skipped.
-// Presses often redraw what's under the finger, such as a mana strip that shrinks or a turn chip that moves to the
-// next player, and that click can land on a different button. So the window that skips it is shared by every
-// button, not kept per button. Keyboard clicks have no detail and always count.
-let ignoreClicksUntil = 0;
-
-// A press counts the moment a finger lands, so a tap can't be lost to a finger drifting off the button
-// or to Android cancelling touches when several fingers land at once. Holding repeats after a pause.
-// Clicks still handle keyboards and assistive technology.
-// adjust gets how long the press has been held, in milliseconds (0 for a tap or a click).
-/**
- * @param {HTMLElement} button
- * @param {(held: number) => void} adjust
- * @param {string} label
- */
-function bindCounter(button, adjust, label) {
-  button.setAttribute('aria-label', label);
-  const tile = button.closest('.player') ?? button;
-  let press;
-  // The last pointer that pressed this button. A press that ended when the finger left the tile still owns the click
-  // that follows its pointerup.
-  let pressPointer;
-
-  button.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
-    pressPointer = event.pointerId;
-    // A new touch ends any earlier press on this button, even if that press never got its pointerup.
-    press?.end();
-    const current = {
-      pointerId: event.pointerId,
-      start: performance.now(),
-      end() {
-        clearTimeout(current.timer);
-        activePresses.delete(current);
-        if (press !== current) return;
-        press = undefined;
-        delete button.dataset.pressed;
-      },
-    };
-    function repeat() {
-      adjust(performance.now() - current.start);
-      current.timer = setTimeout(repeat, 100);
-    }
-    press = current;
-    activePresses.add(current);
-    button.dataset.pressed = '';
-    ignoreClicksUntil = performance.now() + 800;
-    adjust(0);
-    current.timer = setTimeout(repeat, 500);
-    try {
-      button.setPointerCapture(event.pointerId);
-    } catch {
-      // The pointer is already gone. The press still counted, and the next touch ends it.
-    }
-  });
-  // A hold stops when the finger leaves the player's tile.
-  button.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== press?.pointerId) return;
-    const bounds = tile.getBoundingClientRect();
-    if (event.clientX < bounds.left || event.clientX > bounds.right ||
-        event.clientY < bounds.top || event.clientY > bounds.bottom) {
-      press.end();
-    }
-  });
-  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
-    button.addEventListener(type, (event) => {
-      if (event.pointerId === pressPointer) ignoreClicksUntil = performance.now() + 800;
-      if (event.pointerId !== press?.pointerId) return;
-      press.end();
-    });
-  }
-  button.addEventListener('contextmenu', (event) => event.preventDefault());
-  // Skip the click that follows a press already counted on pointerdown. Keyboard clicks have no detail.
-  button.addEventListener('click', (event) => {
-    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) adjust(0);
-  });
-}
-
 // Announce totals once a burst of changes settles, instead of on every step of a hold. Each player's news is
 // read in seat order, and describe() runs when it's read, so it gives the settled value.
 /**
@@ -701,33 +618,6 @@ function announce(index, kind, describe) {
 
 function announceLife(index) {
   announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
-}
-
-// For buttons that act once per press: a press counts the moment a finger lands, as on the life buttons.
-/**
- * @param {HTMLElement & { disabled?: boolean }} button
- * @param {() => void} action
- */
-function bindTap(button, action) {
-  let pointerId;
-  button.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0 || button.disabled) return;
-    pointerId = event.pointerId;
-    ignoreClicksUntil = performance.now() + 800;
-    action();
-  });
-  // However long the press, the click that follows it is skipped.
-  for (const type of /** @type {const} */ (['pointerup', 'pointercancel'])) {
-    button.addEventListener(type, (event) => {
-      if (event.pointerId !== pointerId) return;
-      pointerId = undefined;
-      ignoreClicksUntil = performance.now() + 800;
-    });
-  }
-  button.addEventListener('contextmenu', (event) => event.preventDefault());
-  button.addEventListener('click', (event) => {
-    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) action();
-  });
 }
 
 function layoutBoard() {
@@ -763,132 +653,6 @@ function inColourOf(node, player) {
   node.dataset.colour = swatches[game.colors[player]].id;
   node.dataset.row = seatRow(player);
   return node;
-}
-
-// A map seat: a tap adds one. Holding takes one away once the hold registers, then repeats on the same timing
-// as the life buttons. Whether a press is a tap is only known when it ends, so a tap counts then, however
-// the press ends, and a hold never adds.
-function bindSeat(button, add, remove) {
-  let press;
-  // As in bindCounter: a press that ended when the finger left the tile still owns the click after its pointerup.
-  let pressPointer;
-
-  button.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
-    pressPointer = event.pointerId;
-    press?.finish();
-    const current = {
-      pointerId: event.pointerId,
-      held: false,
-      end() {
-        clearTimeout(current.timer);
-        activePresses.delete(current);
-        if (press !== current) return;
-        press = undefined;
-        delete button.dataset.pressed;
-      },
-      finish() {
-        const tap = press === current && !current.held;
-        current.end();
-        if (tap) add();
-      },
-    };
-    function repeat() {
-      current.held = true;
-      remove();
-      current.timer = setTimeout(repeat, 100);
-    }
-    press = current;
-    activePresses.add(current);
-    button.dataset.pressed = '';
-    ignoreClicksUntil = performance.now() + 800;
-    current.timer = setTimeout(repeat, 500);
-    try {
-      button.setPointerCapture(event.pointerId);
-    } catch {
-      // The pointer is already gone. The next touch ends this press.
-    }
-  });
-  // A hold stops when the finger leaves the player's tile. Cells are bound before they join their tile, so the tile
-  // is looked up here.
-  button.addEventListener('pointermove', (event) => {
-    if (event.pointerId !== press?.pointerId) return;
-    const bounds = (button.closest('.player') ?? button).getBoundingClientRect();
-    if (event.clientX < bounds.left || event.clientX > bounds.right ||
-        event.clientY < bounds.top || event.clientY > bounds.bottom) {
-      press.finish();
-    }
-  });
-  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
-    button.addEventListener(type, (event) => {
-      if (event.pointerId === pressPointer) ignoreClicksUntil = performance.now() + 800;
-      if (event.pointerId !== press?.pointerId) return;
-      press.finish();
-    });
-  }
-  button.addEventListener('contextmenu', (event) => event.preventDefault());
-  button.addEventListener('click', (event) => {
-    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) add();
-  });
-}
-
-// The turn chip and the pill's round button: a tap steps forward when the finger lifts, and a hold steps back once
-// when it registers. A hold never repeats, so a long press can't rewind several turns.
-function bindStep(button, forward, back) {
-  let press;
-  button.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
-    press?.end();
-    const current = {
-      pointerId: event.pointerId,
-      held: false,
-      end() {
-        clearTimeout(current.timer);
-        activePresses.delete(current);
-        if (press !== current) return;
-        press = undefined;
-        delete button.dataset.pressed;
-      },
-      finish() {
-        const tap = press === current && !current.held && button.isConnected;
-        current.end();
-        if (tap) forward();
-      },
-    };
-    press = current;
-    activePresses.add(current);
-    button.dataset.pressed = '';
-    ignoreClicksUntil = performance.now() + 800;
-    current.timer = setTimeout(() => {
-      // A turn chip is rebuilt when someone else steps the turn, and then its pointerup never arrives. Its press
-      // is over: stepping back now would undo their step.
-      if (!button.isConnected) {
-        current.end();
-        return;
-      }
-      current.held = true;
-      delete button.dataset.pressed;
-      back();
-    }, holdDelay);
-    try {
-      button.setPointerCapture(event.pointerId);
-    } catch {
-      // The pointer is already gone. The next touch ends this press.
-    }
-  });
-  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
-    button.addEventListener(type, (event) => {
-      if (event.pointerId !== press?.pointerId) return;
-      ignoreClicksUntil = performance.now() + 800;
-      // A cancelled touch is no tap.
-      if (type === 'pointerup') press.finish();
-      else press.end();
-    });
-  }
-  button.addEventListener('contextmenu', (event) => event.preventDefault());
-  button.addEventListener('click', (event) => {
-    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) forward();
-  });
 }
 
 // Commander damage mode: a map of the table on every tile, in board coordinates. Each opponent's seat shows
