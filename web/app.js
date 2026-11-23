@@ -2,6 +2,10 @@ import {
   chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
 } from './js/actions/edits.js';
 import { autoEmptyPools, clearPool, endUndoClears, spendMana, undoClear } from './js/actions/mana.js';
+import {
+  askFirst, cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setAskFirst, setBoardMode,
+  shuffleFirst,
+} from './js/actions/mode.js';
 import { clearReminders, dismissReminder, remind, turnStarted } from './js/actions/reminders.js';
 import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { requestFit, resetDrops } from './js/layout/fit.js';
@@ -10,34 +14,29 @@ import {
   syncSettingsCue,
 } from './js/layout/settings.js';
 import {
-  badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, designations, discardMessages, doneLabels, editingModes,
-  firstBeat, maxCount, maxRound, maxStartingLife, playerCounts, shuffleTick, shuffleTicks, tileSetOrder, tileSets,
-  trackers,
+  badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, maxCount, maxRound, maxStartingLife, playerCounts,
+  tileSetOrder, tileSets, trackers,
 } from './js/logic/data.js';
-import {
-  applyEdit, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow, trackedDesignations,
-} from './js/logic/rules.js';
+import { isOut, leavingTransfers, nextTurn, outPlayers, previousTurn, trackedDesignations } from './js/logic/rules.js';
 import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from './js/logic/save.js';
 import { announce, announceDesignation, announceLife, clearAnnouncements } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from './js/render/appearance.js';
 import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badges.js';
-import { renderModeLayer, setModeActions } from './js/render/modes.js';
+import { setModeActions } from './js/render/modes.js';
 import { syncPill } from './js/render/pill.js';
 import { paintColours, renderScore } from './js/render/tile.js';
 import {
   android, currentLandscapeAngle, haptic, ios, portraitQuery, reducedMotion, setReduceTransparency, syncWakeLock,
 } from './js/state/platform.js';
 import {
-  boardMode, clearedPools, editStartHolders, edits, game, openBoardMode, saveGame, syncBackHandling, turnSteps,
+  boardMode, clearedPools, editStartHolders, game, saveGame, syncBackHandling, turnSteps,
 } from './js/state/state.js';
 import {
-  announcer, board, boardControls, cancelButton, countersButton, damageButton, diceButton, discardDialog, element, icon,
-  manaButton, playerTemplate, roundBackButton, roundButton, saveButton, setupButton, shuffleButton, undoButton,
+  board, cancelButton, countersButton, damageButton, diceButton, discardDialog, element, icon, manaButton,
+  playerTemplate, roundBackButton, roundButton, saveButton, setupButton, shuffleButton, undoButton,
 } from './js/ui/dom.js';
 import { bindCounter, bindStep, bindTap, cancelPresses } from './js/ui/press.js';
 
-/** @typedef {import('./js/logic/data.js').BoardMode} BoardMode */
-/** @typedef {import('./js/logic/rules.js').Edit} Edit */
 /** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
 /** @typedef {import('./js/logic/data.js').Reminders} Reminders */
 /** @typedef {import('./js/logic/data.js').Style} Style */
@@ -76,9 +75,6 @@ let selectedLife = game.startingLife;
 let diceSides = 20;
 let die;
 let stopRoll;
-// "Who goes first?" waits until settings has closed, then opens.
-let askFirst = false;
-let shuffleTimer;
 
 // Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, announces
 // it, and reminds a new initiative holder to venture.
@@ -120,7 +116,7 @@ function stepTurn() {
     game.turn.round = Math.min(maxRound, game.turn.round + 1);
   } else {
     if (game.turn.active === null) {
-      askFirst = true;
+      setAskFirst(true);
       maybeAskFirst();
       return;
     }
@@ -169,134 +165,6 @@ function stepBack() {
     if (crossed) game.turn.round -= 1;
   }
   showTurn();
-}
-
-// "Who goes first?" opens once nothing else is open: after a new game while Turns is on, and when Turns goes from Off
-// to on in a game with no first player.
-function maybeAskFirst() {
-  if (!askFirst || game.turns === 'off' || boardMode !== null || document.querySelector('dialog[open]')) return;
-  askFirst = false;
-  setBoardMode('first');
-}
-
-// The chosen player goes first and, turn by turn, takes the first turn. Their tile shows "Goes first" for a beat.
-function chooseFirst(index) {
-  if (boardMode !== 'first' || board.hasAttribute('data-picked')) return;
-  clearTimeout(shuffleTimer);
-  game.turn.first = index;
-  game.turn.active = index;
-  turnSteps.length = 0;
-  saveGame();
-  haptic();
-  board.dataset.picked = '';
-  [...board.children].forEach((player, seat) => player.toggleAttribute('data-lit', seat === index));
-  const go = board.children[index].querySelector('.first-go');
-  go.replaceChildren(icon('flag'), 'Goes first');
-  /** @type {Element} */ (go.nextElementSibling).textContent = game.turns === 'rounds' ? 'Tap the flag to start each round' : 'Tap Turn when your turn ends';
-  announcer.textContent = `Player ${index + 1} goes first`;
-  // Their turn starts once the board is back, where its reminder can show.
-  shuffleTimer = setTimeout(() => {
-    setBoardMode(null);
-    turnStarted();
-  }, reducedMotion.matches ? 0 : firstBeat);
-}
-
-// The centre shuffle picks a random player who isn't out, lighting tiles around the table before landing on them.
-function shuffleFirst() {
-  if (boardMode !== 'first' || board.hasAttribute('data-shuffling') || board.hasAttribute('data-picked')) return;
-  const order = playOrder(game);
-  const live = order.filter(player => !isOut(game, player));
-  const candidates = live.length ? live : order;
-  const pick = candidates[randomBelow(candidates.length)];
-  if (reducedMotion.matches) {
-    chooseFirst(pick);
-    return;
-  }
-  board.dataset.shuffling = '';
-  // A run around the table in play order that ends on the pick.
-  const end = order.indexOf(pick) + order.length * shuffleTicks;
-  const lights = Array.from({ length: shuffleTicks }, (_, step) => order[(end - shuffleTicks + 1 + step) % order.length]);
-  const tick = () => {
-    const player = lights.shift();
-    if (!lights.length) {
-      delete board.dataset.shuffling;
-      chooseFirst(player);
-      return;
-    }
-    [...board.children].forEach((tile, seat) => tile.toggleAttribute('data-lit', seat === player));
-    shuffleTimer = setTimeout(tick, shuffleTick);
-  };
-  tick();
-}
-
-// Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
-// Counters mode ends with save or ✕, and keeps a list of its edits until then.
-/** @param {BoardMode} mode */
-function setBoardMode(mode) {
-  cancelPresses();
-  clearTimeout(shuffleTimer);
-  for (const flag of ['data-picked', 'data-shuffling']) board.removeAttribute(flag);
-  for (const player of board.children) player.removeAttribute('data-lit');
-  // Opening mana mode settles any "Undo clear": the cleared pool stays empty.
-  if (mode === 'mana') endUndoClears();
-  openBoardMode(mode);
-  [...board.children].forEach((player, index) => {
-    player.querySelector('.controls').inert = mode !== null;
-    player.querySelector('.rotate-seat').hidden = mode !== 'rotate';
-    renderModeLayer(player, index);
-    renderBadges(index);
-  });
-  for (const node of [board, boardControls]) {
-    if (mode) node.dataset.mode = mode;
-    else delete node.dataset.mode;
-  }
-  // The badges were hidden while the mode was open, so they're measured now that they show again.
-  requestFit();
-  setupButton.setAttribute('aria-label', mode ? doneLabels[mode] ?? 'Settings' : 'Settings');
-  setupButton.setAttribute('aria-haspopup', mode ? 'false' : 'dialog');
-  setupButton.querySelector('.setup-icon').hidden = mode !== null;
-  setupButton.querySelector('.rotation-done').hidden = mode === null;
-  syncPill();
-  const focusTarget = mode === 'rotate' ? board.querySelector('.rotate-seat')
-    : mode === 'colours' ? board.querySelector('.swatch[aria-pressed="true"]')
-    : mode ? board.querySelector('.mode-layer button') : setupButton;
-  focusTarget?.focus();
-  syncBackHandling();
-  // A mode opened from settings, such as Rotate seats, was still open when settings' close event looked, so the question
-  // waits for the mode to end.
-  if (mode === null) maybeAskFirst();
-}
-
-// ✕ in an editing mode: with no changes it just closes; otherwise it asks first, and Keep editing is the default.
-function cancelEditing() {
-  const changes = /** @type {Edit[]} */ (edits).length;
-  if (!changes) {
-    setBoardMode(null);
-    return;
-  }
-  document.querySelector('#discard-title').textContent = `Discard ${changes} ${changes === 1 ? 'change' : 'changes'}?`;
-  // Commander damage can pass the monarch and the initiative, and counters mode sets them.
-  const moved = designations.filter(({ kind }) => game[kind] !== editStartHolders[kind]).map(({ name }) => name);
-  document.querySelector('#discard-message').textContent = discardMessages[boardMode]
-    + (moved.length ? ` So ${moved.length > 1 ? 'do' : 'does'} ${moved.join(' and ')}.` : '');
-  discardDialog.returnValue = 'keep';
-  discardDialog.showModal();
-  syncBackHandling();
-}
-
-function discardEdits() {
-  const changes = /** @type {Edit[]} */ (edits);
-  while (changes.length) applyEdit(game, /** @type {Edit} */ (changes.pop()), -1);
-  game.scores.forEach((_, index) => renderScore(index));
-  saveGame();
-  setBoardMode(null);
-  announcer.textContent = 'Changes discarded';
-}
-
-// Leaves the open board mode the way ✕ or the check mark would without saving anything new.
-function leaveBoardMode() {
-  if (editingModes.includes(boardMode)) cancelEditing();
-  else setBoardMode(null);
 }
 
 function renderBoard() {
@@ -377,7 +245,7 @@ function startGame(playerCount, startingLife) {
   syncBoardTurn();
   renderBoard();
   syncPill();
-  askFirst = game.turns !== 'off';
+  setAskFirst(game.turns !== 'off');
   maybeAskFirst();
 }
 
@@ -717,7 +585,7 @@ for (const choice of turnChoices.children) {
     if (was !== 'off' && mode !== 'off') game.turn.active = null;
     // Turn reminders are only for Turn by turn.
     if (mode !== 'turns') clearReminders();
-    askFirst = was === 'off' && mode !== 'off' ? game.turn.first === null : askFirst && mode !== 'off';
+    setAskFirst(was === 'off' && mode !== 'off' ? game.turn.first === null : askFirst && mode !== 'off');
     saveGame();
     renderTrackSheet();
     renderRemindersSection();
