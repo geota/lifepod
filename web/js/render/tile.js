@@ -44,7 +44,7 @@ function colourIndicator(identity) {
   return indicator;
 }
 
-// The identity's symbol. styles.css picks the glyph from data-symbol. Four colours are the colour pie drawn from
+// The identity's symbol. css/tile.css picks the glyph from data-symbol. Four colours are the colour pie drawn from
 // the five mana symbols, with the missing colour as a ghost.
 function identitySymbol(identity) {
   const symbol = element('span', 'id-symbol');

@@ -81,7 +81,7 @@ function fitInputs() {
     attributes(document.documentElement), attributes(board), attributes(boardControls), pill, ...tiles].join('\n');
 }
 
-// styles.css's --grow in pixels: 1 on phones, up to 2 on tablets.
+// css/tokens.css's --grow in pixels: 1 on phones, up to 2 on tablets.
 export function growPixel() {
   return Math.min(2, Math.max(1, Math.min(window.innerWidth, window.innerHeight) / 430));
 }
@@ -116,7 +116,7 @@ function fitBadgeRows() {
   fitted = fitInputs();
 }
 
-// How large a badge row may grow at a larger Badge size (styles.css): one row, 1.7em tall, between each edge and the
+// How large a badge row may grow at a larger Badge size (css/tile.css): one row, 1.7em tall, between each edge and the
 // total, its − and + glyphs and the "Out" tag, on every tile, measured in each face's own coordinates.
 function measureBadgeRoom() {
   const edge = 8 * growPixel();

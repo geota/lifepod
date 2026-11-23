@@ -9,7 +9,7 @@ const settingsHead = /** @type {HTMLElement} */ (settingsDialog.querySelector('.
 const settingsCue = /** @type {HTMLDivElement} */ (settingsDialog.querySelector('.scroll-cue'));
 export const lifeEditor = /** @type {HTMLSpanElement} */ (document.querySelector('#life-editor'));
 
-// Compact switch rows (styles.css) put their label over the mark and the switch where a row is too narrow for all three
+// Compact switch rows (css/settings.css) put their label over the mark and the switch where a row is too narrow for all three
 // on one line. Container queries cover the usual widths; this catches whatever they miss with the font and style in
 // use: a group with a label cut short stacks every row. It's checked whenever the settings body changes size, as when
 // settings opens or the window turns (the body, a scroller, doesn't change size when its rows stack, so its observer

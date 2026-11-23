@@ -32,8 +32,8 @@ test('node: no test waits on real time, launches its own browser or copies a col
     const text = source(name);
     assert.doesNotMatch(text, /waitForTimeout/, `${name} waits on the page's clock or a condition, not a sleep`);
     assert.doesNotMatch(text, /\b(?:chromium|webkit|engine)\.launch\(/, `${name} opens pages through openPage`);
-    // A colour copied from styles.css fails for a palette tweak rather than a broken behaviour; read it with token().
-    assert.doesNotMatch(text, /rgba?\(\d/, `${name} reads colours from styles.css rather than copying them`);
+    // A colour copied from the CSS fails for a palette tweak rather than a broken behaviour; read it with token().
+    assert.doesNotMatch(text, /rgba?\(\d/, `${name} reads colours from the CSS rather than copying them`);
   }
 });
 

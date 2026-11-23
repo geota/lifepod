@@ -30,14 +30,14 @@ export const seatLayouts = {
 };
 export const playerCounts = Object.keys(seatLayouts).map(Number);
 // Tile colours, in order. Players 1–6 default to the first six. Each has a lighter top-row and a darker
-// bottom-row version in styles.css: players 1, 2 and 5 use the top row, so neighbours differ in lightness too.
+// bottom-row version in css/tokens.css: players 1, 2 and 5 use the top row, so neighbours differ in lightness too.
 // New swatches only ever join the end, so saved choices keep their colour. The ids are Classic's names; each tile set
 // below names them for itself.
 export const swatches = ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid'].map(id => ({ id }));
 export const topRowPlayers = [0, 1, 4];
 // Tile colour sets (design/polish/TILES.md), in the Tile colours control's order: the same twelve swatch ids in each, so
 // a player's colour carries over, with each set's own names for screen readers. Classic is the original twelve; Clear,
-// the default, keeps tiles apart for colour-blind players. styles.css holds each set's palettes under data-tiles. Each id
+// the default, keeps tiles apart for colour-blind players. css/tile.css holds each set's palettes under data-tiles. Each id
 // keeps its colour family in every set (DESIGN-AUDIT M1), so the default seats, ids 0–5, are spread round the hue
 // circle in each. families groups each set's swatches into six look-alike families (tiles7.mjs finds them), which a
 // shuffled new game keeps apart.
@@ -64,11 +64,11 @@ export const tileSets = {
 export const tileSetOrder = /** @type {TileSet[]} */ (Object.keys(tileSets));
 /** @type {TileSet} */
 export const defaultTileSet = 'clear';
-// The Style setting (design/polish/STYLE.md): direction A, Material, or direction B, Glass. styles.css holds each as
+// The Style setting (design/polish/STYLE.md): direction A, Material, or direction B, Glass. css/tokens.css holds each as
 // tokens under data-style. Until the player picks one, the iOS app (its game message handler) starts on Glass, and
 // Android and browsers on Material.
 export const styleOrder = ['material', 'glass'];
-// Settings → Table → Badge size, in the slider's order (styles.css scales the badge rows and the mana strip by it).
+// Settings → Table → Badge size, in the slider's order (css/tile.css scales the badge rows and the mana strip by it).
 export const badgeSizes = { default: 'Default', large: 'Large', larger: 'Larger' };
 export const badgeSizeOrder = /** @type {BadgeSize[]} */ (Object.keys(badgeSizes));
 // The centre button's label while a board mode that ends with the single check mark is open.
@@ -119,7 +119,7 @@ export const commanderWarning = 15;
 export const poisonLethal = 10;
 export const poisonWarning = 7;
 // Colour identity (design/polish/SPEC.md §2): any combination of the five colours, in W U B R G order. A colourless
-// commander has none. Each of the 31 identities has a name and a symbol. styles.css draws the symbols from the Mana
+// commander has none. Each of the 31 identities has a name and a symbol. css/tile.css draws the symbols from the Mana
 // font: each colour's mana symbol, the ten Ravnica guilds, the five Khans clans, the five Streets of New Capenna
 // families for the shards, and the colour pie for all five. Four colours have no official symbol, so they get the
 // colour pie with the missing colour as a ghost.

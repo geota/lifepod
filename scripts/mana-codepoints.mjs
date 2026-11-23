@@ -4,6 +4,7 @@
 // Mana's symbols are all in the Private Use Area (U+E000 to U+F8FF). The font also maps some ASCII, for its own
 // ligatures, but LifePod only sets Mana on empty elements whose ::before draws one symbol, so ASCII isn't needed.
 import { readdirSync, readFileSync } from 'node:fs';
+import { stylesheets } from './stylesheets.mjs';
 
 const read = path => readFileSync(new URL(`../web/${path}`, import.meta.url), 'utf8');
 // Every script in web/: app.js, the modules under web/js/ and dice.js.
@@ -44,7 +45,7 @@ function scriptCodePoints(source) {
 /** @returns {number[]} The Private Use code points that web/ draws in the Mana font, sorted. */
 export function manaCodePoints() {
   const all = [
-    ...cssCodePoints(read('styles.css')),
+    ...stylesheets().flatMap(path => cssCodePoints(read(path))),
     ...scripts().flatMap(path => scriptCodePoints(read(path))),
     ...scriptCodePoints(read('index.html')),
   ];

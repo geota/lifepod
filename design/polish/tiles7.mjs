@@ -1,16 +1,17 @@
 // Alternative 12-colour tile palette sets (TILES.md), generated in OKLCH and checked against the Graphite chrome.
 // Run from the repo root:  node design/polish/tiles7.mjs     (prints the checks, writes tiles7.json for tiles-render.mjs
-// and the Soft, Jewel and Clear blocks in web/styles.css)
+// and the Soft, Jewel and Clear blocks in web/css/tile.css, and the Tile colours bands in web/css/settings.css)
 // Exits with an error if a set misses a contrast minimum.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { readStyles, stylesheetUrl } from '../../scripts/stylesheets.mjs';
 import { oklchToHex, contrast, hexToRgb, rgbToHex, rgbToOklch } from '../counters/oklch.mjs';
 
 const ids = ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid'];
 const roles = ['panel', 'rim', 'seat', 'button'];
 
-// Today's twelve, read from web/styles.css.
-const css = readFileSync(fileURLToPath(new URL('../../web/styles.css', import.meta.url)), 'utf8');
+// Today's twelve, read from the stylesheets: the first of each token is the :root palettes in web/css/tokens.css.
+const css = readStyles();
 const todaySet = Object.fromEntries(ids.map(id => [id, Object.fromEntries(['top', 'bottom'].map(row => [row,
   Object.fromEntries(roles.map(role => [role, css.match(new RegExp(`--${id}-${row}-${role}:\\s*(#[0-9a-f]{6})`))[1]]))]))]));
 
@@ -198,17 +199,20 @@ for (const [k, s] of Object.entries(sets)) {
 }
 writeFileSync(fileURLToPath(new URL('./tiles7.json', import.meta.url)), JSON.stringify(Object.fromEntries(Object.entries(sets).map(([k, s]) => [k, { name: s.name, note: s.note, names: s.names, families: s.families.group, set: s.set }])), null, 1));
 
-// The app's Soft, Jewel and Clear blocks in web/styles.css (Classic is the :root palettes, which today's set reads), so
-// the shipped tokens are always this script's. palette.test.mjs checks they match tiles7.json.
-const cssPath = fileURLToPath(new URL('../../web/styles.css', import.meta.url));
+// The app's Soft, Jewel and Clear blocks in web/css/tile.css (Classic is the :root palettes in web/css/tokens.css,
+// which today's set reads), so the shipped tokens are always this script's. palette.test.mjs checks they match
+// tiles7.json.
+const tilePath = stylesheetUrl('css/tile.css');
+const tileCss = readFileSync(tilePath, 'utf8');
 const block = (setting, set) => `[data-tiles="${setting}"] {\n${ids.map(id => ['top', 'bottom'].map(row =>
   `  ${roles.map(role => `--${id}-${row}-${role}: ${set[id][row][role]};`).join(' ')}`).join('\n')).join('\n')}\n}`;
-let shipped = css;
+let shipped = tileCss;
 for (const [setting, source] of [['soft', 'soft'], ['jewel', 'jewel'], ['clear', 'clear']]) {
   shipped = shipped.replace(new RegExp(`\\[data-tiles="${setting}"\\] \\{[^}]*\\}`), block(setting, sets[source].set));
 }
-// The Tile colours control's colour bands (styles.css, #tile-set-choices): each set's panel and rim for players 1–4 (ids
-// 0–3; players 1 and 2 sit in the top row, 3 and 4 in the bottom), whichever set is in use. The whole run of
+if (shipped !== tileCss) writeFileSync(tilePath, shipped);
+// The Tile colours control's colour bands (web/css/settings.css, #tile-set-choices): each set's panel and rim for
+// players 1–4 (ids 0–3; players 1 and 2 sit in the top row, 3 and 4 in the bottom), whichever set is in use. The whole run of
 // .tile-sets > [data-set] lines is written again from bandSets, one line per set in this order, so adding, removing or
 // swapping a set is a change to this list (with its button in index.html and its entry in tileSets in data.js); the
 // control's own rules read only --strip-1…4 and --strip-1…4-rim.
@@ -218,9 +222,11 @@ const strip = (setting, set) => `.tile-sets > [data-set="${setting}"] { ${[0, 1,
   return `--strip-${player + 1}: ${palette.panel}; --strip-${player + 1}-rim: ${palette.rim};`;
 }).join(' ')} }`;
 const bandLines = /(?:\.tile-sets > \[data-set="[^"]+"\] \{[^}]*\}\n)+/;
-if (!bandLines.test(shipped)) throw new Error('styles.css has no .tile-sets > [data-set] lines to replace');
-shipped = shipped.replace(bandLines, `${bandSets.map(([setting, source]) => strip(setting, sets[source].set)).join('\n')}\n`);
-if (shipped !== css) writeFileSync(cssPath, shipped);
+const settingsPath = stylesheetUrl('css/settings.css');
+const settingsCss = readFileSync(settingsPath, 'utf8');
+if (!bandLines.test(settingsCss)) throw new Error('css/settings.css has no .tile-sets > [data-set] lines to replace');
+const bands = settingsCss.replace(bandLines, `${bandSets.map(([setting, source]) => strip(setting, sets[source].set)).join('\n')}\n`);
+if (bands !== settingsCss) writeFileSync(settingsPath, bands);
 
 console.log('| Set | Life total ≥ 9 | Small text ≥ 7.6 | Life-out red ≥ 4.79 | Seat colour on panel ≥ 7.35 | Warning chip ≥ 4.5 | Closest pair: normal | deuteranope | protanope | tritanope | Across rows, deuteranope |');
 console.log('|---|---|---|---|---|---|---|---|---|---|---|');

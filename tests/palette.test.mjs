@@ -35,7 +35,7 @@ test('chromium: every tile palette is palette.mjs’s and passes its contrast ch
   for (const swatch of generated.r3.swatches) {
     const id = swatch.name.toLowerCase();
     for (const row of ['top', 'bottom']) {
-      assert.deepEqual(shipped[id][row], swatch[row], `${swatch.name} ${row}: styles.css matches palette.mjs`);
+      assert.deepEqual(shipped[id][row], swatch[row], `${swatch.name} ${row}: css/tokens.css matches palette.mjs`);
       const { panel } = shipped[id][row];
       const checks = { life: contrast(tokens['--text'], panel), small: contrast(tokens['--text-soft'], panel), lifeOut: contrast(tokens['--life-out'], panel) };
       for (const [check, minimum] of Object.entries(minimums)) {
@@ -95,7 +95,7 @@ test('chromium: every tile colour set is tiles7.mjs’s and passes the contrast 
         text: value('--text'), soft: value('--text-soft'), out: value('--life-out'),
       };
     }, [setting, ids]);
-    assert.deepEqual(read.palettes, sets[source].set, `${setting}: styles.css matches tiles7.json's ${source}`);
+    assert.deepEqual(read.palettes, sets[source].set, `${setting}: the CSS matches tiles7.json's ${source}`);
     for (const id of ids) {
       for (const row of ['top', 'bottom']) {
         const { panel, seat } = read.palettes[id][row];

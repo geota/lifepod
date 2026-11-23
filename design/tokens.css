@@ -1,6 +1,6 @@
 /*
  * LifePod design tokens.
- * Taken from web/styles.css and adjusted only where design/AUDIT.md found a problem.
+ * Taken from web/styles.css (now web/css/) and adjusted only where design/AUDIT.md found a problem.
  * Every changed value is marked CHANGED with the old value and the audit finding.
  * The app is dark only (color-scheme: dark), so there is no light theme here.
  */

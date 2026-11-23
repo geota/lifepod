@@ -13,11 +13,12 @@
 // the board at rest, rotating seats and with turn reminders, where the badge rows show, at Large and Larger); the
 // screenshots are Material, plus a set in Glass named glass-… and the target's 3- and 5-player boards with mana
 // floating at each Badge size, named …-badge-<size>.
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright-core';
 import { fakeScreenOrientation, turnScreen } from '../../tests/helpers.mjs';
 import { serveApp } from '../../scripts/serve.mjs';
+import { readStyles } from '../../scripts/stylesheets.mjs';
 import { inPage } from './lib.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/final/', import.meta.url));
@@ -725,10 +726,10 @@ async function webkitShots() {
 }
 
 // The colour indicator's one-colour discs against the chip they sit on (#0a0e0b at 44% over each tile panel), from
-// web/styles.css, and the rim each disc has around it (--ci-rim). Non-text marks need 3:1: a disc whose fill is below
-// that still shows its edge when the rim clears it. Printed, and kept in findings.json.
+// the stylesheets (web/css/), and the rim each disc has around it (--ci-rim). Non-text marks need 3:1: a disc whose fill
+// is below that still shows its edge when the rim clears it. Printed, and kept in findings.json.
 async function indicatorContrast() {
-  const css = await readFile(fileURLToPath(new URL('../../web/styles.css', import.meta.url)), 'utf8');
+  const css = readStyles();
   const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   const lum = c => { const f = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
   const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };

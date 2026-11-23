@@ -1,0 +1,156 @@
+/* Dice, then the page-wide rules that must come last: the hover states, reduced motion and the compact sheet spacing.
+   They override earlier rules by coming later, so keep them at the end of the last file. */
+/* Dice sheet: the die on a stage, the sides picker and Roll. Landscape puts the stage on the left.
+   #dice keeps these gaps over the compact sheet spacing for small screens below. */
+#dice { width: min(420px, calc(100% - 32px)); }
+#dice .dice-sheet {
+  grid-template-areas: "header" "stage" "picker" "roll";
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+.dice-sheet .sheet-header { grid-area: header; }
+.dice-stage {
+  grid-area: stage;
+  display: grid;
+  place-items: center;
+  block-size: clamp(176px, calc(100dvh - 340px), 340px);
+  border-radius: var(--card-radius);
+  background: var(--background);
+  container-type: size;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dice-stage:active { background: var(--dice-stage-pressed); }
+.dice-stage > svg { grid-area: 1 / 1; width: 70cqmin; height: 70cqmin; overflow: visible; }
+/* The result again on the stage's far edge, upside down, for the other side of the table. */
+.dice-echo {
+  grid-area: 1 / 1;
+  align-self: start;
+  margin-top: 2.5cqmin;
+  transform: rotate(180deg);
+  color: var(--text);
+  font-size: 9cqmin;
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+/* Three to a row at the default text size; larger text (--rem) fits fewer to a row rather than crowding them. */
+.dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(4.25 * var(--rem))), 1fr)); gap: var(--space-1); }
+.dice-picker button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: 0 var(--space-1);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
+  color: var(--text-soft);
+  font-size: var(--type-label);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.dice-picker button[aria-pressed="true"] { border-color: var(--pick-fill); background: var(--pick-fill); color: var(--pick-ink); box-shadow: var(--pick-shadow); }
+.dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
+.dice-roll { grid-area: roll; min-height: 48px; font-size: calc(1.0625 * var(--rem)); }
+@media (orientation: landscape) {
+  #dice { width: fit-content; max-width: calc(100% - 32px); }
+  #dice .dice-sheet {
+    grid-template-columns: auto minmax(212px, max(260px, calc(16.25 * var(--rem))));
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "stage header" "stage picker" "stage roll";
+    /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the grid gap, not multi-column layout, which the partial note is about. */
+    column-gap: var(--space-4);
+    padding: var(--space-3);
+  }
+  /* The stage is a size container, so it needs both sizes set. */
+  .dice-stage { block-size: min(calc(100dvh - 38px), 400px); inline-size: min(calc(100dvh - 38px), 400px); }
+  .dice-picker { align-content: start; }
+}
+
+/* Die colours. Each die keeps one hue, with the sage die's lightness steps: a pale front face, side faces
+   darker away from the light, and dark ink. Ink is at least 12:1 on the front face and the quieter "d20" label
+   at least 4.9:1. The hues follow the seat colours, so the six dice are told apart at a glance. */
+[data-sides="4"] { /* coral */
+  --die-front: #ffd7cf; --die-side-1: #eaaca1; --die-side-2: #cd8a7e; --die-side-3: #ab6b60;
+  --die-edge: #804e45; --die-outline: #422924; --die-ink: #301814; --die-ink-idle: #7e4f48;
+}
+[data-sides="6"] { /* amber */
+  --die-front: #f3debd; --die-side-1: #d7b986; --die-side-2: #b9985f; --die-side-3: #997940;
+  --die-edge: #72582c; --die-outline: #3b2e18; --die-ink: #291d07; --die-ink-idle: #715931;
+}
+[data-sides="8"] { /* green */
+  --die-front: #d3e9c8; --die-side-1: #a9c999; --die-side-2: #87aa74; --die-side-3: #688a56;
+  --die-edge: #4c663d; --die-outline: #273520; --die-ink: #172410; --die-ink-idle: #4e6640;
+}
+[data-sides="10"] { /* teal */
+  --die-front: #bdede5; --die-side-1: #84cec4; --die-side-2: #59afa4; --die-side-3: #368f85;
+  --die-edge: #246a62; --die-outline: #153733; --die-ink: #032622; --die-ink-idle: #2b6a62;
+}
+[data-sides="12"] { /* blue */
+  --die-front: #c9e5ff; --die-side-1: #95c3eb; --die-side-2: #70a3cf; --die-side-3: #5184ae;
+  --die-edge: #396182; --die-outline: #1e3243; --die-ink: #0e2131; --die-ink-idle: #3d6180;
+}
+[data-sides="20"] { /* violet */
+  --die-front: #e9dafd; --die-side-1: #c9b2e5; --die-side-2: #aa90c8; --die-side-3: #8a71a7;
+  --die-edge: #66537d; --die-outline: #352b41; --die-ink: #241a2f; --die-ink-idle: #66547b;
+}
+/* The die, shared by the stage and the picker icons. */
+.die-face, .die-outline { stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.die-body .die-face { stroke: var(--die-edge); stroke-width: 1.5px; }
+.die-body .die-outline { fill: none; stroke: var(--die-outline); stroke-width: 2.5px; }
+.die-body .tone-0 { fill: var(--die-front); }
+.die-body .tone-1 { fill: var(--die-side-1); }
+.die-body .tone-2 { fill: var(--die-side-2); }
+.die-body .tone-3 { fill: var(--die-side-3); }
+.die-shadow polygon { fill: var(--die-shadow); }
+/* Both layers are positioned so the translucent shadow can't paint over the die. */
+.die-shadow { position: relative; z-index: 0; opacity: .6; transform: translate(2%, 4%); }
+.die-body { position: relative; z-index: 1; }
+.die-number {
+  fill: var(--die-ink);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.04em;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.die-number[data-idle] { fill: var(--die-ink-idle); font-weight: var(--weight-semibold); letter-spacing: -.02em; }
+/* Unselected, the picker icon draws in the die's colour. Selected, it takes the button's dark ink. */
+.dice-picker button:not([aria-pressed="true"]) .die-icon { color: var(--die-front); }
+.die-icon .die-face, .die-icon .die-outline { stroke: currentColor; }
+.die-icon .die-face { stroke-width: 1.25px; }
+.die-icon .die-outline { fill: none; stroke-width: 1.75px; }
+.die-icon .tone-0 { fill: none; }
+.die-icon .tone-1 { fill: currentColor; fill-opacity: .14; }
+.die-icon .tone-2 { fill: currentColor; fill-opacity: .3; }
+.die-icon .tone-3 { fill: currentColor; fill-opacity: .46; }
+
+/* Mouse pointers get a hover state: an 8% layer over the fill. */
+@media (hover: hover) {
+  .pill-button:not(:disabled, .save-button):hover::before { background: var(--state-hover); }
+  :is(.close, .secondary, .nav-row, .switch-row, .segmented > button:not([aria-pressed="true"]), .dice-picker button:not([aria-pressed="true"]), .k-value, .k-stop):hover {
+    background-image: linear-gradient(var(--state-hover), var(--state-hover));
+  }
+  #tile-set-choices > button:not([aria-pressed="true"]):hover { --band-state: var(--state-hover); }
+  .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button:hover::before { content: none; }
+  .save-button:hover::before { background: var(--accent-pressed); }
+  :is(.primary, .k-commit):hover { background: var(--accent-pressed); }
+  .dice-stage:hover { background: var(--dice-stage-pressed); }
+}
+/* Motion is 200ms emphasised easing (Material) or a 250ms spring (Glass), and none at all under reduced motion, where
+   pressed controls keep their size too. */
+@media (prefers-reduced-motion: reduce) {
+  :root { --press-scale: 1; }
+  *, *::before, *::after, ::backdrop { transition: none !important; }
+  .chip.reminder-chip { animation: none; }
+}
+@media (max-height: 420px), (max-width: 420px) {
+  .sheet { gap: var(--space-1); padding-block: var(--space-2); }
+}

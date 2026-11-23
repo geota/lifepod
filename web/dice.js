@@ -88,7 +88,7 @@ window.lifePodDice = (() => {
     return node;
   }
 
-  // data-sides picks the die's colour in styles.css.
+  // data-sides picks the die's colour in css/dice.css.
   function svg(className, count) {
     return element('svg', {
       viewBox: '0 0 100 100', class: className, 'data-sides': count, 'aria-hidden': 'true', focusable: 'false',

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <!-- Icons: Phosphor Icons, Bold weight (the flags, the experience graduation cap and the initiative castle turret are Fill weight), MIT License, Copyright (c) 2020 Phosphor Icons. https://phosphoricons.com -->
-  <!-- Zoom stays on (WCAG 1.4.4): the board turns pinches and double taps away itself (touch-action in styles.css), so
+  <!-- Zoom stays on (WCAG 1.4.4): the board turns pinches and double taps away itself (touch-action in css/board.css), so
        only settings and the dialogs zoom, and closing one puts the scale back (resetZoom in js/ui/dom.js). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111213">
@@ -11,7 +11,13 @@
   <title>LifePod</title>
   <link rel="icon" href="favicon-32.png" sizes="32x32">
   <link rel="icon" href="icon.png" sizes="192x192">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/board.css">
+  <link rel="stylesheet" href="css/tile.css">
+  <link rel="stylesheet" href="css/modes.css">
+  <link rel="stylesheet" href="css/badges.css">
+  <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/dice.css">
   <script src="dice.js" defer></script>
   <script src="app.js" type="module"></script>
 </head>

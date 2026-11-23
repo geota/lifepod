@@ -1,4 +1,4 @@
-// The page-wide settings that only set an attribute for styles.css: the tile colour set, the badge size and the style.
+// The page-wide settings that only set an attribute for the CSS: the tile colour set, the badge size and the style.
 
 import { defaultStyle } from '../state/platform.js';
 import { game } from '../state/state.js';

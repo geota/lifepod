@@ -2,7 +2,7 @@
 
 **Status:** design session, 20 November 2026. These are mock-ups only; nothing in `web/` has changed. This file goes with [PROPOSAL.md](PROPOSAL.md) and [RESEARCH.md](RESEARCH.md).
 
-Each frame is drawn on the real `web/styles.css`, using the app's own tile, pill and dialog markup and only the extra rules in `mock.css`. White rings with labels show where a finger lands and the running tap count. They are notes for the reader, not part of the design.
+Each frame is drawn on the real `web/styles.css` (now `web/css/`), using the app's own tile, pill and dialog markup and only the extra rules in `mock.css`. White rings with labels show where a finger lands and the running tap count. They are notes for the reader, not part of the design.
 
 - **Browse:** serve the repo root over HTTP and open `design/counters/preview.html`. It has a state picker, the strips and the swatch page.
 - **Re-render:** `node design/counters/render.mjs`, or name the scenes and strips to redo. Frames go to `renders/frames/`, and the comparison strips below go to `renders/`.

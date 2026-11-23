@@ -344,7 +344,7 @@ Measured with `node design/polish/palettes7.mjs`, WCAG 2.2.
 
 ## As built: both directions
 
-The owner picked A with Graphite + lime first (SETTINGS-SPEC.md §7), then asked for B as a second whole-app style beside it. Both are in `web/styles.css`: A's tokens under `:root, [data-style="material"]`, and B as a block of overrides under `[data-style="glass"]`. Component rules read only tokens. Settings → Table → **Style** switches between them; it's saved, and until it's picked iOS starts on Glass and Android and browsers on Material.
+The owner picked A with Graphite + lime first (SETTINGS-SPEC.md §7), then asked for B as a second whole-app style beside it. Both are in `web/css/tokens.css`: A's tokens under `:root, [data-style="material"]`, and B as a block of overrides under `[data-style="glass"]`. Component rules read only tokens. Settings → Table → **Style** switches between them; it's saved, and until it's picked iOS starts on Glass and Android and browsers on Material.
 
 Glass follows §3 B, with these differences:
 

@@ -1,5 +1,5 @@
 // Mock-up only: draws LifePod boards with counters, commander damage and tile colours from a scene object,
-// using the real web/styles.css markup and classes. It does not change web/. Scenes live in scenes.js.
+// using the real web/css/ markup and classes. It does not change web/. Scenes live in scenes.js.
 import palette from './palette.js';
 import extraIcons from './phosphor-extra.js';
 

@@ -1,4 +1,4 @@
-/* Mock-up only: counters, commander damage and tile colours on top of the real web/styles.css.
+/* Mock-up only: counters, commander damage and tile colours on top of the real web/css/.
    Nothing here ships. See design/counters/OPTIONS.md. */
 :root {
   /* Near-lethal and lethal. --warn is at least 6.2:1 and --life-out at least 4.79:1 on every swatch panel

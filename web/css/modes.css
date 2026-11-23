@@ -1,0 +1,290 @@
+/* Board modes: the mode layer, tile colours and identity, commander damage, counters, mana and "Who goes first?". */
+/* Board modes other than seat rotation swap the life controls for a layer facing the tile's player. It keeps clear
+   of the centre pill only on the edges the pill reaches (app.js measures them into --clear-far, --clear-end,
+   --clear-near and --clear-start), and its content is centred in what's left: the map, the cells, the swatches, or the
+   identity preview over its toggles. A hint takes the space on the far side of the content, so it doesn't push the
+   content off-centre; only where that space is shorter than the hint does the content give way toward the near edge. */
+.board[data-mode]:not([data-mode="rotate"]) .controls { visibility: hidden; }
+.mode-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-rows: 1fr auto auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
+  /* Content taller than the layer overflows both ways evenly, as it did before the hint had a row of its own. */
+  align-content: center;
+  justify-items: center;
+  padding: max(4px, var(--clear-far, 0px)) calc(6px + var(--clear-end, 0px)) max(4px, var(--clear-near, 0px)) calc(6px + var(--clear-start, 0px));
+  text-align: center;
+}
+.mode-layer > * { grid-row: 2; }
+.mode-layer > .layer-hint { grid-row: 1; align-self: end; margin-bottom: 6px; }
+.mode-layer > .identity { grid-row: 3; margin-top: 6px; }
+.mode-layer[hidden] { display: none; }
+/* A board mode fades in over 120ms rather than swapping in one frame, so players across the table see it change. Only
+   opacity moves, so nothing is measured mid-way; reduced motion turns it off with every transition. */
+.mode-layer { transition: opacity .12s var(--ease); }
+@starting-style {
+  .mode-layer { opacity: 0; }
+}
+.board { --hint-size: clamp(.75rem, calc(3.6 * var(--u)), max(.875rem, 14 * var(--grow))); }
+.layer-hint { font-size: var(--hint-size); font-weight: var(--weight-semibold); line-height: 1.2; color: var(--text-soft); }
+/* Mode hints show only where every tile has room: ub ≥ 200 and ui ≥ 240. */
+.board:is([data-narrow], [data-short]) .layer-hint { display: none; }
+
+/* Tile colour swatches (design/polish/SPEC.md §5): twelve in a 4 × 3 grid, the panel with the seat colour as a
+   dot. The chosen one has a ring inside it, so a tile edge can't clip it. A swatch another player has keeps its
+   full colour, shows its owner ("P2") in the seat colour in place of the dot, and can't be chosen. The grid fits
+   under the hint and clear of the check mark, and every swatch stays at least 44px. */
+.colour-picker {
+  /* The hint's line and its 6px gap. */
+  --hint-space: calc(var(--hint-size) * 1.2 + 6px);
+  --swatch-size: clamp(44px, min((var(--ui, 400px) - 24px) / 4, (var(--ub, 400px) - var(--setup-button) / 2 - 14px - var(--hint-space)) / 3), 60 * var(--grow));
+  display: flex;
+  align-items: center;
+}
+.swatches {
+  display: grid;
+  grid-auto-rows: var(--swatch-size);
+  gap: 4px;
+}
+.swatch {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--rim);
+  border-radius: var(--swatch-radius);
+  background: var(--panel);
+}
+.swatch::before { width: 36%; aspect-ratio: 1; border-radius: 50%; background: var(--seat); content: ''; }
+.swatch[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--text), inset 0 0 0 4px var(--panel); }
+.swatch:disabled { cursor: default; }
+.swatch:disabled::before { content: none; }
+.swatch .owner { color: var(--seat); font-size: max(14px, var(--swatch-size) * .24); font-weight: var(--weight-heavy); line-height: 1; letter-spacing: -.01em; }
+/* Narrow tiles, such as 6 players on a phone, tighten the layer and drop the hint. */
+.board[data-narrow] .mode-layer {
+  padding: max(1px, var(--clear-far, 0px) - 4px) calc(4px + var(--clear-end, 0px)) max(1px, var(--clear-near, 0px)) calc(4px + var(--clear-start, 0px));
+}
+.board[data-narrow] .colour-picker { --swatch-size: 44px; }
+.board[data-narrow] .swatches { gap: 3px; }
+/* Short tiles, such as 4 players on a 320 × 568 phone, drop the hint so the swatches fit. */
+/* On narrow or short boards the swatches are 44px, and each face lays them out in the grid that fits it: 4 × 3, or
+   3 × 4 on a face narrower than four swatches, such as a rotated seat in a short tile (app.js sets --swatch-columns).
+   The layer keeps clear of the pill only on the edges it reaches, and centres the grid in the rest of the face; along
+   an axis where the grid doesn't fit there, it may reach 6px into the clearance (app.js sets --swatch-pad). */
+.swatches { grid-template-columns: repeat(var(--swatch-columns, 4), var(--swatch-size)); }
+.board:is([data-narrow], [data-short]) .mode-layer:has(.colour-picker) {
+  padding: var(--swatch-pad, max(1px, var(--clear-far, 0px) - 6px) max(1px, var(--clear-end, 0px) - 6px) max(1px, var(--clear-near, 0px) - 6px) max(1px, var(--clear-start, 0px) - 6px));
+}
+.board[data-short] .colour-picker { --swatch-size: 44px; }
+.board[data-short] .swatches { gap: 3px; }
+
+/* Identity mode (design/polish/SPEC.md §2.6): a preview chip with everything the identity can show, over the five
+   mana-symbol toggles. They make one row where every tile has room for it (ui ≥ 264), otherwise three over two. */
+.identity-preview {
+  display: flex;
+  justify-content: center;
+  font-size: clamp(.875rem, calc(4.2 * var(--u)), max(1.25rem, 20 * var(--grow)));
+  pointer-events: none;
+}
+.identity {
+  --toggle: clamp(44px, calc(12 * var(--u)), 72 * var(--grow));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  /* Five in a row, three, or two (app.js sets --toggle-columns from each face's room). */
+  width: calc(var(--toggle-columns, 3) * var(--toggle) + (var(--toggle-columns, 3) - 1) * 4px);
+}
+.identity-toggle {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--toggle);
+  height: var(--toggle);
+  padding: 0;
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--radius-full);
+  background: var(--control-fill);
+  transition: box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease-press);
+}
+.identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
+.identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
+/* Off, a raised disc with the symbol muted like an empty mana cell. On, the symbol is in full colour inside a 2px light
+   ring, with a check in the seat colour, so the state never rests on colour alone. */
+.identity-toggle[aria-pressed="false"] .pip { filter: saturate(.3) brightness(.85); opacity: .7; }
+.identity-toggle[aria-pressed="true"] { background: var(--surface-pressed); box-shadow: inset 0 0 0 2px var(--toggle-ring); }
+.toggle-check {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  display: none;
+  place-items: center;
+  width: max(16px, calc(var(--toggle) * .34));
+  height: max(16px, calc(var(--toggle) * .34));
+  border-radius: 50%;
+  background: var(--seat);
+  box-shadow: 0 0 0 2px var(--tile-panel);
+  color: var(--button);
+}
+.toggle-check .icon { width: 62%; height: 62%; }
+.identity-toggle[aria-pressed="true"] .toggle-check { display: grid; }
+
+/* Commander damage mode: a map of the table, in board coordinates, with each opponent's seat showing the damage
+   their commander has dealt this player. Every seat is filled with that player's own tile colour (their panel),
+   exactly as their tile looks across the table, with the number in their seat colour. A seat at 0 has a thin
+   ring in their rim colour; once it has damage the ring turns into a thicker one in their seat colour and the
+   number gets heavier. Nothing is transparent. Cells are at least 44px; the hint goes on narrow tiles. app.js
+   sets the grid's rows and columns and places each seat. */
+.seat-map {
+  display: grid;
+  /* Every seat is the same size on every tile, whichever way the map is turned (app.js: sizeMapSeats). */
+  grid-template-columns: repeat(var(--columns), var(--seat-width, 44px));
+  grid-template-rows: repeat(var(--rows), var(--seat-height, 44px));
+  gap: 4px;
+}
+.map-cell {
+  /* The seat's own ring, kept under the changed and pressed rings below. */
+  --seat-ring: inset 0 0 0 2px var(--seat);
+  --pressed-ring: inset 0 0 0 4px var(--seat);
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--seat-radius);
+  background: var(--panel);
+  color: var(--seat);
+  font-size: clamp(1.0625rem, calc(6 * var(--u)), max(1.625rem, 26 * var(--grow)));
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  box-shadow: var(--seat-ring);
+}
+/* The number is the seat colour on the panel, at least 7.4:1. */
+.map-cell[data-zero] {
+  --seat-ring: inset 0 0 0 1px var(--rim);
+  --pressed-ring: inset 0 0 0 3px var(--seat);
+  font-weight: var(--weight-semibold);
+}
+/* Seats changed since the mode opened get a ring outside, and a held seat looks pressed. */
+.map-cell[data-pressed] { --seat-ring: var(--pressed-ring); }
+.map-cell[data-changed] { box-shadow: var(--seat-ring), 0 0 0 2px var(--tile-panel), 0 0 0 4px var(--text); }
+.map-cell:has(+ .map-remove:focus-visible) { outline: var(--focus-ring); outline-offset: 3px; }
+.map-cell.self {
+  align-content: center;
+  gap: 0;
+  border: 1.5px solid var(--rim);
+  background: transparent;
+  color: var(--text);
+  font-size: clamp(1rem, calc(5.4 * var(--u)), max(1.5rem, 24 * var(--grow)));
+  line-height: 1.05;
+  box-shadow: none;
+}
+.map-cell.self strong[data-out] { color: var(--life-out); }
+.life-change { font-size: max(.75rem, .5em); font-weight: var(--weight-semibold); color: var(--text-soft); letter-spacing: normal; }
+.life-change[data-loss] { color: var(--life-out); }
+
+/* Counters mode: one circle per counter that's on, its icon (0.42 of the cell) over its count (0.3), three to a row
+   with the last row centred. A tap adds one and a hold takes one away. Cells are the same size on every tile and never under 44px:
+   78px on a 952 × 427 phone at 4 or 6 players, 50px at 568 × 320 with 6. */
+.counter-cells {
+  --cell: clamp(44px, min((var(--ui, 400px) - 20px) / 3, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+  /* Three to a row, or two on a face too narrow for three (app.js sets --cell-columns). */
+  width: calc(var(--cell-columns, 3) * var(--cell) + (var(--cell-columns, 3) - 1) * 10px);
+}
+.counter-cell {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1px;
+  width: var(--cell);
+  height: var(--cell);
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--cell-fill);
+  color: var(--text);
+  font-size: calc(var(--cell) * .3);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+}
+.counter-cell :is(.icon, .mana-icon) { color: var(--seat); font-size: 1.4em; }
+.counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
+.counter-cell:is(:active, [data-pressed]) { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
+.counter-cell:has(+ .counter-remove:focus-visible) { outline: var(--focus-ring); outline-offset: 3px; }
+.map-cell:has(+ .map-remove:focus-visible), .counter-cell:has(+ .counter-remove:focus-visible) { position: relative; outline-style: dashed; }
+/* The hidden "Remove one" buttons ring their cell like "Add one" does, so while one has keyboard focus the ring is dashed
+   and a "−1" tab sits on the cell's corner: Enter will take one away (ACCESSIBILITY.md M6). */
+.map-cell:has(+ .map-remove:focus-visible)::after, .counter-cell:has(+ .counter-remove:focus-visible)::after {
+  content: '−1';
+  position: absolute;
+  inset-block-start: -9px;
+  inset-inline-end: -9px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: var(--weight-heavy);
+  letter-spacing: normal;
+  line-height: 1.35;
+  pointer-events: none;
+}
+/* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
+   An empty colour's symbol is muted. */
+.mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
+/* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it, in the seat
+   colour like every counter, so a cell nobody holds reads as one to tap rather than a disabled one (DESIGN-AUDIT S8).
+   The holder's cell fills with their seat colour and gets the identity toggles' check, so it doesn't rest on colour. */
+.designation-cell { position: relative; }
+.designation-cell .icon { font-size: 1.7em; }
+.designation-cell[aria-pressed="true"] { background: var(--seat); color: var(--button); }
+.designation-cell[aria-pressed="true"] .icon { color: var(--button); }
+.designation-cell .toggle-check { --toggle: var(--cell); top: 0; right: 0; }
+.designation-cell[aria-pressed="true"] .toggle-check { display: grid; }
+/* Seven counter cells (every counter, the monarch and the initiative) go four to a row, and the gaps close up to 2px
+   before a cell would go under 44px. A face too narrow for four (a turned seat at 568 × 320) takes three to a row with
+   its gaps closed up. app.js sets data-cell-grid and each face's --wide-columns and --wide-gap. */
+.board[data-cell-grid="4"] .counter-cells:not(.mana-cells) {
+  --cell: clamp(var(--tap-min), min((var(--ui, 400px) - 42px) / 4, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
+  --cell-gap: clamp(2px, (var(--ui, 400px) - 12px - 4 * var(--cell)) / 3, 10px);
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the flex gap, not multi-column layout, which the partial note is about. */
+  column-gap: var(--wide-gap, var(--cell-gap));
+  width: calc(var(--wide-columns, 4) * var(--cell) + (var(--wide-columns, 4) - 1) * var(--wide-gap, var(--cell-gap)));
+}
+.mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); opacity: .5; }
+
+/* "Who goes first?": Me first on every tile, facing its player. The shuffle lights tiles in turn; the chosen tile
+   shows "Goes first" in its seat colour while the others dim. */
+.first-picker { display: grid; justify-items: center; gap: 8px; }
+.first-go {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 1.5px solid var(--seat);
+  border-radius: var(--radius-full);
+  background: var(--button);
+  color: var(--seat);
+  font-size: clamp(1rem, calc(5 * var(--u)), max(1.5rem, 24 * var(--grow)));
+  font-weight: var(--weight-heavy);
+  /* One size on every tile: a narrow face lets it reach into its layer's padding rather than squeeze it. */
+  white-space: nowrap;
+}
+.first-go .icon { width: 1.1em; height: 1.1em; }
+.first-go:active { background: var(--cell-pressed); }
+.board[data-mode="first"] .player[data-lit] { box-shadow: inset 0 0 0 4px var(--seat); }
+.board[data-mode="first"] .player[data-lit] .first-go { background: var(--seat); color: var(--button); }
+.board[data-picked] .player:not([data-lit]) .mode-layer { opacity: .35; }
+.board:is([data-picked], [data-shuffling]) .first-go { pointer-events: none; }
+

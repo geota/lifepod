@@ -155,7 +155,7 @@
   - With "Indicator" alone selected, a mono-black player looks as if they have no identity.
 - **Evidence:**
   - [target-4p-commander-rest.png](renders/final/target-4p-commander-rest.png): P4's Mono-black chip.
-  - The script computes these ratios from `styles.css` for all 24 panels; they're in `findings.json → indicators`.
+  - The script computes these ratios from the stylesheets (`web/css/`) for all 24 panels; they're in `findings.json → indicators`.
 - **Reproduce:** Any size, identity B (or G or U), Show on tiles set to Indicator.
 - **Fix:** Give `.ci` a real rim, `box-shadow: 0 0 0 1.5px color-mix(in oklab, var(--text) 65%, transparent)`, in place of the 1px blurred inset. Then every slice has a visible edge without changing the official colours.
 

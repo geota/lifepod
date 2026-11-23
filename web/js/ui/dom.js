@@ -55,7 +55,7 @@ export function icon(name) {
   return svg;
 }
 
-// A symbol from the bundled Mana font, sized and coloured like the Phosphor icons. styles.css maps each name to its
+// A symbol from the bundled Mana font, sized and coloured like the Phosphor icons. css/board.css maps each name to its
 // code point.
 /** @typedef {'d20' | 'infect' | 'energy' | 'rad' | 'pie' | 'tap' | 'untap' | 'commander'} ManaGlyph */
 /**

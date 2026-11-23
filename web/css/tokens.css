@@ -1,0 +1,392 @@
+/* Tokens: the Mana font, the design tokens and the Classic tile palettes (:root), the Material and Glass
+   token blocks, and Glass's fallbacks. Loads first. */
+/* Mana by Andrew Gioia, SIL OFL 1.1 (fonts/OFL.txt): the mana and colour indicator symbols for colour identity.
+   It's only used for those symbols, so it blocks briefly rather than flashing letters in their place. */
+@font-face {
+  font-family: Mana;
+  src: url('../fonts/mana.woff2') format('woff2');
+  font-display: block;
+}
+
+/* Design tokens. Values and the reasons for them are documented in design/tokens.css and design/AUDIT.md. */
+:root {
+  color-scheme: dark;
+
+  --danger-text: #ffc7b2;
+  /* A destructive button (Discard, Start new game): the danger text on a coral-tinted fill. */
+  --danger-fill: color-mix(in oklab, #f49993 16%, #242528);
+  /* A life total at 0 or below: a muted coral red, at least 4.8:1 on every player panel. */
+  --life-out: #f49993;
+  /* Close to losing: amber text from 15 commander damage or 7 poison, at least 6:1 on its tinted chip. */
+  --warn: #f2c46d;
+  --warn-tint: #f2c46d29;
+  --life-out-tint: #f4999329;
+  /* Badges at rest sit on a translucent dark chip. Colour dots get a thin dark rim. */
+  --chip-background: #0a0e0b70;
+  --dot-rim: #0a0e0b;
+  /* Colour identity: the real mana symbols from the bundled Mana font (fonts/OFL.txt), on the disc colours
+     the symbols are printed with, with the symbol itself in near-black. */
+  --pip-w: #fdfbce; --pip-u: #bcdaf7; --pip-b: #a7999e; --pip-r: #f19b79; --pip-g: #9fcba6; --pip-c: #cdc8c4;
+  --pip-ink: #111;
+  /* The colour indicator's rim: the text colour at 65%. */
+  --ci-rim: #f2f2efa6;
+
+  /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
+  --die-shadow: #070808;
+  --dice-stage-pressed: #191a1c;
+  --press-overlay: #f2f2ef1a;
+
+  /* The safe-area insets, as variables so a test can stand in for a notch. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+
+  /* Board */
+  --seam-width: 2px;
+  --ring-opacity: .08;
+  --watermark-opacity: .07;
+
+  /* Tile colours: twelve swatches, each a full tile palette. Players 1, 2 and 5 use the lighter top-row version
+     and players 3, 4 and 6 the darker bottom-row one, so neighbours stay apart for colour-blind players even
+     when their hues are close. Players 1–6 default to Sage, Sky, Coral, Violet, Amber and Teal. Generated in
+     OKLCH by design/counters/palette.mjs (round 3 adds Copper, Olive and Orchid): on every panel the life total
+     is at least 9:1, small text 7.6:1 and the red of a life total at 0 or below 4.79:1. */
+  --sage-top-panel: #2f432f; --sage-top-rim: #556e4e; --sage-top-seat: #d3eeaa; --sage-top-button: #233324;
+  --sage-bottom-panel: #253725; --sage-bottom-rim: #476548; --sage-bottom-seat: #bde7bd; --sage-bottom-button: #19281a;
+  --sky-top-panel: #2c4352; --sky-top-rim: #517187; --sky-top-seat: #b6e0f7; --sky-top-button: #21323e;
+  --sky-bottom-panel: #1d3544; --sky-bottom-rim: #3c6179; --sky-bottom-seat: #b4e1ff; --sky-bottom-button: #132632;
+  --coral-top-panel: #523734; --coral-top-rim: #8a5e59; --coral-top-seat: #ffd2cc; --coral-top-button: #3e2926;
+  --coral-bottom-panel: #432a27; --coral-bottom-rim: #7b4f44; --coral-bottom-seat: #ffc7b2; --coral-bottom-button: #301d1a;
+  --violet-top-panel: #433a51; --violet-top-rim: #726387; --violet-top-seat: #e5d5fe; --violet-top-button: #322b3d;
+  --violet-bottom-panel: #342b41; --violet-bottom-rim: #655179; --violet-bottom-seat: #e4cff7; --violet-bottom-button: #271f32;
+  --amber-top-panel: #4a4024; --amber-top-rim: #7f6d49; --amber-top-seat: #f6de96; --amber-top-button: #362e16;
+  --amber-bottom-panel: #3a3119; --amber-bottom-rim: #695b35; --amber-bottom-seat: #ecd8a3; --amber-bottom-button: #2a2310;
+  --teal-top-panel: #254642; --teal-top-rim: #42766f; --teal-top-seat: #a8eee3; --teal-top-button: #1b3531;
+  --teal-bottom-panel: #1d3a36; --teal-bottom-rim: #3f675d; --teal-bottom-seat: #b4eddd; --teal-bottom-button: #142925;
+  --rose-top-panel: #573147; --rose-top-rim: #915477; --rose-top-seat: #ffcde8; --rose-top-button: #422435;
+  --rose-bottom-panel: #482339; --rose-bottom-rim: #804568; --rose-bottom-seat: #fec7e5; --rose-bottom-button: #351829;
+  --indigo-top-panel: #343b65; --indigo-top-rim: #5a65a7; --indigo-top-seat: #d4dcfe; --indigo-top-button: #262c4d;
+  --indigo-bottom-panel: #282e56; --indigo-bottom-rim: #4c5696; --indigo-bottom-seat: #cfd8fe; --indigo-bottom-button: #1b2040;
+  --slate-top-panel: #3b4045; --slate-top-rim: #646c76; --slate-top-seat: #d3e0ec; --slate-top-button: #2b3034;
+  --slate-bottom-panel: #2d3238; --slate-bottom-rim: #555d66; --slate-bottom-seat: #cfdbe8; --slate-bottom-button: #202428;
+  --copper-top-panel: #563721; --copper-top-rim: #8f5e3b; --copper-top-seat: #ffd4b8; --copper-top-button: #412917;
+  --copper-bottom-panel: #472a14; --copper-bottom-rim: #7f4f2d; --copper-bottom-seat: #ffcfaf; --copper-bottom-button: #341d0c;
+  --olive-top-panel: #3b441a; --olive-top-rim: #647331; --olive-top-seat: #d4ea91; --olive-top-button: #2c3312;
+  --olive-bottom-panel: #2e360c; --olive-bottom-rim: #566420; --olive-bottom-seat: #d0e58d; --olive-bottom-button: #202706;
+  --orchid-top-panel: #503257; --orchid-top-rim: #865691; --orchid-top-seat: #f6ceff; --orchid-top-button: #3c2542;
+  --orchid-bottom-panel: #422448; --orchid-bottom-rim: #764780; --orchid-bottom-seat: #f4c8fe; --orchid-bottom-button: #301935;
+
+  /* Type */
+  --font-ui: system-ui, -apple-system, sans-serif;
+  --leading: 1.35;
+  --weight-medium: 500;
+  --weight-semibold: 650;
+  --weight-heavy: 750;
+  /* The system's text size (Dynamic Type on iOS, the font scale on Android), from 1 to 2, which the apps pass in
+     (setTextScale in js/state/platform.js). Settings and dialogs size their type in --rem, which grows with it; the
+     board keeps its own fitted type, and the badge rows grow a little (--badge-scale). */
+  --text-scale: 1;
+  --rem: calc(1rem * var(--text-scale));
+  --type-title: calc(1.375 * var(--rem));
+  --type-label: calc(.875 * var(--rem));
+  --type-small: calc(.8125 * var(--rem));
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --tap-min: 44px;
+  /* A pixel that grows past the largest phones. Every phone's short side is 430px or less, so it stays exactly
+     1px there; an unfolded foldable or a tablet gets up to 2px, so tile content keeps scaling with the tile
+     instead of stopping at phone-sized limits. Use it only in the upper bound of a clamp(). */
+  --grow: clamp(1px, 100vmin / 430, 2px);
+  /* The centre pill's buttons: 48px on phones, growing to 64px on tablets. */
+  --setup-button: clamp(48px, 48 * var(--grow), 64px);
+  /* How far the pill's disc and pressed discs sit inside each button: 7px of a 48px button. */
+  --pill-inset: calc(var(--setup-button) * 7 / 48);
+
+  font: 16px/var(--leading) var(--font-ui);
+  color: var(--text);
+  background: var(--background);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* The control style (design/polish/STYLE.md §3): direction A, tonal (Material 3 Expressive), with the Graphite + lime
+   chrome (§5). Every value the style decides is a token here, under one selector, so another style
+   ([data-style="glass"], say) can override the tokens without touching a component rule. The tile palettes above
+   belong to the players, not the style. */
+:root, [data-style="material"] {
+  /* Colour. Neutral graphite surfaces, so the tiles carry all the colour, and the brand lime as the one accent.
+     --raised is a control one tonal step above its card. Text is at least 7:1 on every surface and, with soft text,
+     clears the tile palettes' minimums (life total 9:1, small text 7.6:1; design/polish/TILES.md). */
+  --background: #111213;
+  --surface: #1b1c1e;
+  --raised: #242528;
+  --surface-pressed: #303236;
+  --border: #393b40;
+  --control-border: #8b8f97;
+  --switch-off: #35373b;
+  --text: #f2f2ef;
+  --text-soft: #dedfe2;
+  --muted: #b3b6bc;
+  --accent: #d9f08a;
+  --accent-pressed: #c4dc76;
+  --ink: #1d2608;
+  --scrim: #111213d9;
+
+  /* Fills and edges: controls are filled, not outlined. A chosen value is a tint of the accent, not the accent: a 20%
+     wash over the card with accent text and a faint accent ring. Solid accent is kept for committing (Done, the pill's
+     save and Done discs, Roll), switches that are on and the focus ring, so the screen's one solid lime is its action. */
+  --control-fill: var(--raised);
+  --control-edge: 0px;
+  --chosen-fill: color-mix(in oklab, var(--accent) 20%, var(--card-fill));
+  --chosen-ink: var(--accent);
+  --chosen-ring: inset 0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent);
+  --commit-fill: var(--accent);
+  --commit-ink: var(--ink);
+  --card-fill: var(--surface);
+  --card-edge: 0px;
+  --head-fill: var(--surface);
+  --dialog-fill: var(--surface);
+  --dialog-edge: 0px;
+  --dialog-edge-color: var(--border);
+
+  /* Settings rows: each a filled 16px row, 6px apart. */
+  --row-fill: var(--control-fill);
+  --row-gap: 6px;
+  --row-column-gap: 6px;
+  --row-divider: transparent;
+  --row-inset: 12px;
+  /* What covers the divider under a group's last row (nothing here, where rows have no dividers), and the narrowest a
+     board action gets before the actions take a line each. */
+  --group-end: transparent;
+  --action-min: calc(12 * var(--rem));
+
+  /* Segmented choice: separate filled segments; the chosen one is the accent tint, ringed. */
+  --segment-track: transparent;
+  --segment-track-radius: 0px;
+  --segment-pad: 0px;
+  --segment-gap: 2px;
+  --segment-fill: var(--control-fill);
+  --segment-chosen-fill: var(--chosen-fill);
+  --segment-chosen-ink: var(--chosen-ink);
+  --segment-chosen-shadow: var(--chosen-ring);
+  /* The dice picker's chosen die: the same tint as a chosen segment. */
+  --pick-fill: var(--chosen-fill);
+  --pick-ink: var(--chosen-ink);
+  --pick-shadow: var(--chosen-ring);
+  /* On the player tiles the chrome's accent stays off (DESIGN-AUDIT N2): a light ring, and the check in the seat colour. */
+  --toggle-ring: var(--text);
+
+  /* Floating chrome: the pill, the settings header and dialogs. Solid in Material, so no backdrop filter, no edge, and
+     the header is its own row above the settings body (--head-overlay 0). */
+  --glass-filter: none;
+  --head-radius: 0px;
+  --head-margin: 0px;
+  --head-shadow: none;
+  --head-overlay: 0;
+
+  /* State layers, at Material's opacities: pressed and focus 10%, hover 8%, disabled 38%. */
+  --state-pressed: #f2f2ef1a;
+  --state-hover: #f2f2ef14;
+  --disabled-opacity: .38;
+  --focus-ring: 2px solid var(--accent);
+  --focus-offset: 2px;
+  /* Pressed controls keep their size (Glass shrinks them a little). */
+  --press-scale: 1;
+
+  /* Motion: 200ms emphasised easing, for presses too; none under reduced motion. */
+  --ease: cubic-bezier(.2, 0, 0, 1);
+  --ease-press: var(--ease);
+  --motion: .2s;
+
+  /* Shape: one corner scale (Material's 8, 16, 22, 24 and 28px, then full capsules). Buttons, switches and the chosen
+     segment are capsules; segments are a connected group with 8px inner corners; rows, map seats and swatches 16px;
+     cards 24px; dialogs 28px; cells circles. */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-group: 22px;
+  --radius-card: 24px;
+  --radius-lg: 28px;
+  --radius-full: 999px;
+  --button-radius: var(--radius-full);
+  --row-radius: var(--radius-md);
+  --segment-inner: var(--radius-sm);
+  --segment-outer: var(--radius-group);
+  --segment-chosen: var(--radius-group);
+  --seat-radius: var(--radius-md);
+  --swatch-radius: var(--radius-md);
+  --card-radius: var(--radius-card);
+  --dialog-radius: var(--radius-lg);
+
+  /* Elevation: none in content. Dialogs lift off the scrim, and the centre pill has the only shadow on the board.
+     The pill's fill is one token so a glass pill can replace it. */
+  --shadow-dialog: 0 24px 80px #0b0c0dd9;
+  --pill-background: var(--raised);
+  --pill-edge: 0px;
+  --pill-edge-color: var(--control-border);
+  --pill-shadow: 0 1px 3px #0009, 0 6px 18px #0007;
+
+  /* Switch: off is an outlined track with a small thumb; on is the accent with a larger ink thumb. */
+  --switch-width: 36px;
+  --switch-height: 20px;
+  --switch-edge: 2px;
+  --switch-off-fill: transparent;
+  --switch-off-thumb: var(--control-border);
+  --switch-off-size: 12px;
+  --switch-on-fill: var(--accent);
+  --switch-on-thumb: var(--ink);
+  --switch-on-size: 14px;
+  --switch-thumb-shadow: none;
+
+  /* Slider: a 16px track with a muted accent fill (the accent at 42% over the track), notches as dots, filled ones in
+     the accent at 60%, and a 4px accent bar handle ringed in the card's colour. */
+  --slider-track: 16px;
+  --slider-track-fill: var(--raised);
+  --slider-fill: color-mix(in oklab, var(--accent) 42%, var(--slider-track-fill));
+  --slider-thumb-width: 4px;
+  --slider-thumb-height: 36px;
+  --slider-thumb-radius: 2px;
+  --slider-thumb-fill: var(--accent);
+  --slider-thumb-ring: 0 0 0 4px var(--surface);
+  --tick-width: 2px;
+  --tick-height: 2px;
+  --tick-stop-width: 4px;
+  --tick-stop-height: 4px;
+  --tick-radius: 50%;
+  --tick-fill: var(--muted);
+  --tick-filled: var(--accent);
+  --tick-filled-opacity: .6;
+}
+
+/* Direction B, Glass chrome over solid content (design/polish/STYLE.md §3, the Style setting). Only tokens: every
+   component rule reads the ones above. The floating chrome (the pill, the settings header and dialogs) is tinted glass,
+   design/polish/GLASS.md's recipe: the surface at 68% over an 18px blur, with a light edge and a top highlight. Content
+   stays solid: grouped lists, rows split by hairlines, iOS switches and segmented controls. The palette and its
+   contrast minimums are Material's. The fallbacks after this block make the glass solid. */
+[data-style="glass"] {
+  /* The neutral grey of the switch's off track and the slider's track: 3.6:1 on the card. */
+  --thumb: #707379;
+  --scrim: #111213b3;
+
+  --glass-tint: #1b1c1ead;
+  /* The board's pill isn't blurred (DESIGN-AUDIT S10): over the dark tiles a blur showed nothing but the seams, and it
+     costs the GPU during hold-repeat. A denser tint, 90%, keeps the seams and the active tile's ring from reading
+     through, with the glass edge and highlight. Settings and the dialogs keep the blur. */
+  --pill-tint: #1b1c1ee6;
+  --glass-filter: blur(18px) saturate(1.3);
+  --glass-edge: 1px;
+  --glass-edge-color: #ffffff1f;
+  --glass-highlight: inset 0 1px 0 #ffffff22;
+
+  --pill-background: var(--pill-tint);
+  --pill-edge: var(--glass-edge);
+  --pill-edge-color: var(--glass-edge-color);
+  --pill-shadow: var(--glass-highlight), 0 1px 3px #0009, 0 6px 18px #0007;
+  --dialog-fill: var(--glass-tint);
+  --dialog-edge: var(--glass-edge);
+  --dialog-edge-color: var(--glass-edge-color);
+  --shadow-dialog: var(--glass-highlight), 0 24px 80px #0b0c0dd9;
+  /* The settings header floats over the body, which scrolls under it. */
+  --head-fill: var(--glass-tint);
+  --head-radius: 22px;
+  --head-margin: 8px;
+  --head-shadow: inset 0 0 0 var(--glass-edge) var(--glass-edge-color), var(--glass-highlight), 0 8px 24px #0009;
+  --head-overlay: 1;
+
+  /* Grouped lists: rows share their card, split by hairlines, with switches on the right edge. */
+  --row-fill: transparent;
+  --row-radius: 0px;
+  --row-gap: 0px;
+  --row-column-gap: var(--space-4);
+  --row-divider: var(--border);
+  --row-inset: 2px;
+  /* No hairline under a group's last row, and the board actions as one full-width list, a row each. */
+  --group-end: var(--card-fill);
+  --action-min: 100%;
+
+  /* Segmented choice: one track with the chosen segment as a raised thumb in Material's accent tint, mixed over the
+     track rather than the card, with the accent ring and the thumb's shadow. Solid accent is kept for Done and
+     switches. */
+  --segment-track: var(--raised);
+  --segment-track-radius: 12px;
+  --segment-pad: 2px;
+  --segment-gap: 0px;
+  --segment-fill: transparent;
+  --segment-inner: 10px;
+  --segment-outer: 10px;
+  --segment-chosen: 10px;
+  --chosen-fill: color-mix(in oklab, var(--accent) 20%, var(--raised));
+  --segment-chosen-shadow: var(--chosen-ring), 0 1px 3px #0008;
+  --toggle-ring: var(--text);
+
+  /* Pressed shrinks to 96% under the 10% layer, on a 250ms spring with a gentle overshoot. Everything else (fades, the
+     switch thumb) keeps Material's easing, where an overshoot means nothing (DESIGN-AUDIT N5). */
+  --press-scale: .96;
+  --ease-press: cubic-bezier(.3, 1.35, .55, 1);
+  --motion: .25s;
+
+  /* Shape: capsule buttons, 20px cards, 30px dialogs, 12px map seats and swatches. */
+  --seat-radius: 12px;
+  --swatch-radius: 12px;
+  --card-radius: 20px;
+  --dialog-radius: 30px;
+
+  /* Switch: iOS proportions, a 40 × 24 track and a 20px thumb. Off is a grey track, 3.6:1 on the card, with a white
+     thumb; on is the accent with an ink thumb, since white on the lime would vanish. */
+  --switch-width: 40px;
+  --switch-height: 24px;
+  --switch-edge: 0px;
+  --switch-off-fill: var(--thumb);
+  --switch-off-thumb: #fff;
+  --switch-off-size: 20px;
+  --switch-on-thumb: var(--ink);
+  --switch-on-size: 20px;
+  --switch-thumb-shadow: 0 1px 3px #0006;
+
+  /* Slider: a 4px grey track with Material's muted accent fill, tick lines (the accent at 60% where filled) and a round
+     white 28px thumb. */
+  --slider-track: 4px;
+  --slider-track-fill: var(--thumb);
+  --slider-thumb-width: 28px;
+  --slider-thumb-height: 28px;
+  --slider-thumb-radius: 50%;
+  --slider-thumb-fill: #fff;
+  --slider-thumb-ring: 0 1px 4px #000a;
+  --tick-width: 2px;
+  --tick-height: 8px;
+  --tick-stop-width: 2px;
+  --tick-stop-height: 12px;
+  --tick-radius: 1px;
+  --tick-fill: var(--muted);
+}
+/* Glass falls back to solid surfaces where the blur isn't drawn (no backdrop-filter), where the player asked for less
+   transparency (the media query on Android and in browsers; on iOS, whose WebKit lacks the query, LifePodApp.swift passes
+   Reduce Transparency and app.js sets data-reduce-transparency), and with an outline where they asked for more
+   contrast. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  [data-style="glass"] { --glass-filter: none; --pill-background: var(--raised); --dialog-fill: var(--surface); --head-fill: var(--surface); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  [data-style="glass"] { --glass-filter: none; --pill-background: var(--raised); --dialog-fill: var(--surface); --head-fill: var(--surface); }
+}
+[data-style="glass"][data-reduce-transparency] { --glass-filter: none; --pill-background: var(--raised); --dialog-fill: var(--surface); --head-fill: var(--surface); }
+@media (prefers-contrast: more) {
+  [data-style="glass"] {
+    --glass-filter: none;
+    --glass-edge: 2px;
+    --glass-edge-color: var(--control-border);
+    --pill-background: var(--raised);
+    --dialog-fill: var(--surface);
+    --head-fill: var(--surface);
+  }
+}
+
+/* Under 360px tall (568 × 320), a floating header would take a fifth of the page and blur the labels under it, so
+   Glass's header is its own solid row there, as Material's is (DESIGN-AUDIT S10). */
+@media (max-height: 359.98px) {
+  [data-style="glass"] { --head-fill: var(--surface); --head-radius: 0px; --head-margin: 0px; --head-shadow: none; --head-overlay: 0; }
+}
+

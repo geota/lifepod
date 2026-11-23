@@ -347,7 +347,7 @@ for (const [name, engine] of Object.entries(engines)) {
     // that has them it's dormant. Its rules are applied as an engine without them would, as a constructed sheet (the CSP
     // allows no inline styles).
     const block = stylesCss.match(/@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\) \{\n([\s\S]+?)\n\}/);
-    assert.ok(block, 'styles.css has the @supports fallback');
+    assert.ok(block, 'css/tokens.css has the @supports fallback');
     assert.equal(await page.evaluate(() => CSS.supports('(backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))')), true, 'this browser draws the blur');
     assert.equal((await readChrome(page)).dice.filter, 'blur(18px) saturate(1.3)', 'so Glass is frosted here');
     await page.evaluate((rules) => {

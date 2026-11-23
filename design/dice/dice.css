@@ -1,6 +1,6 @@
 /*
- * Reference CSS for the dice roller (design/dice/SPEC.md). It builds on the tokens in web/styles.css and
- * adds only the tokens below. The preview and the renders load it after web/styles.css.
+ * Reference CSS for the dice roller (design/dice/SPEC.md). It builds on the tokens in web/css/ and
+ * adds only the tokens below. The preview and the renders load it after web/css/.
  */
 :root {
   /* Die body: a pale sage "bone" die. Front face lightest, side faces step darker away from the light. */
