@@ -1,6 +1,6 @@
-// How a press counts (design/polish/SPEC.md): the binders for the life buttons (bindCounter), one-press buttons
-// (bindTap), counter and map cells that count a tap when it ends and step back on a hold (bindSeat), and the turn chip
-// and round button (bindStep). They share one window that skips the click after a press, and the set of presses held
+// How a press counts (design/polish/SPEC.md): the binders for the life buttons (bindCounter), one-press buttons that
+// act as a finger lands (bindTap) or as it lifts on them (bindRelease), counter and map cells that count a tap when it
+// ends and step back on a hold (bindSeat), and the turn chip and round button (bindStep). They share one window that skips the click after a press, and the set of presses held
 // now, which cancelPresses ends. No app state: each binder is given what a press does.
 
 import { holdDelay } from '../logic/data.js';
@@ -109,6 +109,43 @@ export function bindTap(button, action) {
       if (event.pointerId !== pointerId) return;
       pointerId = undefined;
       ignoreClicksUntil = performance.now() + 800;
+    });
+  }
+  button.addEventListener('contextmenu', (event) => event.preventDefault());
+  button.addEventListener('click', (event) => {
+    if (event.detail === 0 || performance.now() >= ignoreClicksUntil) action();
+  });
+}
+
+// For one-press buttons with no undo, such as "Me first", "Pick at random" and "Pass it on" (WCAG 2.5.2): the press
+// acts when the finger lifts while still on the button, so sliding off before lifting cancels it. These don't need the
+// life buttons' multi-touch reliability. The click after a press is skipped through the shared window, so a redraw
+// under the finger can't act twice, and a press on a button that's gone by the time it lifts does nothing.
+/**
+ * @param {HTMLElement & { disabled?: boolean }} button
+ * @param {() => void} action
+ */
+export function bindRelease(button, action) {
+  let pointerId;
+  button.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || button.disabled) return;
+    pointerId = event.pointerId;
+    ignoreClicksUntil = performance.now() + 800;
+    try {
+      button.setPointerCapture(event.pointerId);
+    } catch {
+      // The pointer is already gone, and its pointerup with it.
+    }
+  });
+  for (const type of /** @type {const} */ (['pointerup', 'pointercancel', 'lostpointercapture'])) {
+    button.addEventListener(type, (event) => {
+      if (event.pointerId !== pointerId) return;
+      pointerId = undefined;
+      ignoreClicksUntil = performance.now() + 800;
+      if (type !== 'pointerup' || !button.isConnected || button.disabled) return;
+      // Still over the button, or over its touch area (an ::after past its edge), whatever the tile's rotation.
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      if (under && button.contains(under)) action();
     });
   }
   button.addEventListener('contextmenu', (event) => event.preventDefault());

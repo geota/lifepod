@@ -149,7 +149,7 @@ test('chromium: several players can tap and hold their totals at the same time',
   await wait(400);
   assert.equal(await announced(), settled, 'nothing is announced before the totals settle');
   await wait(100);
-  assert.equal(await announced(), `Player 2, ${(await scores(page))[1]} life`);
+  assert.equal(await announced(), `Player 2, Sky, ${(await scores(page))[1]} life`);
 
   // Pinch and double-tap zoom are off across the board.
   assert.equal(await page.locator('.app').evaluate(element => getComputedStyle(element).touchAction), 'none');

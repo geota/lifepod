@@ -249,7 +249,7 @@ async function checkPassHint(t, engine) {
   assert.deepEqual(await chips(page), [[], ['pass monarch'], [], []], 'the out holder’s tile asks to pass it on');
   const hint = tile(page, 2).locator('.pass-chip');
   assert.equal(await hint.textContent(), 'Pass it on');
-  assert.equal(await hint.getAttribute('aria-label'), 'Player 2 is out and is still the monarch. Pass the monarch on in counters');
+  assert.equal(await hint.getAttribute('aria-label'), 'Pass it on: Player 2 is out and is still the monarch. Give the monarch to someone in counters');
   const box = await hint.evaluate(node => [node.offsetWidth, node.offsetHeight, getComputedStyle(node, '::after').height]);
   assert.equal(box[2], '44px', 'a 44px target');
   // It stays while nobody takes it, even across a reload and a step of the turn in Rounds.

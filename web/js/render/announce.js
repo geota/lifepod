@@ -1,12 +1,37 @@
 // What screen readers hear about the board (#announcer): changes are announced once a burst of them settles, each
 // player's news in seat order, rather than on every step of a hold.
 
-import { designations } from '../logic/data.js';
+import { designations, tileSets } from '../logic/data.js';
 import { poolText } from '../logic/rules.js';
 import { game } from '../state/state.js';
 import { announcer } from '../ui/dom.js';
 
+/** @typedef {import('../logic/data.js').BoardMode} BoardMode */
 /** @typedef {import('../logic/data.js').Designation} Designation */
+
+// A seat as a screen reader hears it: its number and its tile colour, such as "Player 3, Sky". Nothing on screen shows
+// the number, so the colour, which the players can see, ties the voice to a tile. Each tile set names its own colours.
+/** @param {number} index */
+export function seatName(index) {
+  return `Player ${index + 1}, ${tileSets[game.tileColours].names[game.colors[index]]}`;
+}
+
+// What a board mode is and how to use it, read as it opens: its on-screen hints are only for sighted players.
+/** @type {Record<Exclude<BoardMode, null>, string>} */
+const modeIntros = {
+  damage: 'Commander damage. Press a commander on a tile to add one damage. Save or Cancel in the centre',
+  counters: 'Counters. Press a counter to add one. Save or Cancel in the centre',
+  mana: 'Mana pool. Press a colour to add one mana. Save or Cancel in the centre',
+  colours: 'Tile colours. Choose a colour on each tile, then Done in the centre',
+  identity: 'Identities. Choose each player\'s colours, then Done in the centre',
+  rotate: 'Rotate seats. Press a tile to turn it clockwise, then Done in the centre',
+  first: 'Who goes first? Press Me first on a tile, or Pick at random in the centre',
+};
+/** @type {Record<Exclude<BoardMode, null>, string>} */
+const modeNames = {
+  damage: 'Commander damage', counters: 'Counters', mana: 'Mana pool', colours: 'Tile colours', identity: 'Identities',
+  rotate: 'Rotate seats', first: 'Who goes first?',
+};
 
 let announceTimer;
 const pendingAnnouncements = new Map();
@@ -21,15 +46,41 @@ const pendingAnnouncements = new Map();
 export function announce(index, kind, describe) {
   pendingAnnouncements.set(`${index} ${kind}`, { index, describe });
   clearTimeout(announceTimer);
-  announceTimer = setTimeout(() => {
-    announcer.textContent = [...pendingAnnouncements.values()].sort((a, b) => a.index - b.index)
-      .map(item => item.describe()).join('. ');
-    pendingAnnouncements.clear();
-  }, 700);
+  announceTimer = setTimeout(flushAnnouncements, 700);
+}
+
+function flushAnnouncements() {
+  clearTimeout(announceTimer);
+  announcer.textContent = [...pendingAnnouncements.values()].sort((a, b) => a.index - b.index)
+    .map(item => item.describe()).join('. ');
+  pendingAnnouncements.clear();
+}
+
+// Says something about the whole board at once, after anything still waiting, such as a mode opening.
+/** @param {string} words */
+function announceNow(words) {
+  pendingAnnouncements.set('-1 now', { index: -1, describe: () => words });
+  flushAnnouncements();
 }
 
 export function announceLife(index) {
-  announce(index, 'life', () => `Player ${index + 1}, ${game.scores[index]} life`);
+  announce(index, 'life', () => `${seatName(index)}, ${game.scores[index]} life`);
+}
+
+// A board mode opening, or closing with nothing else to say: at once, since focus moves with it. Saving, discarding and
+// a pick of who goes first say so in its place (announceModeEnd).
+/**
+ * @param {BoardMode} mode The mode opening, or null when one closes.
+ * @param {BoardMode} closed The mode that closed.
+ */
+export function announceMode(mode, closed) {
+  if (mode) announceNow(modeIntros[mode]);
+  else if (closed) announceNow(`${modeNames[closed]} closed`);
+}
+
+/** @param {string} words Such as "Saved" or "Changes discarded". */
+export function announceModeEnd(words) {
+  announceNow(words);
 }
 
 // Says who holds a designation now, once a burst of changes settles.

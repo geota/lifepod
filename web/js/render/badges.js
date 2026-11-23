@@ -11,7 +11,7 @@ import {
 } from '../logic/rules.js';
 import { clearedPools, game, reminders } from '../state/state.js';
 import { board, element, icon, manaIcon, setupButton, visuallyHidden } from '../ui/dom.js';
-import { bindStep, bindTap } from '../ui/press.js';
+import { bindRelease, bindStep, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark } from './tile.js';
 
 /** @typedef {import('../logic/data.js').BoardMode} BoardMode */
@@ -56,7 +56,7 @@ function reminderChip(index, kind) {
   chip.type = 'button';
   chip.dataset.designation = kind;
   chip.setAttribute('aria-label', `${reminderText[kind]}. Dismiss`);
-  bindTap(chip, () => badgeActions.dismissReminder(index, kind));
+  bindRelease(chip, () => badgeActions.dismissReminder(index, kind));
   return chip;
 }
 
@@ -78,7 +78,8 @@ function turnChips(index) {
       const chip = active === index
         ? element('button', 'chip turn-chip active-chip', manaIcon('untap'), element('span', 'turn-word', 'Turn'), element('span', 'turn-round', String(round)))
         : element('button', 'chip turn-chip start-chip', manaIcon('untap'), 'Start');
-      chip.setAttribute('aria-label', active === index ? `Player ${index + 1}'s turn, round ${round}. Pass the turn`
+      // Each name starts with the chip's own words (WCAG 2.5.3), so voice control can say what it sees.
+      chip.setAttribute('aria-label', active === index ? `Turn ${round}. Player ${index + 1}'s turn, pass it`
         : `Start Player ${index + 1}'s turn`);
       if (active === index) bindStep(chip, badgeActions.stepTurn, badgeActions.stepBack);
       else bindTap(chip, () => badgeActions.startTurn(index));
@@ -89,10 +90,7 @@ function turnChips(index) {
       chips.push(flag);
     }
   }
-  for (const chip of chips) {
-    if (chip.tagName === 'BUTTON') chip.type = 'button';
-    else chip.setAttribute('role', 'listitem');
-  }
+  for (const chip of chips) if (chip.tagName === 'BUTTON') chip.type = 'button';
   return chips;
 }
 
@@ -102,7 +100,7 @@ function stripItems(index) {
   if (clearedPools.has(index)) {
     const undo = element('button', 'strip-undo', icon('undo'), 'Undo clear');
     undo.type = 'button';
-    undo.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
+    undo.setAttribute('aria-label', `Undo clear, Player ${index + 1}'s mana pool`);
     bindTap(undo, () => badgeActions.undoClear(index));
     return [undo, stripChip(index)];
   }
@@ -146,8 +144,9 @@ function stripChip(index) {
       ? [element('span', 'summary-item', ...held.map(({ colour }) => pip(colour)), String(held.reduce((sum, { amount }) => sum + amount, 0)))]
       : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
     chip = element('button', 'chip strip-chip', ...parts, icon('caret-right'));
-    chip.setAttribute('aria-label', `Player ${index + 1}, mana pool ${poolText(game, index)}. Open mana`);
-    bindTap(chip, () => badgeActions.setBoardMode('mana'));
+    const total = held.reduce((sum, { amount }) => sum + amount, 0);
+    chip.setAttribute('aria-label', `${total} mana. Player ${index + 1}'s pool: ${poolText(game, index)}. Open mana`);
+    bindRelease(chip, () => badgeActions.setBoardMode('mana'));
   }
   chip.type = 'button';
   return chip;
@@ -160,8 +159,8 @@ function designationChip({ kind, label, name, still }, index) {
     const chip = element('button', 'chip pass-chip', designationIcon(kind), icon('arrow-bend-up-right'), element('span', 'pass-word', 'Pass it on'));
     chip.type = 'button';
     chip.dataset.designation = kind;
-    chip.setAttribute('aria-label', `Player ${index + 1} is out and ${still}. Pass ${name} on in counters`);
-    bindTap(chip, () => badgeActions.setBoardMode('counters'));
+    chip.setAttribute('aria-label', `Pass it on: Player ${index + 1} is out and ${still}. Give ${name} to someone in counters`);
+    bindRelease(chip, () => badgeActions.setBoardMode('counters'));
     return chip;
   }
   const chip = element('span', 'chip designation-chip', designationIcon(kind), visuallyHidden(label));
@@ -189,13 +188,13 @@ export function renderBadges(index) {
   far.replaceChildren(...(damage.length ? [sword] : []), ...damage.map(({ amount, attacker }) => {
     const chip = inColourOf(element('span', 'chip damage', String(amount),
       visuallyHidden(` commander damage from Player ${attacker + 1}`)), attacker);
-    chip.setAttribute('role', 'listitem');
     const level = dangerLevel(amount, commanderWarning, commanderLethal);
     if (level) chip.dataset.level = level;
     return chip;
   }), ...(foldedChip ? [foldedChip] : []));
   // The strip folded onto the end of the far row, shown only when it can go nowhere else.
   far.hidden = damage.length === 0;
+  far.setAttribute('aria-label', foldedChip ? 'Commander damage and mana pool' : 'Commander damage');
   const near = player.querySelector('.badges.near');
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
   // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
@@ -229,7 +228,6 @@ export function renderBadges(index) {
   }
   syncReminderChips(index, /** @type {HTMLElement} */ (near.parentElement).querySelector('.reminders'));
   placeReminders(player);
-  for (const chip of chips) if (chip.tagName !== 'BUTTON') chip.setAttribute('role', 'listitem');
   // Keep keyboard focus on a turn chip as the row is rebuilt. When the turn moves to another tile, showTurn follows it.
   const turnFocus = near.contains(document.activeElement) && /** @type {Element} */ (document.activeElement).matches('.turn-chip');
   near.replaceChildren(...chips);

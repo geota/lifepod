@@ -55,7 +55,7 @@ async function checkCountersMode(t, engine) {
   assert.equal(await count(page, 3, 'poison'), '2');
   assert.equal(await count(page, 1, 'casts'), '+4');
   assert.equal(await cell(page, 3, 'poison').getAttribute('aria-label'), 'Player 3 poison, 2. Add one');
-  assert.equal(await cell(page, 1, 'casts').getAttribute('aria-label'), 'Player 1 commander tax, 4, 2 casts. Add one cast');
+  assert.equal(await cell(page, 1, 'casts').getAttribute('aria-label'), '+4 commander tax, Player 1, 2 casts. Add one cast');
   // Taking one away at 0 does nothing and isn't a change.
   await removeOne(page, 'Remove one poison counter from Player 2');
   assert.equal(await count(page, 2, 'poison'), '0');

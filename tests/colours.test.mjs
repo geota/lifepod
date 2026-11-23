@@ -40,10 +40,10 @@ async function checkColours(t, engine) {
   assert.ok(!(await button(page, 'Roll dice').isVisible()), 'only the check mark stays in the centre');
   assert.equal(await page.locator('.player .swatch').count(), 72);
   assert.equal(await page.locator('.mode-layer button:not(.swatch)').count(), 0, 'no identity toggles in Colours');
-  assert.deepEqual(await tile(page, 1).locator('.swatch').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label').split(',')[0])),
+  assert.deepEqual(await tile(page, 1).locator('.swatch').evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label').replace(/^P\d, /, '').split(',')[0])),
     ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid']);
   assert.equal(await swatch(page, 1, 'Sage').getAttribute('aria-pressed'), 'true');
-  assert.ok(await swatch(page, 2, 'Sage, taken by Player 1').isDisabled(), 'player 1’s colour is taken for player 2');
+  assert.ok(await swatch(page, 2, 'P1, Sage, taken by Player 1').isDisabled(), 'player 1’s colour is taken for player 2');
   assert.equal(await tile(page, 1).locator('.swatch:disabled').count(), 5, 'five colours are taken by the others');
   // A taken swatch keeps its full colour, with no strike, and shows its owner in the seat colour in place of the dot.
   const looks = name => swatch(page, 2, name).evaluate((button) => {
@@ -55,7 +55,7 @@ async function checkColours(t, engine) {
       tag: tag && { color: getComputedStyle(tag).color, opacity: getComputedStyle(tag).opacity, hidden: tag.getAttribute('aria-hidden') },
     };
   });
-  assert.deepEqual(await looks('Sage, taken by Player 1'), {
+  assert.deepEqual(await looks('P1, Sage, taken by Player 1'), {
     text: 'P1', opacity: '1', background: await palette(page, 'sage', 'top'), dot: 'none', strike: 'none',
     tag: { color: await palette(page, 'sage', 'top', 'seat'), opacity: '1', hidden: 'true' },
   });
@@ -66,13 +66,13 @@ async function checkColours(t, engine) {
   await swatch(page, 1, 'Rose').tap();
   assert.equal((await panels(page))[0], await palette(page, 'rose', 'top'));
   assert.equal(await swatch(page, 1, 'Rose').getAttribute('aria-pressed'), 'true');
-  assert.ok(await swatch(page, 4, 'Rose, taken by Player 1').isDisabled());
+  assert.ok(await swatch(page, 4, 'P1, Rose, taken by Player 1').isDisabled());
   assert.ok(!(await swatch(page, 4, 'Sage').isDisabled()), 'sage is free again');
   assert.equal(await swatch(page, 4, 'Sage').textContent(), '', 'a freed swatch drops its owner');
-  assert.equal(await swatch(page, 4, 'Rose, taken by Player 1').textContent(), 'P1');
+  assert.equal(await swatch(page, 4, 'P1, Rose, taken by Player 1').textContent(), 'P1');
 
   // A press on a taken swatch changes nothing, even if it reaches the button.
-  await swatch(page, 4, 'Rose, taken by Player 1').evaluate(taken => {
+  await swatch(page, 4, 'P1, Rose, taken by Player 1').evaluate(taken => {
     taken.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, isPrimary: true, button: 0 }));
     taken.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
@@ -85,7 +85,7 @@ async function checkColours(t, engine) {
   // The new hues work like the rest: Orchid is taken for everyone else while Player 5 has it.
   await swatch(page, 5, 'Orchid').tap();
   assert.equal((await panels(page))[4], await palette(page, 'orchid', 'top'));
-  assert.ok(await swatch(page, 6, 'Orchid, taken by Player 5').isDisabled());
+  assert.ok(await swatch(page, 6, 'P5, Orchid, taken by Player 5').isDisabled());
   assert.equal(await tile(page, 6).locator('.swatch:not(:disabled)').count(), 7, 'seven of twelve are free with six players');
   await swatch(page, 5, 'Amber').tap();
   assert.deepEqual(await colours(page), ['rose', 'sky', 'sage', 'violet', 'amber', 'teal'], 'no two players share a colour');

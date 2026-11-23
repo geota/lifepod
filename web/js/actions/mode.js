@@ -6,6 +6,7 @@ import {
   designations, discardMessages, doneLabels, editingModes, firstBeat, shuffleTick, shuffleTicks,
 } from '../logic/data.js';
 import { applyEdit, isOut, playOrder, randomBelow } from '../logic/rules.js';
+import { announceMode, announceModeEnd, clearAnnouncements, seatName } from '../render/announce.js';
 import { renderBadges } from '../render/badges.js';
 import { renderModeLayer } from '../render/modes.js';
 import { syncPill } from '../render/pill.js';
@@ -14,7 +15,7 @@ import { haptic, reducedMotion } from '../state/platform.js';
 import {
   boardMode, editStartHolders, edits, game, openBoardMode, saveGame, syncBackHandling, turnSteps,
 } from '../state/state.js';
-import { announcer, board, boardControls, discardDialog, icon, setupButton } from '../ui/dom.js';
+import { board, boardControls, discardDialog, icon, setupButton } from '../ui/dom.js';
 import { cancelPresses } from '../ui/press.js';
 import { endUndoClears } from './mana.js';
 import { turnStarted } from './reminders.js';
@@ -29,6 +30,9 @@ export function setAskFirst(ask) {
   askFirst = ask;
 }
 let shuffleTimer;
+// What had focus when the board left rest for a mode, so leaving it can give focus back there.
+/** @type {Element | null} */
+let modeOpener = null;
 
 // "Who goes first?" opens once nothing else is open: after a new game while Turns is on, and when Turns goes from Off
 // to on in a game with no first player.
@@ -52,7 +56,7 @@ export function chooseFirst(index) {
   const go = board.children[index].querySelector('.first-go');
   go.replaceChildren(icon('flag'), 'Goes first');
   /** @type {Element} */ (go.nextElementSibling).textContent = game.turns === 'rounds' ? 'Tap the flag to start each round' : 'Tap Turn when your turn ends';
-  announcer.textContent = `Player ${index + 1} goes first`;
+  announceModeEnd(`${seatName(index)}, goes first`);
   // Their turn starts once the board is back, where its reminder can show.
   shuffleTimer = setTimeout(() => {
     setBoardMode(null);
@@ -92,6 +96,11 @@ export function shuffleFirst() {
 // Counters mode ends with save or ✕, and keeps a list of its edits until then.
 /** @param {BoardMode} mode */
 export function setBoardMode(mode) {
+  const closed = boardMode;
+  // A pick of who goes first is announced already, and the mode closes a beat after it. An editing mode's end is
+  // announced by what ended it: Save, Discard, or ✕ with no changes (cancelEditing).
+  const quietly = board.hasAttribute('data-picked') || editingModes.includes(closed);
+  if (closed === null && mode !== null) modeOpener = document.activeElement;
   cancelPresses();
   clearTimeout(shuffleTimer);
   for (const flag of ['data-picked', 'data-shuffling']) board.removeAttribute(flag);
@@ -101,6 +110,8 @@ export function setBoardMode(mode) {
   openBoardMode(mode);
   [...board.children].forEach((player, index) => {
     player.querySelector('.controls').inert = mode !== null;
+    // Rotate seats covers each tile with its rotate button, so nothing else on the tile can take focus or a press.
+    player.querySelector('.player-face').inert = mode === 'rotate';
     player.querySelector('.rotate-seat').hidden = mode !== 'rotate';
     renderModeLayer(player, index);
     renderBadges(index);
@@ -118,19 +129,32 @@ export function setBoardMode(mode) {
   syncPill();
   const focusTarget = mode === 'rotate' ? board.querySelector('.rotate-seat')
     : mode === 'colours' ? board.querySelector('.swatch[aria-pressed="true"]')
-    : mode ? board.querySelector('.mode-layer button') : setupButton;
+    : mode ? board.querySelector('.mode-layer button') : restingFocus();
   focusTarget?.focus();
+  announceMode(mode, quietly ? null : closed);
   syncBackHandling();
   // A mode opened from settings, such as Rotate seats, was still open when settings' close event looked, so the question
   // waits for the mode to end.
   if (mode === null) maybeAskFirst();
 }
 
+// Back at rest, focus returns to what opened the mode, such as the pill's Commander damage, if it still shows; otherwise
+// to Settings.
+function restingFocus() {
+  const opener = modeOpener;
+  modeOpener = null;
+  const usable = opener instanceof HTMLElement && opener !== document.body && opener.isConnected
+    && !opener.closest('[inert], [hidden], dialog') && opener.checkVisibility?.() !== false;
+  return usable ? opener : setupButton;
+}
+
 // ✕ in an editing mode: with no changes it just closes; otherwise it asks first, and Keep editing is the default.
 export function cancelEditing() {
   const changes = /** @type {Edit[]} */ (edits).length;
   if (!changes) {
+    const closed = boardMode;
     setBoardMode(null);
+    announceMode(null, closed);
     return;
   }
   document.querySelector('#discard-title').textContent = `Discard ${changes} ${changes === 1 ? 'change' : 'changes'}?`;
@@ -149,7 +173,9 @@ export function discardEdits() {
   game.scores.forEach((_, index) => renderScore(index));
   saveGame();
   setBoardMode(null);
-  announcer.textContent = 'Changes discarded';
+  // What the discarded changes said is no longer true.
+  clearAnnouncements();
+  announceModeEnd('Changes discarded');
 }
 
 // Leaves the open board mode the way ✕ or the check mark would without saving anything new.

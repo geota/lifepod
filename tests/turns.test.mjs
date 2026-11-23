@@ -173,7 +173,7 @@ async function checkWhoGoesFirst(t, engine) {
   assert.ok(await page.locator('#setup-button').isHidden());
 
   // Me first: P3 goes first and, turn by turn, takes the first turn.
-  await button(page, 'Player 3 goes first').tap();
+  await button(page, 'Me first, Player 3').tap();
   assert.equal(await tile(page, 3).locator('.first-go').textContent(), 'Goes first');
   await page.clock.runFor(firstBeat - 1);
   assert.equal(await mode(page), 'first', '"Goes first" shows for a beat');

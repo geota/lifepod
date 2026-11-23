@@ -12,7 +12,7 @@ const ownSeat = (page, number) => tile(page, number).locator('.map-cell.self').e
   [cell.querySelector('strong').textContent, cell.querySelector('.life-change').textContent]);
 // The far row's chips, after the sword that leads it.
 const farBadges = (page, number) => tile(page, number).locator('.badges.far')
-  .evaluate(row => (row.hidden ? '' : [...row.querySelectorAll('[role="listitem"]')].map(chip => chip.textContent).join(' | ')));
+  .evaluate(row => (row.hidden ? '' : [...row.querySelectorAll('.chip.damage')].map(chip => chip.textContent).join(' | ')));
 // How each opponent's seat looks on a defender's map, and the contrast of its number.
 const seatLooks = (page, defender) => tile(page, defender).locator('.map-cell[data-attacker]').evaluateAll(cells => {
   const rgba = value => value.match(/[\d.]+/g).map(Number);
@@ -103,7 +103,7 @@ async function checkDamage(t, engine) {
   await page.clock.runFor(699);
   assert.equal(await announced(), quiet, 'nothing is announced before the changes settle');
   await page.clock.runFor(1);
-  assert.equal(await announced(), "Player 2's commander, 6 damage to Player 3. Player 3, 34 life");
+  assert.equal(await announced(), "Player 2's commander, 6 damage to Player 3. Player 3, Coral, 34 life");
 
   // Undo steps back one change.
   await button(page, 'Undo').tap();
@@ -267,7 +267,7 @@ test('chromium: warnings at 15 commander damage and 7 poison, out at 21 and 10',
     await seedGame(page, { ...game, tileColours: 'classic' });
     return page.evaluate(() => [...document.querySelectorAll('.player')].map(player => ({
       out: player.querySelector('.score').hasAttribute('data-out'),
-      chips: [...player.querySelectorAll('.badges:not([hidden]) .chip[role="listitem"]')].map(chip => {
+      chips: [...player.querySelectorAll('.badges:not([hidden]) .chip:not(button, .sword)')].map(chip => {
         const style = getComputedStyle(chip);
         const ring = style.boxShadow === 'none' ? 'no ring' : `${style.boxShadow.match(/rgb\([^)]*\)/)[0]} ring`;
         return `${chip.textContent} ${chip.dataset.level ?? 'plain'} ${style.color} ${ring}`;

@@ -16,6 +16,7 @@ import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { resetDrops } from './js/layout/fit.js';
 import { compactGroups, fitCompactSwitches } from './js/layout/settings.js';
+import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
 import { setBadgeActions } from './js/render/badges.js';
 import { setModeActions } from './js/render/modes.js';
@@ -26,7 +27,7 @@ import {
   board, cancelButton, countersButton, damageButton, discardDialog, manaButton, roundBackButton, roundButton,
   saveButton, shuffleButton, undoButton,
 } from './js/ui/dom.js';
-import { bindStep, bindTap, cancelPresses } from './js/ui/press.js';
+import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
 import './js/sheets/options.js';
 import './js/sheets/settings.js';
@@ -42,13 +43,14 @@ countersButton.addEventListener('click', () => setBoardMode('counters'));
 manaButton.addEventListener('click', () => setBoardMode('mana'));
 bindStep(roundButton, stepTurn, stepBack);
 roundBackButton.addEventListener('click', stepBack);
-bindTap(shuffleButton, shuffleFirst);
+bindRelease(shuffleButton, shuffleFirst);
 undoButton.addEventListener('click', undoEdit);
 saveButton.addEventListener('click', () => {
   saveGame();
   // Whoever took the initiative in the mode, by commander damage or a tap, ventures into Undercity.
   const taker = game.initiative !== editStartHolders.initiative ? game.initiative : null;
   setBoardMode(null);
+  announceModeEnd('Saved');
   remind(taker, 'initiative');
 });
 cancelButton.addEventListener('click', () => {
@@ -58,7 +60,9 @@ cancelButton.addEventListener('click', () => {
 discardDialog.addEventListener('close', () => {
   syncBackHandling();
   if (discardDialog.returnValue === 'discard') discardEdits();
-  else cancelButton.focus();
+  // Keep editing: the dialog gives focus back to what had it, such as the cell Escape was pressed on, or ✕. Android's
+  // back gesture can open it with nothing focused, and then ✕ takes it.
+  else if (!document.activeElement || document.activeElement === document.body) cancelButton.focus();
 });
 
 // Android's back gesture closes the open dialog, then leaves the open board mode the way ✕ does.
@@ -73,7 +77,10 @@ window.closeOpenDialog = () => {
   return true;
 };
 document.addEventListener('keydown', (event) => {
-  if (boardMode && event.key === 'Escape' && !document.querySelector('dialog[open]')) leaveBoardMode();
+  if (!boardMode || event.key !== 'Escape' || document.querySelector('dialog[open]')) return;
+  // Escape's own default is a close request, which would go to the Discard dialog this opens and close it at once.
+  event.preventDefault();
+  leaveBoardMode();
 });
 
 // "Who goes first?" waits for settings and the new game dialog to close. These listeners run after each dialog's own.

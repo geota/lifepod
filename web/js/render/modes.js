@@ -6,7 +6,7 @@ import { faceAngles, identityColours, manaColours, swatches, tileSets } from '..
 import { isOut, seatGrid, seatRow, shownCounters, toFace, trackedDesignations } from '../logic/rules.js';
 import { boardMode, editStartScores, edits, game } from '../state/state.js';
 import { board, element, icon, visuallyHidden } from '../ui/dom.js';
-import { bindSeat, bindTap } from '../ui/press.js';
+import { bindRelease, bindSeat, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf } from './tile.js';
 
 /** @typedef {import('../logic/data.js').CountKind} CountKind */
@@ -117,7 +117,8 @@ function syncSwatches(group) {
     button.disabled = taken;
     button.setAttribute('aria-pressed', String(owner === index));
     const name = tileSets[game.tileColours].names[colour];
-    button.setAttribute('aria-label', taken ? `${name}, taken by Player ${owner + 1}` : name);
+    // A taken swatch's name starts with the tag it shows (WCAG 2.5.3).
+    button.setAttribute('aria-label', taken ? `P${owner + 1}, ${name}, taken by Player ${owner + 1}` : name);
     // A free swatch shows the seat colour as a dot. A taken one shows its owner, such as "P2", in its place.
     const tag = taken ? `P${owner + 1}` : '';
     if (button.textContent !== tag) {
@@ -220,7 +221,7 @@ export function syncCounterCells(index) {
     cell.querySelector('b').textContent = kind === 'casts' ? `+${value * 2}` : String(value);
     cell.toggleAttribute('data-zero', value === 0);
     cell.setAttribute('aria-label', kind === 'casts'
-      ? `${name} commander tax, ${value * 2}, ${value} ${value === 1 ? 'cast' : 'casts'}. Add one cast`
+      ? `+${value * 2} commander tax, ${name}, ${value} ${value === 1 ? 'cast' : 'casts'}. Add one cast`
       : `${name} ${kind}, ${value}. Add one`);
   }
 }
@@ -271,8 +272,8 @@ export function renderModeLayer(player, index) {
 function buildFirstPicker(index) {
   const go = element('button', 'first-go', icon('hand-tap'), 'Me first');
   go.type = 'button';
-  go.setAttribute('aria-label', `Player ${index + 1} goes first`);
-  bindTap(go, () => modeActions.chooseFirst(index));
+  go.setAttribute('aria-label', `Me first, Player ${index + 1}`);
+  bindRelease(go, () => modeActions.chooseFirst(index));
   const hint = element('p', 'layer-hint', 'or the centre button picks at random');
   hint.setAttribute('aria-hidden', 'true');
   return element('div', 'first-picker', go, hint);

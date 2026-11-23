@@ -270,7 +270,7 @@ async function checkStripClear(t, engine) {
           assert.equal(state.chips.length, folded, `${view}: each folded strip shows its chip`);
           for (const chip of state.chips) {
             assert.ok(chip.caret, `${view}: a folded chip has a caret`);
-            assert.match(chip.label, /^Player \d, mana pool .+\. Open mana$/);
+            assert.match(chip.label, /^\d+ mana\. Player \d's pool: .+\. Open mana$/);
           }
           if (folded) {
             await page.locator('.strip-chip').filter({ visible: true }).first().tap();

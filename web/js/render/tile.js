@@ -4,6 +4,7 @@
 import { syncBoardDigits } from '../layout/board.js';
 import { identityColours, identityNames, outLabels, swatches } from '../logic/data.js';
 import { identityText, outReason, seatRow } from '../logic/rules.js';
+import { seatName } from './announce.js';
 import { game } from '../state/state.js';
 import { board, element, icon, manaIcon, visuallyHidden } from '../ui/dom.js';
 
@@ -14,6 +15,8 @@ import { board, element, icon, manaIcon, visuallyHidden } from '../ui/dom.js';
 
 export function paintColours() {
   [...board.children].forEach((player, index) => {
+    // The tile's region is named for its seat and colour, which change together here.
+    player.setAttribute('aria-label', seatName(index));
     player.dataset.colour = swatches[game.colors[index]].id;
     player.dataset.row = seatRow(index);
   });

@@ -1121,6 +1121,24 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .counter-cell[data-zero] { color: var(--muted); font-weight: var(--weight-semibold); }
 .counter-cell:is(:active, [data-pressed]) { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .counter-cell:has(+ .counter-remove:focus-visible) { outline: var(--focus-ring); outline-offset: 3px; }
+.map-cell:has(+ .map-remove:focus-visible), .counter-cell:has(+ .counter-remove:focus-visible) { position: relative; outline-style: dashed; }
+/* The hidden "Remove one" buttons ring their cell like "Add one" does, so while one has keyboard focus the ring is dashed
+   and a "−1" tab sits on the cell's corner: Enter will take one away (ACCESSIBILITY.md M6). */
+.map-cell:has(+ .map-remove:focus-visible)::after, .counter-cell:has(+ .counter-remove:focus-visible)::after {
+  content: '−1';
+  position: absolute;
+  inset-block-start: -9px;
+  inset-inline-end: -9px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: var(--weight-heavy);
+  letter-spacing: normal;
+  line-height: 1.35;
+  pointer-events: none;
+}
 /* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
    An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }

@@ -44,9 +44,10 @@
     <section class="player">
       <div class="player-face">
         <span class="watermark" aria-hidden="true"></span>
-        <!-- The far edge: commander damage, then the mana strip while a pool has mana, toward the total. -->
+        <!-- The far edge: commander damage, then the mana strip while a pool has mana, toward the total. The badge rows are
+             labelled groups rather than lists, since some of their chips are buttons, which a list can't hold. -->
         <div class="far-edge">
-          <div class="badges far" role="list" aria-label="Commander damage" hidden></div>
+          <div class="badges far" role="group" aria-label="Commander damage" hidden></div>
           <div class="mana-strip" role="group" aria-label="Mana pool" hidden></div>
         </div>
         <div class="controls">
@@ -59,7 +60,7 @@
         <!-- The near edge: the near badge row. A turn reminder sits above it. -->
         <div class="near-edge">
           <div class="reminders"></div>
-          <div class="badges near" role="list" aria-label="Counters" hidden></div>
+          <div class="badges near" role="group" aria-label="Status" hidden></div>
         </div>
         <div class="mode-layer" hidden></div>
       </div>
