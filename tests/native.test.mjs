@@ -104,6 +104,18 @@ test('node: the bridge names match the Android and iOS wrappers', () => {
   assert.match(appJs, /window\.closeOpenDialog = \(\) => \{/);
 });
 
+// A renderer that dies again and again as the page loads stops being restarted after a few tries, and a native message
+// offers to try again, on both platforms with the same limits (docs/review/LOGIC-AND-STATIC.md S2).
+test('node: the apps stop restarting a renderer that keeps dying on load', () => {
+  assert.match(kotlin, /override fun onRenderProcessGone\([^)]*\): Boolean \{\s*if \(view == webView\) replaceTracker\(\)/);
+  assert.match(kotlin, /quickRestarts = if \(quick\) quickRestarts \+ 1 else 0\s*if \(quickRestarts < MAX_QUICK_RESTARTS\) \{\s*showTracker\(\)/);
+  assert.match(kotlin, /crashNotice =\s*showNotice\(/, 'Android shows a native message instead');
+  assert.match(swift, /quickRestarts = quick \? quickRestarts \+ 1 : 0\s*if quickRestarts < maxQuickRestarts \{\s*loadTracker\(in: webView\)\s*\} else \{\s*showCrashNotice\(in: webView\)/);
+  assert.equal(Number(kotlin.match(/QUICK_RESTART_MS = ([\d_]+)L/)[1].replace('_', '')) / 1000, Number(swift.match(/quickRestart: TimeInterval = (\d+)/)[1]),
+    'the same window on both platforms');
+  assert.equal(kotlin.match(/MAX_QUICK_RESTARTS = (\d+)/)[1], swift.match(/maxQuickRestarts = (\d+)/)[1], 'the same number of tries');
+});
+
 const closeDialog = kotlin.match(/const val CLOSE_DIALOG = "(.+)"/)[1];
 
 const calls = (page, name) => page.evaluate(wanted => window.bridgeCalls.filter(([call]) => call === wanted).map(([, ...args]) => args), name);

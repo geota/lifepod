@@ -10,6 +10,11 @@ private let appScheme = "lifepod"
 private let appHost = "app"
 private let startPage = URL(string: "\(appScheme)://\(appHost)/index.html")!
 
+// A web content process that ends within quickRestart seconds of loading counts as ending on load; after
+// maxQuickRestarts such ends in a row the tracker stops reloading. Keep these in step with MainActivity.kt.
+private let quickRestart: TimeInterval = 10
+private let maxQuickRestarts = 3
+
 @main
 struct LifePodApp: App {
     @Environment(\.scenePhase) private var scenePhase
@@ -74,6 +79,11 @@ private struct TrackerView: UIViewRepresentable {
         private var keepAwake = true
         private let haptics = UISelectionFeedbackGenerator()
         private weak var webView: WKWebView?
+        // When the tracker last loaded, how many times in a row its content process has ended soon after, and the
+        // message shown once it has ended too often.
+        private var loadedAt = Date.distantPast
+        private var quickRestarts = 0
+        private var crashNotice: UIView?
 
         override init() {
             super.init()
@@ -143,8 +153,61 @@ private struct TrackerView: UIViewRepresentable {
             }
         }
 
+        // The game is saved on every change, so a reload carries on where the page was. A page whose process ends again
+        // and again soon after loading would reload forever, so after maxQuickRestarts in a row the tracker stays closed
+        // and a native message offers to try again.
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-            loadTracker(in: webView)
+            let quick = Date().timeIntervalSince(loadedAt) < quickRestart
+            quickRestarts = quick ? quickRestarts + 1 : 0
+            if quickRestarts < maxQuickRestarts {
+                loadTracker(in: webView)
+            } else {
+                showCrashNotice(in: webView)
+            }
+        }
+
+        // English only, like the page.
+        private func showCrashNotice(in webView: WKWebView) {
+            let message = UILabel()
+            message.text =
+                "LifePod's page keeps stopping as it opens. Your game is saved. "
+                + "Try again, or restart your iPhone if it keeps happening."
+            message.textColor = .white
+            message.font = .preferredFont(forTextStyle: .title3)
+            message.adjustsFontForContentSizeCategory = true
+            message.numberOfLines = 0
+            message.textAlignment = .center
+            let retry = UIButton(
+                configuration: .filled(),
+                primaryAction: UIAction(title: "Try again") { [weak self, weak webView] _ in
+                    guard let self, let webView else { return }
+                    self.crashNotice?.removeFromSuperview()
+                    self.crashNotice = nil
+                    self.quickRestarts = 0
+                    self.loadTracker(in: webView)
+                })
+            let stack = UIStackView(arrangedSubviews: [message, retry])
+            stack.axis = .vertical
+            stack.alignment = .center
+            stack.spacing = 24
+            stack.translatesAutoresizingMaskIntoConstraints = false
+            let notice = UIView()
+            notice.backgroundColor = trackerBackgroundColor
+            notice.translatesAutoresizingMaskIntoConstraints = false
+            notice.addSubview(stack)
+            webView.addSubview(notice)
+            let margins = notice.layoutMarginsGuide
+            NSLayoutConstraint.activate([
+                notice.leadingAnchor.constraint(equalTo: webView.leadingAnchor),
+                notice.trailingAnchor.constraint(equalTo: webView.trailingAnchor),
+                notice.topAnchor.constraint(equalTo: webView.topAnchor),
+                notice.bottomAnchor.constraint(equalTo: webView.bottomAnchor),
+                stack.centerXAnchor.constraint(equalTo: margins.centerXAnchor),
+                stack.centerYAnchor.constraint(equalTo: margins.centerYAnchor),
+                stack.widthAnchor.constraint(lessThanOrEqualTo: margins.widthAnchor),
+                message.widthAnchor.constraint(lessThanOrEqualTo: stack.widthAnchor),
+            ])
+            crashNotice = notice
         }
 
         func loadTracker(in webView: WKWebView) {
@@ -174,6 +237,7 @@ private struct TrackerView: UIViewRepresentable {
                         forMainFrameOnly: true
                     ))
             }
+            loadedAt = Date()
             webView.load(URLRequest(url: startPage))
         }
     }
