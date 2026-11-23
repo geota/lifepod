@@ -199,8 +199,8 @@ export function previousTurn(game) {
 // The turn after one step forward (SPEC §8), or null when it can't move. Rounds: the next round. Turn by turn: the next
 // player in play order who isn't out, and the next round when play passes the first player's seat. It doesn't move
 // with nobody's turn yet, when nobody else can take it, or past maxRound: in the last round, play holds rather than pass
-// the first player's seat, so turnBack always takes a step back exactly. actions/turns.js doesn't use these yet: stepTurn
-// should record a step only when turnForward moves, and stepBack's relaunch branch should take turnBack.
+// the first player's seat, so turnBack always takes a step back exactly. actions/turns.js records a step only when this
+// moves, and its stepBack takes turnBack when there's no step to undo.
 /**
  * @param {Game} game
  * @returns {Turn | null}
@@ -409,7 +409,7 @@ export function manaEdit(game, index, colour, delta) {
 
 // Applies a new edit forwards, as a mode's tap does, and returns it. Anyone it puts out of the game hands on what they
 // hold (CR 726.4 and 727.4) in the same edit: the handoffs join its transfers, so applyEdit(game, edit, -1) undoes them
-// with it. actions/edits.js's commitEdit does the same today; it should call this instead.
+// with it. actions/edits.js's commitEdit calls this for every tap.
 /**
  * @param {Game} game
  * @param {Edit} edit

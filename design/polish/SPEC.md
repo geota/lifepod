@@ -390,6 +390,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 - **Both modes:**
   - The pill leads with a round button, the number printed twice like a card index so both sides can read it. Tap does the same as the chip, so anyone can act; hold steps back.
   - Turn steps save at once and aren't in any mode's Undo.
+  - The last round is 999 (`maxRound`). Play holds there rather than start round 1000: in Rounds the flag stays at 999, and turn by turn the turn stays with the last player before the first player's seat.
   - **Off** hides everything about turns but keeps the state, so switching back on mid-game resumes. Only the Off → on change asks "Who goes first?" again, for a game with no first player.
 
 ## 9. Floating mana (Q12: M1 + M2 hybrid; Q13: Manual + turns, switchable)

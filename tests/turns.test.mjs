@@ -283,6 +283,29 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: skipping who goes first starts at round 1, after Off to on too`, t => checkSkipResetsRound(t, engine));
 }
 
+// The last round, 999 (maxRound): play holds rather than start round 1000, and records no step, so a step back, even
+// after a relaunch, takes exactly one (LOGIC-AND-STATIC L3).
+async function checkLastRound(t, engine) {
+  const page = await openPage(t, engine, { clock: true, game: savedGame(4, { turns: 'rounds', turn: { first: 0, active: null, round: 999 } }) });
+  await page.locator('#round-button').tap();
+  assert.equal((await saved(page)).turn.round, 999, 'Rounds holds at 999');
+  await page.locator('#round-back').evaluate(back => back.click());
+  assert.equal((await saved(page)).turn.round, 998, 'and one step back is one round');
+
+  // Turn by turn: P3 is last in play order (P1, P2, P4, P3), so passing would start round 1000.
+  await seedGame(page, savedGame(4, { turns: 'turns', turn: { first: 0, active: 2, round: 999 } }));
+  await tile(page, 3).locator('.active-chip').tap();
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: 2, round: 999 }, 'play holds on the last player of the last round');
+  await page.locator('#round-back').evaluate(back => back.click());
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: 3, round: 999 }, 'a step back takes exactly one step');
+  await page.locator('#round-button').tap();
+  assert.deepEqual((await saved(page)).turn, { first: 0, active: 2, round: 999 }, 'and within the round, play still passes');
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the last round holds rather than pass the first player`, t => checkLastRound(t, engine));
+}
+
 test('chromium: Track in settings holds Turns and fits the smallest phone', async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
   await button(page, 'Settings').tap();
