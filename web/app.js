@@ -1,3 +1,6 @@
+import {
+  chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
+} from './js/actions/edits.js';
 import { autoEmptyPools, clearPool, endUndoClears, spendMana, undoClear } from './js/actions/mana.js';
 import { clearReminders, dismissReminder, remind, turnStarted } from './js/actions/reminders.js';
 import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
@@ -12,18 +15,13 @@ import {
   trackers,
 } from './js/logic/data.js';
 import {
-  applyEdit, editPlayers, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow,
-  trackedDesignations,
+  applyEdit, isOut, leavingTransfers, nextTurn, outPlayers, playOrder, previousTurn, randomBelow, trackedDesignations,
 } from './js/logic/rules.js';
-import {
-  fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, normalizeIdentity,
-} from './js/logic/save.js';
-import { announce, announceDesignation, announceLife, announcePool, clearAnnouncements } from './js/render/announce.js';
+import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from './js/logic/save.js';
+import { announce, announceDesignation, announceLife, clearAnnouncements } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from './js/render/appearance.js';
 import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badges.js';
-import {
-  renderModeLayer, setModeActions, syncAllSwatches, syncCounterCells, syncIdentity, syncManaCells, syncSeatMap,
-} from './js/render/modes.js';
+import { renderModeLayer, setModeActions } from './js/render/modes.js';
 import { syncPill } from './js/render/pill.js';
 import { paintColours, renderScore } from './js/render/tile.js';
 import {
@@ -81,103 +79,6 @@ let stopRoll;
 // "Who goes first?" waits until settings has closed, then opens.
 let askFirst = false;
 let shuffleTimer;
-
-// Colours mode saves each choice at once.
-function chooseColour(index, colour) {
-  if (game.colors.includes(colour)) return;
-  game.colors[index] = colour;
-  paintColours();
-  syncAllSwatches();
-  haptic();
-  saveGame();
-}
-
-// Identity mode saves each change at once, like Colours.
-function toggleIdentity(index, id) {
-  const identity = game.identities[index];
-  game.identities[index] = identity.includes(id) ? identity.replace(id, '') : normalizeIdentity(identity + id);
-  syncIdentity();
-  renderBadges(index);
-  haptic();
-  saveGame();
-}
-
-// Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
-/**
- * @param {Edit} edit
- */
-function showEdit(edit) {
-  const { index } = edit;
-  // Whoever holds the monarch and the initiative now, after a tap, commander damage or a player going out.
-  for (const { kind } of edit.transfers ?? []) announceDesignation(kind);
-  if (edit.kind === 'casts') {
-    announce(index, 'casts', () => `Player ${index + 1}, commander tax ${game.casts[index] * 2}`);
-  } else if (countKinds.includes(edit.kind)) {
-    announce(index, edit.kind, () => `Player ${index + 1}, ${game[edit.kind][index]} ${edit.kind}`);
-  } else if (edit.kind === 'damage') {
-    const attacker = /** @type {number} */ (edit.attacker);
-    announce(index, `damage ${attacker}`, () =>
-      `Player ${attacker + 1}'s commander, ${game.commanderDamage[index][attacker]} damage to Player ${index + 1}`);
-    announceLife(index);
-    syncSeatMap(index);
-  } else if (edit.kind === 'mana') {
-    announcePool(index);
-  }
-  for (const player of editPlayers(edit)) {
-    syncCounterCells(player);
-    syncManaCells(player);
-    renderScore(player);
-    renderBadges(player);
-  }
-  syncPill();
-  haptic();
-  saveGame();
-}
-
-// An edit made in a mode. Anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4), in the same edit.
-/**
- * @param {Edit} edit
- */
-function commitEdit(edit) {
-  const out = outPlayers(game);
-  applyEdit(game, edit, 1);
-  const handoffs = leavingTransfers(game, out);
-  if (handoffs.length) {
-    edit.transfers = [...(edit.transfers ?? []), ...handoffs];
-    for (const transfer of handoffs) game[transfer.kind] = transfer.to;
-  }
-  /** @type {Edit[]} */ (edits).push(edit);
-  showEdit(edit);
-}
-
-function undoEdit() {
-  const edit = edits?.pop();
-  if (!edit) return;
-  applyEdit(game, edit, -1);
-  showEdit(edit);
-}
-
-// Commander damage is combat damage: adding it to the monarch makes the attacker the monarch (CR 726.3), and adding it
-// to the player with the initiative gives the attacker the initiative (CR 727.3). Taking damage away moves nothing.
-function stepDamage(defender, attacker, delta) {
-  const next = game.commanderDamage[defender][attacker] + delta;
-  if (next < 0 || next > maxCount) return;
-  const transfers = delta > 0 ? trackedDesignations(game).filter(({ kind }) => game[kind] === defender)
-    .map(({ kind }) => ({ kind, from: defender, to: attacker })) : [];
-  commitEdit({ kind: 'damage', index: defender, attacker, delta, transfers });
-}
-
-// Counters mode's designation cells: a tap gives it to that player, taking it from whoever had it, and a tap on the
-// holder's own cell clears it.
-function toggleDesignation(kind, index) {
-  const from = game[kind];
-  commitEdit({ kind: 'designation', index, transfers: [{ kind, from, to: from === index ? null : index }] });
-}
-
-function stepCount(kind, index, delta) {
-  const next = game[kind][index] + delta;
-  if (next >= 0 && next <= maxCount) commitEdit({ kind, index, delta });
-}
 
 // Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, announces
 // it, and reminds a new initiative holder to venture.
@@ -326,12 +227,6 @@ function shuffleFirst() {
     shuffleTimer = setTimeout(tick, shuffleTick);
   };
   tick();
-}
-
-// Mana mode's edit: one colour in one player's pool, one up or down.
-function stepMana(index, colour, delta) {
-  const next = game.pools[index][colour] + delta;
-  if (next >= 0 && next <= maxCount) commitEdit({ kind: 'mana', index, colour, delta });
 }
 
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
