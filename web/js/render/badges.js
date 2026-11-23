@@ -379,7 +379,6 @@ export function renderBadges(index) {
   const farRow = farItems(index);
   syncChildren(far, farRow);
   far.hidden = farRow.length === 0;
-  far.setAttribute('aria-label', farRow.some(({ key }) => key.startsWith('strip-')) ? 'Commander damage and mana pool' : 'Commander damage');
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
   // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
   const strip = player.querySelector('.mana-strip');

@@ -69,7 +69,7 @@ for (const [name, engine] of Object.entries(engines)) {
       assert.equal(await tile(page, 2).locator('.turn-chip').getAttribute('aria-label'), "Turn 3. Player 2's turn, pass it");
       assert.equal(await tile(page, 4).locator('.pass-chip').getAttribute('aria-label'),
         'Pass it on: Player 4 is out and still has the initiative. Give the initiative to someone in counters');
-      assert.match(await tile(page, 1).locator('.badges.far .strip-chip').getAttribute('aria-label'), /^5 mana\. Player 1's pool: 1 blue, 3 red, 1 colourless\. Open mana$/);
+      assert.match(await tile(page, 1).locator('.badges.near .strip-chip').getAttribute('aria-label'), /^5 mana\. Player 1's pool: 1 blue, 3 red, 1 colourless\. Open mana$/);
       for (const [entry, layer] of [['Counters', 'counters'], ['Commander damage', 'damage'], ['Mana pool', 'mana']]) {
         await button(page, entry).click();
         assert.equal(await mode(page), layer);
