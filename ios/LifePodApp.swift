@@ -4,6 +4,12 @@ import WebKit
 private let trackerBackgroundColor = UIColor(red: 20.0 / 255, green: 25.0 / 255, blue: 22.0 / 255, alpha: 1)
 private let gameKey = "currentGame"
 
+// The page loads from lifepod://app/, served from the bundle's web folder by WebFolderSchemeHandler, so it has a real
+// origin: 'self' in its CSP matches, and module scripts load, which they don't from file://.
+private let appScheme = "lifepod"
+private let appHost = "app"
+private let startPage = URL(string: "\(appScheme)://\(appHost)/index.html")!
+
 @main
 struct LifePodApp: App {
     @Environment(\.scenePhase) private var scenePhase
@@ -29,6 +35,7 @@ private struct TrackerView: UIViewRepresentable {
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        config.setURLSchemeHandler(WebFolderSchemeHandler(), forURLScheme: appScheme)
         let controller = config.userContentController
         controller.add(context.coordinator, name: "game")
         controller.add(context.coordinator, name: "keepAwake")
@@ -63,7 +70,6 @@ private struct TrackerView: UIViewRepresentable {
 
     @MainActor
     final class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
-        let startPage = Bundle.main.url(forResource: "index", withExtension: "html", subdirectory: "web")
         private var isActive = false
         private var keepAwake = true
         private let haptics = UISelectionFeedbackGenerator()
@@ -99,7 +105,7 @@ private struct TrackerView: UIViewRepresentable {
             _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
             decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
         ) {
-            let localPage = action.request.url?.standardizedFileURL == startPage?.standardizedFileURL
+            let localPage = action.request.url == startPage
             decisionHandler(localPage && action.targetFrame?.isMainFrame == true ? .allow : .cancel)
         }
 
@@ -123,7 +129,6 @@ private struct TrackerView: UIViewRepresentable {
         }
 
         func loadTracker(in webView: WKWebView) {
-            guard let file = startPage else { return }
             self.webView = webView
             let controller = webView.configuration.userContentController
             controller.removeAllUserScripts()
@@ -144,7 +149,73 @@ private struct TrackerView: UIViewRepresentable {
                         forMainFrameOnly: true
                     ))
             }
-            webView.loadFileURL(file, allowingReadAccessTo: file.deletingLastPathComponent())
+            webView.load(URLRequest(url: startPage))
         }
+    }
+}
+
+// Serves the bundle's web folder at lifepod://app/. Any file there loads if its extension is in mimeTypes; any other
+// host, path or type gets a 404. It reads only from the bundle, so the page still can't reach the network.
+@MainActor
+private final class WebFolderSchemeHandler: NSObject, WKURLSchemeHandler {
+    // The types of file the app serves from web/, by extension; keep it in step with MIME_TYPES in MainActivity.kt.
+    // Scripts are text/javascript: WebKit runs a module script only with a JavaScript type.
+    static let mimeTypes = [
+        "html": "text/html",
+        "css": "text/css",
+        "js": "text/javascript",
+        "mjs": "text/javascript",
+        "json": "application/json",
+        "png": "image/png",
+        "svg": "image/svg+xml",
+        "woff2": "font/woff2",
+        "txt": "text/plain",
+    ]
+
+    private let root = Bundle.main.resourceURL?.appending(path: "web", directoryHint: .isDirectory)
+
+    func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
+        guard let url = task.request.url else {
+            task.didFailWithError(URLError(.badURL))
+            return
+        }
+        guard let file = file(for: url), let type = Self.mimeTypes[file.pathExtension],
+            let data = try? Data(contentsOf: file)
+        else {
+            respond(to: task, url: url, status: 404, type: "text/plain", data: Data())
+            return
+        }
+        let charset =
+            type.hasPrefix("text/") || type.hasSuffix("json") || type.hasSuffix("xml") ? "; charset=utf-8" : ""
+        respond(to: task, url: url, status: 200, type: type + charset, data: data)
+    }
+
+    // Every response is sent in full from start, so there's nothing to cancel.
+    func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {}
+
+    // The file in web/ for a URL on the app host, or nil for any other URL. The path is percent-decoded first, so an
+    // encoded "..%2F" is caught too. Empty segments (as in a leading "//") and segments that start with a dot (".",
+    // "..", hidden files) are refused, so a request can't climb out of web/.
+    private func file(for url: URL) -> URL? {
+        guard let root, url.scheme == appScheme, url.host(percentEncoded: false) == appHost else { return nil }
+        let path = url.path(percentEncoded: false)
+        guard path.hasPrefix("/") else { return nil }
+        let segments = path.dropFirst().split(separator: "/", omittingEmptySubsequences: false)
+        guard segments.allSatisfy({ !$0.isEmpty && !$0.hasPrefix(".") && !$0.contains("\\") }) else { return nil }
+        let file = segments.reduce(root) { $0.appending(component: $1) }
+        // A last check on the resolved path, in case a symbolic link in the bundle points out of web/.
+        let inside = file.resolvingSymlinksInPath().pathComponents.starts(
+            with: root.resolvingSymlinksInPath().pathComponents)
+        return inside ? file : nil
+    }
+
+    private func respond(to task: any WKURLSchemeTask, url: URL, status: Int, type: String, data: Data) {
+        let headers = ["Content-Type": type, "Content-Length": String(data.count)]
+        guard
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)
+        else { return }
+        task.didReceive(response)
+        task.didReceive(data)
+        task.didFinish()
     }
 }

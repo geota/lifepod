@@ -250,17 +250,18 @@ class MainActivity : Activity() {
             request: WebResourceRequest,
         ): Boolean = true
 
+        // Serves web/, which build.sh packs as the APK's assets, at https://ASSET_HOST/. Any file there loads if its
+        // extension is in MIME_TYPES. Any other host, path or type gets a 404, so the page can't reach the network.
         override fun shouldInterceptRequest(
             view: WebView,
             request: WebResourceRequest,
         ): WebResourceResponse {
-            val url = request.url
-            val path = url.path.orEmpty()
-            val mimeType = MIME_TYPES[path]
-            if (url.scheme == "https" && url.authority == ASSET_HOST && mimeType != null) {
+            val path = assetPath(request.url)
+            val mimeType = path?.let { MIME_TYPES[it.substringAfterLast('.', "")] }
+            if (path != null && mimeType != null) {
                 try {
-                    val encoding = if (mimeType.startsWith("image/") || mimeType.startsWith("font/")) null else "UTF-8"
-                    return WebResourceResponse(mimeType, encoding, assets.open(path.removePrefix("/")))
+                    val encoding = if (mimeType == "image/png" || mimeType.startsWith("font/")) null else "UTF-8"
+                    return WebResourceResponse(mimeType, encoding, assets.open(path))
                 } catch (_: IOException) {
                     // Treat a missing asset like an unavailable URL.
                 }
@@ -276,6 +277,17 @@ class MainActivity : Activity() {
         }
     }
 
+    // The asset path for a URL on the app's asset host, or null for any other URL. Uri.path is percent-decoded, so an
+    // encoded "..%2F" is caught too. Empty segments (as in a leading "//") and segments that start with a dot (".",
+    // "..", hidden files) are refused, so a request can't climb out of the asset root.
+    private fun assetPath(url: Uri): String? {
+        if (url.scheme != "https" || url.authority != ASSET_HOST) return null
+        val path = url.path?.takeIf { it.startsWith("/") } ?: return null
+        val segments = path.substring(1).split('/')
+        if (segments.any { it.isEmpty() || it.startsWith('.') || '\\' in it }) return null
+        return segments.joinToString("/")
+    }
+
     private companion object {
         val BACKGROUND = Color.rgb(20, 25, 22)
         const val ASSET_HOST = "appassets.androidplatform.net"
@@ -287,15 +299,21 @@ class MainActivity : Activity() {
         // in step with the Chrome entry of browserslist in package.json.
         const val MIN_WEBVIEW_MAJOR = 129
         const val WEBVIEW_PACKAGE = "com.google.android.webview"
+
+        // The types of file the app serves from web/, by extension; keep it in step with mimeTypes in
+        // ios/LifePodApp.swift. Scripts are text/javascript: the WebView runs a module script only with a JavaScript
+        // type.
         val MIME_TYPES =
             mapOf(
-                "/index.html" to "text/html",
-                "/styles.css" to "text/css",
-                "/app.js" to "application/javascript",
-                "/dice.js" to "application/javascript",
-                "/fonts/mana.woff2" to "font/woff2",
-                "/icon.png" to "image/png",
-                "/favicon-32.png" to "image/png",
+                "html" to "text/html",
+                "css" to "text/css",
+                "js" to "text/javascript",
+                "mjs" to "text/javascript",
+                "json" to "application/json",
+                "png" to "image/png",
+                "svg" to "image/svg+xml",
+                "woff2" to "font/woff2",
+                "txt" to "text/plain",
             )
     }
 }

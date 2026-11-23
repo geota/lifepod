@@ -14,11 +14,9 @@ Run `npm run check` before every commit. It runs ESLint, the compatibility lint,
 
 ## Adding a file to `web/`
 
-The page loading a new file isn't enough. List it in all three places, or it will 404 inside the Android app only:
+A new file just needs an allowed extension: html, css, js or mjs, json, png, svg, woff2 or txt. Both apps serve any file under `web/` by its extension, and CI zips the whole folder. The Android app serves `web/` from its assets at `https://appassets.androidplatform.net/` (the interceptor in `MainActivity.kt`), and the iOS app serves it from the bundle at `lifepod://app/` (`WebFolderSchemeHandler` in `LifePodApp.swift`). Both give the page a real origin, so `'self'` in the CSP matches and module scripts load. Any other type, a path with `..` or a hidden file gets a 404.
 
-1. `MIME_TYPES` in `android/src/dev/maceiras/lifepod/MainActivity.kt`, the Android asset allowlist;
-2. the `zip` line of the "Bundle offline web app" step in `.github/workflows/ci.yml`;
-3. the expected file list in `tests/native.test.mjs`, whose contract test checks the other two.
+For a new type, add it to `MIME_TYPES` in `MainActivity.kt` and `mimeTypes` in `LifePodApp.swift`. `tests/native.test.mjs` checks that the two tables match and that every file the page loads has a listed extension. Scripts must stay `text/javascript`, because both WebViews refuse a module script without a JavaScript type.
 
 ## Types
 
