@@ -138,9 +138,9 @@ async function checkDamageTransfer(t, engine) {
   assert.deepEqual(await holders(page), { monarch: 2, initiative: 2 }, 'combat damage to the holder passes both to the attacker');
   assert.equal((await saved(page)).scores[1], 39);
   await page.clock.runFor(announceDelay - 1);
-  assert.equal((await announced(page)).includes('Player 3 is the monarch'), false, 'not announced before it settles');
+  assert.doesNotMatch(await announced(page), /Player 3, \w+, is the monarch/, 'not announced before it settles');
   await page.clock.runFor(1);
-  assert.ok((await announced(page)).includes('Player 3 is the monarch. Player 3 has the initiative'), 'the change is announced');
+  assert.match(await announced(page), /Player 3, (\w+), is the monarch\. Player 3, \1, has the initiative/, 'the change is announced, with the seat\'s colour');
   // Undo takes back the damage and the transfer together.
   await button(page, 'Undo').tap();
   assert.deepEqual(await holders(page), { monarch: 1, initiative: 1 }, 'Undo gives them back');
@@ -187,7 +187,7 @@ async function checkHandoff(t, engine) {
   assert.deepEqual(await holders(page), { monarch: 1, initiative: 1 }, 'the active player takes both');
   assert.deepEqual(await chips(page), [[], ['monarch', 'initiative'], [], [], [], []]);
   await page.clock.runFor(announceDelay);
-  assert.ok((await announced(page)).includes('Player 2 is the monarch. Player 2 has the initiative'), 'announced');
+  assert.match(await announced(page), /Player 2, (\w+), is the monarch\. Player 2, \1, has the initiative/, 'announced');
   // Coming back from 0 doesn't take it back.
   await gain(page, 4);
   assert.deepEqual(await holders(page), { monarch: 1, initiative: 1 });
@@ -596,4 +596,34 @@ async function checkLoad(t, engine) {
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: saved monarch, initiative and reminders are checked when a game loads`, t => checkLoad(t, engine));
+}
+
+// B2 (docs/review/FINAL.md): a Track switch in settings can put the monarch's holder out of the game, which hands it on.
+// While settings is open, #announcer is outside the modal page and out of the accessibility tree, so the handoff is said
+// in the page's own live region instead; once settings closes, the board's announcer speaks again.
+async function checkAnnounceInSettings(t, engine) {
+  const page = await openPage(t, engine, {
+    clock: true,
+    game: savedGame(4, {
+      turns: 'turns', turn: { first: 0, active: 0, round: 2 },
+      counters: { commander: false, poison: false, energy: false, experience: false, rad: false, monarch: true, initiative: false },
+      monarch: 1, poison: [0, 10, 0, 0],
+    }),
+  });
+  await button(page, 'Settings').tap();
+  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Poison', exact: true }) }).tap();
+  assert.notEqual((await saved(page)).monarch, 1, 'Player 2 is out on poison and hands the monarch on');
+  await page.clock.runFor(announceDelay);
+  const region = page.locator('#settings [data-announcer]');
+  assert.match(await region.textContent(), /^Player \d, \w+, is the monarch$/, 'settings says who has it');
+  assert.equal(await region.getAttribute('aria-live'), 'polite');
+  assert.equal(await announced(page), '', 'not the board\'s announcer, which nobody can hear while settings is open');
+  await button(page, 'Close settings').tap();
+  await gain(page, 1);
+  await page.clock.runFor(announceDelay);
+  assert.match(await announced(page), /^Player 1, \w+, 41 life$/, 'with settings closed, the board\'s announcer speaks');
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a handoff while settings is open is announced in settings`, t => checkAnnounceInSettings(t, engine));
 }

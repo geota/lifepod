@@ -87,6 +87,7 @@
       <div class="dice-picker" id="dice-picker" role="group" aria-label="Sides"></div>
       <button class="primary dice-roll" type="button" id="dice-roll" autofocus></button>
       <p class="visually-hidden" id="dice-result" aria-live="polite"></p>
+      <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </div>
   </dialog>
 
@@ -143,6 +144,10 @@
               <!-- What screen readers hear about the pending game and the life field, once a burst of slider steps settles
                    (settings.js). The line above shows the same words. -->
               <p class="visually-hidden" id="settings-status" aria-live="polite"></p>
+              <!-- What screen readers hear about the board while settings is open, in place of #announcer, which is
+                   outside the page and out of the accessibility tree until it closes (render/announce.js). Each
+                   dialog has one. -->
+              <p class="visually-hidden" data-announcer aria-live="polite"></p>
               <div class="fs-gamefoot">
                 <label class="switch-row compact-switch fs-awake">
                   <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M116,36V32a12,12,0,0,1,24,0v4a12,12,0,0,1-24,0Zm80,92a68,68,0,1,1-68-68A68.07,68.07,0,0,1,196,128Zm-24,0a44,44,0,1,0-44,44A44.05,44.05,0,0,0,172,128ZM51.51,68.49a12,12,0,1,0,17-17l-4-4a12,12,0,0,0-17,17Zm0,119-4,4a12,12,0,0,0,17,17l4-4a12,12,0,1,0-17-17ZM196,72a12,12,0,0,0,8.49-3.51l4-4a12,12,0,0,0-17-17l-4,4A12,12,0,0,0,196,72Zm8.49,115.51a12,12,0,0,0-17,17l4,4a12,12,0,0,0,17-17ZM48,128a12,12,0,0,0-12-12H32a12,12,0,0,0,0,24h4A12,12,0,0,0,48,128Zm80,80a12,12,0,0,0-12,12v4a12,12,0,0,0,24,0v-4A12,12,0,0,0,128,208Zm96-92h-4a12,12,0,0,0,0,24h4a12,12,0,0,0,0-24Z"/></svg><span class="nav-label">Keep awake</span>
@@ -334,6 +339,7 @@
         <button class="secondary danger" type="submit" value="discard">Discard</button>
         <button class="primary" type="submit" value="keep" autofocus>Keep editing</button>
       </div>
+      <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </form>
   </dialog>
 
@@ -350,6 +356,7 @@
         <button class="secondary danger" type="submit" value="restart">Start new game</button>
         <button class="primary" type="submit" value="cancel" autofocus>Cancel</button>
       </div>
+      <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </form>
   </dialog>
 </body>
