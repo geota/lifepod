@@ -26,7 +26,7 @@ export default [
     plugins: { compat },
     languageOptions: {
       ecmaVersion: 2024,
-      sourceType: 'script',
+      sourceType: 'module',
       globals: globals.browser,
     },
     rules: {
@@ -41,5 +41,9 @@ export default [
         message: `${feature}: needs ${version}; ${floor}.`,
       }))],
     },
+  },
+  {
+    files: ['web/dice.js'],
+    languageOptions: { sourceType: 'script' },
   },
 ];

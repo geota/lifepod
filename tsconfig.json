@@ -1,5 +1,6 @@
-// `npm run typecheck`: TypeScript checks web/'s JavaScript through its JSDoc comments. Nothing is emitted, so the
-// shipped files stay exactly what's written. types/globals.d.ts declares the native bridges and the dice API.
+// `npm run typecheck`: TypeScript checks web/'s JavaScript (app.js, the modules in web/js/ and dice.js) through its JSDoc
+// comments. Nothing is emitted, so the shipped files stay exactly what's written. types/globals.d.ts declares the native
+// bridges and the dice API.
 {
   "compilerOptions": {
     "allowJs": true,
@@ -16,5 +17,5 @@
     "strictNullChecks": true,
     "skipLibCheck": true
   },
-  "include": ["web/*.js", "types/*.d.ts"]
+  "include": ["web/**/*.js", "types/*.d.ts"]
 }

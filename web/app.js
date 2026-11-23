@@ -1,5 +1,3 @@
-'use strict';
-
 const storageKey = 'lifepod-game';
 const android = window.LifePodAndroid;
 const ios = window.webkit?.messageHandlers;
@@ -3452,6 +3450,9 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
   syncBoardTurn();
   compactGroups.forEach(fitCompactSwitches);
 }));
+// A module's names aren't page globals, so the design scripts (design/polish/final-review.mjs) reach the few internals they
+// drive through ?debug in the URL. The apps never load the page with it.
+if (new URLSearchParams(location.search).has('debug')) window.lifePodDebug = { game, remind };
 applyTileColours();
 applyBadgeSize();
 applyStyle();

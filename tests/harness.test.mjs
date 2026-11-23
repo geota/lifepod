@@ -6,7 +6,7 @@ import { appFile, button, openPage, scores, test } from './helpers.mjs';
 import { startServer } from './server.mjs';
 
 // The test harness itself: every test file registers its tests through it, the test server serves web/ and nothing
-// else, and the app still runs from file://.
+// else, and the app runs as modules over http.
 
 const testFiles = readdirSync(new URL('.', import.meta.url)).filter(name => name.endsWith('.test.mjs'));
 const source = name => readFileSync(new URL(name, import.meta.url), 'utf8');
@@ -72,19 +72,27 @@ test('node: the test server serves web/ and the test fonts, read-only, on 127.0.
   assert.equal((await get(server.origin, '/index.html', 'HEAD')).status, 200);
 });
 
-// The tests load the app over http, and the apps serve it from their own schemes, but the app is still a classic
-// script that runs from a file too: a tap still counts and the page reports no errors or policy violations.
-async function checkFromFile(t, engine) {
-  const page = await openPage(t, engine, { url: appFile, font: 'system' });
-  assert.equal(new URL(page.url()).protocol, 'file:');
+// The app is ES modules (web/app.js and web/js/), which the tests load over http as the apps serve them from their own
+// schemes: a tap still counts and saves, with no errors or policy violations. Browsers run no module script from
+// file://, so a page opened from a file draws no board at all rather than half of one; the README's browser preview
+// serves web/ over http instead.
+async function checkModules(t, engine) {
+  const page = await openPage(t, engine, { font: 'system' });
+  assert.equal(new URL(page.url()).protocol, 'http:');
+  assert.deepEqual(await page.locator('script').evaluateAll(scripts => scripts.map(script => [script.getAttribute('src'), script.type])),
+    [['dice.js', ''], ['app.js', 'module']], 'dice.js is a classic script and app.js the module entry');
   assert.deepEqual(await scores(page), [40, 40, 40, 40]);
   await button(page, 'Add one life to Player 1').tap();
   assert.deepEqual(await scores(page), [41, 40, 40, 40]);
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('lifepod-game')).scores[0]), 41, 'and saves');
+
+  const file = await openPage(t, engine, { url: appFile, font: 'system' });
+  assert.equal(new URL(file.url()).protocol, 'file:');
+  assert.equal(await file.locator('#board .player').count(), 0, 'from file://, the modules never run');
 }
 
-test('chromium: the app runs from file://', t => checkFromFile(t, chromium));
-test('webkit: the app runs from file://', t => checkFromFile(t, webkit));
+test('chromium: the app runs as modules over http, and not from file://', t => checkModules(t, chromium));
+test('webkit: the app runs as modules over http, and not from file://', t => checkModules(t, webkit));
 
 // Chromium pages get the pinned test font, so text measures the same on every machine.
 test('chromium: pages measure their text in the pinned Roboto', async (t) => {
