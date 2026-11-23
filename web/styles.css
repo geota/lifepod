@@ -682,7 +682,15 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .board {
   --u: calc(var(--ui, 400px) / 100);
   --badge-size: clamp(.78125rem, calc(3.6 * var(--u)), max(1rem, 16 * var(--grow)));
+  /* Settings → Table → Badge size scales the badge rows and the mana strip: their chips, counts, icons and the colour
+     indicator (data-badge-size on #board). A row grows no taller than fits between its edge and the total on every
+     tile (app.js measures --far-room and --near-room), and never below the default. */
+  --badge-scale: 1;
+  --far-row-size: max(var(--badge-size), min(calc(var(--badge-size) * var(--badge-scale)), var(--far-room, 100vmax)));
+  --near-row-size: max(var(--badge-size), min(calc(var(--badge-size) * var(--badge-scale)), var(--near-room, 100vmax)));
 }
+.board[data-badge-size="large"] { --badge-scale: 1.2; }
+.board[data-badge-size="larger"] { --badge-scale: 1.4; }
 
 .player-face {
   --control-size: clamp(44px, calc(18 * var(--u)), 74 * var(--grow));
@@ -1157,9 +1165,10 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   display: flex;
   flex-direction: column;
   align-items: center;
+  font-size: var(--far-badge-size, var(--far-row-size));
   pointer-events: none;
 }
-.badges.far { position: relative; align-self: stretch; font-size: var(--far-badge-size, var(--badge-size)); }
+.badges.far { position: relative; align-self: stretch; font-size: var(--far-badge-size, var(--far-row-size)); }
 /* The near edge holds the near row, 3px in from the tile's sides. It keeps clear of the pill where the pill reaches
    past it (a rotated seat). */
 .near-edge {
@@ -1173,7 +1182,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   align-items: center;
   pointer-events: none;
 }
-.badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--badge-size)); }
+.badges.near { position: relative; align-self: stretch; font-size: var(--near-badge-size, var(--near-row-size)); }
 .board[data-drop~="name"] .badges.near .ci-chip :is(.ci, .id-symbol) ~ .id-name, .board[data-drop~="name"] .turn-word,
 .board[data-drop~="symbol"] .badges.near .ci-chip .ci ~ .id-symbol, .board[data-drop~="sword"] .badges.far .sword { display: none; }
 .board[data-drop~="wrap"] .badges.near, .board[data-drop~="wrap-far"] .badges.far { flex-wrap: wrap; row-gap: 2px; }
@@ -1305,25 +1314,28 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   width: fit-content;
   max-width: 100%;
   padding: 0 2px;
-  font-size: var(--strip-size, clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))));
+  font-size: var(--strip-size, calc(clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))) * var(--badge-scale)));
   pointer-events: auto;
 }
 /* Below: the strip's targets sit 2px under the far row, or with no far row its capsule sits where the far row would. */
 .player[data-strip="below"] .mana-strip { margin-top: -6px; }
 .player[data-strip="below"] .far-edge:has(> .badges.far:not([hidden])) > .mana-strip { margin-top: 2px; }
-.mana-strip::before { position: absolute; inset: 6px 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
+/* The capsule is 32px tall, and grows to the targets' 44px with a larger Badge size, so the symbols stay inside it. */
+.mana-strip::before { position: absolute; inset: clamp(0px, calc(22px - .8em), 6px) 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
 .mana-strip[hidden] { display: none; }
 .board[data-drop~="strip-wrap"] .player[data-strip="below"] .mana-strip { flex-wrap: wrap; }
 /* Inline: the far row, then the strip, on one line whose targets reach 2px from the tile's edge (or from the pill's
    clearance, where the pill reaches it). */
-.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--clear-far, 0px) - 6px); }
+/* The line is the targets' 44px, and the far row, centred on it, keeps the pill's clearance at any Badge size (1.7em is
+   the row's height: the far edge takes the row's type). */
+.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--clear-far, 0px) - clamp(0px, (var(--tap-min) - 1.7em) / 2, 6px)); }
 .player[data-strip="inline"] .badges.far { flex: 1 1 0; min-width: 0; align-self: center; }
 .player[data-strip="inline"] .mana-strip { order: 1; }
 /* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line under the far row.
    Where even that can't fit, the strip hides and the same chip ends the far row (fold-inline). */
 .player[data-strip="fold-inline"] .mana-strip, .badges.far > .strip-chip { display: none; }
 .player[data-strip="fold-inline"] .badges.far > .strip-chip { display: inline-flex; }
-.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--badge-size)); }
+.strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--far-row-size)); }
 .player[data-strip="fold"] .mana-strip { padding: 0; }
 .player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
 .player[data-strip="fold"] .mana-strip > .strip-chip { display: inline-flex; }
@@ -1756,7 +1768,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
    a 16px track with an accent fill, notches as dots and a 4px bar handle. The whole slider takes a tap or a sideways
    drag; a vertical swipe scrolls the page. */
 .k-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'label value' 'slider slider'; }
-#players-row, #tiles-row { grid-template-areas: 'label label' 'slider slider'; }
+#players-row, #tiles-row, #badge-size-row { grid-template-areas: 'label label' 'slider slider'; }
 .k-row > .setting-label { grid-area: label; }
 .k-row > .k-slider { grid-area: slider; }
 .k-row > .k-val { grid-area: value; justify-self: end; }
@@ -1778,7 +1790,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   font-variant-numeric: tabular-nums;
 }
 .k-stop[aria-pressed="true"] { color: var(--accent); font-weight: 800; }
-/* A slider whose stops are words (Tile colours): each stop is as wide as its word, and the ends keep room for half of one. */
+/* A slider whose stops are words (Tile colours, Badge size): each stop is as wide as its word, and the ends keep room for half of one. */
 .k-words .k-slider { margin: 0 36px; }
 .k-words .k-stop { width: auto; min-width: var(--tap-min); padding: 0 6px; white-space: nowrap; }
 .k-stop:active { background: var(--state-pressed); }

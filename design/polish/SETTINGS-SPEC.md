@@ -249,3 +249,14 @@ At the owner's request, Settings → **Table** gains **Style: Material · Glass*
 - **Focus under the floating header:** the body's `scroll-padding-top` and the content's top padding both include the header's height (`--head-clear`), so the header can't cover the focused control (WCAG 2.4.11), and the life field still scrolls clear of the header and the keyboard.
 
 Tests: `tests/style.test.mjs` (the default on the web, Android and iOS, the pick persisting and winning, Glass on the key surfaces, each fallback and reduced motion); `tests/native.test.mjs` (the Reduce Transparency bridge, in the contract and in WebKit); `tests/settings.test.mjs` (the header never covers focus and the life field, in both styles); `tests/sizes.test.mjs` and `tests/sizes-glass.test.mjs` (every screen, one style each). `node design/polish/final-review.mjs --sweep` sweeps both styles.
+
+## 10. Badge size (added 22 November 2026)
+
+At the owner's request, Settings → **Table** gains **Badge size: Default · Large · Larger**, a three-stop notched slider in the Tile colours slider's style, after Tile colours.
+
+- **What it scales:** the near and far badge rows and the mana strip, their chips, counts, icons and the colour indicator, by 1.2 (Large) and 1.4 (Larger). Default is the size from before the setting. Mode cells (map seats, counter and mana cells, swatches, identity toggles) and totals stay as they are.
+- **Room:** a row grows no taller than one row fits between its edge (or the pill's clearance) and the life total, its glyphs and the "Out" tag, on every tile (`measureBadgeRoom()` in app.js sets `--far-room` and `--near-room`), and never below the default. So on a small board a row may stay at the default size: at 568 × 320 with 6 players the far row has no room to grow.
+- **Overflow:** the same order at every size (SPEC.md §3.2): names, then the symbol, then a second line, then smaller type down to 9px, or the type first where two lines would cover a total. A change of size fits the rows again from full size, as a new game does.
+- **The strip:** its type scales, and its capsule grows from 32px toward its targets' 44px so the larger symbols stay inside it. Its targets stay 44px.
+- **Saving:** it saves at once, like the switches, and isn't part of a pending new game. `badgeSize` is validated in `loadGame()`: anything but `default`, `large` or `larger`, or a save from before the setting, gets Default. app.js sets `data-badge-size` on `#board` for Large and Larger, and styles.css sets `--badge-scale` from it.
+- Tests: `tests/badge-size.test.mjs` (the slider, saving and loading, what scales and what doesn't, every size fitting 2–6 players on the target and the stress size in both engines) and `tests/autodrop.test.mjs` (the overflow order at each size). `node design/polish/final-review.mjs --sweep` sweeps the board at rest, rotating and with reminders at Large and Larger.

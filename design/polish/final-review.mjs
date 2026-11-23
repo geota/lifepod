@@ -9,8 +9,10 @@
 //   node design/polish/final-review.mjs --sweep    sweep only
 // Screenshots go to design/polish/renders/final/ at 2× (or the largest scale under 1800px wide). The sweep writes
 // renders/final/findings.json (every problem, with its style, size, seed and mode) and prints a summary. The sweep runs in
-// both styles (the Style setting: Material and Glass, design/polish/STYLE.md); the screenshots are Material, plus a set in
-// Glass named glass-….
+// both styles (the Style setting: Material and Glass, design/polish/STYLE.md) and at every Badge size (Settings → Table:
+// the board at rest, rotating seats and with turn reminders, where the badge rows show, at Large and Larger); the
+// screenshots are Material, plus a set in Glass named glass-… and the target's 3- and 5-player boards with mana
+// floating at each Badge size, named …-badge-<size>.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright-core';
@@ -104,6 +106,14 @@ const seeds = {
     turns: 'turns', turn: { first: null, active: null, round: 1 }, manaPool: true,
   }),
 };
+
+// Mana floating in every pool, one to four colours, on the busiest board: the strip at the far edge beside commander
+// damage on every tile.
+seeds.floating = count => ({
+  ...seeds.everything(count),
+  pools: Array.from({ length: count }, (_, i) => [[0, 2, 0, 0, 0, 0], [1, 0, 0, 3, 0, 0], [0, 0, 2, 1, 4, 0], [2, 1, 0, 3, 0, 1]][i % 4]),
+});
+const badgeSizes = ['default', 'large', 'larger'];
 
 // The eight "Show on tiles" combinations.
 const showCombos = [[], ['indicator'], ['symbol'], ['name'], ['indicator', 'symbol'], ['indicator', 'name'], ['symbol', 'name'], ['indicator', 'symbol', 'name']];
@@ -469,8 +479,8 @@ async function openSize(key, { scale = 1, reducedMotion = 'reduce', engine = bro
   return page;
 }
 
-async function load(page, game, style = 'material') {
-  await page.evaluate(g => { localStorage.setItem('lifepod-game', g); }, JSON.stringify({ ...game, style }));
+async function load(page, game, style = 'material', badgeSize = 'default') {
+  await page.evaluate(g => { localStorage.setItem('lifepod-game', g); }, JSON.stringify({ ...game, style, badgeSize }));
   await page.reload();
   await page.waitForSelector('#board .player');
   await page.evaluate(() => document.fonts.ready);
@@ -552,6 +562,7 @@ async function shots() {
     { size: 'stress', count: 6, seed: 'everything', mode: 'identity' },
     { size: 'target', count: 5, seed: 'everything', mode: 'damage' },
     { size: 'stress', count: 5, seed: 'everything', mode: 'damage' },
+    ...[3, 5].flatMap(count => badgeSizes.map(badge => ({ size: 'target', count, seed: 'floating', mode: 'rest', badge }))),
   );
   // Glass: the board, a mode, settings and the dialogs, at the target and the stress size.
   for (const size of ['target', 'stress']) {
@@ -566,12 +577,12 @@ async function shots() {
       const game = seeds[item.seed](item.count);
       if (!available(item.mode, game)) continue;
       const style = item.style ?? 'material';
-      await load(page, game, style);
+      await load(page, game, style, item.badge);
       await enter(page, item.mode, game);
-      const file = `${style === 'glass' ? 'glass-' : ''}${size}-${item.count}p-${item.seed}-${item.mode}.png`;
+      const file = `${style === 'glass' ? 'glass-' : ''}${size}-${item.count}p-${item.seed}-${item.mode}${item.badge ? `-badge-${item.badge}` : ''}.png`;
       await page.screenshot({ path: `${outDir}${file}` });
       const result = await page.evaluate(audit);
-      record({ style, size, count: item.count, seed: item.seed, mode: item.mode, shot: file }, result);
+      record({ style, size, count: item.count, seed: item.seed, mode: item.mode, badge: item.badge ?? 'default', shot: file }, result);
       report.push({ file, ...result.facts, problems: result.problems.length });
       await leave(page);
     }
@@ -609,20 +620,23 @@ async function sweep() {
   let runs = 0;
   await Promise.all(Object.keys(sizes).flatMap(size => styles.map(async (style) => {
     const page = await openSize(size);
-    let combo = 0;
-    for (const count of [2, 3, 4, 5, 6]) {
-      for (const seedName of Object.keys(seeds)) {
-        const parts = showCombos[combo++ % showCombos.length];
-        const game = seedName === 'everything' ? seeds[seedName](count) : withShow(seeds[seedName](count), parts);
-        await load(page, game, style);
-        for (const mode of boardModes) {
-          if (!available(mode, game)) continue;
-          await enter(page, mode, game);
-          record({ style, size, count, seed: seedName === 'everything' ? seedName : `${seedName} (show ${parts.join('+') || 'none'})`, mode }, await page.evaluate(audit));
-          runs++;
-          await leave(page);
-          // "Who goes first?" changes the game; start the next mode from the seed again.
-          if (mode === 'first' || mode === 'rotate') await load(page, game, style);
+    // Every board mode at the default Badge size; at Large and Larger, the states that show the badge rows.
+    for (const badge of badgeSizes) {
+      let combo = 0;
+      for (const count of [2, 3, 4, 5, 6]) {
+        for (const seedName of Object.keys(seeds)) {
+          const parts = showCombos[combo++ % showCombos.length];
+          const game = ['everything', 'floating'].includes(seedName) ? seeds[seedName](count) : withShow(seeds[seedName](count), parts);
+          await load(page, game, style, badge);
+          for (const mode of badge === 'default' ? boardModes : ['rest', 'rotate', 'reminders']) {
+            if (!available(mode, game)) continue;
+            await enter(page, mode, game);
+            record({ style, size, badge, count, seed: ['everything', 'floating'].includes(seedName) ? seedName : `${seedName} (show ${parts.join('+') || 'none'})`, mode }, await page.evaluate(audit));
+            runs++;
+            await leave(page);
+            // "Who goes first?" changes the game; start the next mode from the seed again.
+            if (mode === 'first' || mode === 'rotate') await load(page, game, style, badge);
+          }
         }
       }
     }
@@ -750,12 +764,12 @@ for (const f of allFindings) (grouped[key(f)] ??= []).push(f);
 const summary = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length).map(([k, list]) => ({
   problem: k, count: list.length,
   styles: [...new Set(list.map(f => f.style ?? 'material'))],
-  sizes: [...new Set(list.map(f => f.size))], players: [...new Set(list.map(f => f.count))].sort(), modes: [...new Set(list.map(f => f.mode))],
+  sizes: [...new Set(list.map(f => f.size))], badges: [...new Set(list.map(f => f.badge ?? 'default'))], players: [...new Set(list.map(f => f.count))].sort(), modes: [...new Set(list.map(f => f.mode))],
   example: list[0],
 }));
 const indicators = await indicatorContrast();
 await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
 console.log('Indicator discs on chips (need 3:1 from the fill or the rim):', indicators.map(d => `${d.colour} fill ${d.lowest}, rim ${d.rim}${d.visible ? '' : ' FAILS'}`).join(' · '));
 console.log(`${runs} sweep states, ${allFindings.length} problems in ${summary.length} groups, ${pageErrors.length} page errors, ${Math.round((Date.now() - started) / 1000)}s`);
-for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      styles ${s.styles.join(' ')} · sizes ${s.sizes.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.style ?? 'material'} ${s.example.size} ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
+for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      styles ${s.styles.join(' ')} · sizes ${s.sizes.join(' ')} · badges ${s.badges.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.style ?? 'material'} ${s.example.size} ${s.example.badge ?? 'default'} badges ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
 if (pageErrors.length) console.log('Page errors:\n' + [...new Set(pageErrors)].join('\n'));

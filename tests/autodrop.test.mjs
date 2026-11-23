@@ -18,8 +18,9 @@ const allParts = { indicator: true, symbol: true, name: true };
 // and rad off, for the checks that walk one row's steps with only poison and tax. turns puts the board in Turn by turn
 // at round 12 with Player 1 active, so their near row leads with the turn chip; first says who went first and keeps
 // the small flag.
-function worstGame(count, { damage = () => 19, show = allParts, poison = () => 19, identities = longIdentities, everyCounter = true, turns = false, first = 1 } = {}) {
+function worstGame(count, { damage = () => 19, show = allParts, poison = () => 19, identities = longIdentities, everyCounter = true, turns = false, first = 1, badgeSize } = {}) {
   return {
+    ...(badgeSize ? { badgeSize } : {}),
     ...(turns ? { turns: 'turns', turn: { first, active: 0, round: 12 } } : {}),
     startingLife: 40, scores: Array(count).fill(40), rotations: Array(count).fill(0), keepAwake: true, landscapeAngle: 90,
     colors: [], counters: { commander: true, poison: true, energy: everyCounter, experience: everyCounter, rad: everyCounter },
@@ -339,6 +340,40 @@ async function checkNearSteps(t, engine) {
   }
 }
 
+// The same order at every Badge size (Settings → Table): the names, then the symbol, then a second line, then smaller
+// type, or the type first where two lines would cover the totals. The identity chip and its indicator always stay and
+// every count shows inside its tile. Six players, from the target down, mostly shrink first; two players, whose tall
+// tiles leave room, wrap first: at each size there's a width where the near row has wrapped and its type hasn't shrunk.
+async function checkOrderAtEachSize(t, engine) {
+  for (const badgeSize of ['default', 'large', 'larger']) {
+    for (const [count, start, step] of [[6, 952, 16], [2, 952, 24]]) {
+      const page = await openBoard(t, engine, worstGame(count, { turns: true, badgeSize }), { width: start, height: Math.round(start * 0.5625) });
+      await addCoverCheck(page);
+      let reached = 0;
+      let wrappedFirst = false;
+      for (let width = start; width >= 400; width -= step) {
+        await resize(page, width);
+        const drops = await readDrops(page);
+        const view = `${badgeSize}, ${count} players, ${width}px`;
+        assert.deepEqual(drops.problems, [], `${view}: every count, identity chip and indicator shows inside its tile`);
+        const step = nearStep(drops);
+        assert.ok(step >= reached, `${view}: steps only move forward as the window narrows (step ${step} after ${reached})`);
+        reached = step;
+        const tokens = drops.drop.split(' ');
+        if (tokens.includes('symbol')) assert.ok(tokens.includes('name'), `${view}: the names go before the symbol`);
+        const { wrap, shrink } = lastResorts(drops, 'near');
+        if (wrap || shrink) assert.ok(tokens.includes('symbol'), `${view}: the symbol goes before the last resorts`);
+        if (wrap && !shrink && drops.lines.near > 1) wrappedFirst = true;
+        await checkLastResorts(page, drops, 'near', view);
+        await checkLastResorts(page, drops, 'far', view);
+      }
+      assert.ok(reached >= 3, `${badgeSize}, ${count} players: the narrowest windows take a last resort (reached step ${reached})`);
+      if (count === 2) assert.ok(wrappedFirst, `${badgeSize}, two players: the near row wraps before its type shrinks`);
+      await page.close();
+    }
+  }
+}
+
 // A name dropped for a count of 10 doesn't come back at 9, as with the sword.
 async function checkNameHysteresis(t, engine) {
   // Player 1's near row is the busiest: poison 10 against 9 everywhere else, with the same long name on every tile.
@@ -420,6 +455,7 @@ async function checkShrunkRowsFit(t, engine) {
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: a shrunk badge row is measured again until it fits`, { timeout: 120000 }, t => checkShrunkRowsFit(t, engine));
+  test(`${name}: the overflow order holds at every badge size`, { timeout: 240000 }, t => checkOrderAtEachSize(t, engine));
   test(`${name}: the word "Turn" goes first, with or without identity names`, { timeout: 60000 }, t => checkTurnWord(t, engine));
   test(`${name}: the busiest board today stays within the drop table on phones`, { timeout: 60000 }, t => checkWorstCase(t, engine));
   test(`${name}: badge rows give way in order, board-wide, without blinking`, { timeout: 120000 }, t => checkSteps(t, engine));

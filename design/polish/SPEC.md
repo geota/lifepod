@@ -199,7 +199,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 
 All of these keep 44px targets. Counts shrink their type before they ever leave.
 
-**Overflow order, first to go first** (the owner's order, 22 November 2026; it replaced name, symbol, 11px, identity chip, 9px, wrap). Each step is taken only if the previous one didn't make the row fit.
+**Overflow order, first to go first** (the owner's order, 22 November 2026; it replaced name, symbol, 11px, identity chip, 9px, wrap). Each step is taken only if the previous one didn't make the row fit, and the same order holds at every Badge size (Settings → Table, SETTINGS-SPEC.md §10).
 
 | # | Near row (identity and counters) | Far row (commander damage) |
 |---|---|---|
@@ -215,7 +215,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 - `fitBadgeRows()` runs after every badge change and every layout change. For each side, `fitBadgeSide()` measures the rows at full type with the current drops, then takes the next step until every row fits.
 - **Shrinking is measured, not estimated.** Text doesn't shrink exactly in proportion to its type (gaps, padding and rounding don't), so the type starts from a proportional estimate and steps down 0.25px at a time, measured again after each step, until every row fits or it reaches 9px. (WebKit left a busy row 2–4px wider than its tile with the estimate alone.)
 - **Levels are board-wide.** The busiest tile decides for every tile, so the board stays uniform. That's the same principle as §3.1, and it stops names flickering on one tile while staying on another.
-- **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game. Counters ticking up and down by one can't make names blink.
+- **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game or a change of Badge size. Counters ticking up and down by one can't make names blink.
 - The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `sword`, `wrap`, `wrap-far`), and CSS hides the matching parts; `--near-badge-size` and `--far-badge-size` shrink the type.
 
 **What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent), measured in Chromium with Roboto:

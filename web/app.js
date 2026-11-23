@@ -86,6 +86,9 @@ const defaultTileSet = 'clear';
 // tokens under data-style. Until the player picks one, the iOS app (its game message handler) starts on Glass, and
 // Android and browsers on Material.
 const styleOrder = ['material', 'glass'];
+// Settings → Table → Badge size, in the slider's order (styles.css scales the badge rows and the mana strip by it).
+const badgeSizes = { default: 'Default', large: 'Large', larger: 'Larger' };
+const badgeSizeOrder = /** @type {BadgeSize[]} */ (Object.keys(badgeSizes));
 const defaultStyle = ios?.game ? 'glass' : 'material';
 // The centre button's label while a board mode that ends with the single check mark is open.
 const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
@@ -511,6 +514,7 @@ function requestFit() {
 // its far row's line takes room from that row, so the far rows are fitted again around it.
 function fitBadgeRows() {
   fitQueued = false;
+  measureBadgeRoom();
   for (const player of board.children) {
     if (player.querySelector('.mana-strip').hidden) delete player.dataset.strip;
     else player.dataset.strip = 'below';
@@ -520,6 +524,27 @@ function fitBadgeRows() {
   if (fitStrips()) fitBadgeSide('far');
   // A turn reminder's place depends on how tall the near edge came out.
   for (const index of reminders.keys()) placeReminders(board.children[index]);
+}
+
+// How large a badge row may grow at a larger Badge size (styles.css): one row, 1.7em tall, between each edge and the
+// total, its − and + glyphs and the "Out" tag, on every tile, measured in each face's own coordinates.
+function measureBadgeRoom() {
+  const edge = 8 * growPixel();
+  let far = Infinity;
+  let near = Infinity;
+  for (const player of /** @type {HTMLCollectionOf<HTMLElement>} */ (board.children)) {
+    const face = /** @type {HTMLElement} */ (player.querySelector('.player-face'));
+    const parts = [.../** @type {NodeListOf<HTMLElement>} */ (face.querySelectorAll('.score, .out-tag, .controls button'))].filter(part => part.offsetWidth);
+    if (!parts.length) continue;
+    const clear = side => parseFloat(player.style.getPropertyValue(`--clear-${side}`)) || 0;
+    far = Math.min(far, Math.min(...parts.map(part => part.offsetTop)) - Math.max(edge, clear('far')) - 2);
+    near = Math.min(near, face.offsetHeight - Math.max(edge, clear('near')) - Math.max(...parts.map(part => part.offsetTop + part.offsetHeight)) - 2);
+  }
+  const set = (property, room) => {
+    if (Number.isFinite(room)) board.style.setProperty(property, `${Math.max(0, Math.floor(room / 1.7 * 10) / 10)}px`);
+  };
+  set('--far-room', far);
+  set('--near-room', near);
 }
 
 function syncDropTokens(levels) {
@@ -934,6 +959,7 @@ function fitReminders(saved) {
  * @property {TurnMode} turns
  * @property {Turn} turn
  * @property {TileSet} tileColours
+ * @property {BadgeSize} badgeSize The badge rows' and the mana strip's size.
  * @property {Style | null} style null until the player picks one, so the platform's default applies.
  * @property {number | null} monarch The monarch's seat, or null for nobody.
  * @property {number | null} initiative The initiative holder's seat, or null for nobody.
@@ -959,6 +985,7 @@ function fitReminders(saved) {
  * @property {number} round From 1 to maxRound.
  */
 /** @typedef {'classic' | 'soft' | 'jewel' | 'clear'} TileSet */
+/** @typedef {'default' | 'large' | 'larger'} BadgeSize */
 /** @typedef {'material' | 'glass'} Style */
 /** @typedef {Record<'turns' | 'passOn' | 'gestures', boolean>} Reminders */
 
@@ -970,7 +997,7 @@ function loadGame() {
     landscapeAngle: currentLandscapeAngle(), colors: fitColors([], 4),
     counters: fitTrackers(), .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)]))),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
-    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet,
+    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, badgeSize: 'default',
     style: null, monarch: null, initiative: null, reminders: fitReminders(),
   };
   try {
@@ -1001,6 +1028,8 @@ function loadGame() {
       turn: fitTurn(saved.turn, saved.scores.length),
       // A save from before the setting, or with an unknown set, gets the default.
       tileColours: tileSetOrder.includes(saved.tileColours) ? saved.tileColours : defaultTileSet,
+      // A save from before the setting, or with an unknown size, gets the default.
+      badgeSize: badgeSizeOrder.includes(saved.badgeSize) ? saved.badgeSize : 'default',
       // null until the player picks a style, so the platform's default applies; a save from before the setting, or with an
       // unknown style, gets it too.
       style: styleOrder.includes(saved.style) ? saved.style : null,
@@ -2934,6 +2963,33 @@ function renderTileSetting() {
   tilesSlider.render();
 }
 
+// Badge size: saved the moment it changes, like Tile colours. The rows are fitted again from full size, as at a new game.
+const badgeSizeChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#badge-size-choices'));
+function applyBadgeSize() {
+  if (game.badgeSize === 'default') delete board.dataset.badgeSize;
+  else board.dataset.badgeSize = game.badgeSize;
+}
+function setBadgeSize(size) {
+  if (size === game.badgeSize) return;
+  game.badgeSize = size;
+  saveGame();
+  applyBadgeSize();
+  dropLevels = { near: 0, far: 0, strip: 0 };
+  requestFit();
+  renderBadgeSizeSetting();
+}
+const badgeSizeSlider = notchedSlider({
+  root: document.querySelector('#badge-size-slider'), min: 0, max: 2, snap: 1, step: 1, page: 1, lowest: 0, highest: 2,
+  get: () => badgeSizeOrder.indexOf(game.badgeSize),
+  set: at => setBadgeSize(badgeSizeOrder[at]),
+  describe: at => `${badgeSizes[badgeSizeOrder[at]]} badges`,
+});
+for (const choice of badgeSizeChoices.children) choice.addEventListener('click', () => setBadgeSize(choice.dataset.size));
+function renderBadgeSizeSetting() {
+  for (const choice of badgeSizeChoices.children) choice.setAttribute('aria-pressed', String(choice.dataset.size === game.badgeSize));
+  badgeSizeSlider.render();
+}
+
 // Style: saved the moment it's picked, after which it wins over the platform's default.
 const styleChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#style-choices'));
 const currentStyle = () => game.style ?? defaultStyle;
@@ -3082,6 +3138,7 @@ function openSettings() {
   renderRemindersSection();
   renderIdentitySheet();
   renderTileSetting();
+  renderBadgeSizeSetting();
   renderStyleSetting();
   placeSettingsSections();
   settings.showModal();
@@ -3373,6 +3430,7 @@ document.fonts?.addEventListener?.('loadingdone', () => {
   syncBoardTurn();
 });
 applyTileColours();
+applyBadgeSize();
 applyStyle();
 syncBoardTurn();
 renderBoard();
