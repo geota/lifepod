@@ -256,6 +256,33 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: who goes first opens on a new game and on Off to on`, t => checkWhoGoesFirst(t, engine));
 }
 
+// Skipping "Who goes first?" leaves no first player and round 1 (SPEC §8), also when Turns goes from Off to on in a game
+// whose round had moved on without a first player (SPEC-COMPLIANCE B5). ✕, Escape and Android back all skip.
+async function checkSkipResetsRound(t, engine) {
+  const game = savedGame(4, { turns: 'rounds', turn: { first: null, active: null, round: 1 } });
+  const page = await openPage(t, engine, { clock: true, game });
+  for (const skip of [() => button(page, 'Skip').tap(), () => page.keyboard.press('Escape'), () => page.evaluate(() => window.closeOpenDialog())]) {
+    await seedGame(page, game);
+    await page.locator('#round-button').tap();
+    await page.locator('#round-button').tap();
+    assert.equal((await saved(page)).turn.round, 3, 'Rounds steps without a first player');
+    await setTurns(page, 'Off');
+    await setTurns(page, 'Rounds');
+    await eventually(() => mode(page), 'first', 'Off → on with no first player asks');
+    await skip();
+    assert.equal(await mode(page), null);
+    assert.deepEqual((await saved(page)).turn, { first: null, active: null, round: 1 }, 'a skip starts at round 1');
+    assert.deepEqual(await pillRound(page), ['1', '1']);
+    // Nothing to step back to: the skip cleared the steps that led to round 3.
+    await page.locator('#round-back').evaluate(back => back.click());
+    assert.equal((await saved(page)).turn.round, 1);
+  }
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: skipping who goes first starts at round 1, after Off to on too`, t => checkSkipResetsRound(t, engine));
+}
+
 test('chromium: Track in settings holds Turns and fits the smallest phone', async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 568, height: 320 } });
   await button(page, 'Settings').tap();

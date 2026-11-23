@@ -13,15 +13,16 @@ export function turnStarted() {
   if (game.turns === 'turns' && game.initiative !== null && game.initiative === game.turn.active) remind(game.initiative, 'initiative');
 }
 
-// A turn reminder (Settings → Reminders → Turn reminders), only in Turn by turn: "Monarch: draw a card" or "Initiative:
-// venture into Undercity" on that player's tile, facing them, for 3 seconds or until it's tapped. Screen readers hear it
-// too.
+// A turn reminder (Settings → Reminders → Turn reminders), only in Turn by turn and once someone's turn has started:
+// "Monarch: draw a card" or "Initiative: venture into Undercity" on that player's tile, facing them, for 3 seconds or
+// until it's tapped. Screen readers hear it too. Before any turn, taking the initiative waits for its holder's turn to
+// start (SPEC §13).
 /**
  * @param {number | null} index
  * @param {DesignationKind} kind
  */
 export function remind(index, kind) {
-  if (index === null || game.turns !== 'turns' || !game.reminders.turns || !game.counters[kind]) return;
+  if (index === null || game.turns !== 'turns' || game.turn.active === null || !game.reminders.turns || !game.counters[kind]) return;
   const shown = reminders.get(index) ?? new Map();
   clearTimeout(shown.get(kind));
   shown.set(kind, setTimeout(() => dismissReminder(index, kind), reminderTime));

@@ -10,7 +10,7 @@ import {
 } from './js/actions/edits.js';
 import { clearPool, spendMana, undoClear } from './js/actions/mana.js';
 import {
-  cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst,
+  cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst, skipFirst,
 } from './js/actions/mode.js';
 import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
@@ -66,7 +66,7 @@ saveButton.addEventListener('click', () => {
   remind(taker, 'initiative');
 });
 cancelButton.addEventListener('click', () => {
-  if (boardMode === 'first') setBoardMode(null);
+  if (boardMode === 'first') skipFirst();
   else cancelEditing();
 });
 discardDialog.addEventListener('close', () => {
