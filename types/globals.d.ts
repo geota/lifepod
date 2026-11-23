@@ -16,6 +16,8 @@ interface LifePodAndroidBridge {
   haptic(): void;
   /** Whether the back gesture goes to the page (closeOpenDialog) rather than leaving the app. */
   setBackHandling(enabled: boolean): void;
+  /** The system font scale (Configuration.fontScale), 1 by default. */
+  textScale(): number;
 }
 
 /** A WKScriptMessageHandler that LifePodApp.swift registers with `controller.add(_:name:)`. */
@@ -64,6 +66,10 @@ interface Window {
   initialGame?: string;
   /** UIAccessibility.isReduceTransparencyEnabled, injected at document start by the iOS app. */
   initialReduceTransparency?: boolean;
+  /** Dynamic Type as a scale of the default text size (1 at Large), injected at document start by the iOS app. */
+  initialTextScale?: number;
+  /** Set by app.js. The iOS app calls it when the text size changes. */
+  setTextScale(scale: number | undefined): void;
   /** Set by app.js. The iOS app calls it when Reduce Transparency changes. */
   setReduceTransparency(reduce: boolean | undefined): void;
   /**

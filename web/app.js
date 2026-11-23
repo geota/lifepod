@@ -21,10 +21,12 @@ import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appear
 import { setBadgeActions } from './js/render/badges.js';
 import { setModeActions } from './js/render/modes.js';
 import { syncPill } from './js/render/pill.js';
-import { android, ios, portraitQuery, setReduceTransparency, syncWakeLock } from './js/state/platform.js';
+import {
+  android, ios, portraitQuery, setReduceTransparency, setTextScale, syncWakeLock, systemTextScale,
+} from './js/state/platform.js';
 import { boardMode, editStartHolders, game, saveGame, syncBackHandling } from './js/state/state.js';
 import {
-  board, cancelButton, countersButton, damageButton, discardDialog, manaButton, roundBackButton, roundButton,
+  board, cancelButton, countersButton, damageButton, discardDialog, manaButton, resetZoom, roundBackButton, roundButton,
   saveButton, shuffleButton, undoButton,
 } from './js/ui/dom.js';
 import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
@@ -36,6 +38,15 @@ import './js/sheets/dice.js';
 // The iOS app passes Reduce Transparency in before the page loads, and calls this whenever it changes.
 window.setReduceTransparency = setReduceTransparency;
 setReduceTransparency(window.initialReduceTransparency);
+// The system text size: read at launch, and the iOS app calls this when it changes. The badge rows are fitted again
+// from full size, and settings' compact switches again, as when a font loads.
+setTextScale(systemTextScale());
+window.setTextScale = (scale) => {
+  setTextScale(scale);
+  resetDrops();
+  syncBoardTurn();
+  compactGroups.forEach(fitCompactSwitches);
+};
 
 // The pill's buttons (the setup button is settings.js's, and the dice button dice.js's).
 damageButton.addEventListener('click', () => setBoardMode('damage'));
@@ -84,7 +95,10 @@ document.addEventListener('keydown', (event) => {
 });
 
 // "Who goes first?" waits for settings and the new game dialog to close. These listeners run after each dialog's own.
-for (const dialog of document.querySelectorAll('dialog')) dialog.addEventListener('close', maybeAskFirst);
+for (const dialog of document.querySelectorAll('dialog')) {
+  dialog.addEventListener('close', maybeAskFirst);
+  dialog.addEventListener('close', resetZoom);
+}
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) cancelPresses();
   else if (!android && !ios) syncWakeLock(() => game.keepAwake);

@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <!-- Icons: Phosphor Icons, Bold weight (the flags, the experience graduation cap and the initiative castle turret are Fill weight), MIT License, Copyright (c) 2020 Phosphor Icons. https://phosphoricons.com -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <!-- Zoom stays on (WCAG 1.4.4): the board turns pinches and double taps away itself (touch-action in styles.css), so
+       only settings and the dialogs zoom, and closing one puts the scale back (resetZoom in js/ui/dom.js). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111213">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' file:; style-src 'self' file:; font-src 'self' file:; img-src 'self' file:; base-uri 'none'; form-action 'none'">
   <title>LifePod</title>

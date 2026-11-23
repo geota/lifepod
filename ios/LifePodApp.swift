@@ -85,11 +85,30 @@ private struct TrackerView: UIViewRepresentable {
                 name: UIAccessibility.reduceTransparencyStatusDidChangeNotification,
                 object: nil
             )
+            // The pinch-free board ignores Dynamic Type, so the page hears the text size from here too, as a scale of
+            // the default, and grows settings' and the dialogs' type with it (ACCESSIBILITY.md H1).
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(textSizeChanged),
+                name: UIContentSizeCategory.didChangeNotification,
+                object: nil
+            )
         }
 
         @objc private func reduceTransparencyChanged() {
             let enabled = UIAccessibility.isReduceTransparencyEnabled
             webView?.evaluateJavaScript("window.setReduceTransparency?.(\(enabled));", completionHandler: nil)
+        }
+
+        // Body text's size now over its size at the default, Large (17pt): 1 at Large, about 2 at AX2.
+        private var textScale: Double {
+            let category = UIApplication.shared.preferredContentSizeCategory
+            let traits = UITraitCollection(preferredContentSizeCategory: category)
+            return Double(UIFontMetrics(forTextStyle: .body).scaledValue(for: 17, compatibleWith: traits) / 17)
+        }
+
+        @objc private func textSizeChanged() {
+            webView?.evaluateJavaScript("window.setTextScale?.(\(textScale));", completionHandler: nil)
         }
 
         func setActive(_ active: Bool) {
@@ -135,6 +154,12 @@ private struct TrackerView: UIViewRepresentable {
             controller.addUserScript(
                 WKUserScript(
                     source: "window.initialReduceTransparency = \(UIAccessibility.isReduceTransparencyEnabled);",
+                    injectionTime: .atDocumentStart,
+                    forMainFrameOnly: true
+                ))
+            controller.addUserScript(
+                WKUserScript(
+                    source: "window.initialTextScale = \(textScale);",
                     injectionTime: .atDocumentStart,
                     forMainFrameOnly: true
                 ))

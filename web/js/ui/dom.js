@@ -82,6 +82,19 @@ export function element(tag, className, ...children) {
   return node;
 }
 
+// Settings and the dialogs can be pinch-zoomed, but the board can't, so it couldn't be zoomed back out. When a dialog
+// closes zoomed in, a maximum scale of 1 for a moment puts the page back at its own size (WebKit applies a viewport
+// change at once), then zoom is allowed again. Android's WebView doesn't zoom at all (MainActivity.kt).
+const viewportMeta = /** @type {HTMLMetaElement} */ (document.querySelector('meta[name="viewport"]'));
+export function resetZoom() {
+  if (!window.visualViewport || window.visualViewport.scale <= 1.01) return;
+  const content = viewportMeta.content;
+  viewportMeta.content = `${content}, maximum-scale=1`;
+  setTimeout(() => {
+    viewportMeta.content = content;
+  }, 300);
+}
+
 export function visuallyHidden(text) {
   return element('span', 'visually-hidden', text);
 }
