@@ -4,6 +4,7 @@
 // fonts, passes the renderers the actions their buttons call, and draws the board.
 
 import { renderBoard } from './js/actions/board.js';
+import { commit } from './js/actions/commit.js';
 import {
   chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
 } from './js/actions/edits.js';
@@ -24,7 +25,7 @@ import { syncPill } from './js/render/pill.js';
 import {
   android, ios, portraitQuery, setReduceTransparency, setTextScale, syncWakeLock, systemTextScale,
 } from './js/state/platform.js';
-import { boardMode, editStartHolders, game, saveGame, syncBackHandling } from './js/state/state.js';
+import { boardMode, editStartHolders, game, syncBackHandling } from './js/state/state.js';
 import {
   board, cancelButton, countersButton, damageButton, discardDialog, manaButton, resetZoom, roundBackButton, roundButton,
   saveButton, shuffleButton, undoButton,
@@ -57,7 +58,7 @@ roundBackButton.addEventListener('click', stepBack);
 bindRelease(shuffleButton, shuffleFirst);
 undoButton.addEventListener('click', undoEdit);
 saveButton.addEventListener('click', () => {
-  saveGame();
+  commit();
   // Whoever took the initiative in the mode, by commander damage or a tap, ventures into Undercity.
   const taker = game.initiative !== editStartHolders.initiative ? game.initiative : null;
   setBoardMode(null);

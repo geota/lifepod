@@ -8,12 +8,12 @@ import { isOut, leavingTransfers, outPlayers, shuffledColours } from '../logic/r
 import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from '../logic/save.js';
 import { announce, announceDesignation, announceLife, clearAnnouncements } from '../render/announce.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
-import { syncPill } from '../render/pill.js';
 import { paintColours, renderScore } from '../render/tile.js';
 import { currentLandscapeAngle, haptic, reducedMotion } from '../state/platform.js';
-import { clearedPools, game, saveGame, turnSteps } from '../state/state.js';
+import { clearedPools, game, turnSteps } from '../state/state.js';
 import { board, playerTemplate } from '../ui/dom.js';
 import { bindCounter, cancelPresses } from '../ui/press.js';
+import { commit } from './commit.js';
 import { maybeAskFirst, setAskFirst } from './mode.js';
 import { clearReminders, remind } from './reminders.js';
 
@@ -21,13 +21,13 @@ import { clearReminders, remind } from './reminders.js';
 // it, and reminds a new initiative holder to venture.
 export function handOnLeavers(wasOut) {
   const transfers = leavingTransfers(game, wasOut);
+  if (!transfers.length) return;
+  for (const transfer of transfers) game[transfer.kind] = transfer.to;
+  commit({ badges: transfers.flatMap(({ from, to }) => [from, to]).filter(player => player !== null) });
   for (const transfer of transfers) {
-    game[transfer.kind] = transfer.to;
-    for (const player of [transfer.from, transfer.to]) if (player !== null) renderBadges(player);
     announceDesignation(transfer.kind);
     if (transfer.kind === 'initiative') remind(transfer.to, 'initiative');
   }
-  if (transfers.length) saveGame();
 }
 
 export function renderBoard() {
@@ -44,17 +44,16 @@ export function renderBoard() {
       if (!Number.isSafeInteger(next)) return;
       const out = outPlayers(game);
       game.scores[index] = next;
-      renderScore(index);
       // A player who is out has no chip to start a turn, and hands on the monarch and the initiative.
-      if (isOut(game, index) !== out.has(index)) {
-        renderBadges(index);
+      const leaving = isOut(game, index) !== out.has(index);
+      commit({ scores: [index], badges: leaving ? [index] : [] });
+      if (leaving) {
         handOnLeavers(out);
         renderPassHints();
       }
       if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
       haptic();
       announceLife(index);
-      saveGame();
     }
 
     bindCounter(player.querySelector('.subtract'), () => changeLife(-1), `Subtract one life from ${name}`);
@@ -63,8 +62,7 @@ export function renderBoard() {
     rotateSeat.setAttribute('aria-label', `Rotate ${name} clockwise`);
     rotateSeat.addEventListener('click', () => {
       game.rotations[index] = (game.rotations[index] + 1) % clockwiseEdges.length;
-      layoutBoard();
-      saveGame();
+      commit({ layout: true });
     });
     return player;
   });
@@ -106,10 +104,9 @@ export function startGame(playerCount, startingLife) {
   game.landscapeAngle = currentLandscapeAngle();
   // A new game starts with every badge at full size.
   resetDrops();
-  saveGame();
   syncBoardTurn();
   renderBoard();
-  syncPill();
+  commit({ pill: true });
   announce(-1, 'game', () => `New game, ${playerCount} players at ${startingLife} life`);
   setAskFirst(game.turns !== 'off');
   maybeAskFirst();

@@ -6,9 +6,9 @@ import { hasMana } from '../logic/rules.js';
 import { fitCounts, fitPools } from '../logic/save.js';
 import { announce, announcePool } from '../render/announce.js';
 import { renderBadges } from '../render/badges.js';
-import { syncPill } from '../render/pill.js';
 import { haptic } from '../state/platform.js';
-import { clearedPools, game, saveGame } from '../state/state.js';
+import { clearedPools, game } from '../state/state.js';
+import { commit } from './commit.js';
 
 // Empties every pool when the turn passes, if that's switched on, and returns what it emptied so a step back can put
 // it back. The turn passing also ends any "Undo clear": the pool would have emptied anyway.
@@ -25,10 +25,8 @@ export function autoEmptyPools() {
 export function spendMana(index, colour) {
   if (game.pools[index][colour] === 0) return;
   game.pools[index][colour] -= 1;
-  saveGame();
+  commit({ badges: [index], pill: true });
   haptic();
-  renderBadges(index);
-  syncPill();
   announcePool(index);
 }
 
@@ -39,10 +37,8 @@ export function clearPool(index) {
   const pool = game.pools[index];
   game.pools[index] = fitCounts([], manaColours.length);
   clearedPools.set(index, { pool, timer: setTimeout(() => endUndoClear(index), undoClearTime) });
-  saveGame();
+  commit({ badges: [index], pill: true });
   haptic();
-  renderBadges(index);
-  syncPill();
   announce(index, 'mana', () => `Player ${index + 1}, mana pool cleared`);
 }
 
@@ -54,10 +50,8 @@ export function undoClear(index) {
   cleared.pool.forEach((amount, colour) => {
     game.pools[index][colour] = Math.min(maxCount, game.pools[index][colour] + amount);
   });
-  saveGame();
+  commit({ badges: [index], pill: true });
   haptic();
-  renderBadges(index);
-  syncPill();
   announcePool(index);
 }
 

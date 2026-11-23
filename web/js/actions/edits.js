@@ -5,12 +5,11 @@ import { countKinds, maxCount } from '../logic/data.js';
 import { applyEdit, editPlayers, leavingTransfers, outPlayers, trackedDesignations } from '../logic/rules.js';
 import { normalizeIdentity } from '../logic/save.js';
 import { announce, announceDesignation, announceLife, announcePool } from '../render/announce.js';
-import { renderBadges } from '../render/badges.js';
 import { syncAllSwatches, syncCounterCells, syncIdentity, syncManaCells, syncSeatMap } from '../render/modes.js';
-import { syncPill } from '../render/pill.js';
-import { paintColours, renderScore } from '../render/tile.js';
+import { paintColours } from '../render/tile.js';
 import { haptic } from '../state/platform.js';
-import { edits, game, saveGame } from '../state/state.js';
+import { edits, game } from '../state/state.js';
+import { commit } from './commit.js';
 
 /** @typedef {import('../logic/rules.js').Edit} Edit */
 
@@ -20,8 +19,8 @@ export function chooseColour(index, colour) {
   game.colors[index] = colour;
   paintColours();
   syncAllSwatches();
+  commit();
   haptic();
-  saveGame();
 }
 
 // Identity mode saves each change at once, like Colours.
@@ -29,9 +28,8 @@ export function toggleIdentity(index, id) {
   const identity = game.identities[index];
   game.identities[index] = identity.includes(id) ? identity.replace(id, '') : normalizeIdentity(identity + id);
   syncIdentity();
-  renderBadges(index);
+  commit({ badges: [index] });
   haptic();
-  saveGame();
 }
 
 // Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
@@ -55,15 +53,13 @@ function showEdit(edit) {
   } else if (edit.kind === 'mana') {
     announcePool(index);
   }
-  for (const player of editPlayers(edit)) {
+  const players = editPlayers(edit);
+  for (const player of players) {
     syncCounterCells(player);
     syncManaCells(player);
-    renderScore(player);
-    renderBadges(player);
   }
-  syncPill();
+  commit({ scores: players, badges: players, pill: true });
   haptic();
-  saveGame();
 }
 
 // An edit made in a mode. Anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4), in the same edit.

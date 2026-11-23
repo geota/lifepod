@@ -4,11 +4,10 @@
 import { maxCount, maxRound } from '../logic/data.js';
 import { nextTurn, previousTurn } from '../logic/rules.js';
 import { announce, seatName } from '../render/announce.js';
-import { renderBadges } from '../render/badges.js';
-import { syncPill } from '../render/pill.js';
 import { haptic } from '../state/platform.js';
-import { game, saveGame, turnSteps } from '../state/state.js';
+import { game, turnSteps } from '../state/state.js';
 import { board } from '../ui/dom.js';
+import { commit } from './commit.js';
 import { autoEmptyPools } from './mana.js';
 import { maybeAskFirst, setAskFirst } from './mode.js';
 import { remind, turnStarted } from './reminders.js';
@@ -16,10 +15,8 @@ import { remind, turnStarted } from './reminders.js';
 // Shows a turn step on every tile and the pill, saves it at once and announces it.
 function showTurn() {
   const turnFocus = document.activeElement?.matches('.turn-chip');
-  saveGame();
+  commit({ badges: 'all', pill: true });
   haptic();
-  game.scores.forEach((_, index) => renderBadges(index));
-  syncPill();
   // A turn chip passed from the keyboard is gone, so focus moves to the chip that now has the turn.
   if (turnFocus && !document.activeElement?.matches('.turn-chip')) board.querySelector('.active-chip, .turn-chip')?.focus();
   const { active, round } = game.turn;
