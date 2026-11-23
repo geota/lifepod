@@ -1,6 +1,6 @@
 # Polish round: build spec
 
-**Status:** ready to build, 21 November 2026. This turns the owner's answers to the 14 questions in [OPTIONS.md](OPTIONS.md) into decisions.
+**Status:** built (v0.1.0-alpha.15 and later). Written 21 November 2026 as the build spec; later decisions are marked where they changed it. This turns the owner's answers to the 14 questions in [OPTIONS.md](OPTIONS.md) into decisions.
 
 - Where the owner said "decide", the decision is here with its reason. Where an answer left a gap, I filled it and said so.
 - The questions raised during the spec are all resolved (§12).
@@ -28,7 +28,7 @@
 9. Floating mana
 10. Data model and settings
 11. Build plan
-12. Open questions
+12. Questions resolved
 13. The monarch and the initiative (added after the build)
 
 ---
@@ -47,7 +47,7 @@
   - Physical counters (dice, tokens, beads) are round.
   - The pill's pressed state is a disc.
   - The commander damage map keeps its rounded-rectangle seats, so "seat" and "counter" stay visually different.
-  - Each cell is filled `color-mix(in oklab, var(--button) 55%, var(--panel))`, with no border. A press fills it with `color-mix(in oklab, var(--seat) 26%, var(--panel))`.
+  - Each cell is filled `color-mix(in oklab, var(--button) 55%, var(--panel))`, with no border. A press fills it with `color-mix(in oklab, var(--seat) 26%, var(--panel))`. *As built:* cells press with the 10% state layer (`--state-pressed`, SETTINGS-SPEC.md §7); the 26% seat mix is kept only on the turn, strip, pass and reminder chips and on "Me first".
 - **The pill keeps its shape.** Its pressed disc is unchanged.
 - **Map seats are unchanged.**
 
@@ -59,7 +59,7 @@
 
 ### 2.1 Identity has its own page, and no longer depends on Commander
 
-- **Setup → Identity ›** opens the Identity sheet (§4). Its button **Choose identities** starts the identity board mode.
+- **Settings → Identity** (a section of the settings page, SETTINGS-SPEC.md; it began as an Identity sheet, §4) holds the identity settings. Its button **Choose identities** starts the identity board mode.
 - **The Colours mode becomes tile colour only.** That frees the room for twelve swatches (§5).
 - **Decision: identity is no longer tied to the Commander switch.** It has its own settings, and turning every display option off removes it from the board. Reason: identity is useful for tile meaning and names in any multiplayer game. The owner asked for a full off setting instead.
 
@@ -72,7 +72,7 @@
   - A chip with only the indicator or only the symbol is the round 1.7em chip.
   - A chip with a name is a capsule.
 - **Every identity has a symbol** (§2.4), so a Symbol-only chip never comes up empty. An unset identity shows no chip at all.
-- **The chip leads the near badge row** (§7).
+- **The chip leads the near badge row** (§7), after the turn chips (§8), which lead it when Turns is on.
 - **Names come from the identity automatically** (§2.5).
 
 ### 2.3 The background ("indicator backgrounds")
@@ -153,9 +153,9 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 
 **How:**
 
-- `layoutBoard()` measures every `.player-face` and sets three properties on `#board`:
-  - `--ui`: the smallest face width;
-  - `--ub`: the smallest face height;
+- `measureBoard()` (`web/js/layout/board.js`) measures every `.player-face` inside its pill clearances (see Centring below) and sets three properties on `#board`:
+  - `--ui`: the smallest face width left inside them;
+  - `--ub`: the smallest face height left inside them;
   - `--board-digits`: the most digits in any total, minimum 2.
 - It runs again on resize, rotation, a player-count change, a seat rotation, and any total whose digit count changes.
 - Tile CSS uses `u = var(--ui) / 100` in place of `cqi`: `--control-size: clamp(44px, 18u, 74 × grow)`, glyphs `clamp(1.75rem, 12u, …)`, badges `clamp(.78rem, 3.6u, …)` and so on.
@@ -173,7 +173,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 
 - Totals are already equal on phones, because of the 19vmin cap.
 - The differences today are in the glyphs (the 5-player end seat's ± is 46px against 34px elsewhere on a phone) and on tablets (the end seat's total is 195px against 191px).
-- **A three-digit total shrinks every total together** (decided). Uniformity is the owner's rule, and totals of 100 or more are rare. On phones, three digits still fit at full size, so nothing changes.
+- **A three-digit total shrinks every total together** (decided). Uniformity is the owner's rule, and totals of 100 or more are rare. Only the target (952 × 427) keeps full size with three digits. With 6 players a 100 shrinks every total from 68px to 52px at 640 × 360, and from 61px to 40px at 568 × 320, by the formula above.
 
 **Board units by size**, measured on the current app: `ui` × `ub` is the smallest tile face, then the life total and the badge type.
 
@@ -182,7 +182,7 @@ One fixed table, with no setting. The owner confirmed the full four-colour names
 | **952 × 427 (target)** | 2 | 427 × 475 | 81px | 15.4px |
 | | 3–4 | 427–475 × 213 | 81px | 16px |
 | | 5–6 | 316 × 213 | 81px | 12.5px |
-| 640 × 360 | 6 | 213 × 179 | 68px | 12.5px |
+| 640 × 360 | 6 | 212 × 179 | 68px | 12.5px |
 | 568 × 320 (stress) | 6 | 188 × 159 | 61px | 12.5px |
 
 ### 3.2 Auto-drop: what gives way when a row runs out of room
@@ -216,7 +216,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 - **Shrinking is measured, not estimated.** Text doesn't shrink exactly in proportion to its type (gaps, padding and rounding don't), so the type starts from a proportional estimate and steps down 0.25px at a time, measured again after each step, until every row fits or it reaches 9px. (WebKit left a busy row 2–4px wider than its tile with the estimate alone.)
 - **Levels are board-wide.** The busiest tile decides for every tile, so the board stays uniform. That's the same principle as §3.1, and it stops names flickering on one tile while staying on another.
 - **Hysteresis:** a dropped item comes back only when every row would fit it with 15% to spare, or at a new game or a change of Badge size. Counters ticking up and down by one can't make names blink.
-- The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `sword`, `wrap`, `wrap-far`), and CSS hides the matching parts; `--near-badge-size` and `--far-badge-size` shrink the type.
+- The steps are set as `data-drop` tokens on `#board` (`name`, `symbol`, `sword`, `wrap`, `wrap-far`, and `strip-wrap` for the mana strip, §9), and CSS hides the matching parts; `--near-badge-size` and `--far-badge-size` shrink the type.
 
 **What the worst case does** (every counter on with two-digit counts, the chip showing indicator + symbol + name, Turn by turn, commander damage from every opponent), measured in Chromium with Roboto:
 
@@ -249,7 +249,7 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 |---|---|
 | Mode hints ("Tap +1 · hold −1", "Your tile colour") | `ub ≥ 200` and `ui ≥ 240`, as today. Shown on the target; hidden at 640 × 360 and below with 6 players. |
 | Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2. |
-| Mana strip | One line when it fits; otherwise it wraps to two. It's never dropped. |
+| Mana strip | Never dropped. It tries its four places (§9) at full type, then with its type shrunk to an 11px floor, then wrapped (`strip-wrap`). |
 | Settings header | Fixed at the top of the full-screen settings page; it tightens to 4px padding under 360px tall (SETTINGS-SPEC.md §3). |
 | Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. |
 
@@ -324,12 +324,12 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ## 6. Player counters (Q3: K3; Q5: Cap)
 
-- **Trackers:** Poison, Energy, Experience and Rad, each a switch in the Track sheet, all off by default.
+- **Trackers:** Poison, Energy, Experience and Rad, each a switch in Settings → Track (first built as the Track sheet), all off by default.
   - Commander tax comes with the Commander switch, as today.
   - Player counters only, never permanent counters.
 - **Counters mode:**
   - One circle per enabled counter, in this order: poison, tax, energy, experience, rad.
-  - Three per row, last row centred.
+  - Three per row, last row centred. *As built:* with the designations (§13), seven cells go four to a row.
   - Each circle shows the icon over the count. Tap +1; hold −1 with repeat (500ms, then every 100ms), the map's rule. The hint is "Tap +1 · hold −1", hidden on short tiles.
   - Cell size: `clamp(44px, min((ui − 20px)/3, (ub − 58px)/2), 92 × grow)`. That's 78px on the target at 4 or 6 players, 61px at 640 × 360 and 50px at 568 × 320 (6 players).
   - Undo, ✓ and ✕ work as today. Counts are 0–99, and tax shows +2n.
@@ -349,19 +349,20 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 ![Badges](renders/spec-badges.png)
 
 - **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero, then the monarch's crown and the initiative's castle on their holder's tile (§13).
-- It stays on one line at full size on the target. On smaller phones the auto-drop rules (§3.2) take the name, then the symbol, then wrap or shrink; the identity chip and its indicator always stay.
+- It usually stays on one line at full size on the target; the worst case drops names there (§3.2). On smaller phones the auto-drop rules (§3.2) take the name, then the symbol, then wrap or shrink; the identity chip and its indicator always stay.
 - **Decision: not the right side.** I mocked it with and without the identity chip. Reasons:
   - A column needs the + glyph to move in by 34px, which collides with the total at 6 players.
   - The name can't fit a column.
   - Six chips are taller than a 6-player tile's middle band.
   - Splitting identity (near edge) from counters (right side) means two places to look.
-- Commander damage stays on the far row, at 26px (2f28705).
+- Commander damage stays on the far row. *As built:* its type is 1.7em of the badge size (27.2px with 4 players and 21.25px with 6 on the target), not a fixed 26px.
+- *As built:* the turn chips (§8) lead the near row, before the identity chip.
 
 ## 8. Turns (Q10: B, with both models; Q11: Auto)
 
 ![Turns](renders/spec-turns.png)
 
-- **Setting:** Track → Turns: **Off** (default) · **Rounds** · **Turn by turn**.
+- **Setting:** Settings → Track → Turns: **Off** (default) · **Rounds** · **Turn by turn**.
 - **Who goes first?** opens automatically:
   - on every new game while Turns isn't Off;
   - when Turns changes from Off to on (decided: the game needs a first player).
@@ -395,7 +396,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ![Mana](renders/spec-mana.png)
 
-- **Setting:** Track → Mana pool, off by default. When it's on, the pill shows the tap symbol `\e61a`, with a dot while any pool has mana.
+- **Setting:** Settings → Track → Mana pool, off by default. When it's on, the pill shows the tap symbol `\e61a`, with a dot while any pool has mana.
 - **Adding: the mana mode.**
   - Each tile shows six circles: W U B R G and colourless (`\e904`), mana symbols in cost style, sized like the counter cells. The `.pip` class needs a C entry.
   - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode (edit kind `mana`).
@@ -404,6 +405,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - **Both badge rows always stay** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place).
   - **The strip sits at the far edge, with commander damage** (moved there on 22 November 2026, at the owner's request): the two most used operations are together and the tile is balanced, with the near row at the player's edge and commander damage and mana at the far edge.
   - It takes the first place that fits clear of the total, the glyphs, the "Out" tag, the near row and the pill: its own line just under the far row, toward the total; the end of the far row's line; folded into one chip (the pool, and a caret › that says it opens mana mode) on its own line under the far row; or that chip at the end of the far row. With no commander damage it takes the far row's place.
+  - *As built:* the strip tries those four places at full type, then again with its type shrunk (down to an 11px floor), then wrapped toward the total (`strip-wrap`, `layout/fit.js`). Its level is board-wide, with the same 15% hysteresis as the badge rows, and only the strips that need it fold.
   - The turn chip stays in the near row, so it never meets the strip.
   - Strip items are 44px tall:
     - **Tap a symbol to spend 1** of that colour. It saves at once, and the strip shrinks as colours reach 0.
@@ -428,11 +430,15 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | `manaPool` | boolean | false | |
 | `autoEmpty` | boolean | true | `!== false` |
 | `turns` | `'off' \| 'rounds' \| 'turns'` | `'off'` | enum |
-| `turn` | `{ first: int\|null, active: int\|null, round: int ≥1 }` | `{ null, null, 1 }` | indices must be valid seats |
+| `turn` | `{ first: int\|null, active: int\|null, round: int 1–999 }` | `{ null, null, 1 }` | indices must be valid seats; the round is capped at `maxRound` (999), and turn steps hold there |
 | `identity` | `{ show: { indicator, symbol, name }, background: 'symbol'\|'default'\|'off', version: 2 }` | `{ show: {true, false, true}, 'symbol', 2 }` | without `version`, `'off'` → `'default'` and `'indicator'` → `'symbol'` (§2.3) |
 | `colors` | as today, swatch index 0–11 | seats 1–6 defaults | `fitColors` with 12 swatches |
+| `tileColours` | `'classic' \| 'soft' \| 'jewel' \| 'clear'` (SETTINGS-SPEC.md §7) | `'clear'` | enum (`tileSetOrder`) |
+| `badgeSize` | `'default' \| 'large' \| 'larger'` (SETTINGS-SPEC.md §10) | `'default'` | enum (`badgeSizeOrder`) |
+| `style` | `'material' \| 'glass'` or null (SETTINGS-SPEC.md §9) | null: the platform's default | enum, anything else is null |
 
 - Unchanged: `scores`, `startingLife`, `rotations`, `keepAwake`, `landscapeAngle`, `poison`, `casts`, `identities`, `commanderDamage`.
+- *As built:* each field falls back on its own. `startingLife` must be a whole number from 1 to 999 (`maxStartingLife`, the slider's range), or it's 40. A score that isn't a safe whole number starts at the starting life. Only when `scores` doesn't give a known player count (2–6) does the save get the default 4-player board; the fields that don't depend on the count, such as the settings, are still kept.
 - Changing the player count resizes every array and resets `turn`.
 - Not saved: the mode edit stacks, the "Undo clear" buffer and the hold-back buffer of a turn step.
 
@@ -463,6 +469,8 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | Identity, colours, settings | Instant. Toggle back. |
 
 ## 11. Build plan
+
+> **Historical.** Every milestone below has shipped. It's kept as the record of how the build was split; the sheets it names became the settings page (§4's banner).
 
 Each milestone ships on its own and keeps `npm test` and lint green. The tests extend the existing `tests/*.test.mjs` suites, which use Playwright against `web/index.html`.
 
@@ -557,6 +565,6 @@ From the Comprehensive Rules effective 6 November 2026: the monarch (CR 726) and
   - Otherwise the out holder's near row shows **Pass it on** (the icon, an arrow and the words, outlined like a Start chip) until someone takes it in counters mode. It's a button with a 64 × 44 target that opens counters mode, and it doesn't dim with the out player's badges. It also shows for a holder someone gave it to after they were out, and never when nobody else is in to take it.
 - **Turn reminders,** only in Turn by turn: "Monarch: draw a card" on the monarch's tile when they pass the turn (the draw is at the beginning of their end step); "Initiative: venture into Undercity" on the holder's tile when their turn starts (by the chip, the pill, a Start chip or "Who goes first?") or when they take the initiative mid-turn (commander damage or counters mode, once the mode is saved, or a handoff). Stepping back reminds nobody.
   - A chip in the turn chip's language: the tile's button fill, a ring and the icon in the seat colour, the label in bold. Inside the tile face, so it faces its player. 3 seconds, or until tapped (64 × 44 target), and announced.
-  - It sits on its own line above the near edge where that's 4px clear of the total, the glyphs and the "Out" tag; on a tile too short for that it takes the near edge (the row and any mana strip step aside) for its seconds. Too long for its tile, it drops its label, then wraps.
+  - It sits on its own line above the near edge where that's 4px clear of the total, the glyphs and the "Out" tag; on a tile too short for that it takes the near edge (the near row steps aside; the mana strip is at the far edge, §9) for its seconds. Too long for its tile, it drops its label, then wraps.
 - **Settings → Reminders** (SETTINGS-SPEC.md): Turn reminders, Pass-it-on hints and Gesture hints (the "Tap +1 · hold −1" and "Tap your colours" lines in counters, mana, commander damage and identity modes). All on by default, saved in `game.reminders`.
 - **Data:** `monarch` and `initiative` are seat indexes or null, validated in `loadGame()` (anything but a seat on the board is nobody). A new game clears both, which also covers a change of player count.
