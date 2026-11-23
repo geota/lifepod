@@ -3,9 +3,12 @@
 //
 // Mana's symbols are all in the Private Use Area (U+E000 to U+F8FF). The font also maps some ASCII, for its own
 // ligatures, but LifePod only sets Mana on empty elements whose ::before draws one symbol, so ASCII isn't needed.
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 
 const read = path => readFileSync(new URL(`../web/${path}`, import.meta.url), 'utf8');
+// Every script in web/: app.js, the modules under web/js/ and dice.js.
+const scripts = () => readdirSync(new URL('../web/', import.meta.url), { recursive: true })
+  .map(path => String(path).split('\\').join('/')).filter(path => /\.m?js$/.test(path)).sort();
 const isPrivateUse = codePoint => codePoint >= 0xe000 && codePoint <= 0xf8ff;
 
 // CSS: every string literal, as in `content: '\e600'` or `--glyph: '\e600'`. A CSS escape is a backslash, one to six
@@ -42,8 +45,7 @@ function scriptCodePoints(source) {
 export function manaCodePoints() {
   const all = [
     ...cssCodePoints(read('styles.css')),
-    ...scriptCodePoints(read('app.js')),
-    ...scriptCodePoints(read('dice.js')),
+    ...scripts().flatMap(path => scriptCodePoints(read(path))),
     ...scriptCodePoints(read('index.html')),
   ];
   return [...new Set(all.filter(isPrivateUse))].sort((a, b) => a - b);

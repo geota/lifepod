@@ -1,3 +1,25 @@
+import {
+  badgeSizeOrder, badgeSizes, clockwiseEdges, commanderLethal, commanderWarning, countKinds, counterKinds,
+  defaultTileSet, designationKinds, designations, discardMessages, doneLabels, editingModes, faceAngles, faceEdges,
+  firstBeat, holdDelay, identityBackgrounds, identityColours, identityNames, identityParts, identitySettingsVersion,
+  manaColours, maxCount, maxRound, maxStartingLife, outLabels, playOrders, playerCounts, poisonLethal, poisonWarning,
+  quarterTurns, reminderKinds, reminderText, reminderTime, seatLayouts, shuffleTick, shuffleTicks, styleOrder, swatches,
+  tileSetOrder, tileSets, topRowPlayers, trackers, turnModes, undoClearTime,
+} from './js/logic/data.js';
+
+/** @typedef {import('./js/logic/data.js').BadgeSize} BadgeSize */
+/** @typedef {import('./js/logic/data.js').BoardMode} BoardMode */
+/** @typedef {import('./js/logic/data.js').CountKind} CountKind */
+/** @typedef {import('./js/logic/data.js').Designation} Designation */
+/** @typedef {import('./js/logic/data.js').DesignationKind} DesignationKind */
+/** @typedef {import('./js/logic/data.js').IdentityPart} IdentityPart */
+/** @typedef {import('./js/logic/data.js').QuarterTurn} QuarterTurn */
+/** @typedef {import('./js/logic/data.js').Reminders} Reminders */
+/** @typedef {import('./js/logic/data.js').Style} Style */
+/** @typedef {import('./js/logic/data.js').TileSet} TileSet */
+/** @typedef {import('./js/logic/data.js').Trackers} Trackers */
+/** @typedef {import('./js/logic/data.js').TurnMode} TurnMode */
+
 const storageKey = 'lifepod-game';
 const android = window.LifePodAndroid;
 const ios = window.webkit?.messageHandlers;
@@ -52,133 +74,7 @@ const restart = /** @type {HTMLDialogElement} */ (document.querySelector('#resta
 const announcer = /** @type {HTMLParagraphElement} */ (document.querySelector('#announcer'));
 const portraitQuery = window.matchMedia('(orientation: portrait)');
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
-const quarterTurns = [0, 90, 180, 270];
-// Landscape rows list seats by facing edge and player number. Repeated seats span cells.
-const seatLayouts = {
-  2: ['left-1 right-2'],
-  3: ['top-1 right-3', 'bottom-2 right-3'],
-  4: ['top-1 top-2', 'bottom-3 bottom-4'],
-  5: ['top-1 top-2 right-5', 'bottom-3 bottom-4 right-5'],
-  6: ['top-1 top-2 top-5', 'bottom-3 bottom-4 bottom-6'],
-};
-const playerCounts = Object.keys(seatLayouts).map(Number);
-// Tile colours, in order. Players 1–6 default to the first six. Each has a lighter top-row and a darker
-// bottom-row version in styles.css: players 1, 2 and 5 use the top row, so neighbours differ in lightness too.
-// New swatches only ever join the end, so saved choices keep their colour. The ids are Classic's names; each tile set
-// below names them for itself.
-const swatches = ['sage', 'sky', 'coral', 'violet', 'amber', 'teal', 'rose', 'indigo', 'slate', 'copper', 'olive', 'orchid'].map(id => ({ id }));
-const topRowPlayers = [0, 1, 4];
-// Tile colour sets (design/polish/TILES.md), in the Tile colours slider's order: the same twelve swatch ids in each, so a
-// player's colour carries over, with each set's own names for screen readers. Classic is the original twelve; Clear,
-// the default, keeps tiles apart for colour-blind players. styles.css holds each set's palettes under data-tiles.
-const tileSets = {
-  classic: { label: 'Classic', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'] },
-  soft: { label: 'Soft', names: ['Coral', 'Copper', 'Olive', 'Lime', 'Jade', 'Teal', 'Sky', 'Azure', 'Violet', 'Orchid', 'Plum', 'Slate'] },
-  jewel: { label: 'Jewel', names: ['Sage', 'Sky', 'Coral', 'Violet', 'Amber', 'Teal', 'Rose', 'Indigo', 'Slate', 'Copper', 'Olive', 'Orchid'] },
-  clear: { label: 'Clear', names: ['Coral', 'Copper', 'Olive', 'Lime', 'Jade', 'Cyan', 'Sky', 'Indigo', 'Violet', 'Orchid', 'Pale plum', 'Deep plum'] },
-};
-const tileSetOrder = Object.keys(tileSets);
-const defaultTileSet = 'clear';
-// The Style setting (design/polish/STYLE.md): direction A, Material, or direction B, Glass. styles.css holds each as
-// tokens under data-style. Until the player picks one, the iOS app (its game message handler) starts on Glass, and
-// Android and browsers on Material.
-const styleOrder = ['material', 'glass'];
-// Settings → Table → Badge size, in the slider's order (styles.css scales the badge rows and the mana strip by it).
-const badgeSizes = { default: 'Default', large: 'Large', larger: 'Larger' };
-const badgeSizeOrder = /** @type {BadgeSize[]} */ (Object.keys(badgeSizes));
 const defaultStyle = ios?.game ? 'glass' : 'material';
-// The centre button's label while a board mode that ends with the single check mark is open.
-const doneLabels = { rotate: 'Done rotating seats', colours: 'Done choosing colours', identity: 'Done choosing identities' };
-// Modes whose changes can be undone, saved with the check mark, or discarded with ✕.
-/** @type {BoardMode[]} */
-const editingModes = ['damage', 'counters', 'mana'];
-const discardMessages = {
-  damage: 'Commander damage and life go back to how they were when you opened commander damage.',
-  counters: 'Every counter goes back to how it was when you opened counters.',
-  mana: 'Every mana pool goes back to how it was when you opened mana.',
-};
-// Player counters (design/polish/SPEC.md §6), in the order they appear everywhere: counters mode, the near badge row,
-// the Track sheet and its summary. Each is one count per player in game[kind], shown while its Track switch is on.
-// Commander tax counts casts and comes with the Commander switch. phrase names one counter for screen readers.
-/** @type {{ kind: CountKind, tracker: Tracker, phrase: string }[]} */
-const counterKinds = [
-  { kind: 'poison', tracker: 'poison', phrase: 'poison counter' },
-  { kind: 'casts', tracker: 'commander', phrase: 'commander cast' },
-  { kind: 'energy', tracker: 'energy', phrase: 'energy counter' },
-  { kind: 'experience', tracker: 'experience', phrase: 'experience counter' },
-  { kind: 'rad', tracker: 'rad', phrase: 'rad counter' },
-];
-// Typed as strings, so includes() can test any kind.
-/** @type {string[]} */
-const countKinds = counterKinds.map(counter => counter.kind);
-// The monarch (CR 726) and the initiative (CR 727): one player at most holds each, saved in game[kind] as a seat index
-// or null. Nobody holds either until an effect gives it, so a new game clears both. Counters mode shows a cell for each
-// after the counters, and the holder's near row a chip. The words are for screen readers.
-/** @typedef {{ kind: DesignationKind, label: string, name: string, role: string, still: string }} Designation */
-/** @type {Designation[]} */
-const designations = [
-  { kind: 'monarch', label: 'Monarch', name: 'the monarch', role: 'is the monarch', still: 'is still the monarch' },
-  { kind: 'initiative', label: 'Initiative', name: 'the initiative', role: 'has the initiative', still: 'still has the initiative' },
-];
-const designationKinds = designations.map(designation => designation.kind);
-// The Track switches, in the sheet's order. Each is saved in game.counters.
-const trackers = ['commander', 'poison', 'energy', 'experience', 'rad', ...designationKinds];
-// Settings → Reminders: the monarch's draw and the initiative's venture as the turn passes, the hint on an out holder's
-// tile, and the "Tap +1 · hold −1" lines in the board modes. Each is on unless it was saved as exactly false.
-const reminderKinds = ['turns', 'passOn', 'gestures'];
-// What each turn reminder says, and how long it stays on its tile.
-const reminderText = { monarch: 'Monarch: draw a card', initiative: 'Initiative: venture into Undercity' };
-const reminderTime = 3000;
-// Losing amounts (CR 903.10a and 704.5c), and where the warning starts.
-const commanderLethal = 21;
-const commanderWarning = 15;
-const poisonLethal = 10;
-const poisonWarning = 7;
-// Colour identity (design/polish/SPEC.md §2): any combination of the five colours, in W U B R G order. A colourless
-// commander has none. Each of the 31 identities has a name and a symbol. styles.css draws the symbols from the Mana
-// font: each colour's mana symbol, the ten Ravnica guilds, the five Khans clans, the five Streets of New Capenna
-// families for the shards, and the colour pie for all five. Four colours have no official symbol, so they get the
-// colour pie with the missing colour as a ghost.
-const identityNames = {
-  W: 'Mono-white', U: 'Mono-blue', B: 'Mono-black', R: 'Mono-red', G: 'Mono-green',
-  WU: 'Azorius', UB: 'Dimir', BR: 'Rakdos', RG: 'Gruul', WG: 'Selesnya',
-  WB: 'Orzhov', UR: 'Izzet', BG: 'Golgari', WR: 'Boros', UG: 'Simic',
-  WUG: 'Bant', WUB: 'Esper', UBR: 'Grixis', BRG: 'Jund', WRG: 'Naya',
-  WBG: 'Abzan', WUR: 'Jeskai', UBG: 'Sultai', WBR: 'Mardu', URG: 'Temur',
-  UBRG: 'Glint-Eye', WBRG: 'Dune-Brood', WURG: 'Ink-Treader', WUBG: 'Witch-Maw', WUBR: 'Yore-Tiller',
-  WUBRG: 'WUBRG',
-};
-// What a tile's identity chip can show, in the chip's order, and what can sit behind its life total: the symbol on
-// tiles with an identity, the rings on every tile (Default), or nothing (Off).
-const identityParts = ['indicator', 'symbol', 'name'];
-const identityBackgrounds = ['symbol', 'default', 'off'];
-// The identity settings' save format. Saves without it are from when Background was Symbol · Indicator · Off and
-// Off meant the rings: their Off loads as Default and their Indicator as Symbol, so only a save of this version
-// can mean the new Off.
-const identitySettingsVersion = 2;
-const identityColours = [
-  { id: 'W', name: 'white' }, { id: 'U', name: 'blue' }, { id: 'B', name: 'black' },
-  { id: 'R', name: 'red' }, { id: 'G', name: 'green' },
-];
-// Floating mana (design/polish/SPEC.md §9): one count per colour in each player's pool, in W U B R G C order.
-const manaColours = [...identityColours, { id: 'C', name: 'colourless' }];
-// Turns (design/polish/SPEC.md §8): off, rounds (the first player's flag counts rounds) or turn by turn.
-const turnModes = ['off', 'rounds', 'turns'];
-// Play order is clockwise on screen, which is passing to the left. Seat rotation doesn't change it.
-const playOrders = { 2: [0, 1], 3: [0, 2, 1], 4: [0, 1, 3, 2], 5: [0, 1, 4, 3, 2], 6: [0, 1, 4, 5, 3, 2] };
-const maxRound = 999;
-// How long a hold takes to register on the turn chip and the pill's round button, and how long "Undo clear" stays.
-const holdDelay = 500;
-const undoClearTime = 5000;
-// "Who goes first?": the shuffle lights tiles in turn for about 0.8s, and the chosen tile shows "Goes first" for a beat.
-const shuffleTick = 90;
-const shuffleTicks = 9;
-const firstBeat = 700;
-// Player counters, commander damage and mana stop at this, which keeps every tile readable.
-const maxCount = 99;
-// The custom starting life stepper's range.
-const maxStartingLife = 999;
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
 // tile. Each row first drops words and marks: on the near row the identity's name, the turn chip's word "Turn" and the
 // hint's "Pass it on" (leaving the untap symbol and "T" with the round), then the identity's symbol where the indicator
@@ -206,9 +102,6 @@ const typeFloor = 9;
 // A dropped item comes back only when every row would fit it with this much to spare, so counts ticking up and
 // down by one can't make it blink.
 const dropSlack = 1.15;
-const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
-// A tile face's edges, clockwise from the far edge (its top, toward the table).
-const faceEdges = ['far', 'end', 'near', 'start'];
 // Colours mode's grids for its twelve 44px swatches on narrow or short boards, in the order a face takes the first that
 // fits: 4 × 3, 3 × 4, 6 × 2 and 2 × 6, with 3px gaps.
 const swatchColumns = [4, 3, 6, 2];
@@ -236,9 +129,7 @@ let game = loadGame();
 let selectedPlayerCount = game.scores.length;
 let lock;
 let requestingLock = false;
-// The open board mode: 'rotate', 'colours', 'identity', 'damage', 'counters', 'mana' or 'first' ("Who goes first?"),
-// or null at rest. Only setBoardMode changes it.
-/** @typedef {null | 'rotate' | 'colours' | 'identity' | 'damage' | 'counters' | 'mana' | 'first'} BoardMode */
+// The open board mode (BoardMode in js/logic/data.js), or null at rest. Only setBoardMode changes it.
 /** @type {BoardMode} */
 let boardMode = null;
 // While an editing mode is open: every change made in it, newest last, so it can be undone or discarded,
@@ -963,29 +854,18 @@ function fitReminders(saved) {
  * @property {number | null} initiative The initiative holder's seat, or null for nobody.
  * @property {Reminders} reminders
  */
-/** @typedef {0 | 90 | 180 | 270} QuarterTurn */
-/** @typedef {'commander' | 'poison' | 'energy' | 'experience' | 'rad' | DesignationKind} Tracker */
-/** @typedef {Record<Tracker, boolean>} Trackers */
-/** @typedef {'poison' | 'casts' | 'energy' | 'experience' | 'rad'} CountKind */
-/** @typedef {'monarch' | 'initiative'} DesignationKind */
 /**
  * @typedef {object} IdentitySettings
  * @property {Record<IdentityPart, boolean>} show What the identity chip shows.
  * @property {'symbol' | 'default' | 'off'} background What sits behind the life total.
  * @property {number} version identitySettingsVersion when saved; older saves mean something else by background.
  */
-/** @typedef {'indicator' | 'symbol' | 'name'} IdentityPart */
-/** @typedef {'off' | 'rounds' | 'turns'} TurnMode */
 /**
  * @typedef {object} Turn
  * @property {number | null} first Who went first, as a seat, or null.
  * @property {number | null} active Whose turn it is, as a seat, or null.
  * @property {number} round From 1 to maxRound.
  */
-/** @typedef {'classic' | 'soft' | 'jewel' | 'clear'} TileSet */
-/** @typedef {'default' | 'large' | 'larger'} BadgeSize */
-/** @typedef {'material' | 'glass'} Style */
-/** @typedef {Record<'turns' | 'passOn' | 'gestures', boolean>} Reminders */
 
 /** @returns {Game} */
 function loadGame() {
@@ -2024,7 +1904,6 @@ function outReason(index) {
   if (game.counters.commander && game.commanderDamage[index].some(damage => damage >= commanderLethal)) return 'commander';
   return null;
 }
-const outLabels = { life: 'out', poison: 'out on poison', commander: 'out on commander damage' };
 
 // A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
 function randomBelow(count) {
