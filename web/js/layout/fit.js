@@ -21,11 +21,12 @@ const dropSteps = {
   ],
   far: [{ drop: 'sword', selector: '.sword' }],
   // The mana strip sits at the far edge, under commander damage, and never covers the life total, the − and + glyphs,
-  // the near row or the pill. Its type shrinks first, then it wraps toward the total if there's room. Each strip then
-  // takes the first place that fits (fitStrips): its own line under the far row, or the end of the far row's line, or,
-  // folded, one chip that shows the pool and opens mana mode, on its own line or at the end of the far row. Only the
-  // strips that need it fold, so a short pool elsewhere keeps its spend buttons.
-  strip: [{ floor: 11 }, { drop: 'strip-wrap', wrap: true }],
+  // the near row or the pill. Commander damage keeps the far row's line to itself, and the strip's type never shrinks,
+  // so each symbol stays legible on its 44px target: the strip wraps toward the total if there's room, and otherwise
+  // folds. Each strip takes the first place that fits (fitStrips): its own line under the far row, or, folded, one chip
+  // that shows the pool and opens mana mode, on its own line there or at the end of the near row. Only the strips that
+  // need it fold, so a short pool elsewhere keeps its spend buttons.
+  strip: [{ drop: 'strip-wrap', wrap: true }],
 };
 // A badge row's wrap token, and the smallest type a row shrinks to, which keeps a count legible.
 const wrapTokens = { near: 'wrap', far: 'wrap-far' };
@@ -92,7 +93,7 @@ export function requestFit() {
 }
 
 // The badge rows are fitted first, then each mana strip takes the first place that fits. A strip folded onto the end of
-// its far row's line takes room from that row, so the far rows are fitted again around it.
+// its near row takes room from that row, so the near rows are fitted again around it.
 function fitBadgeRows() {
   fitQueued = false;
   if (fitInputs() === fitted) {
@@ -107,7 +108,7 @@ function fitBadgeRows() {
   }
   fitBadgeSide('near');
   fitBadgeSide('far');
-  if (fitStrips()) fitBadgeSide('far');
+  if (fitStrips()) fitBadgeSide('near');
   // A turn reminder's place depends on how tall the near edge came out.
   for (const index of reminders.keys()) placeReminders(board.children[index]);
   fitted = fitInputs();
@@ -300,12 +301,14 @@ function overlaps(a, b) {
 // The mana strips sit at the far edge, with commander damage (design/polish/SPEC.md §9). They never cover a life total,
 // its − and + glyphs, the "Out" tag, the near row or the pill, and both badge rows always stay. Each strip takes the
 // first of these that fits:
-//   'below': its own line between the far row and the total;
-//   'inline': at the end of the far row's line, where the far row leaves room;
+//   'below': its own line between the far row and the total, at full type, wrapped onto a second line where the
+//     board takes the strip-wrap step;
 //   'fold': folded into one chip that shows the pool and opens mana mode, on its own line under the far row;
-//   'fold-inline': that chip at the end of the far row, which gives way around it like any other chip.
-// The type steps (shrink, then wrap) are board-wide like the badge rows: the fewest that fold the fewest strips, with
-// the same 15% to spare before a step is undone. Returns whether a chip took room on a far row's line.
+//   'near': that chip at the end of the near row, by the player, which gives way with the row like any other chip.
+// Commander damage keeps the far row's line to itself, and the strip's type never shrinks below its full size, so its
+// symbols stay legible and every spend button a 44px target; a strip that can't fit folds instead. The wrap step is
+// board-wide like the badge rows: taken when it folds fewer strips, and undone only with 15% to spare. Returns whether a
+// chip took room on a near row.
 //
 // Every strip tries each place at once: each tile's strip lays out on its own, so the places are set on every tile,
 // then read on every tile, and the board lays out once per place rather than once per strip (PERFORMANCE.md P8).
@@ -320,7 +323,6 @@ function fitStrips() {
   const controls = boardControls.getBoundingClientRect();
   const inset = controls.height > controls.width ? controls.width / 8 : controls.height / 8;
   const pill = { left: controls.left + inset, right: controls.right - inset, top: controls.top + inset, bottom: controls.bottom - inset };
-  const seam = boardControls.hasAttribute('data-vertical');
   const tiles = strips.map((strip) => {
     const player = /** @type {HTMLElement} */ (strip.closest('.player'));
     const face = /** @type {HTMLElement} */ (strip.closest('.player-face'));
@@ -353,38 +355,19 @@ function fitStrips() {
   // costs one, and one on the near row's line two.
   const placeStrips = (slack, wrap) => {
     readTiles();
-    let pending = tiles.filter(tile => !((wrap || tile.line * slack <= tile.room + 1) && clear(tile)));
-    // With 2 players the far rows face the upright pill, so a strip stays on the side of its far row away from the pill
-    // rather than beside it on the row's line (DESIGN-AUDIT S6).
-    if (!seam) {
-      placeAll('inline', pending);
-      pending = pending.filter(tile => !(tile.farWidth + (tile.farWidth ? 4 : 0) + tile.line * slack <= tile.room + 1 && clear(tile)));
-    }
+    const pending = tiles.filter(tile => !((wrap || tile.line * slack <= tile.room + 1) && clear(tile)));
     placeAll('fold', pending);
-    // With no far row, the chip's own line is where the end of the far row's line would be.
-    const folded = pending.filter(tile => (tile.strip.offsetWidth * slack <= tile.room + 1 && clear(tile)) || tile.far.hidden);
-    const inline = pending.filter(tile => !folded.includes(tile));
-    placeAll('fold-inline', inline);
-    return folded.length + 2 * inline.length;
+    const folded = pending.filter(tile => tile.strip.offsetWidth * slack <= tile.room + 1 && clear(tile));
+    const near = pending.filter(tile => !folded.includes(tile));
+    placeAll('near', near);
+    return folded.length + 2 * near.length;
   };
-  const base = parseFloat(getComputedStyle(strips[0]).fontSize);
   // What the strips' places cost at a level.
   let placed = '';
   const measure = (level, slack) => {
     placed = `${level} ${slack}`;
     syncDropTokens({ ...dropLevels, strip: level });
-    setRowSize('strip', null);
-    const taken = steps.slice(0, level);
-    const floors = taken.filter(step => step.floor).map(step => /** @type {number} */ (step.floor));
-    const wrap = taken.some(step => step.wrap);
-    if (floors.length) {
-      // Each strip shrinks toward the line it can have: its own line where that's clear of the total, otherwise what the
-      // far row leaves on its line.
-      readTiles();
-      const ratio = Math.min(...tiles.map(tile => (tile.room - (clear(tile) || tile.far.hidden ? 0 : tile.farWidth + 4)) / (tile.line * slack)));
-      if (ratio < 1) setRowSize('strip', Math.max(Math.min(...floors), Math.floor(base * ratio * 10) / 10));
-    }
-    return placeStrips(slack, wrap);
+    return placeStrips(slack, steps.slice(0, level).some(step => step.wrap));
   };
   // The levels' costs, from the lowest. Once a level folds nothing, none after it can do better.
   /** @type {number[]} */
@@ -408,7 +391,7 @@ function fitStrips() {
   }
   dropLevels = { ...dropLevels, strip: level };
   if (placed !== `${level} 1`) measure(level, 1);
-  return tiles.some(({ player }) => player.dataset.strip === 'fold-inline');
+  return tiles.some(({ player }) => player.dataset.strip === 'near');
 }
 
 // A tile's reminders sit on their own line above the near edge where that's clear of the total, the − and + glyphs and

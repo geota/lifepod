@@ -404,11 +404,14 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - A tile shows a strip **only while its pool has mana**, and only the colours it holds: for example (R)3 (C)1 [eraser].
   - **Both badge rows always stay** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place).
   - **The strip sits at the far edge, with commander damage** (moved there on 22 November 2026, at the owner's request): the two most used operations are together and the tile is balanced, with the near row at the player's edge and commander damage and mana at the far edge.
-  - It takes the first place that fits clear of the total, the glyphs, the "Out" tag, the near row and the pill: its own line just under the far row, toward the total; the end of the far row's line; folded into one chip (the pool, and a caret › that says it opens mana mode) on its own line under the far row; or that chip at the end of the far row. With no commander damage it takes the far row's place.
+  - **Commander damage always has the far row to itself** (the owner's rule, 23 November 2026): mana never shares its line, displaces it or pushes it sideways.
+  - **The strip's type never shrinks**, so every symbol stays legible on its 44px target. Overflow loses detail by folding instead.
+  - It takes the first place that fits clear of the total, the glyphs, the "Out" tag, the near row and the pill: its own line just under the far row, toward the total, wrapping onto a second line there if needed; folded into one chip (the pool, and a caret › that says it opens mana mode, the full-size picker) on its own line under the far row; or that chip at the end of the near row, by the player. With no commander damage it takes the far row's place.
+  - As built: on the phones checked (952 × 427 and 568 × 320, 3 to 6 players) the gap between the far row and the total is shorter than a 44px line, so the chip goes to the near row there; a 1366 × 1024 tablet and the 3- and 5-player end seats keep the full strip under commander damage.
   - *As built:* the strip tries those four places at full type, then again with its type shrunk (down to an 11px floor), then wrapped toward the total (`strip-wrap`, `layout/fit.js`). Its level is board-wide, with the same 15% hysteresis as the badge rows, and only the strips that need it fold.
   - The turn chip stays in the near row, so it never meets the strip.
   - Strip items are 44px tall:
-    - **Tap a symbol to spend 1** of that colour. It saves at once, and the strip shrinks as colours reach 0.
+    - **Tap a symbol to spend 1** of that colour. It saves at once. A colour that reaches 0 keeps its place, dimmed, until 800ms after the strip's last tap, then the strip reflows, so a quick extra tap can't land on whatever would have slid under the finger. The tile's − and + ignore touches for that time too.
     - **The eraser clears the pool** and leaves "Undo clear" in the strip's place for 5 seconds; a tap restores the pool.
 - **Automatic emptying:**
   - Setting: "Empty mana pools when the turn passes", default on. It's shown while Mana pool is on and Turns isn't Off.

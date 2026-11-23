@@ -286,11 +286,13 @@ function nearItems(index) {
   for (const designation of trackedDesignations(game)) {
     if (game[designation.kind] === index) items.push(designationItem(designation, index));
   }
+  // The strip's chip at the end, which shows only when the strip can go nowhere at the far edge.
+  if (stripShows(index)) items.push(stripChipItem(index));
   return items;
 }
 
-// The far row: the sword, then one chip per opponent's commander damage, largest first, and the strip's chip at the
-// end, which shows only when the strip can go nowhere else.
+// The far row: the sword, then one chip per opponent's commander damage, largest first. It's theirs alone: the mana
+// strip goes under it, or folds.
 /** @returns {Keyed[]} */
 function farItems(index) {
   const damage = game.counters.commander ? game.commanderDamage[index]
@@ -319,7 +321,6 @@ function farItems(index) {
       },
     });
   }
-  if (stripShows(index)) items.push(stripChipItem(index));
   return items;
 }
 
@@ -377,7 +378,7 @@ export function renderBadges(index) {
   const far = player.querySelector('.badges.far');
   const farRow = farItems(index);
   syncChildren(far, farRow);
-  far.hidden = !farRow.some(({ key }) => key.startsWith('damage-'));
+  far.hidden = farRow.length === 0;
   far.setAttribute('aria-label', farRow.some(({ key }) => key.startsWith('strip-')) ? 'Commander damage and mana pool' : 'Commander damage');
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
   // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.

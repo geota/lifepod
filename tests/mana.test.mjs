@@ -236,12 +236,69 @@ test('chromium: mana mode fits six players on the smallest phone', async (t) => 
   assert.deepEqual(await problems(), [], 'the mana cells fit');
 });
 
+// Each tile's mana as it sits, in its face's own coordinates (faceBoxes): its place, the commander damage row, the
+// strip's spend buttons and folded chip, and the near row.
+function manaFaces(page) {
+  return Promise.all([
+    page.locator('.player').evaluateAll(players => players.map(player => player.dataset.strip ?? '')),
+    faceBoxes(page, {
+      far: '.badges.far > .chip', strip: '.mana-strip > button:not(.chip)', folded: '.mana-strip > .strip-chip',
+      nearChip: '.badges.near > .strip-chip', near: '.badges.near > :not(.strip-chip)',
+    }),
+  ]);
+}
+
+// The owner's rules for floating mana (design/polish/SPEC.md §9): commander damage always has the far row to itself,
+// and mana never shares its line, displaces it or pushes it sideways. Every spend button is a whole 44px target and its
+// symbol is never shrunk: a strip that can't fit at full size folds into one chip, under the far row or at the end of
+// the near row, which opens mana mode. Checked with one, three and all six colours, at 3 to 6 players, on the target,
+// the stress size and a tablet, in both styles, with commander damage from several opponents.
+async function checkManaRules(t, engine) {
+  const pools = { one: [0, 4, 0, 0, 0, 0], three: [2, 0, 3, 0, 1, 0], six: [2, 3, 1, 4, 2, 1] };
+  for (const style of ['material', 'glass']) {
+    for (const [width, height] of [[952, 427], [568, 320], [1366, 1024]]) {
+      for (const count of [3, 4, 5, 6]) {
+        for (const [colours, pool] of Object.entries(pools)) {
+          const view = `${style}, ${width} × ${height}, ${count} players, ${colours}`;
+          const game = savedGame(count, {
+            style, manaPool: true, pools: Array(count).fill(pool), counters: { commander: true, poison: true }, poison: Array(count).fill(2),
+            commanderDamage: Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) => (defender === attacker ? 0 : [16, 12, 8, 5, 3, 1][attacker]))),
+          });
+          const page = await openPage(t, engine, { viewport: { width, height }, mobile: width < 1000, game });
+          assert.deepEqual(await stripProblems(page), [], `${view}: every strip is clear of the totals, glyphs and rows, and every spend button a whole 44px target`);
+          const [places, faces] = await manaFaces(page);
+          faces.forEach((face, index) => {
+            const seat = `${view}, P${index + 1} (${places[index]})`;
+            const mana = [face.strip, face.folded, face.nearChip].filter(Boolean);
+            assert.equal(mana.length, 1, `${seat}: shows its strip or one folded chip`);
+            // Commander damage owns the far row: no mana on its line, and the row centred in the room the pill leaves.
+            assert.ok(mana[0].top >= face.far.bottom - 0.5, `${seat}: mana sits below the commander damage row`);
+            const off = (face.far.left + face.far.right) / 2 - (face.room.left + face.room.right) / 2;
+            assert.ok(Math.abs(off) <= 1.5, `${seat}: the commander damage row is centred, not pushed aside (${off.toFixed(1)}px)`);
+            if (places[index] === 'near') assert.ok(!face.near || mana[0].top >= face.near.top - 0.5, `${seat}: a chip at the near edge sits in the near row`);
+            else assert.ok(mana[0].top <= face.far.bottom + 3, `${seat}: a strip at the far edge sits just under the commander damage row`);
+          });
+          // Pips are never shrunk: a strip that shows its spend buttons has its full type, or it folds.
+          const pips = await page.locator('.mana-strip .strip-spend .pip').evaluateAll(nodes => nodes.filter(pip => pip.checkVisibility())
+            .map(pip => ({ width: pip.getBoundingClientRect().width, strip: getComputedStyle(pip.closest('.mana-strip')).fontSize })));
+          for (const pip of pips) {
+            assert.ok(pip.width >= 18.5, `${view}: a pip is at least 18.5px (${pip.width.toFixed(1)}px)`);
+            assert.ok(parseFloat(pip.strip) >= 15, `${view}: a strip's type is never shrunk below 15px (${pip.strip})`);
+          }
+          assert.equal(await page.evaluate(() => [...document.querySelectorAll('.far-edge')].filter(edge => edge.style.getPropertyValue('--strip-size')).length), 0,
+            `${view}: no strip's type is shrunk`);
+          await page.close();
+        }
+      }
+    }
+  }
+}
+
 // The strip never covers a life total, its − and + glyphs, the far row, the near row or the pill, and both rows and
 // their counts always show (design/polish/SPEC.md §9). With three or all six colours on every tile, with and without the
-// active player's turn chip, on the target, the smallest real phone and the stress size: a strip sits at the far edge,
-// on its own line under the far row or at the end of the far row's line, and one that can't fit either folds into a
-// chip with a caret that opens mana mode, on its own line or at the end of the far row. The turn chip never leaves the
-// near row.
+// active player's turn chip, on the target, the smallest real phone and the stress size: a strip sits under the far row,
+// and one that can't fit there folds into a chip with a caret that opens mana mode, under the far row or at the end of
+// the near row. The turn chip never leaves the near row.
 async function checkStripClear(t, engine) {
   const three = [0, 2, 0, 3, 0, 1];
   const six = [2, 1, 3, 4, 5, 6];
@@ -273,22 +330,16 @@ async function checkStripClear(t, engine) {
           assert.equal(state.shown, count, `${view}: every tile with mana shows its strip or its folded chip (${state.places})`);
           assert.equal(state.poison, count, `${view}: every near row keeps its poison count`);
           if (turn) assert.ok(state.turnChip, `${view}: the turn chip stays in the near row`);
-          const folded = state.places.filter(place => place.startsWith('fold')).length;
+          const folded = state.places.filter(place => place === 'fold' || place === 'near').length;
           assert.equal(state.chips.length, folded, `${view}: each folded strip shows its chip`);
           for (const chip of state.chips) {
             assert.ok(chip.caret, `${view}: a folded chip has a caret`);
             assert.match(chip.label, /^\d+ mana\. Player \d's pool: .+\. Open mana$/);
           }
+          assert.deepEqual(await tileProblems(page, { targets: '.strip-chip' }), [], `${view}: a folded chip is a whole 64 × 44 target inside its tile`);
           if (folded) {
             await page.locator('.strip-chip').filter({ visible: true }).first().tap();
             assert.equal(await mode(page), 'mana', `${view}: a folded strip opens mana mode`);
-          }
-          // On the target, a strip beside a near row of just the poison count never folds, with three colours at 4 or 6
-          // players or six colours at 4. Only the active tile, whose near row also has the turn chip and the flag, may run
-          // out of room for its 44px targets.
-          if (width === 952 && (colours === 'three colours' || count === 4)) {
-            const folds = state.places.flatMap((place, index) => (place.startsWith('fold') && !(turn && index === 0) ? [`P${index + 1}`] : []));
-            assert.deepEqual(folds, [], `${view}: on the target only the tile with the turn chip may fold`);
           }
           await page.close();
         }
@@ -297,46 +348,9 @@ async function checkStripClear(t, engine) {
   }
 }
 
-// The strip sits at the far edge, with commander damage (design/polish/SPEC.md §9): on its own line just under the far
-// row, toward the total, or at the end of the far row's line, or folded under it or onto its end. With no commander
-// damage it takes the far row's place. On the target, a pool of one colour never folds.
-async function checkStripAtFarEdge(t, engine) {
-  for (const [width, height] of [[952, 427], [568, 320]]) {
-    for (const count of [2, 3, 4, 5, 6]) {
-      for (const damage of [true, false]) {
-        const view = `${width} × ${height}, ${count} players, ${damage ? 'commander damage' : 'no commander damage'}`;
-        const game = savedGame(count, {
-          manaPool: true, pools: Array(count).fill([0, 0, 0, 3, 0, 0]), counters: { commander: true, poison: true }, poison: Array(count).fill(2),
-          commanderDamage: Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) => (damage && defender !== attacker ? 4 : 0))),
-        });
-        const page = await openPage(t, engine, { viewport: { width, height }, game });
-        assert.deepEqual(await stripProblems(page), [], `${view}: every strip is clear of the totals, glyphs, rows and pill`);
-        const places = await page.locator('.player').evaluateAll(players => players.map(player => player.dataset.strip));
-        const faces = await faceBoxes(page, { far: '.badges.far > .chip:not(.strip-chip)', strip: '.mana-strip > :is(button:not(.chip), .strip-chip)', folded: '.badges.far > .strip-chip', near: '.badges.near > *' });
-        faces.forEach((face, index) => {
-          const seat = `${view}, P${index + 1} (${places[index]})`;
-          const strip = face.strip ?? face.folded;
-          assert.ok(strip, `${seat}: shows its strip or its folded chip`);
-          assert.ok((strip.top + strip.bottom) / 2 < face.height / 2, `${seat}: the strip is on the far half of the tile`);
-          assert.ok(strip.bottom <= face.near.top, `${seat}: the strip is on the far side of the near row`);
-          if (!face.far) return;
-          if (places[index] === 'inline' || places[index] === 'fold-inline') {
-            assert.ok(Math.abs((strip.top + strip.bottom) / 2 - (face.far.top + face.far.bottom) / 2) <= 2, `${seat}: on the far row's line`);
-            assert.ok(strip.left >= face.far.right - 0.5, `${seat}: at the end of the far row`);
-          } else {
-            assert.ok(strip.top >= face.far.bottom - 0.5 && strip.top <= face.far.bottom + 3, `${seat}: just under the far row (${strip.top} under ${face.far.bottom})`);
-          }
-        });
-        if (width === 952) assert.deepEqual(places.filter(place => place.startsWith('fold')), [], `${view}: a one-colour pool never folds on the target`);
-        await page.close();
-      }
-    }
-  }
-}
-
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: commander damage owns the far row, and mana folds rather than shrinks`, { timeout: 600000 }, t => checkManaRules(t, engine));
   test(`${name}: the mana strip never covers a life total or its glyphs`, t => checkStripClear(t, engine));
-  test(`${name}: the mana strip sits at the far edge, with commander damage`, t => checkStripAtFarEdge(t, engine));
 }
 
 test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {

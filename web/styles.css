@@ -1359,11 +1359,12 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Floating mana at rest (design/polish/SPEC.md §9): while a pool has mana, a strip shows each colour it holds and its
    amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a 44px-tall
    target at least 44px wide, on a 32px capsule. It sits at the far edge, under commander damage and toward the total,
-   so the two most used counts are together, and both badge rows always stay. app.js puts each strip in the first place
-   that fits clear of the life total, the − and + glyphs, the near row and the pill (data-strip on the tile): below, on
-   its own line under the far row; inline, at the end of the far row's line; fold, one chip that shows the pool and
-   opens mana mode, on its own line; or fold-inline, that chip at the end of the far row. --strip-size shrinks the type
-   and strip-wrap lets a strip below grow toward the total onto a second line. */
+   so the two most used counts are together, and both badge rows always stay. Commander damage keeps the far row to
+   itself, and the strip's type never shrinks, so every symbol stays legible on a 44px target. app.js puts each strip in
+   the first place that fits clear of the life total, the − and + glyphs, the near row and the pill (data-strip on the
+   tile): below, on its own line under the far row, where strip-wrap lets it grow toward the total onto a second line;
+   fold, one chip that shows the pool and opens mana mode, on its own line there; or near, that chip at the end of the
+   near row, by the player. */
 .mana-strip {
   position: relative;
   z-index: 1;
@@ -1386,18 +1387,13 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .mana-strip::before { position: absolute; inset: clamp(0px, calc(22px - .8em), 6px) 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
 .mana-strip[hidden] { display: none; }
 .board[data-drop~="strip-wrap"] .player[data-strip="below"] .mana-strip { flex-wrap: wrap; }
-/* Inline: the far row, then the strip, on one line whose targets reach 2px from the tile's edge (or from the pill's
-   clearance, where the pill reaches it). */
-/* The line is the targets' 44px, and the far row, centred on it, keeps the pill's clearance at any Badge size (1.7em is
-   the row's height: the far edge takes the row's type). */
-.player[data-strip="inline"] .far-edge { flex-direction: row; justify-content: center; gap: 4px; top: max(2px, var(--far-offset, 0px) - clamp(0px, (var(--tap-min) - 1.7em) / 2, 6px)); }
-.player[data-strip="inline"] .badges.far { flex: 1 1 0; min-width: 0; align-self: center; }
-.player[data-strip="inline"] .mana-strip { order: 1; }
-/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, on its own line under the far row.
-   Where even that can't fit, the strip hides and the same chip ends the far row (fold-inline). */
-.player[data-strip="fold-inline"] .mana-strip, .badges.far > .strip-chip { display: none; }
-.player[data-strip="fold-inline"] .badges.far > .strip-chip { display: inline-flex; }
+/* Folded: the strip shows only its chip, with a caret that says it opens mana mode, the full-size picker, on its own
+   line under the far row. Where even that can't fit, the strip hides and the same chip ends the near row (near), where
+   it takes the near row's type and gives way with it like any other chip. */
+.player[data-strip="near"] .mana-strip, .badges.near > .strip-chip { display: none; }
+.player[data-strip="near"] .badges.near > .strip-chip { display: inline-flex; }
 .strip-chip { display: none; gap: .3em; padding: 0 .4em 0 .5em; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-size: var(--far-badge-size, var(--far-row-size)); }
+.badges.near > .strip-chip { font-size: 1em; }
 .player[data-strip="fold"] .mana-strip { padding: 0; }
 .player[data-strip="fold"] .mana-strip::before, .player[data-strip="fold"] .mana-strip > :not(.strip-chip) { display: none; }
 .player[data-strip="fold"] .mana-strip > .strip-chip { display: inline-flex; }
