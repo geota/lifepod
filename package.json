@@ -1,6 +1,7 @@
 {
   "name": "lifepod",
   "private": true,
+  "type": "module",
   "scripts": {
     "lint": "npm run lint:web && npm run lint:android && npm run lint:ios",
     "lint:web": "eslint web",
@@ -19,6 +20,7 @@
     "@eslint/js": "9.39.5",
     "eslint": "9.39.5",
     "eslint-plugin-compat": "7.0.2",
+    "fast-check": "3.23.2",
     "fontkit": "2.0.4",
     "globals": "14.0.0",
     "playwright-core": "1.65.0",
