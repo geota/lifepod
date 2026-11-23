@@ -38,21 +38,35 @@ function loadedFiles() {
   return sorted(found);
 }
 
-test('chromium: every file the page loads is served by the Android app and bundled by CI', () => {
-  const files = loadedFiles();
-  assert.deepEqual(files, sorted(['index.html', 'styles.css', 'app.js', 'dice.js', 'fonts/mana.woff2', 'icon.png', 'favicon-32.png']),
-    'the files the page loads (update this list along with the two below)');
-
-  const served = Object.fromEntries([...kotlin.matchAll(/"\/([^"]+)" to "([^"]+)"/g)].map(([, path, type]) => [path, type]));
-  const types = { html: 'text/html', css: 'text/css', js: 'application/javascript', png: 'image/png', woff2: 'font/woff2' };
-  for (const file of files) {
-    assert.equal(served[file], types[file.split('.').pop()], `MainActivity.kt's MIME_TYPES serves ${file} with its type`);
+test('chromium: every file the page loads is served by the Android and iOS apps and bundled by CI', () => {
+  // Both apps serve any file under web/ whose extension is in their type table, and the two tables match.
+  const table = (source, start, pattern) => Object.fromEntries(
+    [...source.slice(source.indexOf(start)).split(/^\s*[)\]]$/m)[0].matchAll(pattern)].map(([, extension, type]) => [extension, type]));
+  const android = table(kotlin, 'val MIME_TYPES =', /"(\w+)" to "([^"]+)"/g);
+  const ios = table(swift, 'static let mimeTypes = [', /"(\w+)": "([^"]+)"/g);
+  assert.deepEqual(ios, android, "LifePodApp.swift's mimeTypes match MainActivity.kt's MIME_TYPES");
+  assert.equal(android.js, 'text/javascript', 'scripts have a JavaScript type, which module scripts need');
+  assert.equal(android.mjs, 'text/javascript');
+  for (const file of loadedFiles()) {
+    assert.ok(android[file.split('.').pop()], `the apps serve ${file}: its extension is in MIME_TYPES and mimeTypes`);
   }
-  for (const path of Object.keys(served)) assert.ok(existsSync(new URL(`../web/${path}`, import.meta.url)), `MIME_TYPES lists ${path}, which exists`);
 
-  const zip = read('.github/workflows/ci.yml').match(/zip "\$RUNNER_TEMP\/lifepod-web\.zip" (.+)/)[1].trim().split(/\s+/);
-  for (const file of files) assert.ok(zip.includes(file), `the CI web bundle includes ${file}`);
-  for (const path of zip) assert.ok(existsSync(new URL(`../web/${path}`, import.meta.url)), `the CI web bundle lists ${path}, which exists`);
+  // Each app takes its paths percent-decoded, only from its own host, and refuses empty segments and any segment that
+  // starts with a dot, so a request can't climb out of web/.
+  assert.match(kotlin, /val path = assetPath\(request\.url\)/, 'the Android interceptor checks every path');
+  assert.match(kotlin, /if \(url\.scheme != "https" \|\| url\.authority != ASSET_HOST\) return null/);
+  assert.match(kotlin, /val path = url\.path\?/, 'Uri.path, which is percent-decoded');
+  assert.match(kotlin, /if \(segments\.any \{ it\.isEmpty\(\) \|\| it\.startsWith\('\.'\) \|\| '\\\\' in it \}\) return null/);
+  assert.match(swift, /setURLSchemeHandler\(WebFolderSchemeHandler\(\), forURLScheme: appScheme\)/);
+  assert.match(swift, /webView\.load\(URLRequest\(url: startPage\)\)/, 'iOS loads the page through the scheme handler');
+  assert.doesNotMatch(swift, /loadFileURL/, 'and not from file://, where module scripts are blocked');
+  assert.match(swift, /url\.scheme == appScheme, url\.host\(percentEncoded: false\) == appHost/);
+  assert.match(swift, /let path = url\.path\(percentEncoded: false\)/);
+  assert.match(swift, /segments\.allSatisfy\(\{ !\$0\.isEmpty && !\$0\.hasPrefix\("\."\) && !\$0\.contains\("\\\\"\) \}\) else \{ return nil \}/);
+  assert.match(swift, /respond\(to: task, url: url, status: 404,/, 'iOS answers anything else with a 404');
+
+  // CI bundles the whole folder.
+  assert.match(read('.github/workflows/ci.yml'), /name: Bundle offline web app\n\s+working-directory: web\n\s+run: zip -r -X "\$RUNNER_TEMP\/lifepod-web\.zip" \.\n/);
 });
 
 test('chromium: the bridge names match the Android and iOS wrappers', () => {
