@@ -8,7 +8,7 @@ import {
   keepLifeEditorInView, lifeEditor, placeSettingsSections, settings, settingsBody, syncSettingsCue,
 } from '../layout/settings.js';
 import { maxStartingLife, playerCounts } from '../logic/data.js';
-import { boardMode, game, syncBackHandling } from '../state/state.js';
+import { boardMode, game, showDialog, syncBackHandling } from '../state/state.js';
 import { element, icon, setupButton } from '../ui/dom.js';
 import {
   renderBadgeSizeSetting, renderIdentitySheet, renderRemindersSection, renderStyleSetting, renderTileSetting,
@@ -188,11 +188,10 @@ function openSettings() {
   renderBadgeSizeSetting();
   renderStyleSetting();
   placeSettingsSections();
-  settings.showModal();
+  showDialog(settings);
   // Settings always open at the top.
   settingsBody.scrollTop = 0;
   syncSettingsCue();
-  syncBackHandling();
 }
 setupButton.addEventListener('click', () => {
   if (boardMode) {
@@ -259,8 +258,7 @@ restartButton.addEventListener('click', () => {
   document.querySelector('#restart-resets').replaceChildren(...resetList().map(item => element('li', '', item)));
   document.querySelector('#restart-keeps').textContent = game.shuffleColours ? 'Settings and seats stay.' : 'Settings, seats and tile colours stay.';
   restart.returnValue = 'cancel';
-  restart.showModal();
-  syncBackHandling();
+  showDialog(restart);
 });
 restart.addEventListener('close', () => {
   if (restart.returnValue === 'restart') {

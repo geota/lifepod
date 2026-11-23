@@ -13,7 +13,7 @@ import { syncPill } from '../render/pill.js';
 import { renderScore } from '../render/tile.js';
 import { haptic, reducedMotion } from '../state/platform.js';
 import {
-  boardMode, editStartHolders, edits, game, openBoardMode, saveGame, syncBackHandling, turnSteps,
+  boardMode, editStartHolders, edits, game, openBoardMode, saveGame, showDialog, syncBackHandling, turnSteps,
 } from '../state/state.js';
 import { board, boardControls, discardDialog, icon, setupButton } from '../ui/dom.js';
 import { cancelPresses } from '../ui/press.js';
@@ -163,8 +163,7 @@ export function cancelEditing() {
   document.querySelector('#discard-message').textContent = discardMessages[boardMode]
     + (moved.length ? ` So ${moved.length > 1 ? 'do' : 'does'} ${moved.join(' and ')}.` : '');
   discardDialog.returnValue = 'keep';
-  discardDialog.showModal();
-  syncBackHandling();
+  showDialog(discardDialog);
 }
 
 export function discardEdits() {

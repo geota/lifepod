@@ -2,7 +2,7 @@
 // Importing this module wires the sheet and the pill's dice button.
 
 import { haptic, reducedMotion } from '../state/platform.js';
-import { syncBackHandling } from '../state/state.js';
+import { showDialog, syncBackHandling } from '../state/state.js';
 import { diceButton, element } from '../ui/dom.js';
 
 const diceDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#dice'));
@@ -61,8 +61,7 @@ for (const sides of window.lifePodDice.sides) {
 }
 diceButton.addEventListener('click', () => {
   showDie(diceSides);
-  diceDialog.showModal();
-  syncBackHandling();
+  showDialog(diceDialog);
 });
 diceStage.addEventListener('click', rollDie);
 diceRoll.addEventListener('click', rollDie);
