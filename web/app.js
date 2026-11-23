@@ -1,12 +1,13 @@
 import {
   chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
 } from './js/actions/edits.js';
-import { autoEmptyPools, clearPool, endUndoClears, spendMana, undoClear } from './js/actions/mana.js';
+import { clearPool, endUndoClears, spendMana, undoClear } from './js/actions/mana.js';
 import {
   askFirst, cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setAskFirst, setBoardMode,
   shuffleFirst,
 } from './js/actions/mode.js';
-import { clearReminders, dismissReminder, remind, turnStarted } from './js/actions/reminders.js';
+import { clearReminders, dismissReminder, remind } from './js/actions/reminders.js';
+import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { layoutBoard, measureBoard, syncBoardTurn } from './js/layout/board.js';
 import { requestFit, resetDrops } from './js/layout/fit.js';
 import {
@@ -14,12 +15,12 @@ import {
   syncSettingsCue,
 } from './js/layout/settings.js';
 import {
-  badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, maxCount, maxRound, maxStartingLife, playerCounts,
-  tileSetOrder, tileSets, trackers,
+  badgeSizeOrder, badgeSizes, clockwiseEdges, countKinds, maxStartingLife, playerCounts, tileSetOrder, tileSets,
+  trackers,
 } from './js/logic/data.js';
-import { isOut, leavingTransfers, nextTurn, outPlayers, previousTurn, trackedDesignations } from './js/logic/rules.js';
+import { isOut, leavingTransfers, outPlayers, trackedDesignations } from './js/logic/rules.js';
 import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn } from './js/logic/save.js';
-import { announce, announceDesignation, announceLife, clearAnnouncements } from './js/render/announce.js';
+import { announceDesignation, announceLife, clearAnnouncements } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours, currentStyle } from './js/render/appearance.js';
 import { renderBadges, renderPassHints, setBadgeActions } from './js/render/badges.js';
 import { setModeActions } from './js/render/modes.js';
@@ -87,84 +88,6 @@ function handOnLeavers(wasOut) {
     if (transfer.kind === 'initiative') remind(transfer.to, 'initiative');
   }
   if (transfers.length) saveGame();
-}
-
-// Shows a turn step on every tile and the pill, saves it at once and announces it.
-function showTurn() {
-  const turnFocus = document.activeElement?.matches('.turn-chip');
-  saveGame();
-  haptic();
-  game.scores.forEach((_, index) => renderBadges(index));
-  syncPill();
-  // A turn chip passed from the keyboard is gone, so focus moves to the chip that now has the turn.
-  if (turnFocus && !document.activeElement?.matches('.turn-chip')) board.querySelector('.active-chip, .turn-chip')?.focus();
-  const { active, round } = game.turn;
-  announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `Player ${active + 1}'s turn, round ${round}` : `Round ${round}`));
-}
-
-function recordStep(before, emptied) {
-  turnSteps.push({ turn: before, emptied });
-  if (turnSteps.length > 200) turnSteps.shift();
-}
-
-// The next step forward. Rounds: the next round. Turn by turn: the next player in play order who isn't out, and the
-// round goes up when play passes the first player's seat. With nobody's turn yet, the pill asks who goes first.
-function stepTurn() {
-  if (game.turns === 'off') return;
-  const before = { ...game.turn };
-  if (game.turns === 'rounds') {
-    game.turn.round = Math.min(maxRound, game.turn.round + 1);
-  } else {
-    if (game.turn.active === null) {
-      setAskFirst(true);
-      maybeAskFirst();
-      return;
-    }
-    const { next, crossed } = nextTurn(game);
-    game.turn.active = next;
-    if (crossed) game.turn.round = Math.min(maxRound, game.turn.round + 1);
-  }
-  recordStep(before, autoEmptyPools());
-  showTurn();
-  if (game.turns === 'turns') {
-    // The monarch draws at the beginning of their end step, so passing the turn reminds them, and the initiative's
-    // holder ventures at the beginning of their upkeep, so their turn starting reminds them.
-    if (game.monarch === before.active) remind(before.active, 'monarch');
-    turnStarted();
-  }
-}
-
-// Turn by turn with nobody's turn yet: a tile's turn chip starts that player's turn, and they go first if nobody has.
-function startTurn(index) {
-  const before = { ...game.turn };
-  game.turn.active = index;
-  game.turn.first ??= index;
-  recordStep(before, null);
-  showTurn();
-  turnStarted();
-}
-
-// One step back: the last step taken, with any pools it emptied, or after a relaunch the previous player in play
-// order (or the previous round). The round never goes below 1.
-function stepBack() {
-  if (game.turns === 'off') return;
-  const step = turnSteps.pop();
-  if (step) {
-    game.turn = step.turn;
-    step.emptied?.forEach((pool, index) => pool.forEach((amount, colour) => {
-      game.pools[index][colour] = Math.min(maxCount, game.pools[index][colour] + amount);
-    }));
-  } else if (game.turns === 'rounds') {
-    if (game.turn.round === 1) return;
-    game.turn.round -= 1;
-  } else {
-    if (game.turn.active === null) return;
-    const { previous, crossed } = previousTurn(game);
-    if (crossed && game.turn.round === 1) return;
-    game.turn.active = previous;
-    if (crossed) game.turn.round -= 1;
-  }
-  showTurn();
 }
 
 function renderBoard() {
