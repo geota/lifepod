@@ -179,12 +179,14 @@ test('webkit: the iOS bridge saves and loads, keeps the screen awake and ticks',
 // Reduce Transparency on iOS: LifePodApp.swift injects it before the page loads and runs its own script when it changes.
 // The app starts on Glass on iOS, whose pill, settings header and dialogs go solid while it's on.
 const reduceScript = enabled => swift.match(/evaluateJavaScript\("(window\.setReduceTransparency.+?)", completionHandler/)[1].replace('\\(enabled)', String(enabled));
+// The pill's fill, and the blur behind the dialogs (the board's pill has none; DESIGN-AUDIT S10).
 const glassChrome = page => page.evaluate(() => {
   const pill = getComputedStyle(document.querySelector('#board-controls'), '::before');
+  const dialog = getComputedStyle(document.querySelector('#dice'));
   return {
     style: document.documentElement.dataset.style,
     reduce: document.documentElement.hasAttribute('data-reduce-transparency'),
-    filter: pill.webkitBackdropFilter ?? pill.backdropFilter,
+    filter: dialog.webkitBackdropFilter ?? dialog.backdropFilter,
     opaque: pill.backgroundColor.startsWith('rgb('),
   };
 });

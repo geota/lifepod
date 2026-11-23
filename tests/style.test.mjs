@@ -127,11 +127,15 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal(material.settings.segments.chosen, accent, 'the chosen segment is the lime accent');
     assert.deepEqual(material.settings.switch, ['36px', '20px']);
 
-    // Glass: the pill, the dice dialog and the settings header are the surface at 68% over an 18px blur, with a light edge.
-    for (const [part, surface] of [['pill', glass.pill], ['dice dialog', glass.dice], ['settings header', glass.settings.head]]) {
+    // Glass: the dice dialog and the settings header are the surface at 68% over an 18px blur, with a light edge. The
+    // board's pill has the edge and highlight but no blur, at a denser 90%, so the seams don't read through it (DESIGN-AUDIT
+    // S10).
+    for (const [part, surface] of [['dice dialog', glass.dice], ['settings header', glass.settings.head]]) {
       assert.equal(surface.filter, 'blur(18px) saturate(1.3)', `the ${part} is frosted`);
       assert.ok(Math.abs(alpha(surface.background) - 0.68) < 0.01, `the ${part} is tinted at 68% (${surface.background})`);
     }
+    assert.equal(glass.pill.filter, 'none', 'the pill isn\'t blurred');
+    assert.ok(Math.abs(alpha(glass.pill.background) - 0.9) < 0.01, `the pill is tinted at 90% (${glass.pill.background})`);
     assert.equal(glass.pill.edge, '1px', 'the pill has a light edge');
     assert.equal(glass.dice.edge, '1px', 'the dialog has a light edge');
     assert.equal(glass.settings.head.overBody, true, 'the settings header floats over the body, which scrolls under it');
@@ -151,6 +155,61 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(glass.settings.thumb, ['28px', '28px', '50%', sliderThumb]);
     // The tiles and the life halves are the same in both styles.
     assert.deepEqual(glass.tile, material.tile, 'tiles and life halves don’t change');
+  });
+}
+
+// The accent is kept for what is chosen or primary (DESIGN-AUDIT S3): row and section icons are soft text in both
+// styles, while Done, switches that are on and the chosen segment keep it. In Glass, a group's last row has no hairline
+// under it, however many columns the group has, a row on its own has none, and the board actions are one full-width
+// list (S10).
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: settings keeps the accent for chosen and primary, and Glass's groups end without a hairline`, async (t) => {
+    for (const style of ['material', 'glass']) {
+      const page = await openPage(t, engine, { game: { startingLife: 40, scores: [40, 40, 40, 40], counters: { commander: true }, style } });
+      await button(page, 'Settings').tap();
+      const [soft, accent] = await Promise.all([token(page, '--text-soft'), token(page, '--accent')]);
+      const colours = await page.evaluate(() => {
+        const rgb = (node) => {
+          const probe = document.createElement('span');
+          probe.style.color = getComputedStyle(node).color;
+          return probe.style.color;
+        };
+        return {
+          rows: [...document.querySelectorAll('#settings :is(.switch-row, .nav-row) > svg:first-child')].map(rgb),
+          sections: [...document.querySelectorAll('#settings .fs-sec > h3 > :first-child')].map(rgb),
+          done: getComputedStyle(document.querySelector('#save-setup')).backgroundColor,
+        };
+      });
+      const [softRgb, accentRgb] = await page.evaluate(colours => colours.map((colour) => {
+        const probe = document.createElement('span');
+        probe.style.color = colour;
+        return probe.style.color;
+      }), [soft, accent]);
+      assert.ok(colours.rows.length > 5 && colours.rows.every(colour => colour === softRgb), `${style}: row icons are soft text`);
+      assert.ok(colours.sections.length >= 5 && colours.sections.every(colour => colour === softRgb), `${style}: section icons are soft text`);
+      assert.equal(colours.done, accentRgb, `${style}: Done keeps the accent`);
+      const groups = await page.evaluate(() => {
+        const card = getComputedStyle(document.querySelector('#settings-track')).backgroundColor;
+        const ends = [...document.querySelectorAll('#settings :is(.fs-switches, .compact-switches, .fs-actions, .fs-gamefoot)')].map((group) => {
+          const end = getComputedStyle(group, '::after');
+          const last = [...group.children].filter(child => child.offsetParent).at(-1).getBoundingClientRect();
+          return { covers: end.backgroundColor === card && end.height === '1px', atLastRow: Math.abs(group.getBoundingClientRect().bottom - last.bottom) < 1 };
+        });
+        const actions = [...document.querySelectorAll('#settings-table .fs-action')].map(action => action.getBoundingClientRect());
+        return {
+          ends, oneList: actions.length === 2 && actions[0].width === actions[1].width && actions[1].top > actions[0].top,
+          alone: getComputedStyle(document.querySelector('#shuffle-colours-row')).boxShadow,
+        };
+      });
+      if (style === 'glass') {
+        assert.ok(groups.ends.every(end => end.covers && end.atLastRow), `glass: every group's last hairline is covered ${JSON.stringify(groups.ends)}`);
+        assert.ok(groups.oneList, 'glass: Colours and Rotate seats are one full-width list');
+        assert.match(groups.alone, /rgba\(0, 0, 0, 0\)|^none$/, 'glass: a row on its own has no hairline');
+      } else {
+        assert.ok(groups.ends.every(end => !end.covers), 'material: no rows have hairlines to cover');
+        assert.equal(groups.oneList, false, 'material: the board actions sit side by side');
+      }
+    }
   });
 }
 
@@ -198,7 +257,7 @@ for (const [name, engine] of Object.entries(engines)) {
     const block = stylesCss.match(/@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\) \{\n([\s\S]+?)\n\}/);
     assert.ok(block, 'styles.css has the @supports fallback');
     assert.equal(await page.evaluate(() => CSS.supports('(backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))')), true, 'this browser draws the blur');
-    assert.equal((await readChrome(page)).pill.filter, 'blur(18px) saturate(1.3)', 'so Glass is frosted here');
+    assert.equal((await readChrome(page)).dice.filter, 'blur(18px) saturate(1.3)', 'so Glass is frosted here');
     await page.evaluate((rules) => {
       const sheet = new CSSStyleSheet();
       sheet.replaceSync(rules);
@@ -218,8 +277,29 @@ test('chromium: Glass goes solid under prefers-reduced-transparency: reduce', as
   const chrome = await readChrome(page);
   for (const part of ['pill', 'dice', 'head']) assert.deepEqual({ filter: chrome[part].filter, opaque: chrome[part].opaque }, solid, `the ${part} is solid`);
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'no-preference' }] });
-  assert.equal((await readChrome(page)).pill.filter, 'blur(18px) saturate(1.3)', 'and frosted again without it');
+  assert.equal((await readChrome(page)).dice.filter, 'blur(18px) saturate(1.3)', 'and frosted again without it');
 });
+
+// Under 360px tall, Glass's settings header is its own solid row, as Material's is, rather than floating over a fifth of
+// the page (DESIGN-AUDIT S10). Above that it floats.
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: Glass's settings header is an inline row under 360px tall`, async (t) => {
+    const read = async (page) => {
+      await button(page, 'Settings').tap();
+      const head = await page.evaluate(() => {
+        const head = document.querySelector('.fs-head');
+        const style = getComputedStyle(head);
+        return { overBody: head.getBoundingClientRect().bottom > document.querySelector('#settings-body').getBoundingClientRect().top + 1, radius: style.borderTopLeftRadius, opaque: !style.backgroundColor.startsWith('rgba') };
+      });
+      await button(page, 'Close settings').tap();
+      return head;
+    };
+    const short = await openPage(t, engine, { viewport: { width: 568, height: 320 }, game: glassGame });
+    assert.deepEqual(await read(short), { overBody: false, radius: '0px', opaque: true }, 'at 568 × 320 the header is a solid row');
+    const tall = await openPage(t, engine, { viewport: { width: 952, height: 427 }, game: glassGame });
+    assert.deepEqual(await read(tall), { overBody: true, radius: '22px', opaque: false }, 'at 952 × 427 it floats');
+  });
+}
 
 // ---- Motion -------------------------------------------------------------------------------------------------------
 

@@ -150,6 +150,10 @@
   --row-column-gap: 6px;
   --row-divider: transparent;
   --row-inset: 12px;
+  /* What covers the divider under a group's last row (nothing here, where rows have no dividers), and the narrowest a
+     board action gets before the actions take a line each. */
+  --group-end: transparent;
+  --action-min: 12rem;
 
   /* Segmented choice: separate filled segments; the chosen one is the accent. */
   --segment-track: transparent;
@@ -182,8 +186,9 @@
   /* Pressed controls keep their size (Glass shrinks them a little). */
   --press-scale: 1;
 
-  /* Motion: 200ms emphasised easing; none under reduced motion. */
+  /* Motion: 200ms emphasised easing, for presses too; none under reduced motion. */
   --ease: cubic-bezier(.2, 0, 0, 1);
+  --ease-press: var(--ease);
   --motion: .2s;
 
   /* Shape: one corner scale (Material's 8, 16, 22, 24 and 28px, then full capsules). Buttons, switches and the chosen
@@ -256,12 +261,16 @@
   --scrim: #111213b3;
 
   --glass-tint: #1b1c1ead;
+  /* The board's pill isn't blurred (DESIGN-AUDIT S10): over the dark tiles a blur showed nothing but the seams, and it
+     costs the GPU during hold-repeat. A denser tint, 90%, keeps the seams and the active tile's ring from reading
+     through, with the glass edge and highlight. Settings and the dialogs keep the blur. */
+  --pill-tint: #1b1c1ee6;
   --glass-filter: blur(18px) saturate(1.3);
   --glass-edge: 1px;
   --glass-edge-color: #ffffff1f;
   --glass-highlight: inset 0 1px 0 #ffffff22;
 
-  --pill-background: var(--glass-tint);
+  --pill-background: var(--pill-tint);
   --pill-edge: var(--glass-edge);
   --pill-edge-color: var(--glass-edge-color);
   --pill-shadow: var(--glass-highlight), 0 1px 3px #0009, 0 6px 18px #0007;
@@ -283,6 +292,9 @@
   --row-column-gap: var(--space-4);
   --row-divider: var(--border);
   --row-inset: 2px;
+  /* No hairline under a group's last row, and the board actions as one full-width list, a row each. */
+  --group-end: var(--card-fill);
+  --action-min: 100%;
 
   /* Segmented choice: one track with the chosen segment as a raised thumb; the accent is kept for Done and switches. */
   --segment-track: var(--raised);
@@ -300,9 +312,10 @@
   --pick-ink: var(--thumb-ink);
   --toggle-ring: var(--text);
 
-  /* Pressed shrinks to 96% under the 10% layer. Motion is springy, 250ms with a gentle overshoot. */
+  /* Pressed shrinks to 96% under the 10% layer, on a 250ms spring with a gentle overshoot. Everything else (fades, the
+     switch thumb) keeps Material's easing, where an overshoot means nothing (DESIGN-AUDIT N5). */
   --press-scale: .96;
-  --ease: cubic-bezier(.3, 1.35, .55, 1);
+  --ease-press: cubic-bezier(.3, 1.35, .55, 1);
   --motion: .25s;
 
   /* Shape: capsule buttons, 20px cards, 30px dialogs, 12px map seats and swatches. */
@@ -360,6 +373,12 @@
     --dialog-fill: var(--surface);
     --head-fill: var(--surface);
   }
+}
+
+/* Under 360px tall (568 × 320), a floating header would take a fifth of the page and blur the labels under it, so
+   Glass's header is its own solid row there, as Material's is (DESIGN-AUDIT S10). */
+@media (max-height: 359.98px) {
+  [data-style="glass"] { --head-fill: var(--surface); --head-radius: 0px; --head-margin: 0px; --head-shadow: none; --head-overlay: 0; }
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -446,8 +465,6 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   border-radius: var(--radius-full);
   background: var(--pill-background);
   box-shadow: var(--pill-shadow);
-  -webkit-backdrop-filter: var(--glass-filter);
-  backdrop-filter: var(--glass-filter);
 }
 .pill-button {
   position: relative;
@@ -480,7 +497,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   content: '';
   background: var(--border);
 }
-.pill-button::before { transition: transform var(--motion) var(--ease); }
+.pill-button::before { transition: transform var(--motion) var(--ease-press); }
 .pill-button:active::before { background: var(--state-pressed); transform: scale(var(--press-scale)); }
 .pill-button > .icon, .setup-icon, .rotation-done { position: relative; display: grid; }
 .setup-icon[hidden], .rotation-done[hidden] { display: none; }
@@ -984,7 +1001,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   border: var(--control-edge) solid var(--control-border);
   border-radius: var(--radius-full);
   background: var(--control-fill);
-  transition: box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease);
+  transition: box-shadow var(--motion) var(--ease), transform var(--motion) var(--ease-press);
 }
 .identity-toggle:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 .identity-toggle .pip { --pip-size: calc(var(--toggle) * .62); }
@@ -1514,7 +1531,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 }
 :is(.close, .primary, .secondary, .nav-row, .segmented > button, .dice-picker button):disabled { opacity: var(--disabled-opacity); }
 /* Pressed buttons and board-mode cells shrink by --press-scale (Glass); Material keeps them full size. */
-:is(.close, .primary, .secondary, .dice-picker button, button.k-value, .k-commit, .counter-cell, .swatch, .map-cell) { transition: transform var(--motion) var(--ease); }
+:is(.close, .primary, .secondary, .dice-picker button, button.k-value, .k-commit, .counter-cell, .swatch, .map-cell) { transition: transform var(--motion) var(--ease-press); }
 :is(.close, .primary, .secondary, .segmented > button, .dice-picker button, button.k-value, .k-commit, .counter-cell, .identity-toggle, .swatch:enabled, .map-cell):active { transform: scale(var(--press-scale)); }
 
 /* Rows: a board action or a switch, filled one tone above the card, 16px corners. In a switch row the whole row toggles
@@ -1537,7 +1554,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
   text-align: start;
   cursor: pointer;
 }
-.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--accent); }
+.nav-row > :first-child, .switch-row > :first-child { flex: none; width: 18px; height: 18px; font-size: 18px; color: var(--text-soft); }
 .nav-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .switch-row .switch { margin-inline-start: auto; }
 .switch-row[hidden] { display: none; }
@@ -1546,6 +1563,11 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .switch-row:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* A long switch label, such as auto-empty's, wraps rather than being cut short. */
 .wide-switch .nav-label { white-space: normal; line-height: 1.2; }
+/* A row on its own has no divider, and a group's last row covers its own (Glass: DESIGN-AUDIT S10), however many
+   columns the group has and whichever rows are hidden. */
+.wide-switch { --row-divider: transparent; }
+:is(.fs-gamefoot, .fs-switches, .compact-switches, .fs-actions) { position: relative; }
+:is(.fs-gamefoot, .fs-switches, .compact-switches, .fs-actions)::after { position: absolute; inset: auto 0 0; height: 1px; content: ''; background: var(--group-end); pointer-events: none; }
 .setting-row { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; gap: var(--space-1); }
 .setting-label { font-size: var(--type-label); font-weight: var(--weight-semibold); color: var(--text-soft); }
 
@@ -1576,7 +1598,7 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
   font-weight: var(--weight-semibold);
   line-height: 1.15;
   text-align: center;
-  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease), transform var(--motion) var(--ease);
+  transition: border-radius var(--motion) var(--ease), background-color var(--motion) var(--ease), transform var(--motion) var(--ease-press);
 }
 .segmented > button:first-child { border-radius: var(--segment-outer) var(--segment-inner) var(--segment-inner) var(--segment-outer); }
 .segmented > button:last-child { border-radius: var(--segment-inner) var(--segment-outer) var(--segment-outer) var(--segment-inner); }
@@ -1748,7 +1770,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 /* Sections are cards (direction A): the surface on the page background, no border, 24px corners. */
 .fs-sec { display: grid; gap: var(--space-2); min-width: 0; padding: var(--space-3); border: var(--card-edge) solid var(--border); border-radius: var(--card-radius); background: var(--card-fill); container: settings-section / inline-size; }
 .fs-sec > h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 2px; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
-.fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--accent); }
+.fs-sec > h3 > :is(.icon, .mana-icon) { flex: none; width: 16px; height: 16px; font-size: 16px; color: var(--text-soft); }
 /* One column: a label sits beside its control when the card has room (480px), otherwise above it. In two columns each
    label stays above its control. */
 @container settings-section (min-width: 480px) {
@@ -1757,7 +1779,7 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
 .fs-switches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 /* Reminders: two to a line where each row has room for its whole label, otherwise one. */
 .fs-switches.reminder-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
-.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
+.fs-actions { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--action-min)), 1fr)); gap: var(--row-gap) var(--row-column-gap); }
 .fs-action { min-height: 48px; }
 .fs-action > .icon:last-child { flex: none; width: 15px; height: 15px; margin-inline-start: auto; color: var(--muted); }
 .fs-gamefoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
