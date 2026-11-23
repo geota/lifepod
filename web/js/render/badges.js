@@ -335,8 +335,9 @@ function farItems(index) {
 
 // Where focus was when a redraw took away the badge control it was on (a reminder ending, "Undo clear" running out,
 // the last mana spent), so it can move to a control nearby in the same tile rather than to <body> or the pill
-// (docs/review/ACCESSIBILITY.md M4): the next control in its row, else the one before, else another badge control on
-// the same edge of the tile, then on the other edge, else the tile's subtract button. A turn chip that passed the turn
+// (docs/review/ACCESSIBILITY.md M4): the next control in its row, else the one before, else one that took its place
+// there, else another badge control on the same edge of the tile (the near row's before the mana strip's), then on the
+// other edge, else the tile's subtract button. A turn chip that passed the turn
 // hands focus to the chip that now has it.
 /** @type {{ player: Element, row: Element, near: boolean, turn: boolean, after: string[], before: string[] } | null} */
 let lostFocus = null;
@@ -362,10 +363,13 @@ function restoreFocus() {
   const children = /** @type {HTMLElement[]} */ ([...lost.row.children]);
   /** @param {string[]} keys */
   const inRow = keys => keys.map(key => children.find(child => child.dataset.key === key)).find(usable);
+  // The near edge's controls start with its near row's, then the mana strip's above it.
+  /** @param {boolean} near */
+  const edge = near => [...lost.player.querySelectorAll(near ? '.badges.near button' : '.far-edge button'), ...lost.player.querySelectorAll(near ? '.near-edge > .mana-strip button' : '.far-edge button')];
   const target = (lost.turn ? [...board.querySelectorAll('.active-chip')].find(usable) : undefined)
-    ?? inRow(lost.after) ?? inRow(lost.before)
-    ?? [...lost.player.querySelectorAll(lost.near ? '.near-edge button' : '.far-edge button')].find(usable)
-    ?? [...lost.player.querySelectorAll(lost.near ? '.far-edge button' : '.near-edge button')].find(usable)
+    ?? inRow(lost.after) ?? inRow(lost.before) ?? children.find(usable)
+    ?? edge(lost.near).find(usable)
+    ?? edge(!lost.near).find(usable)
     ?? [lost.player.querySelector('.controls .subtract')].find(usable);
   /** @type {HTMLElement | undefined} */ (target)?.focus();
 }
@@ -387,11 +391,15 @@ export function renderBadges(index) {
   syncChildren(far, farRow);
   far.hidden = farRow.length === 0;
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
-  // While a pool has mana, or for 5 seconds after the eraser, its strip shows at the far edge, and both rows stay.
+  // While a pool has mana, or for 5 seconds after the eraser, its strip shows on its own row above the near row, and
+  // both rows stay. Its folded chip waits under the far row too, for a tile with no room for that row (fit.js).
   const strip = player.querySelector('.mana-strip');
   const floating = stripShows(index);
   syncChildren(strip, floating ? stripItems(index) : []);
   strip.hidden = !floating;
+  const farMana = player.querySelector('.mana-far');
+  syncChildren(farMana, floating ? [stripChipItem(index)] : []);
+  farMana.hidden = !floating;
   if (!floating) delete player.dataset.strip;
   const near = player.querySelector('.badges.near');
   const nearRow = nearItems(index);
