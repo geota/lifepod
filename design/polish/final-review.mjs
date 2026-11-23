@@ -17,16 +17,18 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright-core';
 import { fakeScreenOrientation, turnScreen } from '../../tests/helpers.mjs';
-import { serveApp } from '../serve.mjs';
+import { serveApp } from '../../scripts/serve.mjs';
+import { inPage } from './lib.mjs';
 
 const outDir = fileURLToPath(new URL('./renders/final/', import.meta.url));
 const args = new Set(process.argv.slice(2));
 const doShots = !args.has('--sweep');
 const doSweep = !args.has('--shots');
-await mkdir(outDir, { recursive: true });
-// The app over http, with ?debug for the internals it drives (lifePodDebug in web/app.js).
-const server = await serveApp();
-const app = `${server.url}?debug`;
+// Run as a script; tests/design.test.mjs imports it only for its snippets.
+if (import.meta.main) await mkdir(outDir, { recursive: true });
+// The app over http. The internals it drives come from the page's own modules (inPage in lib.mjs), not ?debug.
+const server = import.meta.main ? await serveApp() : null;
+const app = server?.url;
 
 // Sizes in CSS px, as the window is. Portrait windows report a portrait screen (angle 0), the rest landscape (90).
 const styles = ['material', 'glass'];
@@ -42,7 +44,7 @@ const sizes = {
 };
 
 // ---------------------------------------------------------------------------------------------------------------
-// Seeds. Each takes a player count and returns a saved game (the shape loadGame() in web/app.js reads).
+// Seeds. Each takes a player count and returns a saved game (the shape loadGame() in web/js/logic/save.js reads).
 const pick = (list, count) => Array.from({ length: count }, (_, i) => list[i % list.length]);
 const zeros = count => Array(count).fill(0);
 const noPools = count => Array.from({ length: count }, () => zeros(6));
@@ -138,6 +140,9 @@ const click = async (page, selector) => {
   }
 };
 const openSetup = page => click(page, '#setup-button');
+// The page code the modes run, for tests/design.test.mjs.
+const remindersJs = "game.scores.forEach((_, index) => remind(index, index % 2 ? 'initiative' : 'monarch'));";
+export const snippets = () => ({ reminders: { js: remindersJs } });
 const modes = {
   rest: async () => {},
   damage: page => click(page, '#damage-button'),
@@ -154,11 +159,8 @@ const modes = {
     await click(page, '#settings-close');
   },
   dice: page => click(page, '#dice-button'),
-  // Turn reminders on every tile, the monarch's and the initiative's in turn (remind(), through ?debug).
-  reminders: page => page.evaluate(() => {
-    const { game, remind } = window.lifePodDebug;
-    game.scores.forEach((_, index) => remind(index, index % 2 ? 'initiative' : 'monarch'));
-  }),
+  // Turn reminders on every tile, the monarch's and the initiative's in turn (remind() from the page's modules).
+  reminders: page => page.evaluate(inPage(remindersJs)),
   // Settings (design/polish/SETTINGS-SPEC.md): at the top, scrolled to the end, with a new game pending, with the life
   // field open, and turned to face the other side.
   settings: openSetup,
@@ -751,33 +753,35 @@ async function indicatorContrast() {
   });
 }
 
-browser = await chromium.launch();
-const started = Date.now();
-if (doShots) {
-  await shots();
-  await webkitShots();
-}
-let runs = 0;
-if (doSweep) {
-  runs = await sweep();
-  await accessibility();
-}
-await browser.close();
-await server.close();
+if (import.meta.main) {
+  browser = await chromium.launch();
+  const started = Date.now();
+  if (doShots) {
+    await shots();
+    await webkitShots();
+  }
+  let runs = 0;
+  if (doSweep) {
+    runs = await sweep();
+    await accessibility();
+  }
+  await browser.close();
+  await server.close();
 
-// Summary: problems grouped by kind and by a normalised message, with where they happen.
-const key = f => `${f.kind}: ${f.detail.replace(/^P\d /, '').replace(/[\d.]+(px²|px|×[\d.]+|:1)/g, 'N$1').replace(/"[^"]*"/g, '"…"').replace(/\(.*?\)/g, '(…)')}`;
-const grouped = {};
-for (const f of allFindings) (grouped[key(f)] ??= []).push(f);
-const summary = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length).map(([k, list]) => ({
-  problem: k, count: list.length,
-  styles: [...new Set(list.map(f => f.style ?? 'material'))],
-  sizes: [...new Set(list.map(f => f.size))], badges: [...new Set(list.map(f => f.badge ?? 'default'))], players: [...new Set(list.map(f => f.count))].sort(), modes: [...new Set(list.map(f => f.mode))],
-  example: list[0],
-}));
-const indicators = await indicatorContrast();
-await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
-console.log('Indicator discs on chips (need 3:1 from the fill or the rim):', indicators.map(d => `${d.colour} fill ${d.lowest}, rim ${d.rim}${d.visible ? '' : ' FAILS'}`).join(' · '));
-console.log(`${runs} sweep states, ${allFindings.length} problems in ${summary.length} groups, ${pageErrors.length} page errors, ${Math.round((Date.now() - started) / 1000)}s`);
-for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      styles ${s.styles.join(' ')} · sizes ${s.sizes.join(' ')} · badges ${s.badges.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.style ?? 'material'} ${s.example.size} ${s.example.badge ?? 'default'} badges ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
-if (pageErrors.length) console.log('Page errors:\n' + [...new Set(pageErrors)].join('\n'));
+  // Summary: problems grouped by kind and by a normalised message, with where they happen.
+  const key = f => `${f.kind}: ${f.detail.replace(/^P\d /, '').replace(/[\d.]+(px²|px|×[\d.]+|:1)/g, 'N$1').replace(/"[^"]*"/g, '"…"').replace(/\(.*?\)/g, '(…)')}`;
+  const grouped = {};
+  for (const f of allFindings) (grouped[key(f)] ??= []).push(f);
+  const summary = Object.entries(grouped).sort((a, b) => b[1].length - a[1].length).map(([k, list]) => ({
+    problem: k, count: list.length,
+    styles: [...new Set(list.map(f => f.style ?? 'material'))],
+    sizes: [...new Set(list.map(f => f.size))], badges: [...new Set(list.map(f => f.badge ?? 'default'))], players: [...new Set(list.map(f => f.count))].sort(), modes: [...new Set(list.map(f => f.mode))],
+    example: list[0],
+  }));
+  const indicators = await indicatorContrast();
+  await writeFile(`${outDir}findings.json`, JSON.stringify({ runs, pageErrors, indicators, summary, all: allFindings }, null, 1));
+  console.log('Indicator discs on chips (need 3:1 from the fill or the rim):', indicators.map(d => `${d.colour} fill ${d.lowest}, rim ${d.rim}${d.visible ? '' : ' FAILS'}`).join(' · '));
+  console.log(`${runs} sweep states, ${allFindings.length} problems in ${summary.length} groups, ${pageErrors.length} page errors, ${Math.round((Date.now() - started) / 1000)}s`);
+  for (const s of summary) console.log(`${String(s.count).padStart(4)}  ${s.problem}\n      styles ${s.styles.join(' ')} · sizes ${s.sizes.join(' ')} · badges ${s.badges.join(' ')} · players ${s.players.join(' ')} · modes ${s.modes.join(' ')}\n      e.g. ${s.example.style ?? 'material'} ${s.example.size} ${s.example.badge ?? 'default'} badges ${s.example.count}p ${s.example.seed} ${s.example.mode}${s.example.shot ? ` → ${s.example.shot}` : ''}: ${s.example.detail}`);
+  if (pageErrors.length) console.log('Page errors:\n' + [...new Set(pageErrors)].join('\n'));
+}

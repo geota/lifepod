@@ -1,21 +1,15 @@
 // Prints badge row widths against the room available, for the round 2 overflow scenes.
 // Run from the repo root: node design/counters/measure.mjs
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
+import { startServer } from '../../scripts/serve.mjs';
 const root = fileURLToPath(new URL('../../', import.meta.url));
-const server = createServer(async (req, res) => {
-  const path = normalize(decodeURIComponent(new URL(req.url, 'http://x').pathname)).replace(/^([/\\])+/, '');
-  try { const body = await readFile(join(root, path)); res.writeHead(200, { 'content-type': { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript' }[extname(path)] ?? 'application/octet-stream' }); res.end(body); }
-  catch { res.writeHead(404); res.end(); }
-}).listen(0, '127.0.0.1');
-await new Promise(r => server.once('listening', r));
+// The repo root over http (scripts/serve.mjs), for the mock-ups beside the app.
+const server = await startServer({ web: root });
 const browser = await chromium.launch();
 for (const id of ['o-today', 'o-compact', 'o-twoline', 'o-poisonnear']) {
   const page = await browser.newPage({ viewport: { width: 320, height: 568 } });
-  await page.goto(`http://127.0.0.1:${server.address().port}/design/counters/preview.html?scene=${id}`);
+  await page.goto(`${server.origin}/design/counters/preview.html?scene=${id}`);
   await page.waitForFunction(() => window.mockReady);
   const rows = await page.evaluate(() => [...document.querySelectorAll('.player')].slice(0, 4).flatMap((tile, i) =>
     [...tile.querySelectorAll('.badges')].map(row => {
@@ -26,4 +20,4 @@ for (const id of ['o-today', 'o-compact', 'o-twoline', 'o-poisonnear']) {
   await page.close();
 }
 await browser.close();
-server.close();
+await server.close();

@@ -1,6 +1,6 @@
 # Settings page: build spec
 
-**Status:** ready to build, 22 November 2026, from the owner's picks on [SETTINGS.md](SETTINGS.md):
+**Status:** built, 22 November 2026; §7 records where the build differs, and §8–§10 the later additions. Written as the build spec from the owner's picks on [SETTINGS.md](SETTINGS.md):
 
 | Question | Pick |
 |---|---|
@@ -20,7 +20,7 @@
 
 - One full-screen `<dialog id="settings">` replaces four dialogs: `#setup`, `#track`, `#identity-sheet` and `#privacy`.
 - `#restart` (the New game confirmation), `#discard` and `#dice` stay as they are.
-- The saved data doesn't change. Every setting and its default are as in [SPEC.md](SPEC.md) §10.
+- The saved data doesn't change. Every setting and its default are as in [SPEC.md](SPEC.md) §10.1, including the ones added after this spec: `tileColours` (§7), `style` (§9) and `badgeSize` (§10).
 - The ids of the controls inside stay the same where the control survives (`#player-choices`, `#life-presets`, `#commander-switch` … `#auto-empty-switch`, `#identity-show`, `#identity-background`, `#keep-awake`). The existing tests and app.js wiring keep working.
 
 ## 2. Structure
@@ -43,7 +43,7 @@ dialog#settings.fs
 | **Game** | Players **[STYLE Q4]**; Starting life **[STYLE Q5]**; then a footer row with **New game** (secondary button) and **Keep awake** (switch row) side by side |
 | **Track** | Eight switch rows (Commander, Poison, Energy, Experience, Rad, Mana pool, Monarch, Initiative), two to a line; Turns (Off · Rounds · Turn by turn); "Empty mana pools when the turn passes", shown only while Mana pool is on and Turns isn't Off |
 | **Identity** | Show on tiles (three compact switches: Indicator, Symbol, Name); Background (Symbol · Default · Off); the note line; **Choose identities** (board action) |
-| **Table** | **Colours** and **Rotate seats** (board actions), side by side |
+| **Table** | **Colours** and **Rotate seats** (board actions), side by side; then, added after the build, Style (§9), Tile colours (§7) and Badge size (§10) |
 | **Reminders** | Turn reminders, Pass-it-on hints and Gesture hints, compact switch rows (§8) |
 | **About** | Privacy and credits, today's text, in small muted type |
 
@@ -57,6 +57,8 @@ dialog#settings.fs
 - **The section card** (border, fill or neither) is **[STYLE Q1]**.
 
 ## 3. Layout
+
+> **As built (§7):** two columns whenever the window is at least 620px wide, portrait tablets included, not only in landscape. In one column, only Turns and Background put their label beside the control; the sliders and Show on tiles keep it above at every width.
 
 | Viewport | Layout |
 |---|---|
@@ -145,7 +147,7 @@ Each is a row with its icon, its label and an out-to-the-board arrow. The row's 
 - Board actions are buttons named for what they do: "Choose identities on the board", "Choose tile colours on the board", "Rotate seats on the board".
 - Done's accessible name follows its label.
 - The pending line is `aria-live="polite"`.
-- Focus is visible on every control (2px ring at 3:1, WCAG 2.4.13). The fixed header must never cover the focused control (2.4.11), so the body gets `scroll-padding-top` equal to the header's height.
+- Focus is visible on every control (2px ring at 3:1, WCAG 2.4.13). The fixed header must never cover the focused control (2.4.11), so the body gets `scroll-padding-top` equal to the header's height. *As built (§7):* the header is its own grid row above the scrolling body, so it can't cover a control, and the body has 8px scroll padding.
 
 ## 6. Build steps and tests
 
@@ -191,7 +193,7 @@ Where the build differs from the spec above, and why:
 | One column: labels beside controls in cards at least 480px wide | True for Turns and Background. The sliders and Show on tiles keep their label above at every width. | A slider needs the full width for 44px stops; beside a 7.5rem label the life stops crowd. |
 | Compact switches put the label over the switch in portrait | They do so whenever their card is narrow: under 460px for Show on tiles, under 340px for Track's switches | At 640 × 360 and 667 × 375 the two columns are narrower than a portrait phone, and "Indicator" or "Experience" would be cut short. A container query decides. |
 | Two columns in landscape from 620px wide | Two columns whenever the window is at least 620px wide, portrait tablets included | The width is what matters; a portrait tablet has room. |
-| Section order by layout | app.js moves the sections between the columns (and keeps focus) rather than reordering them with CSS | The reading and focus order always match what shows. The move waits while the life field is open, so a keyboard resize can't close it. |
+| Section order by layout | `placeSettingsSections()` (`web/js/layout/settings.js`) moves the sections between the columns (and keeps focus) rather than reordering them with CSS | The reading and focus order always match what shows. The move waits while the life field is open, so a keyboard resize can't close it. |
 | `scroll-padding-top` equal to the header | The header is its own grid row above the scrolling body, so it can't cover anything; the body has 8px scroll padding | Covering is impossible by construction; a test tabs through every control at 568 × 320 to check it. |
 | Arrow keys step, Page Up and Page Down step life by 5 | As specified. Home and End go to the ends of the track (2 and 6; 10 and 60). Life's ARIA range is 1 to 999, and keys can step past the track, where the handle pins and is marked with an arrow. | Keyboard users can reach every life the field allows. |
 | Each stop is a target | Stops are buttons with `tabindex="-1"`: the slider is one tab stop, and screen readers can still reach each stop | Five extra tab stops per slider would be noise next to the arrow keys. |
@@ -216,7 +218,7 @@ With the monarch and the initiative (SPEC.md §13), Settings gains a **Reminders
 | **Gesture hints** | hand-tap | always | the "Tap +1 · hold −1" and "Tap your colours" lines in counters, mana, commander damage and identity modes (Colours' "Your tile colour" is a label, so it stays) |
 
 - All on by default and saved the moment they change, in `game.reminders` (`loadGame()` keeps each on unless it was saved as exactly false). Gesture hints always shows, so the section always has something in it.
-- **Placement (layout B):** the left column, after Table: Game, Table and Reminders are about as tall as Track and Identity, and Reminders is the least-used section. In one column it comes after Table, before About. app.js moves it with the others.
+- **Placement (layout B):** the left column, after Table: Game, Table and Reminders are about as tall as Track and Identity, and Reminders is the least-used section. In one column it comes after Table, before About. `placeSettingsSections()` moves it with the others.
 - **Rows:** compact switch rows like Track's, two to a line where each row has room for its whole label (13rem), otherwise one, so no label is ever cut short (a container's auto-fit grid rather than Track's label-over-switch rule).
 - Tests: `tests/monarch.test.mjs` (which rows show when, the order of the sections in both layouts, 44px rows, saving) and `sizes.test.mjs` (every screen, no label cut short).
 
@@ -255,10 +257,10 @@ Tests: `tests/style.test.mjs` (the default on the web, Android and iOS, the pick
 At the owner's request, Settings → **Table** gains **Badge size: Default · Large · Larger**, a three-stop notched slider in the Tile colours slider's style, after Tile colours.
 
 - **What it scales:** the near and far badge rows and the mana strip, their chips, counts, icons and the colour indicator, by 1.2 (Large) and 1.4 (Larger). Default is the size from before the setting. Mode cells (map seats, counter and mana cells, swatches, identity toggles) and totals stay as they are.
-- **Room:** a row grows no taller than one row fits between its edge (or the pill's clearance) and the life total, its glyphs and the "Out" tag, on every tile (`measureBadgeRoom()` in app.js sets `--far-room` and `--near-room`), and never below the default. So on a small board a row may stay at the default size: at 568 × 320 with 6 players the far row has no room to grow.
+- **Room:** a row grows no taller than one row fits between its edge (or the pill's clearance) and the life total, its glyphs and the "Out" tag, on every tile (`measureBadgeRoom()` in `web/js/layout/fit.js` sets `--far-room` and `--near-room`), and never below the default. So on a small board a row may stay at or near the default size: at 568 × 320 with 6 players the far row grows only from 12.5px to 12.9px.
 - **Overflow:** the same order at every size (SPEC.md §3.2): names, then the symbol, then a second line, then smaller type down to 9px, or the type first where two lines would cover a total. A change of size fits the rows again from full size, as a new game does.
 - **The strip:** its type scales, and its capsule grows from 32px toward its targets' 44px so the larger symbols stay inside it. Its targets stay 44px.
-- **Saving:** it saves at once, like the switches, and isn't part of a pending new game. `badgeSize` is validated in `loadGame()`: anything but `default`, `large` or `larger`, or a save from before the setting, gets Default. app.js sets `data-badge-size` on `#board` for Large and Larger, and styles.css sets `--badge-scale` from it.
+- **Saving:** it saves at once, like the switches, and isn't part of a pending new game. `badgeSize` is validated in `loadGame()`: anything but `default`, `large` or `larger`, or a save from before the setting, gets Default. `applyBadgeSize()` in `web/js/render/appearance.js` sets `data-badge-size` on `#board` for Large and Larger, and styles.css sets `--badge-scale` from it.
 - Tests: `tests/badge-size.test.mjs` (the slider, saving and loading, what scales and what doesn't, every size fitting 2–6 players on the target and the stress size in both engines) and `tests/autodrop.test.mjs` (the overflow order at each size). `node design/polish/final-review.mjs --sweep` sweeps the board at rest, rotating and with reminders at Large and Larger.
 
 ## 11. New game in the header, and the design audit's fixes (added 23 November 2026)

@@ -3,13 +3,14 @@
 // mode's edits forwards and back. No DOM and no state of their own.
 
 import {
-  commanderLethal, countKinds, counterKinds, designations, identityColours, identityNames, manaColours, playOrders,
-  poisonLethal, seatLayouts, topRowPlayers,
+  commanderLethal, countKinds, counterKinds, designations, identityColours, identityNames, manaColours, maxCount, maxRound,
+  playOrders, poisonLethal, seatLayouts, topRowPlayers,
 } from './data.js';
 
 /** @typedef {import('./data.js').CountKind} CountKind */
 /** @typedef {import('./data.js').DesignationKind} DesignationKind */
 /** @typedef {import('./save.js').Game} Game */
+/** @typedef {import('./save.js').Turn} Turn */
 
 /**
  * One change made in an editing mode (damage, counters or mana), kept until the mode closes so it can be undone.
@@ -40,7 +41,12 @@ export function seatRow(index) {
 }
 
 // The board's seats as rows and columns of the landscape grid, with the cells each seat spans, for count players.
-/** @param {number} count */
+// rows and columns are typed any only because render/modes.js passes them to style.setProperty as numbers; once it passes
+// String(rows), they can be number.
+/**
+ * @param {number} count
+ * @returns {{ rows: any, columns: any, areas: Map<number, { top: number, bottom: number, left: number, right: number }> }}
+ */
 export function seatGrid(count) {
   const rows = seatLayouts[count].map(row => row.split(' ').map(seat => Number(seat.split('-')[1]) - 1));
   const areas = new Map();
@@ -55,6 +61,14 @@ export function seatGrid(count) {
 
 // Where a board cell lands in a tile's own frame, which is turned clockwise by angle. Drawing the map there
 // makes it match the table from every seat.
+/**
+ * @param {number} angle
+ * @param {number} rows
+ * @param {number} columns
+ * @param {number} row
+ * @param {number} column
+ * @returns {[number, number]}
+ */
 export function toFace(angle, rows, columns, row, column) {
   if (angle === 90) return [columns - 1 - column, row];
   if (angle === 180) return [rows - 1 - row, columns - 1 - column];
@@ -100,11 +114,19 @@ export function hasMana(game, index) {
 // ---- Out of the game ------------------------------------------------------------------------------------------------
 
 // Close to losing: a warning from 15 commander damage or 7 poison, and out at 21 or 10.
+/**
+ * @param {number} value
+ * @param {number} warning
+ * @param {number} lethal
+ */
 export function dangerLevel(value, warning, lethal) {
   return value >= lethal ? 'out' : value >= warning ? 'warn' : '';
 }
 
-/** @param {Game} game */
+/**
+ * @param {Game} game
+ * @param {number} index
+ */
 export function isOut(game, index) {
   return outReason(game, index) !== null;
 }
@@ -140,7 +162,7 @@ export function playOrder(game) {
 export function nextTurn(game) {
   const { active, first } = game.turn;
   const order = playOrder(game);
-  const position = order.indexOf(active);
+  const position = order.indexOf(/** @type {number} */ (active));
   let next = active;
   let crossed = false;
   for (let step = 1; step <= order.length; step++) {
@@ -160,7 +182,7 @@ export function nextTurn(game) {
 export function previousTurn(game) {
   const { active, first } = game.turn;
   const order = playOrder(game);
-  const position = order.indexOf(active);
+  const position = order.indexOf(/** @type {number} */ (active));
   let previous = active;
   let crossed = false;
   for (let step = 1; step <= order.length; step++) {
@@ -174,7 +196,41 @@ export function previousTurn(game) {
   return { previous, crossed };
 }
 
+// The turn after one step forward (SPEC §8), or null when it can't move. Rounds: the next round. Turn by turn: the next
+// player in play order who isn't out, and the next round when play passes the first player's seat. It doesn't move
+// with nobody's turn yet, when nobody else can take it, or past maxRound: in the last round, play holds rather than pass
+// the first player's seat, so turnBack always takes a step back exactly. actions/turns.js doesn't use these yet: stepTurn
+// should record a step only when turnForward moves, and stepBack's relaunch branch should take turnBack.
+/**
+ * @param {Game} game
+ * @returns {Turn | null}
+ */
+export function turnForward(game) {
+  const { turn } = game;
+  if (game.turns === 'rounds') return turn.round < maxRound ? { ...turn, round: turn.round + 1 } : null;
+  if (game.turns !== 'turns' || turn.active === null) return null;
+  const { next, crossed } = nextTurn(game);
+  if ((crossed && turn.round === maxRound) || (next === turn.active && !crossed)) return null;
+  return { ...turn, active: next, round: turn.round + Number(crossed) };
+}
+
+// The turn one step back when there's no step to undo (after a relaunch), or null when it can't move: the previous
+// round, or the previous player in play order who isn't out. The round never goes below 1.
+/**
+ * @param {Game} game
+ * @returns {Turn | null}
+ */
+export function turnBack(game) {
+  const { turn } = game;
+  if (game.turns === 'rounds') return turn.round > 1 ? { ...turn, round: turn.round - 1 } : null;
+  if (game.turns !== 'turns' || turn.active === null) return null;
+  const { previous, crossed } = previousTurn(game);
+  if ((crossed && turn.round === 1) || (previous === turn.active && !crossed)) return null;
+  return { ...turn, active: previous, round: turn.round - Number(crossed) };
+}
+
 // A random whole number below count, from the same crypto RNG as the dice, without modulo bias.
+/** @param {number} count */
 export function randomBelow(count) {
   const limit = Math.floor(0x100000000 / count) * count;
   const value = new Uint32Array(1);
@@ -223,9 +279,14 @@ function handsOnByItself(game) {
 // Who takes a designation when its holder leaves the game (CR 726.4 and 727.4): the active player, or, if the active
 // player is the one leaving or has already left, the next player in turn order who is still in. Nobody can take the
 // monarch if everyone else has left, and the game goes on without one; the initiative always has a holder, so it stays.
-/** @param {Game} game */
+/**
+ * @param {Game} game
+ * @param {DesignationKind} kind
+ * @param {number} leaver
+ */
 function heir(game, kind, leaver) {
-  const { active } = game.turn;
+  // Only called once somebody's turn has started (handsOnByItself).
+  const active = /** @type {number} */ (game.turn.active);
   if (active !== leaver && !isOut(game, active)) return active;
   const order = playOrder(game);
   const position = order.indexOf(active);
@@ -255,7 +316,11 @@ export function leavingTransfers(game, wasOut) {
 
 // Whether an out player's tile should ask for its designation to be passed on: they hold it, someone is still in to take
 // it, and the hint is on.
-/** @param {Game} game */
+/**
+ * @param {Game} game
+ * @param {DesignationKind} kind
+ * @param {number} index
+ */
 export function needsPassing(game, kind, index) {
   return game.reminders.passOn && game[kind] === index && isOut(game, index) && game.scores.some((_, player) => player !== index && !isOut(game, player));
 }
@@ -273,7 +338,7 @@ export function needsPassing(game, kind, index) {
 export function applyEdit(game, edit, direction) {
   // Every edit but a designation's has a delta, mana's a colour and commander damage's an attacker.
   const delta = /** @type {number} */ (edit.delta);
-  if (countKinds.includes(edit.kind)) game[edit.kind][edit.index] += delta * direction;
+  if (countKinds.includes(edit.kind)) game[/** @type {CountKind} */ (edit.kind)][edit.index] += delta * direction;
   else if (edit.kind === 'mana') game.pools[edit.index][/** @type {number} */ (edit.colour)] += delta * direction;
   else if (edit.kind === 'damage') {
     // Commander damage is damage, so the defender loses the same life in the same save.
@@ -284,6 +349,81 @@ export function applyEdit(game, edit, direction) {
   for (const transfer of direction > 0 ? transfers : [...transfers].reverse()) {
     game[transfer.kind] = direction > 0 ? transfer.to : transfer.from;
   }
+}
+
+// The edits a mode's taps make (actions/edits.js), or null for a tap that would take a count below 0 or above maxCount.
+// Commander damage is combat damage: adding it to the monarch makes the attacker the monarch (CR 726.3), and adding it to
+// the player with the initiative gives the attacker the initiative (CR 727.3). Taking damage away moves nothing.
+/**
+ * @param {Game} game
+ * @param {number} defender
+ * @param {number} attacker
+ * @param {number} delta
+ * @returns {Edit | null}
+ */
+export function damageEdit(game, defender, attacker, delta) {
+  const next = game.commanderDamage[defender][attacker] + delta;
+  if (defender === attacker || next < 0 || next > maxCount) return null;
+  const transfers = delta > 0 ? trackedDesignations(game).filter(({ kind }) => game[kind] === defender)
+    .map(({ kind }) => ({ kind, from: defender, to: attacker })) : [];
+  return { kind: 'damage', index: defender, attacker, delta, transfers };
+}
+
+// Counters mode's designation cells: a tap gives it to that player, taking it from whoever had it, and a tap on the
+// holder's own cell clears it.
+/**
+ * @param {Game} game
+ * @param {DesignationKind} kind
+ * @param {number} index
+ * @returns {Edit}
+ */
+export function designationEdit(game, kind, index) {
+  const from = game[kind];
+  return { kind: 'designation', index, transfers: [{ kind, from, to: from === index ? null : index }] };
+}
+
+/**
+ * @param {Game} game
+ * @param {CountKind} kind
+ * @param {number} index
+ * @param {number} delta
+ * @returns {Edit | null}
+ */
+export function countEdit(game, kind, index, delta) {
+  const next = game[kind][index] + delta;
+  return next >= 0 && next <= maxCount ? { kind, index, delta } : null;
+}
+
+// Mana mode's edit: one colour in one player's pool, one up or down.
+/**
+ * @param {Game} game
+ * @param {number} index
+ * @param {number} colour
+ * @param {number} delta
+ * @returns {Edit | null}
+ */
+export function manaEdit(game, index, colour, delta) {
+  const next = game.pools[index][colour] + delta;
+  return next >= 0 && next <= maxCount ? { kind: 'mana', index, colour, delta } : null;
+}
+
+// Applies a new edit forwards, as a mode's tap does, and returns it. Anyone it puts out of the game hands on what they
+// hold (CR 726.4 and 727.4) in the same edit: the handoffs join its transfers, so applyEdit(game, edit, -1) undoes them
+// with it. actions/edits.js's commitEdit does the same today; it should call this instead.
+/**
+ * @param {Game} game
+ * @param {Edit} edit
+ * @returns {Edit}
+ */
+export function applyNewEdit(game, edit) {
+  const out = outPlayers(game);
+  applyEdit(game, edit, 1);
+  const handoffs = leavingTransfers(game, out);
+  if (handoffs.length) {
+    edit.transfers = [...(edit.transfers ?? []), ...handoffs];
+    for (const transfer of handoffs) game[transfer.kind] = transfer.to;
+  }
+  return edit;
 }
 
 // Every player an edit shows on: its own, and anyone a designation moved to or from.
@@ -299,6 +439,7 @@ export function editPlayers(edit) {
 // ---- Words for screen readers ---------------------------------------------------------------------------------------
 
 // How a screen reader hears an identity, such as "Selesnya, colour identity white, green", whatever the chip shows.
+/** @param {string} identity */
 export function identityText(identity) {
   if (!identity) return 'no colour identity';
   return `${identityNames[identity]}, colour identity ${[...identity].map(id => /** @type {{ id: string, name: string }} */ (identityColours.find(colour => colour.id === id)).name).join(', ')}`;

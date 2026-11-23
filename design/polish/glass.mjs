@@ -1,11 +1,11 @@
 // Solid vs glass pill (GLASS.md; renders/glass-*.png) on the current app with the Graphite chrome and direction A.
 // Each crop is captioned with the measured contrast of the pill's icons against the backdrop under them.
 // Run from the repo root:  node design/polish/glass.mjs [strip ...]
-import { launch, close, open, game, shot, compose } from './lib.mjs';
+import { launch, close, open, inPage, game, shot, compose } from './lib.mjs';
 import { paletteCss, ratio } from './palettes7.mjs';
 
 const only = process.argv.slice(2);
-const browser = await launch();
+const browser = import.meta.main ? await launch() : null;
 const caption = (f, text) => ({ ...f, caption: text });
 const T = { width: 952, height: 427 };
 const S = { width: 568, height: 320 };
@@ -35,6 +35,8 @@ const base = n => game(n, {
 // Presses every life half, so seat-colour washes cover the whole board under the pill: the brightest backdrop it gets.
 const washJs = "document.querySelectorAll('.player .controls button').forEach(b => { b.dataset.pressed = ''; })";
 
+// The page code each scene runs, for tests/design.test.mjs.
+export const snippets = () => Object.fromEntries(scenes.filter(scene => scene.js).map(scene => [scene.id, { seed: scene.seed, js: scene.js }]));
 const scenes = [
   { id: 'busy4', label: '4 players: watermarks, every half pressed (washes everywhere)', size: T, seed: base(4), js: washJs },
   { id: 'two', label: '2 players: the pill over the seam between sideways tiles', size: T, seed: base(2), js: washJs },
@@ -73,7 +75,7 @@ async function measure(page) {
 async function crop(scene, pill) {
   const css = paletteCss('graphite') + pills[pill].css + pressCss;
   const p = await open(scene.size, scene.seed, { css });
-  if (scene.js) await p.evaluate(scene.js);
+  if (scene.js) await p.evaluate(inPage(scene.js));
   await p.waitForTimeout(200);
   const box = await p.locator('#board-controls').boundingBox();
   const w = Math.min(scene.size.width, box.width + 120), h = Math.min(scene.size.height, box.height + 100);
@@ -110,8 +112,11 @@ strips['glass-boards'] = async () => {
   await compose('glass-boards', 'Whole boards: solid and tinted glass', '', rows);
 };
 
-for (const [name, run] of Object.entries(strips)) {
-  if (only.length && !only.includes(name)) continue;
-  await run();
+// Run as a script; tests/design.test.mjs imports it only for its snippets.
+if (import.meta.main) {
+  for (const [name, run] of Object.entries(strips)) {
+    if (only.length && !only.includes(name)) continue;
+    await run();
+  }
+  await close();
 }
-await close();

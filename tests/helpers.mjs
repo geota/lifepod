@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { after, test as nodeTest } from 'node:test';
 import { isDeepStrictEqual } from 'node:util';
 import { chromium, webkit } from 'playwright-core';
-import { startServer } from './server.mjs';
+import { startServer } from '../scripts/serve.mjs';
 
 // ---- Registering tests ----------------------------------------------------------------------------------------------
 
@@ -41,8 +41,8 @@ export const engines = { chromium, webkit };
 // The app as a file, for the test that checks it doesn't run from file://, where browsers block module scripts.
 export const appFile = new URL('../web/index.html', import.meta.url).href;
 
-// `npm test` runs one server for every file (tests/server.mjs). A file run on its own starts one the first time it
-// opens a page.
+// `npm test` runs one server for every file (scripts/serve.mjs, started by tests/server.mjs). A file run on its own
+// starts one the first time it opens a page.
 let server;
 async function origin() {
   if (process.env.LIFEPOD_TEST_ORIGIN) return process.env.LIFEPOD_TEST_ORIGIN;

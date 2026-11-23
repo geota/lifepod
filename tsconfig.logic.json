@@ -1,0 +1,7 @@
+// The second pass of `npm run typecheck`: web/js/logic/, the save format and the rules, with noImplicitAny too, since a
+// wrong type there can lose a game. logic/ imports only itself, so this checks nothing else.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noImplicitAny": true },
+  "include": ["web/js/logic/*.js"]
+}

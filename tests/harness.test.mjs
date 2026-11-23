@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { chromium, webkit } from 'playwright-core';
 import { appFile, button, openPage, scores, test } from './helpers.mjs';
-import { startServer } from './server.mjs';
+import { startServer } from '../scripts/serve.mjs';
 
 // The test harness itself: every test file registers its tests through it, the test server serves web/ and nothing
 // else, and the app runs as modules over http.

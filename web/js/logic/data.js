@@ -20,6 +20,7 @@
 export const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
 export const quarterTurns = [0, 90, 180, 270];
 // Landscape rows list seats by facing edge and player number. Repeated seats span cells.
+/** @type {Record<number, string[]>} */
 export const seatLayouts = {
   2: ['left-1 right-2'],
   3: ['top-1 right-3', 'bottom-2 right-3'],
@@ -122,6 +123,7 @@ export const poisonWarning = 7;
 // font: each colour's mana symbol, the ten Ravnica guilds, the five Khans clans, the five Streets of New Capenna
 // families for the shards, and the colour pie for all five. Four colours have no official symbol, so they get the
 // colour pie with the missing colour as a ghost.
+/** @type {Record<string, string>} */
 export const identityNames = {
   W: 'Mono-white', U: 'Mono-blue', B: 'Mono-black', R: 'Mono-red', G: 'Mono-green',
   WU: 'Azorius', UB: 'Dimir', BR: 'Rakdos', RG: 'Gruul', WG: 'Selesnya',
@@ -133,6 +135,7 @@ export const identityNames = {
 };
 // What a tile's identity chip can show, in the chip's order, and what can sit behind its life total: the symbol on
 // tiles with an identity, the rings on every tile (Default), or nothing (Off).
+/** @type {IdentityPart[]} */
 export const identityParts = ['indicator', 'symbol', 'name'];
 export const identityBackgrounds = ['symbol', 'default', 'off'];
 // The identity settings' save format. Saves without it are from when Background was Symbol · Indicator · Off and
@@ -148,6 +151,7 @@ export const manaColours = [...identityColours, { id: 'C', name: 'colourless' }]
 // Turns (design/polish/SPEC.md §8): off, rounds (the first player's flag counts rounds) or turn by turn.
 export const turnModes = ['off', 'rounds', 'turns'];
 // Play order is clockwise on screen, which is passing to the left. Seat rotation doesn't change it.
+/** @type {Record<number, number[]>} */
 export const playOrders = { 2: [0, 1], 3: [0, 2, 1], 4: [0, 1, 3, 2], 5: [0, 1, 4, 3, 2], 6: [0, 1, 4, 5, 3, 2] };
 export const maxRound = 999;
 // How long a hold takes to register on the turn chip and the pill's round button, and how long "Undo clear" stays.

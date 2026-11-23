@@ -12,9 +12,13 @@
     "target": "es2024",
     "lib": ["es2024", "dom"],
     "types": [],
-    "strict": false,
+    // strict, except noImplicitAny, which web/js/logic/ turns on in tsconfig.logic.json (npm run typecheck runs both).
+    "strict": true,
     "noImplicitAny": false,
-    "strictNullChecks": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
   "include": ["web/**/*.js", "types/*.d.ts"]

@@ -2,12 +2,12 @@
 // so run `node design/polish/tiles7.mjs` first. Run from the repo root:  node design/polish/tiles-render.mjs [set ...]
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { launch, close, open, game, shot, compose } from './lib.mjs';
+import { launch, close, open, inPage, game, shot, compose } from './lib.mjs';
 import { paletteCss } from './palettes7.mjs';
 
 const sets = JSON.parse(readFileSync(fileURLToPath(new URL('./tiles7.json', import.meta.url)), 'utf8'));
 const only = process.argv.slice(2);
-await launch();
+if (import.meta.main) await launch();
 const caption = (f, text) => ({ ...f, caption: text });
 const fit = (f, show) => ({ ...f, show });
 const T = { width: 952, height: 427 };
@@ -31,9 +31,12 @@ const seed = colors => game(6, {
   commanderDamage: n6.map(d => n6.map(a => (d === a ? 0 : [0, 6, 0, 3, 9][(d + a) % 5]))),
   identity: { show: { indicator: true, symbol: false, name: true }, background: 'symbol' },
 });
+const coloursJs = "setBoardMode('colours')";
+// The page code the frames run, for tests/design.test.mjs.
+export const snippets = () => ({ colours: { seed: seed(n6), js: coloursJs }, deutan: { seed: seed(n6), js: deutanJs } });
 async function frame(key, colors, opts = {}) {
   const p = await open(opts.size ?? T, seed(colors), { css: paletteCss('graphite') + setCss(key) });
-  if (opts.colours) { await p.evaluate("setBoardMode('colours')"); await p.waitForTimeout(150); }
+  if (opts.colours) { await p.evaluate(inPage(coloursJs)); await p.waitForTimeout(150); }
   if (opts.deutan) await p.evaluate(deutanJs);
   await p.waitForTimeout(150);
   const f = await shot(p);
@@ -58,8 +61,11 @@ strips['tiles-overview'] = async () => {
   await compose('tiles-overview', 'Tile palette sets side by side', 'Every set passes the app’s contrast minimums on every panel. The deuteranope column shows how far apart the colours stay for the most common colour blindness.', rows);
 };
 
-for (const [name, run] of Object.entries(strips)) {
-  if (only.length && !only.includes(name)) continue;
-  await run();
+// Run as a script; tests/design.test.mjs imports it only for its snippets.
+if (import.meta.main) {
+  for (const [name, run] of Object.entries(strips)) {
+    if (only.length && !only.includes(name)) continue;
+    await run();
+  }
+  await close();
 }
-await close();

@@ -2,9 +2,10 @@
 // and JS, and compose labelled comparison strips. Nothing here changes web/.
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { serveApp } from '../serve.mjs';
+import { serveApp } from '../../scripts/serve.mjs';
 
-// The app over http (design/serve.mjs); LIFEPOD_APP points the renders at another copy of web/.
+// The app over http (serveApp in scripts/serve.mjs). LIFEPOD_APP points the renders at another copy of web/: the folder,
+// or its index.html.
 let server;
 
 export const outDir = fileURLToPath(new URL('./renders/', import.meta.url));
@@ -37,6 +38,50 @@ export function game(count, extra = {}) {
   };
 }
 
+// The app's own modules, for the code a design script runs in the page. A module's names aren't page globals, so
+// inPage(code) returns code wrapped in an async function that first imports each name below that the code mentions, from
+// the page's own module instances (await import('/js/…')), the same ones the app uses. Wrapping an app function on window
+// never reaches the module's own calls, so code that changes what the app draws runs through afterRender(fn) instead:
+// fn runs now, and again after anything redraws the board. extendBadges(fn) is the same for badge rows: after a redraw,
+// every row is drawn again by renderBadges and then by each fn(index) in turn, as the old wrappers of renderBadges did.
+// tests/design.test.mjs checks that each name here is still exported, and runs every design script's snippets.
+export const appModules = {
+  'ui/dom.js': ['board', 'element', 'icon', 'manaIcon'],
+  'state/state.js': ['game', 'saveGame'],
+  'layout/fit.js': ['requestFit'],
+  'render/badges.js': ['renderBadges'],
+  'render/modes.js': ['renderModeLayer', 'syncIdentity', 'syncAllSwatches'],
+  'actions/mode.js': ['setBoardMode'],
+  'actions/reminders.js': ['remind'],
+  'logic/data.js': ['swatches', 'identityNames'],
+};
+const afterRenderJs = `const afterRender = fn => {
+    const observer = new MutationObserver(() => run());
+    const run = () => { observer.disconnect(); fn(); observer.observe(board, { childList: true, subtree: true, characterData: true }); };
+    run();
+  };`;
+const extendBadgesJs = `const extendBadges = fn => {
+    const extensions = window.mkBadgeExtensions ??= [];
+    extensions.push(fn);
+    if (extensions.length === 1) {
+      queueMicrotask(() => afterRender(() => {
+        [...board.children].forEach((_, index) => { renderBadges(index); for (const extend of extensions) extend(index); });
+        requestFit();
+      }));
+    }
+  };`;
+export function inPage(code) {
+  const mentions = name => new RegExp(`\\b${name}\\b`).test(code);
+  const extend = mentions('extendBadges');
+  const hook = extend || mentions('afterRender');
+  const needs = name => mentions(name) || (hook && name === 'board') || (extend && ['renderBadges', 'requestFit'].includes(name));
+  const imports = Object.entries(appModules)
+    .map(([path, names]) => [path, names.filter(needs)])
+    .filter(([, names]) => names.length)
+    .map(([path, names]) => `const { ${names.join(', ')} } = await import('/js/${path}');`);
+  return `(async () => {\n  ${imports.join('\n  ')}\n  ${hook ? afterRenderJs : ''}\n  ${extend ? extendBadgesJs : ''}\n  {\n${code}\n  }\n})()`;
+}
+
 let browser;
 export const errors = [];
 export async function launch() {
@@ -67,8 +112,7 @@ export async function open(size, seed, variant = {}, scale = 2) {
   await page.goto(server.url);
   await page.waitForSelector('#board .player');
   if (variant.css) await page.addStyleTag({ content: variant.css });
-  if (variant.js) await page.evaluate(variant.js);
-  await page.evaluate(() => window.fitAllBadges?.());
+  if (variant.js) await page.evaluate(inPage(variant.js));
   return page;
 }
 

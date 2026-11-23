@@ -1,12 +1,12 @@
 // Control styling round (STYLE.md; renders/style7-*.png): three style directions and four chrome palettes, drawn on
 // the current app (web/index.html) and the full-screen settings page (layout B, the owner's pick). Nothing in web/
 // changes. Run from the repo root:  node design/polish/style7.mjs [strip ...]
-import { launch, close, open, game, shot, compose } from './lib.mjs';
+import { launch, close, open, inPage, game, shot, compose } from './lib.mjs';
 import { pageJs, pageCss } from './settings-lib.mjs';
 import { palettes, paletteCss } from './palettes7.mjs';
 
 const only = process.argv.slice(2);
-await launch();
+if (import.meta.main) await launch();
 const caption = (f, text) => ({ ...f, caption: text });
 const fit = (f, show) => ({ ...f, show });
 const T = { width: 952, height: 427 };
@@ -161,14 +161,18 @@ async function boardAtRest(size, dir, pal) {
 }
 async function snap(p) { const f = await shot(p); await p.close(); return f; }
 
+const modeJs = [['Counters mode', "setBoardMode('counters')"], ['Commander damage map', "setBoardMode('damage')"], ['Choosing identities', "setBoardMode('identity')"], ['Dice', "document.querySelector('#dice-button').click()"]];
+// The page code the board modes run, for tests/design.test.mjs. The settings frames' pageJs (settings-lib.mjs) mocks
+// markup from before the settings page was built and throws on today's; it isn't covered until that's redone.
+export const snippets = () => Object.fromEntries(modeJs.map(([label, js]) => [label, { seed, js }]));
 const strips = {};
 for (const [dir, d] of Object.entries(directions)) {
   strips[`style7-${dir.toLowerCase()}`] = async () => {
     const pal = recommendedPalette[dir];
     const modes = [];
-    for (const [label, js] of [['Counters mode', "setBoardMode('counters')"], ['Commander damage map', "setBoardMode('damage')"], ['Choosing identities', "setBoardMode('identity')"], ['Dice', "document.querySelector('#dice-button').click()"]]) {
+    for (const [label, js] of modeJs) {
       const p = await app(T, dir, pal);
-      await p.evaluate(js); await p.waitForTimeout(200);
+      await p.evaluate(inPage(js)); await p.waitForTimeout(200);
       modes.push(caption(fit(await snap(p), 270), label));
     }
     const rows = [
@@ -213,8 +217,11 @@ strips['style7-sliders'] = async () => {
   await compose('style7-sliders', 'Players and starting life as notched sliders', 'Every labelled stop is a 44px tap target, so the slider works by tap as well as by drag (WCAG 2.5.7). Labels sit above the track so a finger never covers them.', rows);
 };
 
-for (const [name, run] of Object.entries(strips)) {
-  if (only.length && !only.includes(name)) continue;
-  await run();
+// Run as a script; tests/design.test.mjs imports it only for its snippets.
+if (import.meta.main) {
+  for (const [name, run] of Object.entries(strips)) {
+    if (only.length && !only.includes(name)) continue;
+    await run();
+  }
+  await close();
 }
-await close();
