@@ -185,7 +185,7 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the life slider has stops at 20, 30 and 40, snaps to fives and steps by keys`, async (t) => {
     const page = await openPage(t, engine);
     await button(page, 'Settings').tap();
-    assert.deepEqual(await sliderState(page, 'life'), { now: 40, text: 'Starting life 40', at: 0.6, pinned: '' });
+    assert.deepEqual(await sliderState(page, 'life'), { now: 40, text: '40 life', at: 0.6, pinned: '' });
     assert.deepEqual(await page.locator('#life-presets .k-stop').allTextContents(), ['20', '30', '40']);
     assert.equal(await page.locator('#life-track .k-tick').count(), 11, 'a tick every 5 from 10 to 60');
     assert.equal(await page.locator('#life-track .k-tick[data-stop]').count(), 3, 'three of them are the stops');
@@ -218,10 +218,10 @@ for (const [name, engine] of Object.entries(engines)) {
     // Past the end of the track the value keeps going, with the handle pinned and marked.
     await page.keyboard.press('End');
     await page.keyboard.press('ArrowRight');
-    assert.deepEqual(await sliderState(page, 'life'), { now: 61, text: 'Starting life 61', at: 1, pinned: 'high' });
+    assert.deepEqual(await sliderState(page, 'life'), { now: 61, text: '61 life', at: 1, pinned: 'high' });
     await page.keyboard.press('Home');
     for (let step = 0; step < 12; step++) await page.keyboard.press('ArrowLeft');
-    assert.deepEqual(await sliderState(page, 'life'), { now: 1, text: 'Starting life 1', at: 0, pinned: 'low' }, 'never below 1');
+    assert.deepEqual(await sliderState(page, 'life'), { now: 1, text: '1 life', at: 0, pinned: 'low' }, 'never below 1');
     await button(page, '40').tap();
     assert.equal(await doneLabel(page), 'Done', 'back at 40 nothing is pending');
   });
@@ -245,13 +245,18 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal(await page.locator('#life-editor').isHidden(), true, 'Enter closes the field');
     assert.deepEqual(await openDialogs(page), ['settings'], 'Enter doesn’t submit settings');
     assert.equal(await page.locator('#life-value').textContent(), '25');
-    assert.deepEqual(await sliderState(page, 'life'), { now: 25, text: 'Starting life 25', at: 0.3, pinned: '' });
+    assert.deepEqual(await sliderState(page, 'life'), { now: 25, text: '25 life', at: 0.3, pinned: '' });
     assert.equal(await doneLabel(page), 'Start new game');
     assert.equal(await page.evaluate(() => document.activeElement.id), 'life-edit', 'focus returns to the number');
 
-    // Invalid: empty, 0 and letters keep the last value.
+    // Invalid: empty, 0 and letters keep the field open and say why (WCAG 3.3.1), and Escape then keeps the last value.
     for (const text of ['', '0', 'ab']) {
       await edit(text, 'Enter');
+      assert.equal(await page.locator('#life-editor').isHidden(), false, `"${text}" keeps the field open`);
+      assert.equal(await field.getAttribute('aria-invalid'), 'true');
+      assert.equal(await page.locator('#settings-status').textContent(), 'Starting life is a whole number from 1 to 999');
+      assert.equal(await page.evaluate(() => document.activeElement.id), 'life-input', 'focus stays in the field');
+      await field.press('Escape');
       assert.equal(await page.locator('#life-value').textContent(), '25', `"${text}" reverts`);
     }
     // Escape cancels without closing settings.
@@ -263,11 +268,11 @@ for (const [name, engine] of Object.entries(engines)) {
     await edit('150');
     await page.locator('#life-commit').tap();
     assert.equal(await page.locator('#life-value').textContent(), '150');
-    assert.deepEqual(await sliderState(page, 'life'), { now: 150, text: 'Starting life 150', at: 1, pinned: 'high' });
+    assert.deepEqual(await sliderState(page, 'life'), { now: 150, text: '150 life', at: 1, pinned: 'high' });
     await edit('7');
     // Leaving the field commits (iOS has no Enter on its number pad).
     await page.locator('.fs-sec > h3').first().tap();
-    assert.deepEqual(await sliderState(page, 'life'), { now: 7, text: 'Starting life 7', at: 0, pinned: 'low' });
+    assert.deepEqual(await sliderState(page, 'life'), { now: 7, text: '7 life', at: 0, pinned: 'low' });
     // Only three digits fit.
     await edit('12345', 'Enter');
     assert.equal(await page.locator('#life-value').textContent(), '123');
@@ -277,7 +282,7 @@ for (const [name, engine] of Object.entries(engines)) {
     // An old save off the track opens with its life shown and the handle pinned.
     await seedGame(page, { startingLife: 5, scores: [5, 3, 5, 5] });
     await button(page, 'Settings').tap();
-    assert.deepEqual(await sliderState(page, 'life'), { now: 5, text: 'Starting life 5', at: 0, pinned: 'low' });
+    assert.deepEqual(await sliderState(page, 'life'), { now: 5, text: '5 life', at: 0, pinned: 'low' });
     assert.equal(await doneLabel(page), 'Done', 'nothing has changed yet');
   });
 }
@@ -329,11 +334,13 @@ for (const [name, engine] of Object.entries(engines)) {
 
     await button(page, '6 players').tap();
     assert.equal(await doneLabel(page), 'Start new game');
-    assert.equal(await pendingText(page), 'Starts a new game with 6 players at 40 life when you leave settings.');
-    assert.equal(await page.locator('#settings-pending').getAttribute('aria-live'), 'polite');
+    assert.equal(await pendingText(page), 'Starts a new game with 6 players at 40 life when you press Start new game.');
+    // Screen readers hear it from #settings-status once the slider settles, with what Close does.
+    await eventually(() => page.locator('#settings-status').textContent(),
+      'Starts a new game with 6 players at 40 life when you press Start new game. Close keeps the current game.');
     assert.ok(!(await button(page, 'New game').isVisible()), 'New game hides while a game is pending');
     await button(page, '30').tap();
-    assert.equal(await pendingText(page), 'Starts a new game with 6 players at 30 life when you leave settings.');
+    assert.equal(await pendingText(page), 'Starts a new game with 6 players at 30 life when you press Start new game.');
     // Choosing the old values again clears it.
     await button(page, '4 players').tap();
     await button(page, '40').tap();

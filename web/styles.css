@@ -1591,6 +1591,9 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 .switch-row:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
 /* A long switch label, such as auto-empty's, wraps rather than being cut short. */
 .wide-switch .nav-label { white-space: normal; line-height: 1.2; }
+/* Labels outside the fitted compact groups, and those in a group already stacked, wrap rather than end in an ellipsis
+   under larger text or the WCAG text-spacing overrides (ACCESSIBILITY.md L7). */
+:is(.fs-action, .reminder-grid .compact-switch, [data-stacked] .compact-switch) > .nav-label { white-space: normal; line-height: 1.2; }
 /* A row on its own has no divider, and a group's last row covers its own (Glass: DESIGN-AUDIT S10), however many
    columns the group has and whichever rows are hidden. */
 .wide-switch { --row-divider: transparent; }
