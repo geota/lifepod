@@ -43,7 +43,7 @@ const glyphCss = `
   .mk-g { display: inline-block; width: 1em; height: 1em; font: normal normal normal 1em/1 Mana; text-align: center; }
   .mk-g::before { content: var(--g); }
   .mk-g[data-g="infect"] { --g: '\\ea73'; } .mk-g[data-g="energy"] { --g: '\\e907'; } .mk-g[data-g="rad"] { --g: '\\ea50'; }
-  .mk-g[data-g="tap"] { --g: '\\e61a'; } .mk-g[data-g="C"] { --g: '\\e904'; }
+  .mk-g[data-g="tap"] { --g: '\\e61c'; } .mk-g[data-g="C"] { --g: '\\e904'; }
   .pip[data-pip="C"] { --pip: #cdc8c4; --glyph: '\\e904'; }
   .mk-svg { width: 1em; height: 1em; fill: currentColor; }`;
 // Page-side helpers the injected scripts share.

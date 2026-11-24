@@ -151,7 +151,7 @@ async function checkSizes(t, engine, style, names) {
           if (!portrait) scale[name].counterCell = await readModeScale(page, '.counter-cell');
           await button(page, 'Cancel').tap();
 
-          await button(page, 'Mana pool').tap();
+          await page.locator('#mana-button').tap();
           await checkTiles(page, '.mana-cell', '.mana-cell', `${view}, mana`);
           await button(page, 'Cancel').tap();
 
@@ -267,7 +267,8 @@ async function checkPill(t, engine, style, screens) {
         // The board modes, at the target and the stress size.
         if ((width === 952 || width === 568) && rotations !== pillRotations[2]) {
           for (const [open, close] of [['Commander damage', 'Cancel'], ['Counters', 'Cancel'], ['Mana pool', 'Cancel']]) {
-            await button(page, open).tap();
+            // The mana button's name goes on to say how much is floating.
+            await page.locator('#board-controls').getByRole('button', { name: new RegExp(`^${open}(,|$)`) }).tap();
             assert.deepEqual(await underPill(page), [], `${view}, ${open}: every target is clear of the pill and inside its tile`);
             await button(page, close).tap();
           }

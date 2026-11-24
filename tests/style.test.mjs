@@ -408,3 +408,45 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(await read(still), { scale: '1', motion: '.25s', transition: '0s' }, 'no scaling and no transitions under reduced motion');
   });
 }
+
+// ---- The mana button: the classic tap symbol on a pip (MANA-UNDO-SPEC §5) ------------------------------------------
+
+// The pill's mana button in each style: Mana's classic tilted T (U+E61C) in ink on a light disc in the C pip's colour,
+// 0.56 of the button, flat in Material and with Glass's light inner edge. While mana floats, a 9px lime dot sits on the
+// pip's upper end with a 2px ring in the pill's fill, and the disc itself stays light: solid lime is for committing.
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the mana button is the classic tap symbol on a pip, with a ringed dot while mana floats, in both styles`, async (t) => {
+    const read = page => page.evaluate(() => {
+      const button = document.querySelector('#mana-button');
+      const pip = getComputedStyle(button.querySelector('.mana-icon'));
+      const glyph = getComputedStyle(button.querySelector('.mana-icon'), '::before').content;
+      const dot = getComputedStyle(button.querySelector('.mana-dot'));
+      return {
+        glyph: [...glyph.replace(/["']/g, '')].map(character => character.codePointAt(0).toString(16)).join(),
+        disc: pip.backgroundColor, ink: pip.color, radius: pip.borderRadius, edge: pip.boxShadow,
+        size: Math.round(parseFloat(pip.width) / button.offsetWidth * 100) / 100, round: pip.width === pip.height,
+        dot: { shown: dot.display !== 'none', width: dot.width, background: dot.backgroundColor, ring: dot.boxShadow },
+        name: button.getAttribute('aria-label'),
+      };
+    });
+    for (const style of ['material', 'glass']) {
+      const board = { startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, style };
+      const page = await openPage(t, engine, { game: board });
+      const [disc, ink, accent, pill] = [await token(page, '--pip-c'), await token(page, '--pip-ink'), await token(page, '--accent'), await token(page, '--pill-background')];
+      const rest = await read(page);
+      assert.equal(rest.glyph, 'e61c', `${style}: the classic tilted T`);
+      assert.deepEqual({ disc: rest.disc, ink: rest.ink, radius: rest.radius, size: rest.size, round: rest.round },
+        { disc, ink, radius: '50%', size: 0.56, round: true }, `${style}: ink on a round C-coloured pip, 0.56 of the button`);
+      if (style === 'material') assert.equal(rest.edge, 'none', 'Material\'s pip is flat');
+      else assert.match(rest.edge, /inset/, 'Glass\'s pip has the glass edge');
+      assert.equal(rest.dot.shown, false, `${style}: no dot with every pool empty`);
+      assert.equal(rest.name, 'Mana pool');
+
+      await seedGame(page, { ...board, pools: [[0, 0, 0, 2, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]] });
+      const floating = await read(page);
+      assert.deepEqual(floating.dot, { shown: true, width: '9px', background: accent, ring: `${pill} 0px 0px 0px 2px` }, `${style}: a 9px lime dot ringed 2px in the pill's fill`);
+      assert.equal(floating.disc, disc, `${style}: the disc never turns lime`);
+      assert.equal(floating.name, 'Mana pool, 3 mana floating', 'the name says how much is floating');
+    }
+  });
+}

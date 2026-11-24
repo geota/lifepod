@@ -70,7 +70,7 @@ Settings → **Reminders** has three switches, all on by default.
 
 ## Mana pool
 
-Turn on **Mana pool** in Settings → **Track** to keep floating mana. The center controls gain the tap symbol, with a dot while any pool has mana. Tap it and every tile shows six circles, white, blue, black, red, green and colourless, each with its mana symbol over the amount: tap to add one, hold to take one away, with Undo, the check mark and ✕ as for counters.
+Turn on **Mana pool** in Settings → **Track** to keep floating mana. The center controls gain the tap symbol, the classic tilted T on a light pip, with a lime dot on the pip while any pool has mana. Tap it and every tile shows six circles, white, blue, black, red, green and colourless, each with its mana symbol over the amount: tap to add one, hold to take one away, with Undo, the check mark and ✕ as for counters.
 
 At rest, a tile with mana shows a strip on a row of its own, just above the player's own row of badges, with just the colours it holds: tap a symbol to spend one, or the eraser to empty the pool, which leaves **Undo clear** for 5 seconds. The strip never shares a line with another badge, never covers a life total, its − and + or the center controls, and its symbols never shrink. To make room for it, the life totals get smaller and move toward commander damage, all alike and never below two thirds of their size. Where the strip is too wide for its row, or would take the totals smaller than three quarters of their size, it folds into one chip that shows the pool and opens mana mode, on the same row. Only the tiles that need it fold. On a very crowded small board with no room for that row, the chip sits under commander damage, or as a last resort at the end of the player's own row.
 

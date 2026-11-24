@@ -399,7 +399,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ![Mana](renders/spec-mana.png)
 
-- **Setting:** Settings → Track → Mana pool, off by default. When it's on, the pill shows the tap symbol `\e61a`, with a dot while any pool has mana.
+- **Setting:** Settings → Track → Mana pool, off by default. When it's on, the pill shows the tap symbol, with a dot while any pool has mana. *As built (MANA-UNDO-SPEC §5, M1):* the classic tilted T, Mana's `\e61c`, in `--pip-ink` on a `--pip-c` disc 0.56 of the button (with Glass's light inner edge); the dot is a 9px `--accent` dot on the pip's upper end, ringed 2px in `--pill-background`, and the disc never turns lime. The button's name adds what's floating: "Mana pool, 3 mana floating". `\e61a`, the curved arrow it replaced, is gone from the font subset.
 - **Adding: the mana mode.**
   - Each tile shows six circles: W U B R G and colourless (`\e904`), mana symbols in cost style, sized like the counter cells. The `.pip` class needs a C entry.
   - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode (edit kind `mana`).

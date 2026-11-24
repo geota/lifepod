@@ -40,7 +40,7 @@ async function checkManaMode(t, engine) {
   assert.equal(await floating(page), false, 'no dot while every pool is empty');
   assert.equal((await saved(page)).manaPool, true, 'the switch saves at once');
 
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   assert.equal(await mode(page), 'mana');
   assert.deepEqual(await tile(page, 1).locator('.mana-cell').evaluateAll(cells => cells.map(node => node.dataset.colour)), ['W', 'U', 'B', 'R', 'G', 'C']);
   assert.equal(await page.locator('.mana-cell').count(), 24);
@@ -79,7 +79,7 @@ async function checkManaMode(t, engine) {
   await tile(page, 2).locator('.counter-cell[data-kind="poison"]').tap();
   await tile(page, 3).locator('.counter-cell[data-kind="poison"]').tap();
   await button(page, 'Save').tap();
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   for (const [number, colour] of [[1, 'W'], [1, 'W'], [1, 'U'], [3, 'R'], [3, 'R'], [3, 'R'], [3, 'C']]) await cell(page, number, colour).tap();
   await button(page, 'Save').tap();
   assert.equal(await mode(page), null);
@@ -157,7 +157,7 @@ async function checkAutoEmpty(t, engine) {
   assert.deepEqual((await saved(page)).pools, Array(4).fill([0, 0, 0, 0, 0, 0]));
   assert.equal(await floating(page), false);
   // Mana added after the pass stays when the step is held back, and the emptied pools come back on top.
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   await cell(page, 2, 'G').tap();
   await cell(page, 3, 'R').tap();
   await button(page, 'Save').tap();
@@ -191,7 +191,7 @@ async function checkAutoEmpty(t, engine) {
   assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Mana pool off');
   await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
   await button(page, 'Close settings').tap();
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   await cell(page, 4, 'B').tap();
   await button(page, 'Save').tap();
   await page.locator('#round-button').tap();
@@ -231,7 +231,7 @@ test('chromium: mana mode fits six players on the smallest phone', async (t) => 
   const problems = () => tileProblems(page, { targets: '.mode-layer .mana-cell, .mana-strip button' });
   // Every colour held: each strip folds into its chip, which stays inside the tile.
   assert.deepEqual(await problems(), [], 'the strips fit');
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   assert.equal(await page.locator('.mana-cell').count(), 36);
   assert.deepEqual(await problems(), [], 'the mana cells fit');
 });
@@ -435,12 +435,12 @@ for (const [name, engine] of Object.entries(engines)) {
 test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {
   const page = await openPage(t, chromium, { native: 'android', clock: true, game: savedGame(4, { manaPool: true }) });
   const back = () => page.evaluate(() => window.closeOpenDialog());
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   assert.deepEqual(await backHandling(page), [false, true], 'off on load, then on for mana mode');
   assert.equal(await back(), true);
   assert.equal(await mode(page), null, 'back with no changes closes the mode');
   assert.deepEqual(await backHandling(page), [false, true, false], 'then back goes to the system');
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   await cell(page, 2, 'G').tap();
   assert.equal(await back(), true);
   assert.ok(await isOpen(page, 'discard'), 'back with changes asks first');

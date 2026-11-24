@@ -26,6 +26,9 @@ function busyGame(extra = {}) {
 const mode = page => page.locator('#board').getAttribute('data-mode');
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const announced = page => page.locator('#announcer').textContent();
+// A pill button by the words it shows. The mana button's name goes on to say how much is floating ("Mana pool, 5 mana
+// floating").
+const pillButton = (page, name) => page.locator('#board-controls').getByRole('button', { name: new RegExp(`^${name}(,|$)`) });
 const focused = page => page.evaluate(() => {
   const active = document.activeElement;
   return active?.getAttribute('aria-label') ?? active?.id ?? active?.tagName;
@@ -71,7 +74,7 @@ for (const [name, engine] of Object.entries(engines)) {
         'Pass it on: Player 4 is out and still has the initiative. Give the initiative to someone in counters');
       assert.match(await tile(page, 1).locator('.badges.near .strip-chip').getAttribute('aria-label'), /^5 mana\. Player 1's pool: 1 blue, 3 red, 1 colourless\. Open mana$/);
       for (const [entry, layer] of [['Counters', 'counters'], ['Commander damage', 'damage'], ['Mana pool', 'mana']]) {
-        await button(page, entry).click();
+        await pillButton(page, entry).click();
         assert.equal(await mode(page), layer);
         assert.deepEqual(await labelProblems(page), [], `${view}: ${layer} mode`);
         await button(page, 'Cancel').click();
@@ -189,12 +192,12 @@ for (const [name, engine] of Object.entries(engines)) {
 
     // A mode gives focus back to the pill button that opened it, on Save and on Cancel.
     for (const [entry, leave] of [['Commander damage', 'Save'], ['Counters', 'Cancel'], ['Mana pool', 'Save']]) {
-      await button(page, entry).focus();
+      await pillButton(page, entry).focus();
       await page.keyboard.press('Enter');
       assert.equal(await page.evaluate(() => document.activeElement?.closest('.mode-layer') !== null), true, `${entry} puts focus on its first cell`);
       await button(page, leave).click();
       assert.equal(await mode(page), null);
-      assert.equal(await focused(page), entry, `${leave} gives focus back to ${entry}`);
+      assert.equal((await focused(page)).split(',')[0], entry, `${leave} gives focus back to ${entry}`);
     }
   });
 

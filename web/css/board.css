@@ -10,7 +10,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
 /* Game symbols from the Mana font: the d20 for dice, infect for poison, the commander symbol for commander tax, energy,
-   rad, the colour pie for identity, the tap symbol for the mana pool and the untap symbol for turns. */
+   rad, the colour pie for identity, the classic tilted tap symbol for the mana pool and the untap symbol for turns. */
 .mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
 .mana-icon::before { content: var(--glyph); speak: never; }
 .mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
@@ -18,7 +18,7 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .mana-icon[data-glyph="energy"] { --glyph: '\e907'; }
 .mana-icon[data-glyph="rad"] { --glyph: '\ea50'; }
 .mana-icon[data-glyph="pie"] { --glyph: '\e9f0'; }
-.mana-icon[data-glyph="tap"] { --glyph: '\e61a'; }
+.mana-icon[data-glyph="tap"] { --glyph: '\e61c'; }
 .mana-icon[data-glyph="untap"] { --glyph: '\e61b'; }
 .mana-icon[data-glyph="commander"] { --glyph: '\e9c6'; }
 
@@ -172,9 +172,35 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .round-button .round > span:first-child { transform: rotate(180deg); }
 .round-button .round::after { position: absolute; top: 50%; left: 22%; right: 22%; height: 1px; content: ''; background: var(--border); }
 .round-button[data-pressed]::before { background: var(--state-pressed); }
-/* The mana pool's tap symbol, with a dot while any pool has mana. */
-.pill-button > .mana-icon, .mana-dot { position: relative; }
-#mana-button[data-floating] { color: var(--accent); }
-.mana-dot { position: absolute; top: calc(var(--setup-button) * .24); right: calc(var(--setup-button) * .2); width: 7px; height: 7px; border-radius: 50%; }
-#mana-button[data-floating] .mana-dot { background: var(--accent); }
+/* The mana pool's button (MANA-UNDO-SPEC §5): the classic tilted tap symbol in ink on a light pip, as card text prints
+   {T}, the disc in the C pip's colour. While any pool has mana, a lime dot sits on the pip's upper end, ringed in the
+   pill's own fill so it reads against the light disc. The disc itself never turns lime: solid lime means commit. */
+#mana-button > .mana-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: calc(var(--setup-button) * .56);
+  height: calc(var(--setup-button) * .56);
+  border-radius: 50%;
+  background: var(--pip-c);
+  box-shadow: var(--tap-pip-edge);
+  color: var(--pip-ink);
+  font-size: calc(var(--setup-button) * .4);
+}
+/* The tilted T sits a little left and high in its em box, so it's nudged to look centred on the disc. */
+#mana-button > .mana-icon::before { display: block; transform: translate(-3%, 2%); }
+#mana-button > .mana-icon { transition: transform var(--motion) var(--ease-press); }
+#mana-button:active > .mana-icon { transform: scale(var(--press-scale)); }
+.mana-dot {
+  position: absolute;
+  top: calc(var(--setup-button) * .17);
+  right: calc(var(--setup-button) * .15);
+  display: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--pill-background);
+}
+#mana-button[data-floating] .mana-dot { display: block; }
 

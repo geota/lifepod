@@ -106,7 +106,7 @@ async function checkCentring(t, engine, sizes) {
 async function checkOtherLayers(t, engine) {
   for (const count of [3, 5]) {
     const page = await openPage(t, engine, { game: { ...busyGame(count, Array(count).fill(0)), manaPool: true, turns: 'rounds' } });
-    await button(page, 'Mana pool').tap();
+    await page.locator('#mana-button').tap();
     assert.deepEqual(centringProblems(await readFaces(page), { layer: true }), [], `${count} players, mana: every layer is centred`);
     await button(page, 'Cancel').tap();
     await button(page, 'Settings').tap();

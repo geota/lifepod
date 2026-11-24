@@ -3,7 +3,7 @@
 
 import { measureBoard } from '../layout/board.js';
 import { editingModes } from '../logic/data.js';
-import { hasCountersMode, hasMana, restPillButtons } from '../logic/rules.js';
+import { hasCountersMode, restPillButtons } from '../logic/rules.js';
 import { boardMode, edits, game } from '../state/state.js';
 import {
   boardControls, cancelButton, countersButton, damageButton, diceButton, manaButton, roundBackButton, roundButton,
@@ -36,8 +36,10 @@ export function syncPill() {
   roundButton.setAttribute('aria-label', game.turns === 'rounds' ? `Round ${round}. Next round`
     : active === null ? `Round ${round}. Choose who goes first` : `Round ${round}, Player ${active + 1}'s turn. Pass the turn`);
   roundBackButton.setAttribute('aria-label', game.turns === 'rounds' ? 'Back one round' : 'Back one turn');
-  // The tap symbol gets a dot while any pool has mana.
-  manaButton.toggleAttribute('data-floating', game.pools.some((_, index) => hasMana(game, index)));
+  // The tap symbol's pip gets a dot while any pool has mana, and the button's name says how much (MANA-UNDO-SPEC §5).
+  const floating = game.pools.reduce((sum, pool) => sum + pool.reduce((total, amount) => total + amount, 0), 0);
+  manaButton.toggleAttribute('data-floating', floating > 0);
+  manaButton.setAttribute('aria-label', floating ? `Mana pool, ${floating} mana floating` : 'Mana pool');
   // The pill's length decides which face edges it reaches, so the board is measured again when it changes.
   const shape = `${[...boardControls.querySelectorAll('.pill-button')].filter(button => !button.hidden).length} ${restPillButtons(game)}`;
   if (shape !== pillShape) {
