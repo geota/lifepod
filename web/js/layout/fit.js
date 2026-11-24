@@ -4,6 +4,7 @@
 // one's is skipped (docs/review/PERFORMANCE.md P3).
 
 import { trackedDesignations } from '../logic/rules.js';
+import { toasts } from '../state/history.js';
 import { game, shownReminders } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
 
@@ -109,7 +110,7 @@ function fitBadgeRows() {
   fitBadgeSide('far');
   fitStrips();
   // A turn reminder's place depends on how tall the near edge came out.
-  for (const index of shownReminders.keys()) placeReminders(board.children[index]);
+  for (const index of new Set([...shownReminders.keys(), ...toasts.keys()])) placeReminders(board.children[index]);
   syncBoardDrops();
   fitted = fitInputs();
 }

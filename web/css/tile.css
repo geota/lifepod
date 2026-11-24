@@ -254,7 +254,7 @@
   font-size: min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2)));
   /* Where a tile's mana row needs the room, fit.js shrinks every total alike (--score-size on each tile's .controls,
      design/polish/SPEC.md §9), no smaller than its floor. */
-  font-size: var(--score-size, min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2))));
+  font-size: var(--total-size);
   line-height: 1;
   font-weight: var(--weight-heavy);
   font-variant-numeric: tabular-nums;
@@ -289,6 +289,8 @@
 .player[data-out] .badges .chip:not([data-level="out"], .turn-chip, .strip-chip, .pass-chip) { opacity: .82; filter: saturate(.35); }
 /* The life halves have no button chrome: the − and + glyphs sit near the tile's outer edges, 5u in. */
 .controls {
+  /* The total's size, which its running delta reads too. */
+  --total-size: var(--score-size, min(clamp(2rem, 19vmin, max(7rem, 112 * var(--grow))), calc((var(--ui, 400px) - 2 * var(--control-size) - 2 * var(--control-gap) - 8px) * 1.5 / var(--board-digits, 2))));
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -331,6 +333,32 @@
   border: 0;
   background: transparent;
 }
+/* The running delta of a life burst (MANA-UNDO-SPEC §6.2b): a capsule at the total's top end corner, 0.3 of its size and
+   never under 14px, overlapping the corner by about a fifth of its width, facing the player. Its number is the seat
+   colour for a gain and the total's red for a loss, ringed in the same. It's drawn from a zero-sized anchor in the
+   total's cell, so it takes no room and nothing refits, isn't a target, and fades once the burst ends. */
+.life-delta { grid-area: 1 / 2; align-self: start; justify-self: end; position: relative; width: 0; height: 0; pointer-events: none; }
+.life-delta[hidden] { display: none; }
+.life-delta-value {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  left: 0;
+  padding: .08em .38em;
+  border-radius: var(--radius-full);
+  background: var(--button);
+  box-shadow: inset 0 0 0 1.5px currentColor, 0 1px 4px #0009;
+  color: var(--seat);
+  font-size: max(14px, calc(var(--total-size) * .3));
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  white-space: nowrap;
+  transform: translate(-20%, -35%);
+  transition: opacity .3s var(--ease);
+}
+.life-delta[data-sign="loss"] .life-delta-value { color: var(--life-out); }
+.life-delta[data-fading] .life-delta-value { opacity: 0; }
 /* While rotating seats, the badge takes the + button's place, which is always well inside the tile. */
 .controls .subtract { grid-area: 1 / 1; }
 .controls .score { grid-area: 1 / 2; }

@@ -4,7 +4,6 @@
 // opens.
 
 import { handOnLeavers } from '../actions/board.js';
-import { endUndoClears } from '../actions/mana.js';
 import { askFirst, setAskFirst } from '../actions/mode.js';
 import { clearReminders } from '../actions/reminders.js';
 import { measureBoard } from '../layout/board.js';
@@ -17,7 +16,8 @@ import { renderBadges, renderPassHints } from '../render/badges.js';
 import { syncPill } from '../render/pill.js';
 import { paintColours, renderScore } from '../render/tile.js';
 import { syncWakeLock } from '../state/platform.js';
-import { game, saveGame, turnSteps } from '../state/state.js';
+import { rebase } from '../state/history.js';
+import { game, saveGame as saveNow, turnSteps } from '../state/state.js';
 import { notchedSlider } from './slider.js';
 
 /** @typedef {import('../logic/data.js').IdentityPart} IdentityPart */
@@ -33,6 +33,13 @@ const turnChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.query
 const identityNote = /** @type {HTMLParagraphElement} */ (document.querySelector('#identity-note'));
 const identityShowSwitches = /** @type {NodeListOf<HTMLInputElement>} */ (document.querySelectorAll('#identity-show input'));
 const identityBackgroundChoices = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#identity-background'));
+
+// Settings aren't game steps (MANA-UNDO-SPEC §6.3), so each saves without recording one. The board as it is becomes
+// the history's baseline: Turns, for one, clears whose turn it is, which the next step mustn't claim as its own.
+function saveGame() {
+  rebase();
+  saveNow();
+}
 
 // Every section here as the game has it, as settings opens.
 export function renderOptions() {
@@ -147,7 +154,6 @@ for (const choice of turnChoices.children) {
 }
 manaSwitch.addEventListener('change', () => {
   game.manaPool = manaSwitch.checked;
-  if (!game.manaPool) endUndoClears();
   saveGame();
   renderTrackSheet();
   renderAllBadges();

@@ -157,6 +157,31 @@
 .reminder-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: max(100%, var(--tap-min)); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
 .reminder-chip:active { background: var(--cell-pressed); }
 .reminder-chip:focus-visible { outline-offset: 2px; }
+/* An undo's toast (MANA-UNDO-SPEC §6.7): a reminder chip, "↶ Undid life 38 → 37", whose Redo is its action, a 64 × 44
+   target. After a redo the whole chip is a button that dismisses it. It stays 4 seconds. */
+.toast-chip > .icon { color: var(--text-soft); }
+/* After an undo the chip itself isn't a button, so it has no touch area of its own: Redo's is the target. */
+div.toast-chip::after { content: none; }
+div.toast-chip:active { background: var(--button); }
+.toast-redo {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: .25em;
+  margin-inline-start: .35em;
+  padding: .15em .55em;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--chip-background);
+  color: var(--text);
+  font: inherit;
+  font-weight: var(--weight-heavy);
+}
+.toast-redo > .icon { width: 1em; height: 1em; color: var(--seat); }
+.toast-redo::after { position: absolute; top: 50%; left: 50%; width: max(100%, 64px); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
+.toast-redo:active { background: var(--cell-pressed); }
+.toast-redo:focus-visible { outline-offset: 2px; }
 /* A keyframe entrance rather than @starting-style: restingBox in app.js measures the chip with an important inline
    transform, which outranks an animation but not a transition. */
 @keyframes reminder-in { from { opacity: 0; transform: translateY(.4em); } }

@@ -154,9 +154,8 @@ export const turnModes = ['off', 'rounds', 'turns'];
 /** @type {Record<number, number[]>} */
 export const playOrders = { 2: [0, 1], 3: [0, 2, 1], 4: [0, 1, 3, 2], 5: [0, 1, 4, 3, 2], 6: [0, 1, 4, 5, 3, 2] };
 export const maxRound = 999;
-// How long a hold takes to register on the turn chip and the pill's round button, and how long "Undo clear" stays.
+// How long a hold takes to register on the turn chip, the pill's round button and Undo.
 export const holdDelay = 500;
-export const undoClearTime = 5000;
 // A mana strip keeps its buttons where they are for this long after its last tap, so a quick extra tap lands on what it
 // was aimed at (docs/review/DEEP-DIVE.md D1).
 export const stripHoldTime = 800;
@@ -175,3 +174,27 @@ export const faceAngles = { bottom: 0, left: 90, top: 180, right: 270 };
 // A tile face's edges, clockwise from the far edge (its top, toward the table).
 export const faceEdges = ['far', 'end', 'near', 'start'];
 export const outLabels = { life: 'out', poison: 'out on poison', commander: 'out on commander damage' };
+// The undo history (MANA-UNDO-SPEC §6, UNDO-ARCHITECTURE.md). The board fields are what a step records and an undo
+// restores; the settings fields never are (§6.3). Every field of a saved game is in exactly one of the two lists
+// (tests/logic.test.mjs), so a new field can't be forgotten.
+export const historyFields = [
+  'startingLife', 'scores', 'rotations', 'colors', 'poison', 'casts', 'energy', 'experience', 'rad', 'identities',
+  'commanderDamage', 'pools', 'turn', 'monarch', 'initiative',
+];
+export const settingsFields = [
+  'keepAwake', 'landscapeAngle', 'counters', 'identity', 'manaPool', 'autoEmpty', 'turns', 'tileColours',
+  'shuffleColours', 'badgeSize', 'style', 'reminders', 'history',
+];
+// The saved history's format, and its cap: the newest 500 steps, and at most 64 KB of them as JSON.
+export const historyVersion = 1;
+export const historyCap = 500;
+export const historyBytes = 64 * 1024;
+// Quick taps on one tile and count merge into one step while each comes within this of the last (§6.2a).
+export const mergeWindow = 1500;
+// The running delta on a total fades for this long once its burst ends (§6.2b), and an undo's toast stays this long.
+export const deltaFade = 300;
+export const toastTime = 4000;
+// The labels a step can carry, where its cells alone don't say what it was.
+/** @typedef {'newGame' | 'turn' | 'turnBack' | 'first' | 'start' | 'eraser'} StepKind */
+/** @type {string[]} */
+export const stepKinds = ['newGame', 'turn', 'turnBack', 'first', 'start', 'eraser'];

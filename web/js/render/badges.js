@@ -12,7 +12,8 @@ import {
 import {
   dangerLevel, hasMana, isOut, needsPassing, poolText, shownCounters, trackedDesignations,
 } from '../logic/rules.js';
-import { clearedPools, game, shownReminders, stripHolds } from '../state/state.js';
+import { toasts } from '../state/history.js';
+import { game, shownReminders, stripHolds } from '../state/state.js';
 import { board, element, icon, manaIcon, syncChildren, visuallyHidden } from '../ui/dom.js';
 import { bindRelease, bindStep, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark } from './tile.js';
@@ -30,9 +31,10 @@ import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark
  * @property {(index: number) => void} startTurn
  * @property {(index: number, colour: number) => void} spendMana
  * @property {(index: number) => void} clearPool
- * @property {(index: number) => void} undoClear
  * @property {(index: number, kind: DesignationKind) => void} dismissReminder
  * @property {(mode: BoardMode) => void} setBoardMode
+ * @property {() => void} redo
+ * @property {(index: number) => void} dismissUndoToast
  */
 /** @type {BadgeActions} */
 let badgeActions;
@@ -46,10 +48,35 @@ export function renderPassHints() {
   for (const kind of designationKinds) if (game[kind] !== null) renderBadges(game[kind]);
 }
 
-// The reminders a tile shows, newest last: each a chip in the turn chip's style that a tap dismisses.
+// The reminders a tile shows, newest last: each a chip in the turn chip's style that a tap dismisses. An undo's toast
+// comes after them.
 /** @returns {Keyed[]} */
 function reminderItems(index) {
-  return [...(shownReminders.get(index)?.keys() ?? [])].map(kind => ({ key: `reminder-${kind}`, create: () => reminderChip(index, kind) }));
+  /** @type {Keyed[]} */
+  const items = [...(shownReminders.get(index)?.keys() ?? [])].map(kind => ({ key: `reminder-${kind}`, create: () => reminderChip(index, kind) }));
+  const toast = toasts.get(index);
+  if (toast) items.push({ key: `toast-${toast.id}`, create: () => toastChip(index, toast) });
+  return items;
+}
+
+// The toast an undo or redo leaves (MANA-UNDO-SPEC §6.7), in the reminder chip's language: "Undid life 38 → 37" with
+// Redo, a 64 × 44 target, after an undo; "Redid …" alone after a redo, which a tap dismisses. The label in the seat colour
+// is what drops first on a short tile (placeReminders).
+/** @param {number} index @param {import('../state/history.js').Toast} toast */
+function toastChip(index, toast) {
+  const words = element('span', 'reminder-words', element('b', 'reminder-label', `${toast.verb} `), toast.words);
+  if (!toast.redo) {
+    const chip = element('button', 'chip reminder-chip toast-chip', icon('redo'), words);
+    chip.type = 'button';
+    chip.setAttribute('aria-label', `${toast.verb} ${toast.words}. Dismiss`);
+    bindRelease(chip, () => badgeActions.dismissUndoToast(index));
+    return chip;
+  }
+  const redo = element('button', 'toast-redo', icon('redo'), 'Redo');
+  redo.type = 'button';
+  redo.setAttribute('aria-label', `Redo ${toast.words}`);
+  bindRelease(redo, () => badgeActions.redo());
+  return element('div', 'chip reminder-chip toast-chip', icon('undo'), words, redo);
 }
 
 function reminderChip(index, kind) {
@@ -121,28 +148,16 @@ function turnItems(index) {
   return items;
 }
 
-// Whether a tile's strip shows: while its pool has mana, for 5 seconds after the eraser, and while it's being tapped.
+// Whether a tile's strip shows: while its pool has mana, and while it's being tapped.
 function stripShows(index) {
-  return game.manaPool && (hasMana(game, index) || clearedPools.has(index) || stripHolds.has(index));
+  return game.manaPool && (hasMana(game, index) || stripHolds.has(index));
 }
 
-// A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then the eraser. Or
-// "Undo clear" for 5 seconds after the eraser. While the strip is being tapped, its colours keep their places, at 0
-// once spent (actions/mana.js), and "Undo clear" ignores taps, so a quick extra tap on the eraser can't undo it.
+// A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then the eraser. While
+// the strip is being tapped, its colours keep their places, at 0 once spent or erased (actions/mana.js), so a quick
+// extra tap lands where it was aimed.
 /** @returns {Keyed[]} */
 function stripItems(index) {
-  if (clearedPools.has(index)) {
-    return [{
-      key: 'undo',
-      create: () => {
-        const undo = element('button', 'strip-undo', icon('undo'), 'Undo clear');
-        undo.type = 'button';
-        undo.setAttribute('aria-label', `Undo clear, Player ${index + 1}'s mana pool`);
-        bindTap(undo, () => stripHolds.has(index) || badgeActions.undoClear(index));
-        return undo;
-      },
-    }, stripChipItem(index)];
-  }
   const held = stripHolds.get(index)?.colours;
   const spends = manaColours.flatMap((colour, at) => {
     const amount = game.pools[index][at];
@@ -182,21 +197,9 @@ function stripItems(index) {
 }
 
 // The strip folded into one chip, where the strip can't fit: the pool's colours and amounts with a caret, which opens
-// mana mode. Or, for 5 seconds after the eraser, "Undo".
+// mana mode.
 /** @returns {Keyed} */
 function stripChipItem(index) {
-  if (clearedPools.has(index)) {
-    return {
-      key: 'strip-undo',
-      create: () => {
-        const chip = element('button', 'chip strip-chip', icon('undo'), 'Undo');
-        chip.type = 'button';
-        chip.setAttribute('aria-label', `Undo clearing Player ${index + 1}'s mana pool`);
-        bindTap(chip, () => stripHolds.has(index) || badgeActions.undoClear(index));
-        return chip;
-      },
-    };
-  }
   return {
     key: 'strip-chip',
     create: () => {
@@ -391,7 +394,7 @@ export function renderBadges(index) {
   syncChildren(far, farRow);
   far.hidden = farRow.length === 0;
   player.toggleAttribute('data-active', game.turns === 'turns' && game.turn.active === index);
-  // While a pool has mana, or for 5 seconds after the eraser, its strip shows on its own row above the near row, and
+  // While a pool has mana, or while it's being tapped, its strip shows on its own row above the near row, and
   // both rows stay. Its folded chip waits under the far row too, for a tile with no room for that row (fit.js).
   const strip = player.querySelector('.mana-strip');
   const floating = stripShows(index);

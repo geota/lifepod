@@ -26,13 +26,13 @@ Tap the sliders beside the die to open **Settings**, a full-screen page in secti
 
 ### New game
 
-**New game**, beside **Done** in the Settings header, restarts with the same players and life. It asks first and lists what resets: life totals, every counter and commander tax, commander damage, floating mana, turns (back to round 1, with "Who goes first?" again if Turns is on), the monarch and the initiative, and colour identities. With **Shuffle tile colours each game** on, the tile colours are shuffled too. Every setting and the seats' rotations stay, and so do the tile colours unless they're shuffled; **Cancel** is the default. New game hides while a players or life change is pending, when **Start new game** does the same job.
+**New game**, beside **Done** in the Settings header, restarts with the same players and life. It asks first and lists what resets: life totals, every counter and commander tax, commander damage, floating mana, turns (back to round 1, with "Who goes first?" again if Turns is on), the monarch and the initiative, and colour identities. With **Shuffle tile colours each game** on, the tile colours are shuffled too. Every setting and the seats' rotations stay, and so do the tile colours unless they're shuffled; **Cancel** is the default. New game hides while a players or life change is pending, when **Start new game** does the same job. Starting one is a step like any other: **Undo** in the center brings the old game back.
 
 ## Counters
 
 Turn on **Commander**, **Poison**, **Energy**, **Experience** or **Rad** in Settings → **Track** to track commander damage and tax, poison, energy, experience or rad counters. All are off by default, save the moment you switch them, and stay as you set them across launches and new games.
 
-With any of them on, a counters button joins the center controls. Tap it and each tile shows a circle for each counter that's on, in the order poison, commander tax (+2 per cast, under Mana's commander symbol), energy, experience and rad, facing its player, each with its icon over the count. Tap a circle to add one; hold it to take one away, repeating while you hold. While counters are open, the center shows Undo, a check mark and ✕: Undo steps back one change at a time, the check mark saves, and ✕ discards every change made since opening, asking first if there are any. Android back works like ✕.
+With any of them on, a counters button joins the center controls. Tap it and each tile shows a circle for each counter that's on, in the order poison, commander tax (+2 per cast, under Mana's commander symbol), energy, experience and rad, facing its player, each with its icon over the count. Tap a circle to add one; hold it to take one away, repeating while you hold. While counters are open, the center shows Undo, a check mark and ✕: Undo in the center steps back through the whole game; in a mode it stops at what you changed there, and quick taps on one circle are one step. The check mark saves, and ✕ discards every change made since opening, asking first if there are any; Redo can bring them back after. Android back works like ✕.
 
 At rest, a row along each player's own edge shows their colour identity chip, then poison, tax, energy, experience and rad, each only when set. Starting a new game resets the counts and keeps the switches and colours.
 
@@ -44,13 +44,25 @@ At rest, a row along each tile's far edge starts with a sword and shows the comm
 
 If a badge row runs out of room, the same thing gives way on every tile. Along the far edge the sword goes first; along the near edge the identity names and the word "Turn" go first, then the identity symbol if the colour indicator also shows. Then the row takes a second line, and only then does its type shrink, to a 9px floor; where a second line would cover a life total, the type shrinks first and the row wraps last. Counts, the crown, the castle, the identity chip and its colour indicator are never hidden, and anything that gave way comes back only when there's room to spare.
 
+## Undo
+
+**Undo** sits in the center controls, between the game's buttons and the die. Each tap steps back one action through the whole game: a life change, spending or erasing floating mana, a turn step (with the pools it emptied), "Who goes first?", or a new game. Quick taps on one tile and one count are one action: while you keep tapping, within a second and a half of the last tap, a small badge on the total shows the change so far (−3), which is exactly what one Undo takes back. Two players tapping at once each keep their own.
+
+After an undo, a note on the tile it changed, facing its player, says what was undone ("Undid life 38 → 37"), with **Redo** to bring it back, for four seconds. You can keep stepping back and forward until someone takes a new action, which ends Redo. Undoing a new game brings the whole board back, players, colours and seats included, and every tile says "Game restored". Undo is dimmed when there's nothing to undo; screen readers hear what it would undo, and a Redo button follows it for keyboards. Hold Undo to open History.
+
+In counters, commander damage and mana modes, Undo goes back through what you changed there and stops at what was there when the mode opened; ✕ discards those changes, and Redo or History can bring them back.
+
+**History**, from a hold on Undo or Settings → **Game** → **History**, lists the game's actions newest first, each with its player, what changed and how long ago. Actions you've undone are struck through above the **Now** line, and each new game is a divider. Tap a row to go back, or forward, to just after it, or use **Back** and **Forward** to step one at a time. It faces the phone; the turn button flips it round.
+
+Settings, Rotate seats, tile colours and identities aren't undone: they toggle back. The history is saved with the game, so it survives closing the app, and keeps the last 500 actions.
+
 ## Turns
 
 Set **Turns** in Settings → **Track** to follow the game's turns: **Off** (the default), **Rounds** or **Turn by turn**. Each new game while Turns is on, and switching Turns on in a game with nobody first, opens "Who goes first?": tap **Me first** on your tile, tap the center shuffle to pick at random, or ✕ to skip. Play goes clockwise on screen, which is passing to the left, whatever the seat rotations.
 
 With **Rounds**, the first player's flag shows the round: tap it as each round starts, or hold it to go back one. With **Turn by turn**, the active player's tile lifts toward their colour inside a ring, and their row leads with the untap symbol and "Turn 3": tap it when your turn ends and play passes to the next player who isn't out, with the round going up when play comes back round to the first player, who keeps a small flag. Hold it to step back one turn. If nobody's turn has started, every tile of a player who is still in has a Start chip until someone starts theirs.
 
-Either way, the round leads the center controls, printed twice so both sides of the table can read it, and works like the chip, so anyone can step the game on. Turn steps save at once. Off hides everything about turns and keeps it for when you switch back on.
+Either way, the round leads the center controls, printed twice so both sides of the table can read it, and works like the chip, so anyone can step the game on. Turn steps save at once, and **Undo** in the center takes one back, with any mana it emptied. Off hides everything about turns and keeps it for when you switch back on.
 
 ## The monarch and the initiative
 
@@ -70,9 +82,9 @@ Settings → **Reminders** has three switches, all on by default.
 
 ## Mana pool
 
-Turn on **Mana pool** in Settings → **Track** to keep floating mana. The center controls gain the tap symbol, with a dot while any pool has mana. Tap it and every tile shows six circles, white, blue, black, red, green and colourless, each with its mana symbol over the amount: tap to add one, hold to take one away, with Undo, the check mark and ✕ as for counters.
+Turn on **Mana pool** in Settings → **Track** to keep floating mana. The center controls gain the tap symbol, the classic tilted T on a light pip, with a lime dot on the pip while any pool has mana. Tap it and every tile shows six circles, white, blue, black, red, green and colourless, each with its mana symbol over the amount: tap to add one, hold to take one away, with Undo, the check mark and ✕ as for counters.
 
-At rest, a tile with mana shows a strip on a row of its own, just above the player's own row of badges, with just the colours it holds: tap a symbol to spend one, or the eraser to empty the pool, which leaves **Undo clear** for 5 seconds. The strip never shares a line with another badge, never covers a life total, its − and + or the center controls, and its symbols never shrink. To make room for it, the life totals get smaller and move toward commander damage, all alike and never below two thirds of their size. Where the strip is too wide for its row, or would take the totals smaller than three quarters of their size, it folds into one chip that shows the pool and opens mana mode, on the same row. Only the tiles that need it fold. On a very crowded small board with no room for that row, the chip sits under commander damage, or as a last resort at the end of the player's own row.
+At rest, a tile with mana shows a strip on a row of its own, just above the player's own row of badges, with just the colours it holds: tap a symbol to spend one, or the eraser to empty the pool; **Undo** in the center puts it back. The strip never shares a line with another badge, never covers a life total, its − and + or the center controls, and its symbols never shrink. To make room for it, the life totals get smaller and move toward commander damage, all alike and never below two thirds of their size. Where the strip is too wide for its row, or would take the totals smaller than three quarters of their size, it folds into one chip that shows the pool and opens mana mode, on the same row. Only the tiles that need it fold. On a very crowded small board with no room for that row, the chip sits under commander damage, or as a last resort at the end of the player's own row.
 
 With Turns on, **Empty mana pools when the turn passes** (on by default) empties every pool on each round or turn step, and stepping back restores what it emptied. A new game empties every pool.
 

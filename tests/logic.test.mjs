@@ -4,15 +4,19 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import {
-  badgeSizeOrder, countKinds, designationKinds, identityBackgrounds, identityParts, identitySettingsVersion, manaColours,
-  maxCount, maxRound, maxStartingLife, playOrders, playerCounts, reminderKinds, styleOrder, swatches, tileSetOrder, trackers,
-  turnModes,
+  badgeSizeOrder, countKinds, designationKinds, historyBytes, historyCap, historyFields, historyVersion, identityBackgrounds,
+  identityParts, identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playOrders, playerCounts,
+  reminderKinds, settingsFields, stepKinds, styleOrder, swatches, tileSetOrder, trackers, turnModes,
 } from '../web/js/logic/data.js';
+import {
+  applyStep, boardOf, composeChanges, describeStep, diffBoard, emptyHistory, fitHistory, mergeStep, overlaps, stepCells,
+  stepText, trimHistory,
+} from '../web/js/logic/history.js';
 import {
   applyEdit, applyNewEdit, countEdit, damageEdit, designationEdit, isOut, leavingTransfers, manaEdit, nextTurn, outPlayers,
   playOrder, previousTurn, turnBack, turnForward,
 } from '../web/js/logic/rules.js';
-import { loadGame } from '../web/js/logic/save.js';
+import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, loadGame } from '../web/js/logic/save.js';
 import { test } from './helpers.mjs';
 
 const opts = { numRuns: Number(process.env.PBT_RUNS ?? 500) };
@@ -45,11 +49,29 @@ function gameProblems(g) {
   if (!(g.style === null || styleOrder.includes(g.style))) p.push('style');
   if (!seatOrNull(g.monarch, n) || !seatOrNull(g.initiative, n)) p.push('designations');
   if (!reminderKinds.every(k => typeof g.reminders[k] === 'boolean')) p.push('reminders');
+  if (historyProblems(g.history, n).length) p.push('history');
+  return p;
+}
+
+// A valid History (logic/history.js): version 1, `at` within its steps, at most historyCap steps and historyBytes of
+// them, each step's t, k and n well formed and its delta naming only board fields, and a fixed point of fitHistory, which
+// checks every cell against the player count at its place.
+function historyProblems(h, n) {
+  const p = [];
+  if (!h || h.v !== historyVersion || !Array.isArray(h.steps)) return ['shape'];
+  if (!(Number.isInteger(h.at) && h.at >= 0 && h.at <= h.steps.length)) p.push('at');
+  if (!(Number.isFinite(h.base) && h.base >= 0)) p.push('base');
+  if (h.steps.length > historyCap || JSON.stringify(h.steps).length > historyBytes) p.push('cap');
+  for (const step of h.steps) {
+    if (!(Number.isFinite(step.t) && step.t >= 0) || (step.k !== undefined && !stepKinds.includes(step.k)) || (step.n !== undefined && !(Number.isInteger(step.n) && step.n > 1))) p.push('step');
+    if (!step.d || !Object.keys(step.d).length || !Object.keys(step.d).every(f => historyFields.includes(f))) p.push('delta');
+  }
+  if (JSON.stringify(fitHistory(h, n)) !== JSON.stringify(h)) p.push('not fitted');
   return p;
 }
 
 // The fields that hold one entry per seat, so they mean nothing without a board to fit them to, and the rest.
-const perPlayerFields = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools', 'turn', 'monarch', 'initiative'];
+const perPlayerFields = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools', 'turn', 'monarch', 'initiative', 'history'];
 
 // ---- Generators ---------------------------------------------------------------------------------------------------
 
@@ -86,8 +108,72 @@ const gameOf = n => fc.record({
   monarch: seat(n),
   initiative: seat(n),
   reminders: boolRecord(reminderKinds),
+  history: fc.constant(0).map(() => emptyHistory()),
 });
-const anyGame = fc.constantFrom(...playerCounts).chain(gameOf);
+
+// ---- Actions on the board, for the history's properties ----------------------------------------------------------
+
+// One game action, as random numbers read against the board when it's applied, since a new game can change the player
+// count: a life change, a counter, commander damage (with its handoffs), a mana count, a designation, a turn step that
+// empties the pools, a new game (with a new count, sometimes), an identity, or a seat's rotation and a colour swap.
+const actionArb = fc.record({ kind: fc.nat(9), a: fc.nat(30), b: fc.nat(30), c: fc.integer({ min: -12, max: 12 }) });
+const clamp = v => Math.min(maxCount, Math.max(0, v));
+function act(g, { kind, a, b, c }) {
+  const n = g.scores.length;
+  const i = a % n;
+  if (kind === 0) g.scores[i] += c || 1;
+  else if (kind === 1) {
+    const k = countKinds[b % countKinds.length];
+    g[k][i] = clamp(g[k][i] + (c || 1));
+  } else if (kind === 2) {
+    const edit = damageEdit(g, i, (i + 1 + (b % (n - 1))) % n, c < 0 ? -1 : 1);
+    if (edit) applyNewEdit(g, edit);
+  } else if (kind === 3) g.pools[i][b % manaColours.length] = clamp(g.pools[i][b % manaColours.length] + (c || 1));
+  else if (kind === 4) applyNewEdit(g, designationEdit(g, designationKinds[b % 2], i));
+  else if (kind === 5) {
+    g.turn = turnForward(g) ?? { ...g.turn, round: Math.min(maxRound, g.turn.round + 1) };
+    g.pools = fitPools([], n);
+  } else if (kind === 6) {
+    const count = b % 3 === 0 ? playerCounts[b % playerCounts.length] : n;
+    if (count !== n) g.rotations = Array(count).fill(0);
+    g.colors = fitColors(g.colors, count);
+    for (const k of countKinds) g[k] = fitCounts([], count);
+    g.identities = fitIdentities([], count);
+    g.commanderDamage = fitDamage([], count);
+    g.pools = fitPools([], count);
+    g.turn = fitTurn(null, count);
+    g.monarch = null;
+    g.initiative = null;
+    g.startingLife = 1 + (a * 37 + b) % maxStartingLife;
+    g.scores = Array(count).fill(g.startingLife);
+  } else if (kind === 7) g.identities[i] = ['', 'W', 'UB', 'BRG', 'WUBRG'][b % 5];
+  else {
+    g.rotations[i] = (g.rotations[i] + 1) % 4;
+    const free = [...swatches.keys()].find(colour => !g.colors.includes(colour));
+    if (free !== undefined) g.colors[i] = free;
+  }
+  return kind === 6 ? 'newGame' : kind === 5 ? 'turn' : undefined;
+}
+
+// Records each action as the app's commit() does, one step per action with nothing merged, and leaves `back` of them
+// undone, so the game is where the history's `at` says.
+function played(g, actions, back = 0) {
+  const history = emptyHistory();
+  actions.forEach((action, t) => {
+    const before = boardOf(g);
+    const k = act(g, action);
+    const d = diffBoard(before, boardOf(g));
+    if (Object.keys(d).length) history.steps.push({ t, ...(k ? { k } : {}), d });
+  });
+  history.at = history.steps.length;
+  for (let undone = 0; undone < back && history.at; undone++) applyStep(g, history.steps[--history.at], 'b');
+  g.history = history;
+  return g;
+}
+
+const anyGame = fc.constantFrom(...playerCounts).chain(gameOf)
+  .chain(g => fc.tuple(fc.constant(g), fc.array(actionArb, { maxLength: 8 }), fc.nat(3)))
+  .map(([g, actions, back]) => played(g, actions, back));
 
 // Every path to a field of g, nested ones included.
 const fieldPaths = g => {
@@ -431,4 +517,215 @@ test('node: commander damage to a holder moves the designation to the attacker; 
   assert.deepEqual(damageEdit(g, 1, 2, -1)?.transfers, []);
   g.commanderDamage[1][2] = maxCount;
   assert.equal(damageEdit(g, 1, 2, 1), null, 'no more than maxCount');
+});
+
+// ---- The undo history: logic/history.js (MANA-UNDO-SPEC §6, UNDO-ARCHITECTURE.md §7) ------------------------------
+
+const steps = fc.array(actionArb, { minLength: 1, maxLength: 30 });
+// The board fields only, compared as the save compares them.
+const boardJson = g => json(boardOf(g));
+
+test('node: every saved field is in exactly one of historyFields and settingsFields', () => {
+  const fields = Object.keys(loadGame(() => null, 0));
+  for (const field of fields) {
+    assert.equal(Number(historyFields.includes(field)) + Number(settingsFields.includes(field)), 1, `${field} is a board field or a setting, not both or neither`);
+  }
+  assert.deepEqual([...historyFields, ...settingsFields].sort(), [...fields].sort(), 'and the lists name nothing else');
+});
+
+test('node: undo ∘ do = id and redo ∘ undo = id, for any action on any game', () => {
+  fc.assert(fc.property(anyGame, actionArb, (g, action) => {
+    const before = structuredClone(g);
+    const board = boardOf(g);
+    act(g, action);
+    const after = structuredClone(g);
+    const step = { t: 0, d: diffBoard(board, boardOf(g)) };
+    applyStep(g, step, 'b');
+    assert.deepEqual(g, before, 'undo restores the game exactly');
+    applyStep(g, step, 'a');
+    assert.deepEqual(g, after, 'redo puts the action back');
+  }), opts);
+});
+
+test('node: after any actions, undoing every step gives the start, and undoing j then redoing j gives the same game', () => {
+  fc.assert(fc.property(anyGame, steps, fc.nat(30), (g, actions, j) => {
+    // From a game at the end of its own history, so every step since is one of these actions.
+    g.history = emptyHistory();
+    const start = boardJson(g);
+    played(g, actions);
+    const end = structuredClone(g);
+    const { history } = g;
+    const back = j % (history.steps.length + 1);
+    for (let at = history.steps.length; at > history.steps.length - back; at--) applyStep(g, history.steps[at - 1], 'b');
+    for (let at = history.steps.length - back; at < history.steps.length; at++) applyStep(g, history.steps[at], 'a');
+    assert.deepEqual(g, end, 'undo j then redo j');
+    for (let at = history.steps.length; at > 0; at--) applyStep(g, history.steps[at - 1], 'b');
+    assert.equal(boardJson(g), start, 'undo all');
+  }), opts);
+});
+
+test('node: a step only restores its own cells, so a change that isn\'t a step survives an unrelated undo', () => {
+  fc.assert(fc.property(anyGame, (g) => {
+    const board = boardOf(g);
+    g.scores[0] -= 3;
+    const step = { t: 0, d: diffBoard(board, boardOf(g)) };
+    // A colour change and a rotation, which aren't steps, since.
+    const free = [...swatches.keys()].find(colour => !g.colors.includes(colour));
+    if (free !== undefined) g.colors[1] = free;
+    g.rotations[1] = (g.rotations[1] + 1) % 4;
+    const colours = json(g.colors);
+    const rotations = json(g.rotations);
+    applyStep(g, step, 'b');
+    assert.equal(g.scores[0], board.scores[0]);
+    assert.equal(json(g.colors), colours, 'the colour stays');
+    assert.equal(json(g.rotations), rotations, 'the rotation stays');
+  }), opts);
+});
+
+// Merging a burst (§6.2a): the merged step is the burst's net change, which is the change from its first tap's before
+// to its last tap's after, and a burst whose net change is nothing leaves no step.
+test('node: merging taps preserves the net change, and a net-zero burst leaves no step', () => {
+  const tapArb = fc.record({ delta: fc.integer({ min: -3, max: 3 }), damage: fc.boolean(), attacker: fc.nat(5) });
+  fc.assert(fc.property(editGame, fc.array(tapArb, { minLength: 1, maxLength: 25 }), (g, taps) => {
+    const n = g.scores.length;
+    const start = boardOf(g);
+    // The burst's step so far, or null while its net change is nothing, as state/history.js keeps it.
+    let open = null;
+    for (const { delta, damage, attacker } of taps) {
+      const before = boardOf(g);
+      // One tile and one count: player 1's life, or the commander damage one attacker dealt them (with any handoff).
+      if (damage) {
+        const edit = damageEdit(g, 0, 1 + (attacker % (n - 1)), delta < 0 ? -1 : 1);
+        if (edit) applyNewEdit(g, edit);
+      } else g.scores[0] += delta;
+      const step = { t: 0, d: diffBoard(before, boardOf(g)) };
+      if (!Object.keys(step.d).length) continue;
+      open = open ? mergeStep(open, step) : step;
+    }
+    const net = diffBoard(start, boardOf(g));
+    assert.equal(json(open?.d ?? {}), json(net), 'the merged step is the net change, and nothing is no step');
+    // Undoing the merged step goes back to before the burst.
+    if (open) applyStep(g, open, 'b');
+    assert.equal(json(boardOf(g)), json(start));
+  }), opts);
+  // −3 then +1 is life 40 → 38, in 4 taps; +2 then −2 is nothing.
+  const one = d => ({ t: 1, d: { scores: { 2: d } } });
+  const burst = [[40, 39], [39, 38], [38, 37], [37, 38]].map(one).reduce((a, b) => mergeStep(a, b));
+  assert.deepEqual(burst, { t: 1, n: 4, d: { scores: { 2: [40, 38] } } });
+  assert.equal(mergeStep(one([40, 42]), one([42, 40])), null);
+});
+
+test('node: composing two deltas is the delta across both, whatever the fields and counts', () => {
+  fc.assert(fc.property(anyGame, actionArb, actionArb, (g, first, second) => {
+    const a = boardOf(g);
+    act(g, first);
+    const b = boardOf(g);
+    act(g, second);
+    const c = boardOf(g);
+    assert.equal(json(composeChanges(diffBoard(a, b), diffBoard(b, c))), json(diffBoard(a, c)));
+  }), opts);
+});
+
+test('node: steps overlap exactly when they touch a cell in common', () => {
+  const life2 = stepCells({ scores: { 2: [40, 39] } });
+  assert.equal(overlaps(life2, stepCells({ scores: { 3: [40, 39] } })), false, 'another tile\'s life');
+  assert.equal(overlaps(life2, stepCells({ scores: { 2: [39, 38] }, monarch: [2, 1] })), true, 'the same total');
+  assert.equal(overlaps(life2, stepCells({ scores: [[40, 40], [40, 40, 40]] })), true, 'a whole value touches every cell');
+  assert.equal(overlaps(stepCells({ pools: { 1: { 3: [1, 0] } } }), stepCells({ pools: { 1: { 4: [1, 0] } } })), false, 'another colour');
+  assert.equal(overlaps(stepCells({ monarch: [null, 1] }), stepCells({ monarch: [1, 2] })), true);
+});
+
+// The cap (§6.1): at most 500 steps and 64 KB, the oldest dropped first, Forward counted, and `at` kept in step.
+test('node: the history stays within 500 steps and 64 KB, dropping the oldest', () => {
+  fc.assert(fc.property(fc.integer({ min: 0, max: 800 }), fc.nat(40), fc.integer({ min: 1, max: 400 }), (count, back, width) => {
+    const history = emptyHistory();
+    for (let t = 0; t < count; t++) {
+      history.steps.length = history.at;
+      history.steps.push({ t, d: { scores: Object.fromEntries(Array.from({ length: 1 + (t % 3) }, (_, i) => [i, [t, t + width]])) } });
+      history.at = history.steps.length;
+      trimHistory(history);
+      assert.ok(history.steps.length <= historyCap, 'at most 500 steps');
+      assert.ok(JSON.stringify(history.steps).length <= historyBytes, 'at most 64 KB');
+      assert.equal(history.at, history.steps.length);
+    }
+    if (history.steps.length) assert.equal(history.steps.at(-1).t, count - 1, 'the newest step is kept');
+    // With Forward steps: they count, and `at` stays on the same step among those kept.
+    history.at = Math.max(0, history.steps.length - back);
+    const kept = history.steps[history.at];
+    history.steps.push(...Array.from({ length: 30 }, (_, t) => ({ t, d: { poison: { 0: [0, 1] } } })));
+    trimHistory(history);
+    assert.ok(history.steps.length <= historyCap);
+    if (kept && history.at < history.steps.length) assert.equal(history.steps[history.at], kept, '`at` still points at the same step');
+  }), { ...opts, numRuns: Math.min(opts.numRuns, 25) });
+});
+
+// fitHistory (§10): anything at all never throws and gives a valid history, a valid one round-trips, and a bad step
+// drops itself and everything further from `at`, including across a change of player count.
+test('node: fitHistory accepts anything without throwing, and gives a valid history', () => {
+  const cell = fc.oneof(fc.anything(), fc.tuple(nearMiss, nearMiss), fc.dictionary(fc.constantFrom('0', '1', '2', '7', '-1', 'x'), fc.tuple(nearMiss, nearMiss)));
+  const weird = fc.oneof(fc.anything(), fc.jsonValue(), fc.record({ v: fc.constant(1), at: fc.anything(), base: fc.anything(), steps: fc.array(fc.anything()) }),
+    fc.record({ v: fc.constant(1), at: fc.nat(5), base: fc.nat(), steps: fc.array(fc.record({ t: fc.anything(), k: fc.anything(), n: fc.anything(), d: fc.dictionary(fc.constantFrom(...historyFields, 'treasure', 'x'), cell) })) }));
+  fc.assert(fc.property(weird, fc.constantFrom(...playerCounts), (saved, n) => {
+    const fitted = fitHistory(saved, n);
+    assert.deepEqual(historyProblems(fitted, n), []);
+  }), opts);
+  assert.deepEqual(fitHistory(undefined, 4), emptyHistory(), 'a save from before Undo gets an empty history');
+  assert.deepEqual(fitHistory({ v: 2, at: 0, steps: [] }, 4), emptyHistory(), 'an unknown version is empty');
+});
+
+test('node: a valid history round-trips through JSON and fitHistory unchanged', () => {
+  fc.assert(fc.property(anyGame, (g) => {
+    assert.equal(json(fitHistory(JSON.parse(json(g.history)), g.scores.length)), json(g.history));
+  }), opts);
+});
+
+test('node: a corrupt step drops itself and every step further from at; at is clamped; the game is untouched', () => {
+  const life = (i, b, a) => ({ t: 0, d: { scores: { [i]: [b, a] } } });
+  const ok = [life(0, 40, 39), life(1, 40, 38), life(2, 40, 37), life(3, 40, 36)];
+  const fit = (list, at, n = 4) => fitHistory({ v: 1, at, base: 5, steps: list }, n);
+  assert.deepEqual(fit(ok, 4).steps, ok, 'valid steps are kept');
+  assert.equal(fit(ok, 9).at, 4, 'an `at` past the end is the end');
+  assert.equal(fit(ok, -1).at, 4);
+  assert.equal(fit(ok, 1.5).at, 4);
+  const bad = [life(0, 40, 39), life(9, 40, 38), life(2, 40, 37), life(3, 40, 36)];
+  assert.deepEqual(fit(bad, 4), { v: 1, at: 2, base: 5, steps: [life(2, 40, 37), life(3, 40, 36)] }, 'an index out of range drops it and everything older');
+  assert.deepEqual(fit(bad, 1), { v: 1, at: 1, base: 5, steps: [life(0, 40, 39)] }, 'ahead of at, everything newer goes');
+  assert.deepEqual(fit([life(0, 40, '39')], 1).steps, [], 'a value that fails its field\'s check');
+  assert.deepEqual(fit([{ t: 0, d: { scores: { 0: [40, 40] } } }], 1).steps, [], 'a cell that doesn\'t change');
+  assert.deepEqual(fit([{ t: 0, d: { treasure: { 0: [0, 1] }, scores: { 0: [40, 39] } } }], 1).steps, [life(0, 40, 39)], 'a field it doesn\'t know is left out');
+  // Across a new game from 4 players to 6: the steps before it are checked against 4 players, the ones after against 6.
+  const newGame = { t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [30, 30, 30, 30, 30, 30]] } };
+  assert.equal(fit([life(3, 40, 39), newGame, life(5, 30, 29)], 3, 6).steps.length, 3, 'each side of a count change has its own count');
+  assert.equal(fit([life(5, 40, 39), newGame, life(5, 30, 29)], 3, 6).steps.length, 2, 'a step before it is checked against 4 players');
+  assert.equal(fit([newGame, life(5, 30, 29)], 1, 6).at, 1, 'with a step ahead');
+  assert.deepEqual(fit([newGame, life(5, 30, 29)], 0, 6).steps, [], 'at 0 the game has 6 players, so a new game from 4 ahead of it is wrong');
+  // A history that's corrupt never touches the rest of the save.
+  const save = { startingLife: 40, scores: [39, 40, 40, 40], history: { v: 1, at: 'x', base: null, steps: [null, life(0, 40, 39)] } };
+  const loaded = load(JSON.stringify(save));
+  assert.deepEqual(loaded.scores, [39, 40, 40, 40]);
+  assert.deepEqual(loaded.history, { v: 1, at: 1, base: 0, steps: [life(0, 40, 39)] });
+});
+
+// What each step says (§6.7), for Undo's name, the toast and the announcement.
+test('node: describeStep and stepText say what each kind of step changed', () => {
+  const g = load(JSON.stringify({ startingLife: 40, scores: [40, 40, 40, 40], colors: [0, 1, 2, 3], tileColours: 'classic', turns: 'turns' }));
+  const text = d => stepText({ t: 0, d }, g);
+  const cases = [
+    [{ scores: { 2: [38, 37] } }, 'Player 3, Coral, life 38 → 37'],
+    [{ scores: { 0: [1, -2] } }, 'Player 1, Sage, life 1 → −2'],
+    [{ poison: { 1: [2, 3] } }, 'Player 2, Sky, poison 2 → 3'],
+    [{ casts: { 0: [1, 2] } }, 'Player 1, Sage, commander tax +2 → +4'],
+    [{ commanderDamage: { 1: { 0: [0, 5] } }, scores: { 1: [33, 28] } }, 'Player 2, Sky, 5 commander damage from Player 1, life 33 → 28'],
+    [{ commanderDamage: { 1: { 0: [5, 3] } } }, 'Player 2, Sky, commander damage from Player 1 5 → 3'],
+    [{ pools: { 3: { 3: [1, 0] } } }, 'Player 4, Violet, red mana 1 → 0'],
+    [{ monarch: [3, 1] }, 'Player 2, Sky, monarch: Player 4 → Player 2. Player 4, Violet, monarch: Player 4 → Player 2'],
+    [{ initiative: [null, 0] }, 'Player 1, Sage, initiative: nobody → Player 1'],
+    [{ turn: [{ first: 0, active: 0, round: 3 }, { first: 0, active: 1, round: 3 }] }, 'turn: Player 1 → Player 2, round 3'],
+  ];
+  for (const [d, words] of cases) assert.equal(text(d), words);
+  assert.equal(stepText({ t: 0, k: 'eraser', d: { pools: { 0: { 0: [2, 0], 3: [1, 0] } } } }, g), 'Player 1, Sage, mana pool emptied');
+  assert.equal(stepText({ t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [40, 40]] } }, g), 'new game');
+  const rounds = { ...g, turns: 'rounds' };
+  assert.equal(stepText({ t: 0, k: 'turn', d: { turn: [{ first: 0, active: null, round: 2 }, { first: 0, active: null, round: 3 }], pools: { 0: { 0: [1, 0] } } } }, rounds), 'round 2 → 3. mana pools emptied');
+  assert.deepEqual(describeStep({ t: 0, k: 'turn', d: { turn: [{ first: 0, active: 0, round: 1 }, { first: 0, active: 1, round: 1 }] } }, g).label, 'turn pass');
 });

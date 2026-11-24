@@ -196,6 +196,8 @@
   --focus-offset: 2px;
   /* Pressed controls keep their size (Glass shrinks them a little). */
   --press-scale: 1;
+  /* The mana button's pip is flat in Material; Glass gives it the glass edge language (MANA-UNDO-SPEC §5). */
+  --tap-pip-edge: none;
 
   /* Motion: 200ms emphasised easing, for presses too; none under reduced motion. */
   --ease: cubic-bezier(.2, 0, 0, 1);
@@ -326,6 +328,7 @@
   /* Pressed shrinks to 96% under the 10% layer, on a 250ms spring with a gentle overshoot. Everything else (fades, the
      switch thumb) keeps Material's easing, where an overshoot means nothing (DESIGN-AUDIT N5). */
   --press-scale: .96;
+  --tap-pip-edge: inset 0 0 0 1px #ffffff55, 0 1px 1px #0009;
   --ease-press: cubic-bezier(.3, 1.35, .55, 1);
   --motion: .25s;
 

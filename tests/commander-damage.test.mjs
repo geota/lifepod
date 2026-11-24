@@ -85,7 +85,10 @@ async function checkDamage(t, engine) {
   assert.notEqual((await seatLooks(page, 3))[0].panel, (await seatLooks(page, 3))[1].panel, 'each seat is its own player’s panel');
 
   // Each tap on an opponent's seat adds 1 commander damage from them and takes 1 life, together.
-  for (let tap = 0; tap < 6; tap++) await seat(page, 3, 2).tap();
+  // Quick taps on one seat merge into one undo step (MANA-UNDO-SPEC §6.2a), so the sixth comes after the merge window.
+  for (let tap = 0; tap < 5; tap++) await seat(page, 3, 2).tap();
+  await page.clock.runFor(1501);
+  await seat(page, 3, 2).tap();
   assert.equal(await seat(page, 3, 2).textContent(), '6');
   // With damage the seat keeps the attacker's tile colour, and its ring turns into a thicker one in their seat
   // colour. Changed seats add a ring outside, over the tile.
@@ -105,7 +108,7 @@ async function checkDamage(t, engine) {
   await page.clock.runFor(1);
   assert.equal(await announced(), "Player 2's commander, 6 damage to Player 3. Player 3, Coral, 34 life");
 
-  // Undo steps back one change.
+  // Undo steps back one step.
   await button(page, 'Undo').tap();
   assert.equal(await seat(page, 3, 2).textContent(), '5');
   assert.deepEqual(await ownSeat(page, 3), ['35', '−5']);
@@ -149,8 +152,9 @@ async function checkDamage(t, engine) {
 
   // ✕ asks before discarding, then puts damage and life back as they were.
   await button(page, 'Cancel').tap();
-  // Ten changes: six taps, the undo of one, the hold's three and the keyboard's two.
-  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 10 changes?');
+  // Two changes, the mode's steps in the history: the five quick taps, and the hold. The sixth tap was undone, and the
+  // keyboard's +1 and −1 merged to nothing.
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 2 changes?');
   await button(page, 'Discard').tap();
   await eventually(() => mode(page), null);
   assert.deepEqual(await scores(page), [40, 40, 40, 40]);
@@ -380,7 +384,8 @@ test('chromium: Android back cancels commander damage the way ✕ does', async (
   await seat(page, 2, 1).tap();
   await seat(page, 2, 1).tap();
   assert.equal(await back(), true);
-  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 2 changes?');
+  // Two quick taps on one seat are one change.
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 1 change?');
   assert.equal(await back(), true, 'back closes the question and keeps editing');
   await eventually(() => page.locator('#discard').evaluate(dialog => dialog.open), false);
   assert.equal(await mode(page), 'damage');

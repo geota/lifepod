@@ -8,11 +8,10 @@ import {
 // clear) and emptying pools when the turn passes.
 
 // Timers in web/js/logic/data.js. A mana cell held for holdDelay takes one away, then one more every 100ms; a turn chip
-// or the round button held for holdDelay steps back once. "Undo clear" lasts undoClearTime. A strip keeps its buttons in
+// or the round button held for holdDelay steps back once. A strip keeps its buttons in
 // place for stripHoldTime after its last tap, then reflows (tests/presses.test.mjs). Tests that tap or hold
 // these pause the page's clock, so a tap can't become a hold and each happens only when the test runs the clock.
 const holdDelay = 500;
-const undoClearTime = 5000;
 const stripHoldTime = 800;
 
 const mode = page => page.locator('#board').getAttribute('data-mode');
@@ -20,11 +19,11 @@ const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const cell = (page, number, colour) => tile(page, number).locator(`.mana-cell[data-colour="${colour}"]`);
 const amount = (page, number, colour) => cell(page, number, colour).locator('b').textContent();
 const isOpen = (page, id) => page.locator(`#${id}`).evaluate(dialog => dialog.open);
-// Each tile's strip as it reads: 'R3 C1 clear', 'undo', or '' with no strip. The folded chip, which shows only where
+// Each tile's strip as it reads: 'R3 C1 clear', or '' with no strip. The folded chip, which shows only where
 // the strip can't fit, is left out.
 const strips = page => page.locator('.mana-strip').evaluateAll(rows => rows.map(row => (row.hidden ? '' : [...row.children]
   .filter(item => !item.matches('.chip') && item.checkVisibility())
-  .map(item => (item.matches('.strip-clear') ? 'clear' : item.matches('.strip-undo') ? 'undo' : `${item.dataset.colour}${item.textContent}`)).join(' '))));
+  .map(item => (item.matches('.strip-clear') ? 'clear' : `${item.dataset.colour}${item.textContent}`)).join(' '))));
 // Whether each tile's near row shows anything.
 const nearShown = page => page.locator('.badges.near').evaluateAll(rows => rows.map(row => !row.hidden && [...row.children].some(chip => chip.checkVisibility() && chip.offsetWidth > 0)));
 const floating = page => page.locator('#mana-button').evaluate(node => node.hasAttribute('data-floating'));
@@ -40,7 +39,7 @@ async function checkManaMode(t, engine) {
   assert.equal(await floating(page), false, 'no dot while every pool is empty');
   assert.equal((await saved(page)).manaPool, true, 'the switch saves at once');
 
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   assert.equal(await mode(page), 'mana');
   assert.deepEqual(await tile(page, 1).locator('.mana-cell').evaluateAll(cells => cells.map(node => node.dataset.colour)), ['W', 'U', 'B', 'R', 'G', 'C']);
   assert.equal(await page.locator('.mana-cell').count(), 24);
@@ -79,7 +78,7 @@ async function checkManaMode(t, engine) {
   await tile(page, 2).locator('.counter-cell[data-kind="poison"]').tap();
   await tile(page, 3).locator('.counter-cell[data-kind="poison"]').tap();
   await button(page, 'Save').tap();
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   for (const [number, colour] of [[1, 'W'], [1, 'W'], [1, 'U'], [3, 'R'], [3, 'R'], [3, 'R'], [3, 'C']]) await cell(page, number, colour).tap();
   await button(page, 'Save').tap();
   assert.equal(await mode(page), null);
@@ -99,8 +98,8 @@ async function checkManaMode(t, engine) {
   assert.deepEqual(await strips(page), ['W2 U1 clear', '', 'R3 C1 clear', '']);
 }
 
-// At rest: tap a symbol to spend one, and the strip shrinks as colours run out. The eraser clears the pool and leaves
-// "Undo clear" for 5 seconds. Playwright's clock drives the 5 seconds.
+// At rest: tap a symbol to spend one, and the strip shrinks as colours run out. The eraser clears the pool, and Undo in
+// the centre puts it back.
 async function checkStrip(t, engine) {
   const pools = [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 3, 0, 1], [0, 0, 0, 0, 0, 0]];
   const page = await openPage(t, engine, { clock: true, game: savedGame(4, { manaPool: true, pools, counters: { poison: true }, poison: [1, 1, 1, 1] }) });
@@ -122,25 +121,22 @@ async function checkStrip(t, engine) {
   assert.deepEqual(await nearShown(page), [true, true, true, true], 'the near rows stay as pools empty');
   assert.equal(await floating(page), true);
 
-  // The eraser clears P3's pool and leaves "Undo clear"; a tap puts the pool back.
+  // The eraser clears P3's pool as one step, which Undo in the centre takes back: it replaced "Undo clear"
+  // (MANA-UNDO-SPEC §6.5). While it's being tapped, the strip keeps its place, its colours at 0.
   await tile(page, 3).locator('.strip-clear').tap();
-  assert.deepEqual(await strips(page), ['', '', 'undo', '']);
+  assert.deepEqual(await strips(page), ['', '', 'R0 C0 clear', '']);
   assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 0, 0, 0], 'the clear saves at once');
   assert.equal(await floating(page), false, 'no dot once every pool is empty');
-  // A second before it ends.
-  await page.clock.runFor(undoClearTime - 1000);
-  await tile(page, 3).locator('.strip-undo').tap();
-  assert.deepEqual(await strips(page), ['', '', 'R3 C1 clear', '']);
-  assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 3, 0, 1], 'Undo clear restores the pool');
-
-  // "Undo clear" lasts 5 seconds, then the strip goes and the pool stays empty.
-  await tile(page, 3).locator('.strip-clear').tap();
-  await page.clock.runFor(undoClearTime - 1);
-  assert.deepEqual(await strips(page), ['', '', 'undo', ''], 'still there just before 5 seconds');
-  await page.clock.runFor(1);
-  assert.deepEqual(await strips(page), ['', '', '', ''], 'gone after 5 seconds');
+  await page.clock.runFor(stripHoldTime);
+  assert.deepEqual(await strips(page), ['', '', '', ''], 'then the strip goes');
   assert.deepEqual(await nearShown(page), [true, true, true, true]);
-  assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 0, 0, 0]);
+  assert.equal((await saved(page)).history.steps.at(-1).k, 'eraser', 'the eraser is a step');
+  await page.locator('#undo-button').tap();
+  assert.deepEqual(await strips(page), ['', '', 'R3 C1 clear', '']);
+  assert.deepEqual((await saved(page)).pools[2], [0, 0, 0, 3, 0, 1], 'Undo restores the pool');
+  // Spends merge per colour: the two quick white spends were one step, which Undo takes back next.
+  await page.locator('#undo-button').tap();
+  assert.deepEqual((await saved(page)).pools[0], [2, 0, 0, 0, 0, 0], 'two quick spends of white are one step');
 }
 
 // Each round step or turn pass empties every pool when auto-empty is on (the default), and holding back that step
@@ -157,7 +153,7 @@ async function checkAutoEmpty(t, engine) {
   assert.deepEqual((await saved(page)).pools, Array(4).fill([0, 0, 0, 0, 0, 0]));
   assert.equal(await floating(page), false);
   // Mana added after the pass stays when the step is held back, and the emptied pools come back on top.
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   await cell(page, 2, 'G').tap();
   await cell(page, 3, 'R').tap();
   await button(page, 'Save').tap();
@@ -166,11 +162,11 @@ async function checkAutoEmpty(t, engine) {
   assert.deepEqual((await saved(page)).pools, [[2, 1, 0, 0, 0, 0], [0, 0, 0, 0, 1, 0], [0, 0, 0, 4, 0, 1], [0, 0, 0, 0, 0, 0]], 'and restores what the pass emptied');
   assert.deepEqual(await strips(page), ['W2 U1 clear', 'G1 clear', 'R4 C1 clear', '']);
 
-  // A pass also ends any "Undo clear": the pool would have emptied anyway.
+  // A pass just after the eraser: P3's strip keeps its place, at 0, while it's being tapped.
   await tile(page, 3).locator('.strip-clear').tap();
-  assert.deepEqual(await strips(page), ['W2 U1 clear', 'G1 clear', 'undo', '']);
+  assert.deepEqual(await strips(page), ['W2 U1 clear', 'G1 clear', 'R0 C0 clear', '']);
   await page.locator('#round-button').tap();
-  assert.deepEqual(await strips(page), ['', '', 'clear', ''], 'P3’s strip keeps its place while it’s being tapped');
+  assert.deepEqual(await strips(page), ['', '', 'R0 C0 clear', ''], 'P3’s strip keeps its place while it’s being tapped');
   await page.clock.runFor(stripHoldTime);
   assert.deepEqual(await strips(page), ['', '', '', '']);
   await page.locator('#round-button').tap();
@@ -191,7 +187,7 @@ async function checkAutoEmpty(t, engine) {
   assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Mana pool off');
   await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
   await button(page, 'Close settings').tap();
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   await cell(page, 4, 'B').tap();
   await button(page, 'Save').tap();
   await page.locator('#round-button').tap();
@@ -220,7 +216,7 @@ async function checkAutoEmpty(t, engine) {
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: mana mode adds mana with undo, save and discard`, t => checkManaMode(t, engine));
-  test(`${name}: the mana strip spends, clears and undoes a clear for 5 seconds`, t => checkStrip(t, engine));
+  test(`${name}: the mana strip spends and clears, and Undo puts a clear back`, t => checkStrip(t, engine));
   test(`${name}: passing the turn empties pools, and stepping back restores them`, t => checkAutoEmpty(t, engine));
 }
 
@@ -231,7 +227,7 @@ test('chromium: mana mode fits six players on the smallest phone', async (t) => 
   const problems = () => tileProblems(page, { targets: '.mode-layer .mana-cell, .mana-strip button' });
   // Every colour held: each strip folds into its chip, which stays inside the tile.
   assert.deepEqual(await problems(), [], 'the strips fit');
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   assert.equal(await page.locator('.mana-cell').count(), 36);
   assert.deepEqual(await problems(), [], 'the mana cells fit');
 });
@@ -435,12 +431,12 @@ for (const [name, engine] of Object.entries(engines)) {
 test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {
   const page = await openPage(t, chromium, { native: 'android', clock: true, game: savedGame(4, { manaPool: true }) });
   const back = () => page.evaluate(() => window.closeOpenDialog());
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   assert.deepEqual(await backHandling(page), [false, true], 'off on load, then on for mana mode');
   assert.equal(await back(), true);
   assert.equal(await mode(page), null, 'back with no changes closes the mode');
   assert.deepEqual(await backHandling(page), [false, true, false], 'then back goes to the system');
-  await button(page, 'Mana pool').tap();
+  await page.locator('#mana-button').tap();
   await cell(page, 2, 'G').tap();
   assert.equal(await back(), true);
   assert.ok(await isOpen(page, 'discard'), 'back with changes asks first');

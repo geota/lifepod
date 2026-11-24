@@ -462,3 +462,54 @@ dialog.fs[data-flipped] .fs-body { padding-top: var(--keyboard, 0px); padding-bo
   .k-slider { --slider-thumb-height: 28px; height: 72px; }
 }
 
+
+/* History (MANA-UNDO-SPEC §6.8): a dialog in the dice sheet's style, facing the phone (the flip turns it), its rows
+   newest first, each a 44px button: the seat's dot, who, what changed and how long ago. Steps ahead of Now, which Redo
+   brings back, are struck through above the Now line; a new game is a divider. Back and Forward span the foot, and move
+   into the header under 360px tall so the list keeps at least three rows. */
+#history { width: min(600px, calc(100% - 32px)); }
+#history[data-flipped] { transform: rotate(180deg); }
+.history-sheet {
+  grid-template: "header" auto "empty" auto "list" minmax(0, 1fr) "steps" auto / minmax(0, 1fr);
+  gap: var(--space-3);
+  max-height: calc(100dvh - 12px);
+}
+.history-sheet > .sheet-header { grid-area: header; }
+.history-sheet > .sheet-header h2 { margin-inline-end: auto; }
+.history-empty { grid-area: empty; color: var(--text-soft); }
+.history-empty[hidden] { display: none; }
+.history-list { grid-area: list; display: grid; gap: 2px; min-height: 0; margin: 0; padding: 0; overflow-y: auto; list-style: none; overscroll-behavior: contain; }
+.history-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control, 12px);
+  background: var(--control-fill);
+  color: var(--text);
+  text-align: start;
+}
+.history-row:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
+.history-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--seat); }
+.history-dot[data-table] { background: var(--muted); }
+.history-who { font-weight: var(--weight-semibold); white-space: nowrap; }
+.history-what { overflow: hidden; color: var(--text-soft); text-overflow: ellipsis; white-space: nowrap; }
+.history-when { color: var(--muted); font-size: var(--type-small); white-space: nowrap; }
+.history-row[data-ahead] :is(.history-who, .history-what) { color: var(--muted); text-decoration: line-through; }
+.history-row.history-divider { grid-template-columns: minmax(0, 1fr) auto; background: transparent; box-shadow: inset 0 0 0 1px var(--border); }
+.history-row.history-divider .history-what { color: var(--text); font-weight: var(--weight-semibold); }
+.history-now { display: flex; align-items: center; gap: var(--space-2); padding-block: var(--space-1); color: var(--accent); font-size: var(--type-small); font-weight: var(--weight-heavy); text-transform: uppercase; letter-spacing: .08em; }
+.history-now::after { flex: 1; height: 1px; content: ''; background: var(--accent); }
+.history-steps { grid-area: steps; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-2); }
+.history-steps > button { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); }
+.history-steps .icon { width: 1.1em; height: 1.1em; }
+@media (max-height: 359.98px) {
+  .history-sheet { grid-template: "header steps" auto "empty empty" auto "list list" minmax(0, 1fr) / minmax(0, 1fr) auto; }
+  .history-steps > button { padding-inline: var(--space-3); }
+}
+/* The History row in Settings → Game sits beside Keep awake. */
+.fs-gamefoot > .fs-history { flex: 1 1 calc(11 * var(--rem)); min-height: 48px; }

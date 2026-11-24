@@ -37,7 +37,7 @@
 - Commander damage on a map of the table: one tap adds the damage and takes the life.
 - Commander tax, poison, energy, experience and rad counters. Turn on only the ones you use.
 - Amber warnings at 15 commander damage or 7 poison, red at 21 or 10.
-- Undo, save or discard every edit.
+- Undo and redo for the whole game, with a history of every action; quick taps merge into one step.
 
 <p align="center">
   <img src="screenshots/readme/commander-damage.png" width="400" alt="Commander damage mode: each opponent's seat in their colour with the damage they have dealt" />

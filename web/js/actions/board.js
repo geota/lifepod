@@ -10,7 +10,8 @@ import { announce, announceDesignation, announceLife, clearAnnouncements } from 
 import { renderBadges, renderPassHints } from '../render/badges.js';
 import { paintColours, renderScore } from '../render/tile.js';
 import { currentLandscapeAngle, haptic, reducedMotion } from '../state/platform.js';
-import { clearedPools, game, stripHolds, turnSteps } from '../state/state.js';
+import { clearToasts, closeBurst } from '../state/history.js';
+import { game, stripHolds, turnSteps } from '../state/state.js';
 import { board, playerTemplate } from '../ui/dom.js';
 import { bindCounter, cancelPresses } from '../ui/press.js';
 import { commit } from './commit.js';
@@ -18,22 +19,39 @@ import { endStripHolds } from './mana.js';
 import { maybeAskFirst, setAskFirst } from './mode.js';
 import { clearReminders, remind } from './reminders.js';
 
-// Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, announces
-// it, and reminds a new initiative holder to venture.
-export function handOnLeavers(wasOut) {
+// Hands on whatever a change at rest (a life total, or a Track switch) took out of the game with its holder, in the
+// game, and returns the tiles it touched. The caller's commit records it with the change, so one Undo takes back both
+// (MANA-UNDO-SPEC §6.2).
+function handOn(wasOut) {
   const transfers = leavingTransfers(game, wasOut);
-  if (!transfers.length) return;
   for (const transfer of transfers) game[transfer.kind] = transfer.to;
-  commit({ badges: transfers.flatMap(({ from, to }) => [from, to]).filter(player => player !== null) });
+  return transfers;
+}
+
+// Announces handoffs, and reminds a new initiative holder to venture.
+function announceHandOn(transfers) {
   for (const transfer of transfers) {
     announceDesignation(transfer.kind);
     if (transfer.kind === 'initiative') remind(transfer.to, 'initiative');
   }
 }
 
+/** @param {{ from: number | null, to: number | null }[]} transfers */
+const handOnTiles = transfers => transfers.flatMap(({ from, to }) => [from, to]).filter(player => player !== null);
+
+// A Track switch that put a holder out of the game (sheets/options.js): the handoff is a step of its own, since the
+// switch itself isn't one.
+export function handOnLeavers(wasOut) {
+  const transfers = handOn(wasOut);
+  if (!transfers.length) return;
+  commit({ badges: handOnTiles(transfers) });
+  announceHandOn(transfers);
+}
+
 export function renderBoard() {
   cancelPresses();
   clearAnnouncements();
+  clearToasts();
   const players = game.scores.map((_, index) => {
     const player = /** @type {HTMLElement} */ (/** @type {Element} */ (playerTemplate.content.firstElementChild).cloneNode(true));
     const name = `Player ${index + 1}`;
@@ -45,11 +63,14 @@ export function renderBoard() {
       if (!Number.isSafeInteger(next)) return;
       const out = outPlayers(game);
       game.scores[index] = next;
-      // A player who is out has no chip to start a turn, and hands on the monarch and the initiative.
+      // A player who is out has no chip to start a turn, and hands on the monarch and the initiative, in the same step.
+      // Quick taps merge into one step (MANA-UNDO-SPEC §6.2a); a tap that puts the player out ends the burst after it.
       const leaving = isOut(game, index) !== out.has(index);
-      commit({ scores: [index], badges: leaving ? [index] : [] });
+      const transfers = leaving ? handOn(out) : [];
+      commit({ scores: [index], badges: leaving ? [index, ...handOnTiles(transfers)] : [], step: { key: `life:${index}` } });
       if (leaving) {
-        handOnLeavers(out);
+        if (isOut(game, index)) closeBurst(index);
+        announceHandOn(transfers);
         renderPassHints();
       }
       if (!reducedMotion.matches) score.animate([{ transform: 'scale(1.08)' }, { transform: 'none' }], 160);
@@ -65,7 +86,8 @@ export function renderBoard() {
     rotateSeat.setAttribute('aria-label', `Rotate ${name} clockwise`);
     rotateSeat.addEventListener('click', () => {
       game.rotations[index] = (game.rotations[index] + 1) % clockwiseEdges.length;
-      commit({ layout: true });
+      // Seating isn't a game step (MANA-UNDO-SPEC §6.3).
+      commit({ layout: true, step: false });
     });
     return player;
   });
@@ -99,8 +121,6 @@ export function startGame(playerCount, startingLife) {
   game.initiative = null;
   clearReminders();
   turnSteps.length = 0;
-  for (const { timer } of clearedPools.values()) clearTimeout(timer);
-  clearedPools.clear();
   endStripHolds();
   game.startingLife = startingLife;
   game.scores = Array(playerCount).fill(startingLife);
@@ -110,7 +130,8 @@ export function startGame(playerCount, startingLife) {
   resetDrops();
   syncBoardTurn();
   renderBoard();
-  commit({ pill: true });
+  // A new game is one step, which Undo can take back (MANA-UNDO-SPEC §6.9); the history carries on through it.
+  commit({ pill: true, step: { kind: 'newGame' } });
   announce(-1, 'game', () => `New game, ${playerCount} players at ${startingLife} life`);
   setAskFirst(game.turns !== 'off');
   maybeAskFirst();

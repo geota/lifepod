@@ -33,6 +33,12 @@
       <button class="pill-button" type="button" id="counters-button" aria-label="Counters" hidden><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M234.36,170A12,12,0,0,1,230,186.37l-96,56a12,12,0,0,1-12.1,0l-96-56a12,12,0,0,1,12.09-20.74l90,52.48L218,165.63A12,12,0,0,1,234.36,170ZM218,117.63,128,170.11,38.05,117.63A12,12,0,0,0,26,138.37l96,56a12,12,0,0,0,12.1,0l96-56A12,12,0,0,0,218,117.63ZM20,80a12,12,0,0,1,6-10.37l96-56a12.06,12.06,0,0,1,12.1,0l96,56a12,12,0,0,1,0,20.74l-96,56a12,12,0,0,1-12.1,0l-96-56A12,12,0,0,1,20,80Zm35.82,0L128,122.11,200.18,80,128,37.89Z"/></svg></button>
       <!-- Mana pool: the tap symbol, with a dot while any pool has mana. -->
       <button class="pill-button" type="button" id="mana-button" aria-label="Mana pool" hidden><span class="icon mana-icon" data-glyph="tap" aria-hidden="true"></span><span class="mana-dot" aria-hidden="true"></span></button>
+      <!-- Undo (MANA-UNDO-SPEC §6.6): back one step through the whole game, dimmed with nothing to undo; held, it opens
+           History. In counters, commander damage and mana modes it stays, and stops at what was changed in the mode. Redo
+           is on the toast after an undo; the button after Undo redoes for keyboards and screen readers, and shows only
+           while it has keyboard focus. -->
+      <button class="pill-button" type="button" id="undo-button" aria-label="Undo"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z"/></svg></button>
+      <button class="visually-hidden" type="button" id="redo-button"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg></button>
       <button class="pill-button" type="button" id="dice-button" aria-label="Roll dice" aria-haspopup="dialog"><span class="icon mana-icon" data-glyph="d20" aria-hidden="true"></span></button>
       <button class="pill-button" type="button" id="setup-button" aria-label="Settings" aria-haspopup="dialog">
         <span class="setup-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M40,92H70.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24H137.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24Zm64-24A12,12,0,1,1,92,80,12,12,0,0,1,104,68Zm112,96H201.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24h94.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24Zm-48,24a12,12,0,1,1,12-12A12,12,0,0,1,168,188Z"/></svg></span>
@@ -40,8 +46,7 @@
       </button>
       <!-- "Who goes first?" replaces the pill with a shuffle that picks at random and ✕ to skip. -->
       <button class="pill-button" type="button" id="shuffle-button" aria-label="Pick at random" hidden><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M240.49,175.51a12,12,0,0,1,0,17l-24,24a12,12,0,0,1-17-17L203,196h-2.09a76.17,76.17,0,0,1-61.85-31.83L97.38,105.78A52.1,52.1,0,0,0,55.06,84H32a12,12,0,0,1,0-24H55.06a76.17,76.17,0,0,1,61.85,31.83l41.71,58.39A52.1,52.1,0,0,0,200.94,172H203l-3.52-3.51a12,12,0,0,1,17-17Zm-95.62-72.62a12,12,0,0,0,16.93-1.13A52,52,0,0,1,200.94,84H203l-3.52,3.51a12,12,0,0,0,17,17l24-24a12,12,0,0,0,0-17l-24-24a12,12,0,0,0-17,17L203,60h-2.09a76,76,0,0,0-57.2,26A12,12,0,0,0,144.87,102.89Zm-33.74,50.22a12,12,0,0,0-16.93,1.13A52,52,0,0,1,55.06,172H32a12,12,0,0,0,0,24H55.06a76,76,0,0,0,57.2-26A12,12,0,0,0,111.13,153.11Z"/></svg></button>
-      <!-- Commander damage, counters and mana modes replace the pill with Undo, a filled check mark that saves, and ✕ to discard. -->
-      <button class="pill-button" type="button" id="undo-button" aria-label="Undo" hidden disabled><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z"/></svg></button>
+      <!-- Commander damage, counters and mana modes replace the pill with Undo (above), a filled check mark that saves, and ✕ to discard. -->
       <button class="pill-button save-button" type="button" id="save-button" aria-label="Save" hidden><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,80.49l-128,128a12,12,0,0,1-17,0l-56-56a12,12,0,1,1,17-17L96,183,215.51,63.51a12,12,0,0,1,17,17Z"/></svg></button>
       <button class="pill-button" type="button" id="cancel-button" aria-label="Cancel" hidden><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
     </div>
@@ -90,6 +95,26 @@
       <div class="dice-picker" id="dice-picker" role="group" aria-label="Sides"></div>
       <button class="primary dice-roll" type="button" id="dice-roll" autofocus></button>
       <p class="visually-hidden" id="dice-result" aria-live="polite"></p>
+      <p class="visually-hidden" data-announcer aria-live="polite"></p>
+    </div>
+  </dialog>
+
+  <!-- History (MANA-UNDO-SPEC §6.8): the game's steps, newest first, with Now between the steps ahead (struck through) and
+       the steps taken. A row goes to just after its step; Back and Forward step one at a time, in the foot, or in the
+       header on a short screen. It faces the phone, and the flip turns it for a player across the table. -->
+  <dialog id="history" aria-labelledby="history-title">
+    <div class="sheet history-sheet">
+      <div class="sheet-header">
+        <h2 id="history-title">History</h2>
+        <button class="close" type="button" id="history-flip" aria-label="Turn history to face the other side" aria-pressed="false"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,224.49l-24,24a12,12,0,0,1-17-17L171,228H80a28,28,0,0,1-28-28V108a12,12,0,0,1,24,0v92a4,4,0,0,0,4,4h91l-3.52-3.51a12,12,0,0,1,17-17l24,24A12,12,0,0,1,208.49,224.49ZM80,76a12,12,0,0,0,8.49-20.49L85,52h91a4,4,0,0,1,4,4v92a12,12,0,0,0,24,0V56a28,28,0,0,0-28-28H85l3.52-3.52a12,12,0,0,0-17-17l-24,24a12,12,0,0,0,0,17l24,24A12,12,0,0,0,80,76Z"/></svg></button>
+        <button class="close" type="button" data-close aria-label="Close history" autofocus><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+      </div>
+      <p class="history-empty" id="history-empty">Nothing yet. Each change to the game shows here, newest first.</p>
+      <ol class="history-list" id="history-list" aria-label="Steps, newest first"></ol>
+      <div class="history-steps">
+        <button class="secondary" type="button" id="history-back"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z"/></svg>Back</button>
+        <button class="secondary" type="button" id="history-forward"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg>Forward</button>
+      </div>
       <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </div>
   </dialog>
@@ -153,6 +178,8 @@
                    dialog has one. -->
               <p class="visually-hidden" data-announcer aria-live="polite"></p>
               <div class="fs-gamefoot">
+                <!-- History (MANA-UNDO-SPEC §6.6): the game's undo history, also a hold on Undo in the centre. -->
+                <button class="nav-row fs-action fs-history" type="button" id="settings-history" aria-haspopup="dialog"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M140,80v41.21l34.17,20.5a12,12,0,1,1-12.34,20.58l-40-24A12,12,0,0,1,116,128V80a12,12,0,0,1,24,0ZM128,28A99.38,99.38,0,0,0,57.24,57.34c-4.69,4.74-9,9.37-13.24,14V64a12,12,0,0,0-24,0v40a12,12,0,0,0,12,12H72a12,12,0,0,0,0-24H57.77C63,86,68.37,80.22,74.26,74.26a76,76,0,1,1,1.58,109,12,12,0,0,0-16.48,17.46A100,100,0,1,0,128,28Z"/></svg><span class="nav-label">History</span></button>
                 <label class="switch-row compact-switch fs-awake">
                   <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M116,36V32a12,12,0,0,1,24,0v4a12,12,0,0,1-24,0Zm80,92a68,68,0,1,1-68-68A68.07,68.07,0,0,1,196,128Zm-24,0a44,44,0,1,0-44,44A44.05,44.05,0,0,0,172,128ZM51.51,68.49a12,12,0,1,0,17-17l-4-4a12,12,0,0,0-17,17Zm0,119-4,4a12,12,0,0,0,17,17l4-4a12,12,0,1,0-17-17ZM196,72a12,12,0,0,0,8.49-3.51l4-4a12,12,0,0,0-17-17l-4,4A12,12,0,0,0,196,72Zm8.49,115.51a12,12,0,0,0-17,17l4,4a12,12,0,0,0,17-17ZM48,128a12,12,0,0,0-12-12H32a12,12,0,0,0,0,24h4A12,12,0,0,0,48,128Zm80,80a12,12,0,0,0-12,12v4a12,12,0,0,0,24,0v-4A12,12,0,0,0,128,208Zm96-92h-4a12,12,0,0,0,0,24h4a12,12,0,0,0,0-24Z"/></svg><span class="nav-label">Keep awake</span>
                   <input type="checkbox" id="keep-awake" role="switch">
