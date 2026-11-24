@@ -1,5 +1,5 @@
 /* Board: the page base (box sizing, buttons, focus ring), the icons, the board and its rotation, and the centre pill
-   with its round and mana buttons. */
+   with its round and mana buttons, Track and its tabs. */
 *, *::before, *::after { box-sizing: border-box; }
 body, h1, h2, h3, p { margin: 0; }
 body { overflow: hidden; }
@@ -74,8 +74,9 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* app.js places the pill on a seam that only far rows face (design/polish/FINAL-REVIEW.md #1). With 2 players that's the
    middle seam, so the pill stands upright along it, and the round's two copies face the two players. */
 .board-controls[data-vertical] { transform: translate(-50%, -50%) rotate(90deg); }
-/* Where the pill would pass the board's short side, its buttons shrink to 44px (MANA-UNDO-SPEC §6.6): only the upright
-   2-player pill on a 568 × 320 phone, whose seven buttons at rest are 308px of its 320px. measureBoard sets it. */
+/* Where even Track's pill would pass the end of its seam at full size, its buttons shrink to 44px (MANA-UNDO-SPEC §6.6,
+   design/polish/PILL-SPEC.md as built): the 3-player board at 568 × 320, whose seam column is 283px, with Track's six
+   buttons in its mode. measureBoard sets it. */
 .board-controls[data-tight] { --setup-button: var(--tap-min); }
 /* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target, or up to
    64px on tablets. app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
@@ -177,10 +178,11 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .round-button .round > span:first-child { transform: rotate(180deg); }
 .round-button .round::after { position: absolute; top: 50%; left: 22%; right: 22%; height: 1px; content: ''; background: var(--border); }
 .round-button[data-pressed]::before { background: var(--state-pressed); }
-/* The mana pool's button (MANA-UNDO-SPEC §5): the classic tilted tap symbol in ink on a light pip, as card text prints
-   {T}, the disc in the C pip's colour. While any pool has mana, a lime dot sits on the pip's upper end, ringed in the
-   pill's own fill so it reads against the light disc. The disc itself never turns lime: solid lime means commit. */
-#mana-button > .mana-icon {
+/* The mana pool's button (MANA-UNDO-SPEC §5), and Track's mana tab and face: the classic tilted tap symbol in ink on a
+   light pip, as card text prints {T}, the disc in the C pip's colour. While any pool has mana, a lime dot sits on the
+   pip's upper end, ringed in the pill's own fill so it reads against the light disc. The disc itself never turns lime:
+   solid lime means commit. */
+.pill-button .tap-pip {
   position: relative;
   display: grid;
   place-items: center;
@@ -193,9 +195,9 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   font-size: calc(var(--setup-button) * .4);
 }
 /* The tilted T sits a little left and high in its em box, so it's nudged to look centred on the disc. */
-#mana-button > .mana-icon::before { display: block; transform: translate(-3%, 2%); }
-#mana-button > .mana-icon { transition: transform var(--motion) var(--ease-press); }
-#mana-button:active > .mana-icon { transform: scale(var(--press-scale)); }
+.pill-button .tap-pip::before { display: block; transform: translate(-3%, 2%); }
+.pill-button .tap-pip { transition: transform var(--motion) var(--ease-press); }
+.pill-button:active .tap-pip { transform: scale(var(--press-scale)); }
 .mana-dot {
   position: absolute;
   top: calc(var(--setup-button) * .17);
@@ -207,5 +209,41 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--pill-background);
 }
-#mana-button[data-floating] .mana-dot { display: block; }
+.pill-button[data-floating] > .mana-dot { display: block; }
+
+/* Track (design/polish/PILL-SPEC.md, as built), where the pill can't hold commander damage, counters and mana as three
+   buttons. Its face is the icon of the tab it opens, raised a little over a dot for each tab, that one lit. */
+.track-face { position: relative; display: grid; place-items: center; transform: translateY(calc(var(--setup-button) * -.06)); }
+.track-face > * { grid-area: 1 / 1; }
+.track-face > [hidden] { display: none; }
+.pill-button .track-face > .tap-pip { width: calc(var(--setup-button) * .5); height: calc(var(--setup-button) * .5); font-size: calc(var(--setup-button) * .36); }
+.track-dots {
+  position: absolute;
+  bottom: calc(var(--setup-button) * .13);
+  left: 50%;
+  display: flex;
+  gap: 3px;
+  transform: translateX(-50%);
+}
+.track-dots > i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-soft); opacity: .4; }
+.track-dots > i[hidden] { display: none; }
+.track-dots > i[data-on] { background: var(--text); opacity: 1; }
+/* Track's tabs lead its mode's pill: one row with the buttons beside them, the open tab in the chosen tint (Accent L3),
+   never solid lime, which is for ✓. Its mana pip takes an accent ring. The last tab's disc reaches its divider like any
+   button's, and a 2px rule, stronger than the dividers, sets the tabs off from Undo, save and ✕. */
+.pill-tabs { display: flex; }
+.pill-tabs[hidden] { display: none; }
+.pill-tabs > .pill-button:nth-last-child(1 of :not([hidden]))::before { inset-inline-end: 2px; }
+.track-tab[aria-selected="true"] { color: var(--chosen-ink); }
+.track-tab[aria-selected="true"]::before { background: var(--chosen-fill); box-shadow: var(--chosen-ring); }
+.track-tab[aria-selected="true"] .tap-pip { box-shadow: var(--tap-pip-edge), 0 0 0 2px var(--accent); }
+#board-controls .pill-tabs:not([hidden]) + #undo-button::after {
+  position: absolute;
+  top: var(--pill-inset);
+  bottom: var(--pill-inset);
+  left: -1px;
+  width: 2px;
+  content: '';
+  background: color-mix(in oklab, var(--text-soft) 45%, transparent);
+}
 

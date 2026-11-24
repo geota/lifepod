@@ -11,6 +11,11 @@ export const countersButton = /** @type {HTMLButtonElement} */ (document.querySe
 export const roundButton = /** @type {HTMLButtonElement} */ (document.querySelector('#round-button'));
 export const roundBackButton = /** @type {HTMLButtonElement} */ (document.querySelector('#round-back'));
 export const manaButton = /** @type {HTMLButtonElement} */ (document.querySelector('#mana-button'));
+// Track (design/polish/PILL-SPEC.md): one button for commander damage, counters and mana where the pill can't hold
+// three, and its mode's tabs, each keyed by its mode in data-tab.
+export const trackButton = /** @type {HTMLButtonElement} */ (document.querySelector('#track-button'));
+export const trackTabList = /** @type {HTMLDivElement} */ (document.querySelector('#track-tabs'));
+export const trackTabButtons = /** @type {HTMLButtonElement[]} */ ([...trackTabList.querySelectorAll('[role="tab"]')]);
 export const shuffleButton = /** @type {HTMLButtonElement} */ (document.querySelector('#shuffle-button'));
 export const undoButton = /** @type {HTMLButtonElement} */ (document.querySelector('#undo-button'));
 export const redoButton = /** @type {HTMLButtonElement} */ (document.querySelector('#redo-button'));

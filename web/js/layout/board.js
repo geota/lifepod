@@ -2,8 +2,8 @@
 // where the centre pill sits and what each face keeps clear of it, and the one size every tile draws its content at,
 // with the mode grids and map seats sized to fit. Measuring ends by queueing a fit of the badge rows (fit.js).
 
-import { clockwiseEdges, faceAngles, faceEdges, seatLayouts } from '../logic/data.js';
-import { restPillButtons, seatGrid, shownCounters, trackedDesignations } from '../logic/rules.js';
+import { clockwiseEdges, faceAngles, faceEdges, pillMargin, seatLayouts } from '../logic/data.js';
+import { pillFit, pillFits, seatGrid, shownCounters, trackedDesignations, widestPill } from '../logic/rules.js';
 import { isPortraitWindow, readScreen } from '../state/platform.js';
 import { boardMode, game } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
@@ -47,17 +47,35 @@ export function syncBoardTurn() {
 // ResizeObserver, the resize event and the orientation change measures once (docs/review/PERFORMANCE.md F7).
 /** @typedef {{ player: HTMLElement, face: HTMLElement, edge: string, left: number, top: number, right: number, bottom: number, faceWidth: number, faceHeight: number }} Tile */
 let measured = '';
+
+// The pill's form (design/polish/PILL-SPEC.md, as built). Where every button the pill can show fits along its seam at
+// full size, commander damage, counters and mana are three buttons; where they don't, they're one Track button whose
+// mode has a tab for each (`pillCollapsed`). Each measure decides what the board wants from its seam's length and the
+// buttons that are on, which change only with the window, the player count or a setting, so the pill never flips on a
+// redraw; and the pill only takes it at rest (settlePillForm), so a resize never changes a mode that's open.
+export let pillCollapsed = false;
+let wantCollapsed = false;
+// The seam's length less the pill's margins, and a button's full size, as last measured, for the tests and the
+// design scripts.
+export const pillRoom = { room: 0, natural: 48 };
+let formChanged = () => {};
+// Told when the pill's form changes (syncPill in render/pill.js, which shows its buttons and measures again).
+/** @param {() => void} listener */
+export function onPillFormChange(listener) {
+  formChanged = listener;
+}
+
+// The pill takes the form the board wants, if it's at rest. Returns whether the form changed.
+export function settlePillForm() {
+  if (boardMode !== null || wantCollapsed === pillCollapsed) return false;
+  pillCollapsed = wantCollapsed;
+  return true;
+}
+
 export function measureBoard() {
   const faces = /** @type {HTMLElement[]} */ ([...board.querySelectorAll('.player-face')]);
   // A new player count is measured once its tiles are drawn.
   if (faces.length !== game.scores.length || !board.clientWidth || !board.clientHeight) return;
-  const buttons = /** @type {HTMLElement[]} */ ([...boardControls.querySelectorAll('.pill-button')]);
-  const shown = buttons.filter(button => !button.hidden).length;
-  // The upright 2-player pill takes 44px buttons where its buttons at full size would pass the board's short side
-  // (MANA-UNDO-SPEC §6.6), before anything is read from the pill.
-  const natural = Math.min(64, Math.max(48, 48 * growPixel()));
-  boardControls.toggleAttribute('data-tight', game.scores.length === 2 && Math.max(shown, restPillButtons(game)) * natural > board.clientHeight);
-  const size = Math.max(...buttons.map(button => button.offsetWidth));
   const area = { width: board.clientWidth, height: board.clientHeight, left: board.offsetLeft, top: board.offsetTop };
   /** @type {Tile[]} */
   const tiles = faces.map((face) => {
@@ -69,18 +87,34 @@ export function measureBoard() {
       faceWidth: face.offsetWidth, faceHeight: face.offsetHeight,
     };
   });
+  // Which pill fits the seam: separate buttons, or Track; and only where even Track doesn't fit at full size, 44px
+  // buttons (MANA-UNDO-SPEC §6.6). The tiles don't move with the pill, so its form can't feed back into the room it has.
+  const natural = Math.min(64, Math.max(48, 48 * growPixel()));
+  const seam = pillSeam(area, tiles);
+  const room = seam.end - seam.start - 2 * pillMargin;
+  pillRoom.room = room;
+  pillRoom.natural = natural;
+  wantCollapsed = pillFit(game, room, natural).collapsed;
+  if (settlePillForm()) {
+    formChanged();
+    return;
+  }
+  boardControls.toggleAttribute('data-tight', !pillFits(game, { collapsed: pillCollapsed }, room, natural));
+  const buttons = /** @type {HTMLElement[]} */ ([...boardControls.querySelectorAll('.pill-button')]);
+  const shown = buttons.filter(button => !button.hidden).length;
+  const size = Math.max(...buttons.map(button => button.offsetWidth));
   const grow = growPixel();
   const seamGap = parseFloat(getComputedStyle(board).getPropertyValue('--space-4')) || 16;
   syncBoardDigits();
   // Colours mode covers the face with its swatches, which aren't sized for the far edge's clearance as rest content is,
   // so there a far edge costs what it takes (centreClearance).
   const farDiscount = boardMode === 'colours' ? 0 : size / 2 + 2;
-  const readings = JSON.stringify([area, size, shown, seamGap, restPillButtons(game), grow, game.reminders.gestures, farDiscount,
+  const readings = JSON.stringify([area, size, shown, seamGap, widestPill(game, { collapsed: pillCollapsed }), grow, game.reminders.gestures, farDiscount,
     shownCounters(game).length + trackedDesignations(game).length, tiles.map(tile => [tile.edge, tile.left, tile.top, tile.right, tile.bottom, tile.faceWidth, tile.faceHeight])]);
   if (readings === measured) return;
   measured = readings;
   layoutStats.measures++;
-  const pill = placePill(size, shown, area, tiles);
+  const pill = placePill(size, shown, area, seam);
   // Tile content is sized as if every far edge kept this much clear, the pill's half and 2px, so a far edge the pill
   // reaches costs only what it reaches past that.
   const farClear = size / 2 + 2;
@@ -130,25 +164,35 @@ function farRowOffsets(tiles, gap) {
   });
 }
 
+// The stretch of seam the pill sits on, in the board's own coordinates: with 2 players the middle seam, from the board's
+// top to its bottom, and otherwise the horizontal seam across the columns whose seats are split into two rows.
+/**
+ * @param {{ width: number, height: number }} area
+ * @param {Tile[]} tiles
+ */
+function pillSeam(area, tiles) {
+  if (game.scores.length === 2) return { start: 0, end: area.height };
+  const [top, bottom] = seatLayouts[game.scores.length].map(row => row.split(' '));
+  const split = top.filter((seat, column) => seat !== bottom[column]).map(seat => tiles[Number(seat.split('-')[1]) - 1]);
+  return { start: Math.min(...split.map(tile => tile.left)), end: Math.max(...split.map(tile => tile.right)) };
+}
+
 // Places the pill and returns the box its buttons cover now, in the board's own coordinates. The place is chosen for
-// the pill at its widest, so it doesn't move when a mode opens with fewer buttons.
+// the pill at its widest, at rest or in Track's mode, so it doesn't move when a mode opens.
 /**
  * @param {number} size
  * @param {number} shown
  * @param {{ width: number, height: number, left: number, top: number }} area
- * @param {Tile[]} tiles
+ * @param {{ start: number, end: number }} seam
  */
-function placePill(size, shown, area, tiles) {
+function placePill(size, shown, area, seam) {
   const { width, height } = area;
   const vertical = game.scores.length === 2;
-  const widest = Math.max(shown, restPillButtons(game)) * size;
+  const widest = Math.max(shown, widestPill(game, { collapsed: pillCollapsed })) * size;
   let x = width / 2;
   const y = height / 2;
   if (!vertical) {
-    const [top, bottom] = seatLayouts[game.scores.length].map(row => row.split(' '));
-    const split = top.filter((seat, column) => seat !== bottom[column]).map(seat => tiles[Number(seat.split('-')[1]) - 1]);
-    const start = Math.min(...split.map(tile => tile.left));
-    const end = Math.max(...split.map(tile => tile.right));
+    const { start, end } = seam;
     // At the board's centre where that's on the seam and the pill fits there, otherwise centred on the seam (3 players).
     x = x > start + 1 && x < end - 1 && end - start >= widest ? Math.min(Math.max(x, start + widest / 2), end - widest / 2) : (start + end) / 2;
     x = Math.min(Math.max(x, widest / 2), width - widest / 2);
