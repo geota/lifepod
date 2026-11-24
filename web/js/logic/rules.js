@@ -4,11 +4,12 @@
 
 import {
   commanderLethal, countKinds, counterKinds, designations, identityColours, identityNames, manaColours, maxCount, maxRound,
-  playOrders, poisonLethal, seatLayouts, topRowPlayers,
+  pillTools, playOrders, poisonLethal, seatLayouts, topRowPlayers, trackTabKinds,
 } from './data.js';
 
 /** @typedef {import('./data.js').CountKind} CountKind */
 /** @typedef {import('./data.js').DesignationKind} DesignationKind */
+/** @typedef {import('./data.js').TrackTab} TrackTab */
 /** @typedef {import('./save.js').Game} Game */
 /** @typedef {import('./save.js').Turn} Turn */
 
@@ -96,11 +97,77 @@ export function hasCountersMode(game) {
   return shownCounters(game).length > 0 || trackedDesignations(game).length > 0;
 }
 
-// How many buttons the pill holds at rest: the round, commander damage, counters and mana when they're on, then Undo,
-// dice and setup.
+// ---- The centre pill ------------------------------------------------------------------------------------------------
+
+// The editing modes that are on, in Track's order: commander damage, counters, mana (design/polish/PILL-SPEC.md §3).
+/**
+ * @param {Game} game
+ * @returns {TrackTab[]}
+ */
+export function trackTabs(game) {
+  const on = { damage: game.counters.commander, counters: hasCountersMode(game), mana: game.manaPool };
+  return trackTabKinds.filter(tab => on[tab]);
+}
+
+// The tab Track opens on: the one it last showed, or the first that's still on.
 /** @param {Game} game */
-export function restPillButtons(game) {
-  return 3 + Number(game.turns !== 'off') + Number(game.counters.commander) + Number(hasCountersMode(game)) + Number(game.manaPool);
+export function openingTab(game) {
+  const tabs = trackTabs(game);
+  return tabs.includes(game.trackTab) ? game.trackTab : tabs[0] ?? game.trackTab;
+}
+
+/**
+ * How the pill is laid out: `collapsed` when commander damage, counters and mana are one Track button, and `tools`,
+ * the buttons that always show at rest (pillTools in data.js).
+ *
+ * @typedef {{ collapsed?: boolean, tools?: number }} PillShape
+ */
+
+// How many buttons the pill holds at rest: the round, then commander damage, counters and mana when they're on, as
+// three buttons or one Track button, then the tools (Undo, dice and setup).
+/**
+ * @param {Game} game
+ * @param {PillShape} [shape]
+ */
+export function restPillButtons(game, { collapsed = false, tools = pillTools } = {}) {
+  const tabs = trackTabs(game).length;
+  return tools + Number(game.turns !== 'off') + (collapsed ? Math.min(1, tabs) : tabs);
+}
+
+// The most buttons the pill holds at rest or in an editing mode: Undo, save and ✕, after Track's tabs when it has two
+// or more.
+/**
+ * @param {Game} game
+ * @param {PillShape} [shape]
+ */
+export function widestPill(game, shape = {}) {
+  const tabs = trackTabs(game).length;
+  return Math.max(restPillButtons(game, shape), 3 + (shape.collapsed && tabs > 1 ? tabs : 0));
+}
+
+// Which pill the board takes (PILL-SPEC.md, as built): three buttons for commander damage, counters and mana wherever
+// every button the pill can show fits `room` (the length of the seam it sits on, in px) at their full size, `natural`;
+// otherwise one Track button. Only if even that doesn't fit do the buttons shrink to 44px (`tight`).
+/**
+ * @param {Game} game
+ * @param {number} room
+ * @param {number} natural
+ * @param {number} [tools]
+ */
+export function pillFit(game, room, natural, tools = pillTools) {
+  const collapsed = trackTabs(game).length > 1 && !pillFits(game, { collapsed: false, tools }, room, natural);
+  return { collapsed, tight: !pillFits(game, { collapsed, tools }, room, natural) };
+}
+
+// Whether every button the pill can show, laid out one way, fits `room` at `natural` px each.
+/**
+ * @param {Game} game
+ * @param {PillShape} shape
+ * @param {number} room
+ * @param {number} natural
+ */
+export function pillFits(game, shape, room, natural) {
+  return widestPill(game, shape) * natural <= room;
 }
 
 /**

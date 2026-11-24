@@ -16,6 +16,7 @@
 /** @typedef {'default' | 'large' | 'larger'} BadgeSize */
 /** @typedef {'material' | 'glass'} Style */
 /** @typedef {Record<'turns' | 'passOn' | 'gestures', boolean>} Reminders */
+/** @typedef {'damage' | 'counters' | 'mana'} TrackTab */
 
 export const clockwiseEdges = ['bottom', 'left', 'top', 'right'];
 export const quarterTurns = [0, 90, 180, 270];
@@ -81,6 +82,22 @@ export const discardMessages = {
   counters: 'Every counter goes back to how it was when you opened counters.',
   mana: 'Every mana pool goes back to how it was when you opened mana.',
 };
+// Track (design/polish/PILL-SPEC.md, option A): where the pill can't hold commander damage, counters and mana as three
+// buttons, they become one Track button whose mode has a tab for each, in this order. The editing modes are its tabs,
+// so a tab is a BoardMode too. What ✕'s message names for the tabs a visit changed, and how each tab is named.
+/** @type {TrackTab[]} */
+export const trackTabKinds = ['damage', 'counters', 'mana'];
+/** @type {Record<TrackTab, { name: string, words: string, discard: string[] }>} */
+export const trackTabInfo = {
+  damage: { name: 'Commander damage', words: 'commander damage', discard: ['Commander damage', 'life'] },
+  counters: { name: 'Counters', words: 'counters', discard: ['counters'] },
+  mana: { name: 'Mana pool', words: 'mana', discard: ['mana pools'] },
+};
+// The pill's tools, the buttons after the modes that show at rest whatever is on: Undo, the dice and settings. A new
+// tool, such as card lookup's magnifier, counts here, and the pill's fit (pillFit in logic/rules.js) follows.
+export const pillTools = 3;
+// The pill stands this far clear of each end of the seam it sits on.
+export const pillMargin = 4;
 // Player counters (design/polish/SPEC.md §6), in the order they appear everywhere: counters mode, the near badge row,
 // the Track sheet and its summary. Each is one count per player in game[kind], shown while its Track switch is on.
 // Commander tax counts casts and comes with the Commander switch. phrase names one counter for screen readers.
@@ -183,7 +200,7 @@ export const historyFields = [
 ];
 export const settingsFields = [
   'keepAwake', 'landscapeAngle', 'counters', 'identity', 'manaPool', 'autoEmpty', 'turns', 'tileColours',
-  'shuffleColours', 'badgeSize', 'style', 'reminders', 'history',
+  'shuffleColours', 'badgeSize', 'style', 'reminders', 'trackTab', 'history',
 ];
 // The saved history's format, and its cap: the newest 500 steps, and at most 64 KB of them as JSON.
 export const historyVersion = 1;

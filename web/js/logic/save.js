@@ -5,7 +5,7 @@
 import {
   badgeSizeOrder, clockwiseEdges, countKinds, defaultTileSet, identityBackgrounds, identityColours, identityParts,
   identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, quarterTurns, reminderKinds,
-  styleOrder, swatches, tileSetOrder, trackers, turnModes,
+  styleOrder, swatches, tileSetOrder, trackers, trackTabKinds, turnModes,
 } from './data.js';
 import { emptyHistory, fitHistory } from './history.js';
 
@@ -17,6 +17,7 @@ import { emptyHistory, fitHistory } from './history.js';
 /** @typedef {import('./data.js').Style} Style */
 /** @typedef {import('./data.js').TileSet} TileSet */
 /** @typedef {import('./data.js').Trackers} Trackers */
+/** @typedef {import('./data.js').TrackTab} TrackTab */
 /** @typedef {import('./data.js').TurnMode} TurnMode */
 /** @typedef {import('./history.js').History} History */
 
@@ -199,6 +200,7 @@ function fitReminders(saved) {
  * @property {number | null} monarch The monarch's seat, or null for nobody.
  * @property {number | null} initiative The initiative holder's seat, or null for nobody.
  * @property {Reminders} reminders
+ * @property {TrackTab} trackTab The tab Track last showed, where the pill has one Track button (PILL-SPEC.md §3.2).
  * @property {History} history The undo history (logic/history.js): its steps, oldest first, and how many are applied.
  */
 /**
@@ -233,7 +235,8 @@ export function loadGame(read, landscapeAngle) {
     counters: fitTrackers(), .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)]))),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
     manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, shuffleColours: false,
-    badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(), history: emptyHistory(),
+    badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(), trackTab: 'damage',
+    history: emptyHistory(),
   };
   try {
     const snapshot = read();
@@ -280,6 +283,8 @@ export function loadGame(read, landscapeAngle) {
       monarch: fitSeat(board.monarch, count),
       initiative: fitSeat(board.initiative, count),
       reminders: fitReminders(saved.reminders),
+      // A save from before Track, or with an unknown tab, opens Track on its first tab that's on (openingTab in rules.js).
+      trackTab: trackTabKinds.includes(saved.trackTab) ? saved.trackTab : defaults.trackTab,
       // A save from before Undo, or a history that's corrupt, gets an empty one; the game itself is never touched
       // (fitHistory in history.js).
       history: fitHistory(saved.history, count),
