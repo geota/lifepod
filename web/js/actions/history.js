@@ -4,14 +4,15 @@
 
 import { syncBoardTurn } from '../layout/board.js';
 import { resetDrops } from '../layout/fit.js';
-import { countKinds, toastTime } from '../logic/data.js';
+import { countKinds, editingModes, toastTime } from '../logic/data.js';
 import { describeStep, stepText } from '../logic/history.js';
 import { announce, clearAnnouncements, seatName } from '../render/announce.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
+import { syncCounterCells, syncManaCells, syncSeatMap } from '../render/modes.js';
 import { paintColours } from '../render/tile.js';
 import { bringForward, clearToasts, dismissToast, setToasts, takeBack } from '../state/history.js';
 import { haptic } from '../state/platform.js';
-import { boardMode, game, turnSteps } from '../state/state.js';
+import { boardMode, editStart, game, turnSteps } from '../state/state.js';
 import { cancelPresses } from '../ui/press.js';
 import { renderBoard } from './board.js';
 import { commit } from './commit.js';
@@ -70,6 +71,14 @@ function redraw(changes) {
   commit({ scores: dirty.tiles, badges: dirty.tiles, pill: dirty.pill, layout: dirty.layout, step: false });
   // Who is out, and so who must pass the monarch or the initiative on, may have changed.
   renderPassHints();
+  // In an editing mode, its cells show the counts too.
+  if (editingModes.includes(boardMode)) {
+    for (const index of game.scores.keys()) {
+      syncCounterCells(index);
+      syncManaCells(index);
+      syncSeatMap(index);
+    }
+  }
 }
 
 // The turn as players hear it after a step: "Player 1, Sky's turn, round 3" or "Round 3".
@@ -115,9 +124,12 @@ function feedback(steps, verb) {
 }
 
 // Back one step (Undo in the centre). Any press still held ends first, and every open burst closes, so an undo
-// mid-burst takes back the whole burst so far (§6.9).
+// mid-burst takes back the whole burst so far (§6.9). In an editing mode, Undo stops at what was there when the mode
+// opened (§6.5), and the cells change in place with no toast; other modes have no Undo.
 export function undo() {
-  if (boardMode !== null) return;
+  const editing = editingModes.includes(boardMode);
+  if (boardMode !== null && !editing) return;
+  if (editing && game.history.at <= editStart) return;
   cancelPresses();
   const step = takeBack();
   if (!step) return;
@@ -164,9 +176,17 @@ export function endToasts() {
   for (const tile of clearToasts()) renderBadges(tile);
 }
 
-// History, which a hold on Undo opens (MANA-UNDO-SPEC §6.8). Until the sheet is built, a hold only says where the
-// history stands.
-export function openHistory() {
-  const { at, steps } = game.history;
-  announce(-1, 'history', () => (steps.length ? `History: ${at} of ${steps.length} steps. ${at ? `Last, ${stepText(steps[at - 1], game)}` : ''}` : 'History: nothing yet'));
+// Takes steps back to `target` without a word, for ✕'s Discard in an editing mode, which says so itself. They can be
+// redone.
+/** @param {number} target */
+export function takeBackTo(target) {
+  cancelPresses();
+  /** @type {Step[]} */
+  const steps = [];
+  while (game.history.at > target) {
+    const step = takeBack();
+    if (!step) break;
+    steps.push(step);
+  }
+  if (steps.length) redraw(steps.map(step => step.d));
 }

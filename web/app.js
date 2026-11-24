@@ -6,9 +6,9 @@
 import { renderBoard } from './js/actions/board.js';
 import { commit } from './js/actions/commit.js';
 import {
-  chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
+  chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity,
 } from './js/actions/edits.js';
-import { dismissUndoToast, openHistory, redo, undo } from './js/actions/history.js';
+import { dismissUndoToast, redo, takeBackTo, undo } from './js/actions/history.js';
 import { clearPool, spendMana } from './js/actions/mana.js';
 import {
   cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst, skipFirst,
@@ -29,7 +29,7 @@ import {
   android, ios, portraitQuery, setReduceTransparency, setTextScale, syncWakeLock, systemTextScale,
 } from './js/state/platform.js';
 import { onBurstChange } from './js/state/history.js';
-import { boardMode, editStartHolders, game, syncBackHandling } from './js/state/state.js';
+import { boardMode, editStart, editStartHolders, game, syncBackHandling } from './js/state/state.js';
 import {
   board, cancelButton, countersButton, damageButton, discardDialog, manaButton, redoButton, resetZoom, roundBackButton,
   roundButton, saveButton, shuffleButton, undoButton,
@@ -38,6 +38,7 @@ import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
 import './js/sheets/settings.js';
 import './js/sheets/dice.js';
+import { openHistorySheet } from './js/sheets/history.js';
 
 // The iOS app passes Reduce Transparency in before the page loads, and calls this whenever it changes.
 window.setReduceTransparency = setReduceTransparency;
@@ -59,10 +60,9 @@ manaButton.addEventListener('click', () => setBoardMode('mana'));
 bindStep(roundButton, stepTurn, stepBack);
 roundBackButton.addEventListener('click', stepBack);
 bindRelease(shuffleButton, shuffleFirst);
-// Undo: at rest, back one step through the game, and a hold opens History (MANA-UNDO-SPEC §6.6); in an editing mode, the
-// mode's last edit, held or not. The hidden button beside it redoes, for keyboards and screen readers.
-const editing = () => editingModes.includes(boardMode);
-bindStep(undoButton, () => (editing() ? undoEdit() : undo()), () => (editing() ? undoEdit() : openHistory()));
+// Undo: back one step through the game, and at rest a hold opens History (MANA-UNDO-SPEC §6.6); in an editing mode it
+// stops at the mode's start, held or not. The hidden button beside it redoes, for keyboards and screen readers.
+bindStep(undoButton, undo, () => (editingModes.includes(boardMode) ? undo() : openHistorySheet(undoButton)));
 redoButton.addEventListener('click', redo);
 saveButton.addEventListener('click', () => {
   commit();
@@ -78,7 +78,10 @@ cancelButton.addEventListener('click', () => {
 });
 discardDialog.addEventListener('close', () => {
   syncBackHandling();
-  if (discardDialog.returnValue === 'discard') discardEdits();
+  if (discardDialog.returnValue === 'discard') {
+    takeBackTo(editStart);
+    discardEdits();
+  }
   // Keep editing: the dialog gives focus back to what had it, such as the cell Escape was pressed on, or ✕. Android's
   // back gesture can open it with nothing focused, and then ✕ takes it.
   else if (!document.activeElement || document.activeElement === document.body) cancelButton.focus();

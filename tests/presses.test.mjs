@@ -88,7 +88,8 @@ async function checkTurnSurvivesRedraw(t, engine) {
 }
 
 // D3: a hold stops when a dialog opens over it. In counters mode, P1 holds their poison cell, which takes one away every
-// 100ms; ✕ (here Android back) opens "Discard 10 changes?", and the count stays at what the question says.
+// 100ms; ✕ (here Android back) opens "Discard 1 change?" (the taps and the hold are one burst, one undo step), and the
+// count stays at what the question says.
 async function checkHoldUnderDialog(t, engine) {
   const page = await openPage(t, engine, { clock: true, game: savedGame(4, { counters: { poison: true } }) });
   await page.getByRole('button', { name: 'Counters', exact: true }).tap();
@@ -101,11 +102,11 @@ async function checkHoldUnderDialog(t, engine) {
   // The hold took away two: one at 500ms and one at 600ms.
   assert.equal(await poison.locator('b').textContent(), '6');
   await page.evaluate(() => window.closeOpenDialog());
-  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 10 changes?');
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 1 change?');
   await page.clock.runFor(400);
   assert.equal(await poison.locator('b').textContent(), '6', 'the hold stops under the dialog');
   await page.mouse.up();
-  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 10 changes?');
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 1 change?');
 
   // The same for a life hold when settings opens over it.
   await page.getByRole('button', { name: 'Discard', exact: true }).tap();

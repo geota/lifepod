@@ -18,6 +18,8 @@ const isOpen = (page, id) => page.locator(`#${id}`).evaluate(dialog => dialog.op
 const phone = { width: 852, height: 393 };
 // A cell held for `ms` takes one away at 500ms, then one every 100ms (bindSeat in web/js/ui/press.js). The page's clock
 // is paused, so a hold of a given length takes an exact number away.
+// Quick taps on one cell merge into one undo step while each comes within mergeWindow of the last (MANA-UNDO-SPEC §6.2a).
+const mergeWindow = 1500;
 const removals = ms => (ms < 500 ? 0 : Math.floor((ms - 500) / 100) + 1);
 
 async function checkCountersMode(t, engine) {
@@ -51,6 +53,8 @@ async function checkCountersMode(t, engine) {
   await cell(page, 3, 'poison').tap();
   await cell(page, 3, 'poison').tap();
   await cell(page, 1, 'casts').tap();
+  // A tap after the merge window is a step of its own.
+  await page.clock.runFor(mergeWindow + 1);
   await cell(page, 1, 'casts').tap();
   assert.equal(await count(page, 3, 'poison'), '2');
   assert.equal(await count(page, 1, 'casts'), '+4');
@@ -60,7 +64,7 @@ async function checkCountersMode(t, engine) {
   await removeOne(page, 'Remove one poison counter from Player 2');
   assert.equal(await count(page, 2, 'poison'), '0');
 
-  // Undo steps back one change at a time.
+  // Undo steps back one step at a time: a tap, or quick taps on one cell together.
   assert.ok(!(await button(page, 'Undo').isDisabled()));
   await button(page, 'Undo').tap();
   assert.equal(await count(page, 1, 'casts'), '+2');
@@ -69,7 +73,8 @@ async function checkCountersMode(t, engine) {
   // ✕ with changes asks first. Keep editing is the default and keeps everything.
   await button(page, 'Cancel').tap();
   assert.ok(await isOpen(page, 'discard'));
-  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 3 changes?');
+  // The two quick poison taps are one change, and the first cast another.
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 2 changes?');
   assert.equal(await page.evaluate(() => document.activeElement.textContent), 'Keep editing');
   await button(page, 'Keep editing').tap();
   await eventually(() => isOpen(page, 'discard'), false);
@@ -162,7 +167,7 @@ const everyTracker = { Commander: true, Poison: true, Energy: true, Experience: 
 // Energy, experience and rad (design/polish/SPEC.md §6 and §7): each has its own Track switch, a circle in counters
 // mode and a badge at rest, always in the order poison, tax, energy, experience, rad.
 async function checkNewCounters(t, engine) {
-  const page = await openPage(t, engine, { viewport: phone });
+  const page = await openPage(t, engine, { viewport: phone, clock: true });
 
   // Each new tracker on its own shows the counters button and only its own circle, with its icon.
   const icons = { energy: '.mana-icon[data-glyph="energy"]', experience: 'svg[data-icon="graduation-cap"]', rad: '.mana-icon[data-glyph="rad"]' };
@@ -200,6 +205,7 @@ async function checkNewCounters(t, engine) {
   await cell(page, 1, 'experience').tap();
   await cell(page, 2, 'rad').tap();
   await cell(page, 2, 'rad').tap();
+  await page.clock.runFor(mergeWindow + 1);
   await removeOne(page, 'Remove one rad counter from Player 2');
   assert.equal(await count(page, 3, 'energy'), '3');
   assert.equal(await count(page, 1, 'experience'), '1');
@@ -207,6 +213,7 @@ async function checkNewCounters(t, engine) {
   assert.equal(await cell(page, 3, 'energy').getAttribute('aria-label'), 'Player 3 energy, 3. Add one');
   assert.equal(await cell(page, 1, 'experience').getAttribute('aria-label'), 'Player 1 experience, 1. Add one');
   assert.equal(await cell(page, 2, 'rad').getAttribute('aria-label'), 'Player 2 rad, 1. Add one');
+  await page.clock.runFor(mergeWindow + 1);
   await removeOne(page, 'Remove one experience counter from Player 1');
   await removeOne(page, 'Remove one energy counter from Player 3');
   assert.equal(await count(page, 1, 'experience'), '0');
@@ -219,7 +226,8 @@ async function checkNewCounters(t, engine) {
 
   // Discard takes every new kind back to how it was when the mode opened, and that's saved.
   await button(page, 'Cancel').tap();
-  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 6 changes?');
+  // Six steps, three of them undone.
+  assert.equal(await page.locator('#discard-title').textContent(), 'Discard 3 changes?');
   assert.equal(await page.locator('#discard-message').textContent(), 'Every counter goes back to how it was when you opened counters.');
   await button(page, 'Discard').tap();
   await eventually(() => mode(page), null, 'Discard closes the mode');

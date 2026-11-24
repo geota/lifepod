@@ -5,7 +5,7 @@ import { measureBoard } from '../layout/board.js';
 import { editingModes } from '../logic/data.js';
 import { stepText } from '../logic/history.js';
 import { hasCountersMode, restPillButtons } from '../logic/rules.js';
-import { boardMode, edits, game } from '../state/state.js';
+import { boardMode, editStart, game } from '../state/state.js';
 import {
   boardControls, cancelButton, countersButton, damageButton, diceButton, manaButton, redoButton, roundBackButton,
   roundButton, saveButton, setupButton, shuffleButton, undoButton,
@@ -52,12 +52,13 @@ export function syncPill() {
 
 // Undo and its hidden Redo. At rest they step through the game's history (MANA-UNDO-SPEC §6.6): Undo always shows, so the
 // pill never changes length, and is dimmed with nothing to undo, but not disabled, so a hold still opens History; its
-// name says what it would undo. While editing, Undo takes back the mode's own edits and is disabled once they're gone.
+// name says what it would undo. While editing, Undo goes back through the steps taken in the mode, and is disabled once
+// they're all undone (MANA-UNDO-SPEC §6.5).
 export function syncUndo() {
   const editing = editingModes.includes(boardMode);
   redoButton.hidden = boardMode !== null;
   if (editing) {
-    undoButton.disabled = !edits?.length;
+    undoButton.disabled = game.history.at <= editStart;
     undoButton.removeAttribute('aria-disabled');
     undoButton.setAttribute('aria-label', 'Undo');
     return;

@@ -32,7 +32,7 @@ Tap the sliders beside the die to open **Settings**, a full-screen page in secti
 
 Turn on **Commander**, **Poison**, **Energy**, **Experience** or **Rad** in Settings → **Track** to track commander damage and tax, poison, energy, experience or rad counters. All are off by default, save the moment you switch them, and stay as you set them across launches and new games.
 
-With any of them on, a counters button joins the center controls. Tap it and each tile shows a circle for each counter that's on, in the order poison, commander tax (+2 per cast, under Mana's commander symbol), energy, experience and rad, facing its player, each with its icon over the count. Tap a circle to add one; hold it to take one away, repeating while you hold. While counters are open, the center shows Undo, a check mark and ✕: Undo steps back one change at a time, the check mark saves, and ✕ discards every change made since opening, asking first if there are any. Android back works like ✕.
+With any of them on, a counters button joins the center controls. Tap it and each tile shows a circle for each counter that's on, in the order poison, commander tax (+2 per cast, under Mana's commander symbol), energy, experience and rad, facing its player, each with its icon over the count. Tap a circle to add one; hold it to take one away, repeating while you hold. While counters are open, the center shows Undo, a check mark and ✕: Undo in the center steps back through the whole game; in a mode it stops at what you changed there, and quick taps on one circle are one step. The check mark saves, and ✕ discards every change made since opening, asking first if there are any; Redo can bring them back after. Android back works like ✕.
 
 At rest, a row along each player's own edge shows their colour identity chip, then poison, tax, energy, experience and rad, each only when set. Starting a new game resets the counts and keeps the switches and colours.
 
@@ -49,6 +49,10 @@ If a badge row runs out of room, the same thing gives way on every tile. Along t
 **Undo** sits in the center controls, between the game's buttons and the die. Each tap steps back one action through the whole game: a life change, spending or erasing floating mana, a turn step (with the pools it emptied), "Who goes first?", or a new game. Quick taps on one tile and one count are one action: while you keep tapping, within a second and a half of the last tap, a small badge on the total shows the change so far (−3), which is exactly what one Undo takes back. Two players tapping at once each keep their own.
 
 After an undo, a note on the tile it changed, facing its player, says what was undone ("Undid life 38 → 37"), with **Redo** to bring it back, for four seconds. You can keep stepping back and forward until someone takes a new action, which ends Redo. Undoing a new game brings the whole board back, players, colours and seats included, and every tile says "Game restored". Undo is dimmed when there's nothing to undo; screen readers hear what it would undo, and a Redo button follows it for keyboards. Hold Undo to open History.
+
+In counters, commander damage and mana modes, Undo goes back through what you changed there and stops at what was there when the mode opened; ✕ discards those changes, and Redo or History can bring them back.
+
+**History**, from a hold on Undo or Settings → **Game** → **History**, lists the game's actions newest first, each with its player, what changed and how long ago. Actions you've undone are struck through above the **Now** line, and each new game is a divider. Tap a row to go back, or forward, to just after it, or use **Back** and **Forward** to step one at a time. It faces the phone; the turn button flips it round.
 
 Settings, Rotate seats, tile colours and identities aren't undone: they toggle back. The history is saved with the game, so it survives closing the app, and keeps the last 500 actions.
 

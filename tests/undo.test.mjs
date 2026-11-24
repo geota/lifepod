@@ -381,3 +381,54 @@ for (const [name, engine] of Object.entries(engines)) {
     }
   });
 }
+
+for (const [name, engine] of Object.entries(engines)) {
+  // Modes on the one history (§6.5): each tap is a step, merged per cell; the mode's Undo stops at what was there when
+  // it opened; ✕ asks, then takes the mode's steps back, and Redo at rest brings them back; and after ✓ they're ordinary
+  // steps that Undo in the centre takes back. Commander damage's monarch transfer is in its step.
+  test(`${name}: the modes' Undo, ✕ and Discard work on the game's history, and Redo brings a discard back`, async (t) => {
+    const page = await openPage(t, engine, { clock: true, game: savedGame(4, { counters: { commander: true, poison: true, monarch: true }, monarch: 2 }) });
+    await subtract(page, 4).tap();
+    await page.clock.runFor(mergeWindow + 1);
+    await button(page, 'Counters').tap();
+    assert.ok(await button(page, 'Undo').isDisabled(), 'nothing to undo in the mode yet, though the game has a step');
+    const poison = (number) => tile(page, number).locator('.counter-cell[data-kind="poison"]');
+    await poison(1).tap();
+    await poison(1).tap();
+    await page.clock.runFor(mergeWindow + 1);
+    await poison(2).tap();
+    assert.equal((await history(page)).steps.length, 3, 'a life step, then two poison steps');
+    await button(page, 'Undo').tap();
+    await button(page, 'Undo').tap();
+    assert.deepEqual((await saved(page)).poison, [0, 0, 0, 0]);
+    assert.ok(await button(page, 'Undo').isDisabled(), 'Undo stops at the mode\'s start');
+    assert.equal((await saved(page)).scores[3], 39, 'and leaves the life step before it');
+    assert.equal(await announced(page), 'Undid: Player 1, Jade, poison 0 → 2');
+    assert.equal(await page.locator('.toast-chip').count(), 0, 'no toast in a mode: the cells change in place');
+
+    // ✕ with changes asks, and Discard takes the mode's steps back; Redo at rest brings them back.
+    await poison(3).tap();
+    await page.clock.runFor(mergeWindow + 1);
+    await poison(3).tap();
+    await button(page, 'Cancel').tap();
+    assert.equal(await page.locator('#discard-title').textContent(), 'Discard 2 changes?');
+    await button(page, 'Discard').tap();
+    await eventually(() => page.locator('#board').getAttribute('data-mode'), null);
+    assert.deepEqual((await saved(page)).poison, [0, 0, 0, 0], 'discarded');
+    const after = await history(page);
+    assert.equal(after.steps.length - after.at, 2, 'the discarded steps are ahead, to redo');
+    await page.locator('#redo-button').evaluate(redo => redo.click());
+    await page.locator('#redo-button').evaluate(redo => redo.click());
+    assert.deepEqual((await saved(page)).poison, [0, 0, 2, 0], 'Redo brings them back');
+
+    // Commander damage to the monarch passes the crown in the same step; after ✓, Undo in the centre takes both back.
+    await button(page, 'Commander damage').tap();
+    await tile(page, 3).locator('.map-cell[data-attacker="0"]').tap();
+    assert.equal((await saved(page)).monarch, 0, 'the attacker takes the crown');
+    await button(page, 'Save').tap();
+    await page.clock.runFor(toastTime);
+    await undoButton(page).tap();
+    const back = await saved(page);
+    assert.deepEqual([back.commanderDamage[2][0], back.scores[2], back.monarch], [0, 40, 2], 'one Undo takes back the damage, the life and the crown');
+  });
+}

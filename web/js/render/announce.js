@@ -19,9 +19,9 @@ export function seatName(index) {
 // What a board mode is and how to use it, read as it opens: its on-screen hints are only for sighted players.
 /** @type {Record<Exclude<BoardMode, null>, string>} */
 const modeIntros = {
-  damage: 'Commander damage. Press a commander on a tile to add one damage. Save or Cancel in the centre',
-  counters: 'Counters. Press a counter to add one. Save or Cancel in the centre',
-  mana: 'Mana pool. Press a colour to add one mana. Save or Cancel in the centre',
+  damage: 'Commander damage. Press a commander on a tile to add one damage. Undo goes back one step. Save or Cancel in the centre',
+  counters: 'Counters. Press a counter to add one. Undo goes back one step. Save or Cancel in the centre',
+  mana: 'Mana pool. Press a colour to add one mana. Undo goes back one step. Save or Cancel in the centre',
   colours: 'Tile colours. Choose a colour on each tile, then Done in the centre',
   identity: 'Identities. Choose each player\'s colours, then Done in the centre',
   rotate: 'Rotate seats. Press a tile to turn it clockwise, then Done in the centre',

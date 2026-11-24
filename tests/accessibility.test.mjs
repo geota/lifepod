@@ -224,7 +224,7 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: entering and leaving modes, a new game, who goes first and the turn are announced`, async (t) => {
     const page = await openPage(t, engine, { clock: true, game: busyGame({ turns: 'turns', turn: { first: 0, active: 1, round: 3 } }) });
     await button(page, 'Commander damage').click();
-    assert.equal(await announced(page), 'Commander damage. Press a commander on a tile to add one damage. Save or Cancel in the centre');
+    assert.equal(await announced(page), 'Commander damage. Press a commander on a tile to add one damage. Undo goes back one step. Save or Cancel in the centre');
     await button(page, 'Save').click();
     assert.equal(await announced(page), 'Saved');
     await button(page, 'Counters').click();

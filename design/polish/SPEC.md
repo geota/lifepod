@@ -402,7 +402,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 - **Setting:** Settings → Track → Mana pool, off by default. When it's on, the pill shows the tap symbol, with a dot while any pool has mana. *As built (MANA-UNDO-SPEC §5, M1):* the classic tilted T, Mana's `\e61c`, in `--pip-ink` on a `--pip-c` disc 0.56 of the button (with Glass's light inner edge); the dot is a 9px `--accent` dot on the pip's upper end, ringed 2px in `--pill-background`, and the disc never turns lime. The button's name adds what's floating: "Mana pool, 3 mana floating". `\e61a`, the curved arrow it replaced, is gone from the font subset.
 - **Adding: the mana mode.**
   - Each tile shows six circles: W U B R G and colourless (`\e904`), mana symbols in cost style, sized like the counter cells. The `.pip` class needs a C entry.
-  - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode (edit kind `mana`).
+  - Tap +1; hold −1 with repeat. Undo, ✓ and ✕ as in counters mode, on the game's history (MANA-UNDO-SPEC §6.5).
 - **At rest:**
   - A tile shows a strip **only while its pool has mana**, and only the colours it holds: for example (R)3 (C)1 [eraser].
   - **Both badge rows always stay** (FINAL-REVIEW #3: §3.2's "every count" wins over the first version of this section, which had the strip take the near row's place).
@@ -466,7 +466,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 - *As built:* each field falls back on its own. `startingLife` must be a whole number from 1 to 999 (`maxStartingLife`, the slider's range), or it's 40. A score that isn't a safe whole number starts at the starting life. Only when `scores` doesn't give a known player count (2–6) does the save get the default 4-player board; the fields that don't depend on the count, such as the settings, are still kept.
 - Changing the player count resizes every array and resets `turn`.
 - `history` (MANA-UNDO-SPEC §10): `{ v: 1, at, base, steps }`, checked by `fitHistory` in `logic/history.js`; anything wrong drops steps or the whole history, never the game.
-- Not saved: the mode edit stacks and the hold-back buffer of a turn step.
+- Not saved: the hold-back buffer of a turn step, the open bursts and the toasts. *As built (M5):* the mode edit stacks are gone; a mode keeps only where the history stood when it opened.
 
 ### 10.2 New game
 
@@ -478,7 +478,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.3 Android back, in order
 
-1. The topmost dialog closes: New game's confirmation over settings first, then settings (dropping a pending new game), the dice and other dialogs. (Updated for the settings page; there are no sub-sheets any more.)
+1. The topmost dialog closes: New game's confirmation over settings first, History over settings, then settings (dropping a pending new game), the dice, History and other dialogs. (Updated for the settings page; there are no sub-sheets any more.)
 2. Rotate, colours and identity modes end, keeping their changes.
 3. Counters, damage and mana modes behave like ✕: they ask when there are edits.
 4. "Who goes first?" is skipped.
@@ -486,13 +486,15 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.4 Undo summary
 
+*Replaced by MANA-UNDO-SPEC §12, as built in M4 and M5 (24 November 2026):*
+
 | Where | How |
 |---|---|
-| Counters, commander damage, mana mode | The edit stack: Undo / ✓ / ✕, as today. Giving or clearing the monarch or the initiative is an edit, and so is a transfer that commander damage or a player going out causes, inside the edit that caused it (§13). |
-| Turn steps | Hold the chip or pill to step back. That also restores auto-emptied pools. |
-| Spending from the strip | No undo. Add it back in mana mode. |
-| Clearing a pool | "Undo clear" for 5 seconds |
-| Identity, colours, settings | Instant. Toggle back. |
+| **Anything at rest:** life, spending floating mana, the eraser, turn steps (with what they emptied), "Who goes first?", New game | **Undo** in the centre: back one step per tap. Quick taps on one tile and count are one step while each comes within 1.5s of the last; the running delta shows it. **Redo** on the toast after an undo, beside Undo for keyboards, or in History. Any new game action ends Redo. |
+| Counters, commander damage and mana in their modes | The same history. The mode's Undo stops at what was changed in the mode; ✓ closes; ✕ asks, then undoes the mode's changes (which Redo can bring back). Transfers of the monarch and the initiative are in the step that caused them. |
+| Many steps at once | Hold Undo (or Settings → Game → History): the list, Back and Forward, or tap a row to go back to it. |
+| Turn steps, the turn chip or pill held | Steps back one turn, restoring what that pass emptied. It's a step of its own, so Undo can take it back. |
+| Settings, Rotate seats, tile colours, identities | Instant, and not in the history. Toggle back. A New game's resets of them are undone with the New game. |
 
 ## 11. Build plan
 
@@ -580,13 +582,13 @@ From the Comprehensive Rules effective 6 November 2026: the monarch (CR 726) and
 
 - **Track:** Monarch and Initiative switches after Mana pool, off by default, saved in `game.counters`. Either one shows the counters button.
 - **Icons:** the monarch is the Phosphor crown (Bold), which tax used before (§6); the initiative is Phosphor's castle-turret (Fill).
-- **Counters mode:** a crown cell and a castle cell after rad, in the circle-cell style, with the icon alone (0.51 of the cell). A tap gives it to that player and takes it from whoever had it; a tap on the holder's own cell clears it. The holder's cell fills with their seat colour. Each tap is an edit (`designation`) on the Undo / ✓ / ✕ stack.
+- **Counters mode:** a crown cell and a castle cell after rad, in the circle-cell style, with the icon alone (0.51 of the cell). A tap gives it to that player and takes it from whoever had it; a tap on the holder's own cell clears it. The holder's cell fills with their seat colour. Each tap is a step (`designation`) of the game's history, which Undo / ✓ / ✕ work on.
   - Seven cells (every counter and both designations) go four to a row, with the column gaps closing from 10px to 2px before a cell would go under 44px; a turned seat too narrow for four (568 × 320, five players) takes three to a row with its gaps closed up.
 - **At rest:** the holder's near row ends with a round crown or castle chip, like the flag. They count as counts: never dropped (§3.2).
 - **Commander damage** is combat damage: adding it to the monarch makes the attacker the monarch (CR 726.3), and the same for the initiative (CR 727.3), as transfers inside the same edit, announced. Taking damage away moves nothing.
 - **Leaving the game** (CR 726.4, 727.4), when a change puts the holder out (`isOut`):
   - Only in Turn by turn with an active player: the active player takes it, or, if the active player is the one leaving or is already out, the next player in turn order who is still in. If nobody else is in, the monarch goes to nobody; the initiative always has a holder, so it stays. Announced, and a new initiative holder is reminded to venture.
-  - In counters or damage mode the handoff is part of the edit that caused it, so Undo or ✕ takes both back. At rest (a life total, or a Track switch that puts someone out) it saves at once.
+  - The handoff is inside the step that caused it, so Undo or ✕ takes both back, in a mode or at rest (a life total). A Track switch that puts someone out isn't a step, so its handoff is a step of its own.
   - Rounds doesn't follow whose turn it is, and Off follows no turns, so neither hands anything on. Nor does Turn by turn before anyone's turn has started.
   - Otherwise the out holder's near row shows **Pass it on** (the icon, an arrow and the words, outlined like a Start chip) until someone takes it in counters mode. It's a button with a 64 × 44 target that opens counters mode, and it doesn't dim with the out player's badges. It also shows for a holder someone gave it to after they were out, and never when nobody else is in to take it.
 - **Turn reminders,** only in Turn by turn: "Monarch: draw a card" on the monarch's tile when they pass the turn (the draw is at the beginning of their end step); "Initiative: venture into Undercity" on the holder's tile when their turn starts (by the chip, the pill, a Start chip or "Who goes first?") or when they take the initiative mid-turn (commander damage or counters mode, once the mode is saved, or a handoff). Stepping back reminds nobody.

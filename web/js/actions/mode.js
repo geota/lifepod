@@ -5,7 +5,7 @@ import { requestFit } from '../layout/fit.js';
 import {
   designations, discardMessages, doneLabels, editingModes, firstBeat, shuffleTick, shuffleTicks,
 } from '../logic/data.js';
-import { applyEdit, isOut, playOrder, randomBelow } from '../logic/rules.js';
+import { isOut, playOrder, randomBelow } from '../logic/rules.js';
 import { fitTurn } from '../logic/save.js';
 import { announceMode, announceModeEnd, clearAnnouncements, seatName } from '../render/announce.js';
 import { renderBadges } from '../render/badges.js';
@@ -14,7 +14,7 @@ import { syncPill } from '../render/pill.js';
 import { clearToasts, closeBursts } from '../state/history.js';
 import { haptic, reducedMotion } from '../state/platform.js';
 import {
-  boardMode, editStartHolders, edits, game, openBoardMode, syncBackHandling, turnSteps,
+  boardMode, editStart, editStartHolders, game, openBoardMode, syncBackHandling, turnSteps,
 } from '../state/state.js';
 import { board, boardControls, discardDialog, icon, setupButton } from '../ui/dom.js';
 import { cancelPresses } from '../ui/press.js';
@@ -23,7 +23,6 @@ import { showDialog } from './dialog.js';
 import { turnStarted } from './reminders.js';
 
 /** @typedef {import('../logic/data.js').BoardMode} BoardMode */
-/** @typedef {import('../logic/rules.js').Edit} Edit */
 
 // "Who goes first?" waits until settings has closed, then opens.
 export let askFirst = false;
@@ -105,7 +104,7 @@ export function shuffleFirst() {
 }
 
 // Board-wide modes. Seat rotation, tile colours and identities end with the check mark that replaces the setup button.
-// Counters mode ends with save or ✕, and keeps a list of its edits until then.
+// Counters mode ends with save or ✕, and its Undo goes back through the steps taken since it opened.
 /** @param {BoardMode} mode */
 export function setBoardMode(mode) {
   const closed = boardMode;
@@ -168,7 +167,8 @@ function restingFocus() {
 
 // ✕ in an editing mode: with no changes it just closes; otherwise it asks first, and Keep editing is the default.
 export function cancelEditing() {
-  const changes = /** @type {Edit[]} */ (edits).length;
+  // The mode's changes are the history's steps since it opened, each tap or burst one.
+  const changes = Math.max(0, game.history.at - editStart);
   if (!changes) {
     const closed = boardMode;
     setBoardMode(null);
@@ -184,10 +184,10 @@ export function cancelEditing() {
   showDialog(discardDialog);
 }
 
+// Discard, once the mode's steps are taken back through the history (takeBackTo in actions/history.js, which app.js
+// calls first, since history.js draws the board and sits after this module), so Redo can bring them back
+// (MANA-UNDO-SPEC §6.5): the mode closes.
 export function discardEdits() {
-  const changes = /** @type {Edit[]} */ (edits);
-  while (changes.length) applyEdit(game, /** @type {Edit} */ (changes.pop()), -1);
-  commit({ scores: 'all', step: false });
   setBoardMode(null);
   // What the discarded changes said is no longer true.
   clearAnnouncements();

@@ -1,16 +1,17 @@
 // What the board modes change: an editing mode's edits (commander damage, counters, designations and mana), each
-// applied, shown and saved at once and kept for Undo and ✕, and the choices that Colours and Identity save at once.
+// applied, shown and saved at once as a step of the game's history, where the mode's Undo and ✕ find them
+// (MANA-UNDO-SPEC §6.5), and the choices that Colours and Identity save at once, which aren't steps.
 
 import { countKinds } from '../logic/data.js';
 import {
-  applyEdit, applyNewEdit, countEdit, damageEdit, designationEdit, editPlayers, manaEdit,
+  applyNewEdit, countEdit, damageEdit, designationEdit, editPlayers, manaEdit,
 } from '../logic/rules.js';
 import { normalizeIdentity } from '../logic/save.js';
 import { announce, announceDesignation, announceLife, announcePool } from '../render/announce.js';
 import { syncAllSwatches, syncCounterCells, syncIdentity, syncManaCells, syncSeatMap } from '../render/modes.js';
 import { paintColours } from '../render/tile.js';
 import { haptic } from '../state/platform.js';
-import { edits, game } from '../state/state.js';
+import { game } from '../state/state.js';
 import { commit } from './commit.js';
 
 /** @typedef {import('../logic/rules.js').Edit} Edit */
@@ -35,11 +36,13 @@ export function toggleIdentity(index, id) {
   haptic();
 }
 
-// Shows an edit everywhere it appears, and saves it, so nothing is lost if the app is closed mid-mode.
+// Shows an edit everywhere it appears, and saves it as a step, so nothing is lost if the app is closed mid-mode. Quick
+// taps on one cell merge, by key (the tile is the key's second part).
 /**
  * @param {Edit} edit
+ * @param {string} [key]
  */
-function showEdit(edit) {
+function showEdit(edit, key) {
   const { index } = edit;
   // Whoever holds the monarch and the initiative now, after a tap, commander damage or a player going out.
   for (const { kind } of edit.transfers ?? []) announceDesignation(kind);
@@ -61,34 +64,27 @@ function showEdit(edit) {
     syncCounterCells(player);
     syncManaCells(player);
   }
-  // A mode's edits stay on its own stack until the mode closes; the history doesn't record them yet.
-  commit({ scores: players, badges: players, pill: true, step: false });
+  commit({ scores: players, badges: players, pill: true, step: key ? { key } : {} });
   haptic();
 }
 
 // An edit made in a mode, or null for a tap that would take a count out of range, which does nothing. applyNewEdit
-// applies it, and anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4) in the same edit.
+// applies it, and anyone it puts out of the game hands on what they hold (CR 726.4 and 727.4) in the same step.
 /**
  * @param {Edit | null} edit
+ * @param {string} [key]
  */
-function commitEdit(edit) {
+function commitEdit(edit, key) {
   if (!edit) return;
-  /** @type {Edit[]} */ (edits).push(applyNewEdit(game, edit));
-  showEdit(edit);
-}
-
-export function undoEdit() {
-  const edit = edits?.pop();
-  if (!edit) return;
-  applyEdit(game, edit, -1);
-  showEdit(edit);
+  showEdit(applyNewEdit(game, edit), key);
 }
 
 // The modes' taps. The edit each makes, and what it passes on, is in rules.js: commander damage to the monarch or the
 // initiative's holder passes it to the attacker (damageEdit), and a designation cell gives it or clears it
 // (designationEdit).
+// (designationEdit), a moment of its own rather than a tap that merges.
 export function stepDamage(defender, attacker, delta) {
-  commitEdit(damageEdit(game, defender, attacker, delta));
+  commitEdit(damageEdit(game, defender, attacker, delta), `damage:${defender}:${attacker}`);
 }
 
 export function toggleDesignation(kind, index) {
@@ -96,9 +92,9 @@ export function toggleDesignation(kind, index) {
 }
 
 export function stepCount(kind, index, delta) {
-  commitEdit(countEdit(game, kind, index, delta));
+  commitEdit(countEdit(game, kind, index, delta), `count:${index}:${kind}`);
 }
 
 export function stepMana(index, colour, delta) {
-  commitEdit(manaEdit(game, index, colour, delta));
+  commitEdit(manaEdit(game, index, colour, delta), `mana:${index}:${colour}`);
 }

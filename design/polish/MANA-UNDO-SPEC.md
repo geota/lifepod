@@ -1,6 +1,6 @@
 # Treasure, lighter floating mana, Keep, the mana icon, and Undo: design spec
 
-**Status:** proposal for the owner's review, 23 November 2026, against main `1a9cdb5` (v0.1.0-alpha.17). Nothing here is built.
+**Status:** proposal for the owner's review, 23 November 2026, against main `1a9cdb5` (v0.1.0-alpha.17). *Built since (24 November 2026): M1 (the icon), M4 (the undo core) and M5 (the modes on the history and the History sheet), with the open questions on their recommendations: Q4 placement B, Q5 keep the confirmation with its new line, Q8 a 1.5s window from the last tap, Q9 Undo always shown and dimmed, Q10 the running delta for life at rest. M2 and M3 (Treasure, Gold, Keep and the pips) aren't built, so `treasure`, `gold` and `keepMana` aren't board fields yet. See "As built" at the end.*
 
 - The mock-ups are drawn on the real app (CSS and DOM injected with Playwright, served by `scripts/serve.mjs`) and laid out with captions on the review page: `design-mana-undo/index.html` in this session's scratchpad. Each figure below names its image there.
 - Rules are quoted from the Comprehensive Rules effective 6 November 2026 and card text from Scryfall's Oracle text, both read on 23 November 2026.
@@ -703,3 +703,19 @@ M2 and M3 don't depend on M4. M4 could ship before them if the owner wants Undo 
 | Q10 | Show the **running delta** (−3) on the total during a burst? | Yes, for life at rest (`burst-952-4.png`). |
 | Q11 | Card lookup's entry: a magnifier in the pill, or a **Tools sheet** behind the d20? | The Tools sheet. With Undo, the pill is at its 7-button limit for 568 × 320 (§6.6). |
 | Q9 | Should the Undo button hide until the first action of a fresh install? | No. It always shows, dimmed when empty, so the pill never changes length mid-game. |
+
+---
+
+## As built (M1, M4, M5; 24 November 2026)
+
+Where the build differs from the sections above, or decides what they left open:
+
+- **§5:** the Settings row for Mana pool draws the same classic T (bare, without the pip), so U+E61A left the subset with the pill's old arrow. Glass's pip edge is a token (`--tap-pip-edge`), not a component rule.
+- **§6.2a:** merge keys put the tile second: `life:i`, `spend:i:colour`, `count:i:kind`, `damage:i:attacker`, `mana:i:colour`. Designation cells don't merge. A burst whose net change comes back to nothing drops its step but stays open, so a third tap in the window still merges.
+- **§6.5:** the hold-back buffer (`turnSteps`) stays, as this section says; each pass, start, pick and step back is also a history step. An undo or redo of a turn step empties the buffer, so a later hold steps back by the play order, as after a relaunch. ✕'s "Discard N changes?" counts the mode's steps, so quick taps on one cell are one change. Discard is the history taken back to the mode's start, so the steps are Forward and Redo (or History) brings them back. The damage map marks a seat changed when a step since the mode opened touched it.
+- **§6.6:** the upright 2-player pill takes 44px buttons whenever its buttons at full size would pass the board's short side (`data-tight`, measured from the button list, not a fixed count). Undo's name includes the seat's colour ("Undo: Player 3, Coral, life 38 → 37"). A hold on Undo in an editing mode undoes, as a tap does; History opens only at rest.
+- **§6.7:** the toast is the reminder chip: on a short tile it takes the near edge for its 4 seconds, as a reminder does, so the row under it waits. After a redo the whole chip is a button that dismisses it.
+- **§6.8:** History draws 100 rows and adds 100 more as it scrolls near the end. A turn step's row is the active player's (or the first player's), else "Table".
+- **§10:** `fitHistory` leaves out a cell whose field it doesn't know (UNDO-ARCHITECTURE §8.4), and keeps the step if anything is left. Steps ahead of `at` are walked forward from it, and the first bad one drops itself and everything newer. An empty history has `base` 0 until its first step, so loading an untouched save is idempotent.
+- **Layout:** with seven buttons the 5-player pill sits further left at 568 × 320, and in Colours mode its Done button reached a far edge whose clearance left no room for twelve swatches; Colours mode now prices a far-edge clearance at full cost, since its swatches aren't sized for the far edge as rest content is.
+- **Performance (Chromium, 4× CPU throttle, `tests/perf.test.mjs`):** see the build report; commit() with 500 steps stayed near 0.6ms p50 and 1.0ms p95, against UNDO-ARCHITECTURE §2.3's 0.5 / 0.9ms and the 4ms budget. The device check on a Pixel and an iPhone (§8) is still to do.

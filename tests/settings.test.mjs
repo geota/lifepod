@@ -821,15 +821,20 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 }
 
-// The Keep awake row fills its card like the other rows, so its switch sits at the card's edge (docs/review/FINAL.md U2;
-// it was capped from when it shared Game's footer with New game).
+// The Keep awake row ends at its card's edge like the other rows, so its switch sits there (docs/review/FINAL.md U2),
+// with the History row beside it (MANA-UNDO-SPEC §6.6); together they fill the footer.
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: the Keep awake row fills its card`, async (t) => {
+  test(`${name}: the Keep awake row fills its card beside History`, async (t) => {
     for (const style of ['material', 'glass']) {
       const page = await openPage(t, engine, { viewport: { width: 952, height: 427 }, style });
       await button(page, 'Settings').tap();
-      const [row, foot] = await page.locator('.fs-awake').evaluate(node => [node.getBoundingClientRect().width, node.parentElement.getBoundingClientRect().width]);
-      assert.ok(Math.abs(row - foot) < 1, `${style}: the row is ${row}px in its ${foot}px footer`);
+      const { row, history, foot, gap } = await page.locator('.fs-awake').evaluate((node) => {
+        const box = element => element.getBoundingClientRect();
+        return { row: box(node), history: box(document.querySelector('#settings-history')), foot: box(node.parentElement), gap: parseFloat(getComputedStyle(node.parentElement).columnGap) };
+      });
+      assert.ok(Math.abs(row.right - foot.right) < 1, `${style}: Keep awake ends at the footer's edge (${row.right} of ${foot.right})`);
+      assert.ok(Math.abs(row.width + history.width + gap - foot.width) < 1 || Math.abs(row.width - foot.width) < 1, `${style}: Keep awake and History fill the footer`);
+      assert.ok(history.height >= 44, 'History is a whole target');
       await page.close();
     }
   });

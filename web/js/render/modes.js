@@ -4,7 +4,7 @@
 
 import { faceAngles, identityColours, manaColours, swatches, tileSets } from '../logic/data.js';
 import { isOut, seatGrid, seatRow, shownCounters, toFace, trackedDesignations } from '../logic/rules.js';
-import { boardMode, editStartScores, edits, game } from '../state/state.js';
+import { boardMode, editStart, editStartScores, game } from '../state/state.js';
 import { board, element, icon, visuallyHidden } from '../ui/dom.js';
 import { bindRelease, bindSeat, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf } from './tile.js';
@@ -64,15 +64,29 @@ function buildSeatMap(index) {
   return map;
 }
 
+// The seats on a defender's map that a step since the mode opened has changed, by attacker, even back to where they were.
+/** @param {number} index */
+function changedSeats(index) {
+  const { at, steps } = game.history;
+  const seats = new Set();
+  for (const { d } of steps.slice(editStart, at)) {
+    const damage = d.commanderDamage;
+    if (Array.isArray(damage)) return new Set(game.scores.keys());
+    for (const attacker of Object.keys(damage?.[index] ?? {})) seats.add(Number(attacker));
+  }
+  return seats;
+}
+
 export function syncSeatMap(index) {
   const map = board.children[index]?.querySelector('.seat-map');
   if (!map) return;
+  const changed = changedSeats(index);
   for (const cell of map.querySelectorAll('.map-cell[data-attacker]')) {
     const attacker = Number(cell.dataset.attacker);
     const damage = game.commanderDamage[index][attacker];
     cell.textContent = String(damage);
     cell.toggleAttribute('data-zero', damage === 0);
-    cell.toggleAttribute('data-changed', Boolean(edits?.some(edit => edit.kind === 'damage' && edit.index === index && edit.attacker === attacker)));
+    cell.toggleAttribute('data-changed', changed.has(attacker));
     cell.setAttribute('aria-label', `Player ${attacker + 1}'s commander, ${damage} damage. Add one`);
   }
   const self = map.querySelector('.self');
