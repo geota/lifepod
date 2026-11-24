@@ -336,10 +336,12 @@ function audit() {
     if (c < need && !disabled) add('contrast', `${who(el)}${name(el)} "${node.textContent.trim().slice(0, 20)}" ${c.toFixed(2)}:1 at ${px(size)}px (needs ${need})`);
   }
   for (const el of scope.querySelectorAll('.icon, .mana-icon, .id-symbol')) {
-    if (!visible(el) || el.closest('.watermark, .pip, .ci, :disabled, .die-icon') || el.closest('[hidden]')) continue;
+    // A dimmed control (disabled, or aria-disabled like Undo with nothing to undo) is exempt, as for text (WCAG 1.4.11).
+    if (!visible(el) || el.closest('.watermark, .pip, .ci, :disabled, [aria-disabled="true"], .die-icon') || el.closest('[hidden]')) continue;
     const fg = rgba(getComputedStyle(el).color);
     fg[3] *= opacityOf(el);
-    const bg = backgroundOf(el.parentElement);
+    // From the icon itself, so an icon on its own disc (the mana button's pip) is measured on the disc.
+    const bg = backgroundOf(el);
     const c = ratio(over(fg, bg), bg);
     keep(c, el);
     if (c < 3) add('contrast', `${who(el)}${name(el)} icon in ${name(el.parentElement)} ${c.toFixed(2)}:1 (needs 3)`);
