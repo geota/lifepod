@@ -44,6 +44,12 @@ At rest, a row along each tile's far edge starts with a sword and shows the comm
 
 If a badge row runs out of room, the same thing gives way on every tile. Along the far edge the sword goes first; along the near edge the identity names and the word "Turn" go first, then the identity symbol if the colour indicator also shows. Then the row takes a second line, and only then does its type shrink, to a 9px floor; where a second line would cover a life total, the type shrinks first and the row wraps last. Counts, the crown, the castle, the identity chip and its colour indicator are never hidden, and anything that gave way comes back only when there's room to spare.
 
+## Track
+
+On a small phone, or a board whose center has less room, such as three players on a small phone, the center controls can't fit separate buttons for commander damage, counters and mana. There they become one **Track** button, in the same place. Its face is the icon of what it will open, with a dot under it for each of the three that's on; the lit dot is the one it opens.
+
+Tap Track and the center shows a tab for each of them, then Undo, the check mark and ✕. Tap a tab to switch the tiles between commander damage, counters and mana, as often as you like in one visit. Undo steps back through everything you changed since opening Track, in any tab, switching to the tab each change was made in so you see it. The check mark saves it all, and ✕ discards it all, asking first and saying what goes back. Track opens on the tab you used last, and a counter or mana chip on a tile opens its own tab directly. With only one of the three on, it keeps its own button. On a larger screen, or when you turn the phone so there's room, the three buttons come back once you close what's open.
+
 ## Undo
 
 **Undo** sits in the center controls, between the game's buttons and the die. Each tap steps back one action through the whole game: a life change, spending or erasing floating mana, a turn step (with the pools it emptied), "Who goes first?", or a new game. Quick taps on one tile and one count are one action: while you keep tapping, within a second and a half of the last tap, a small badge on the total shows the change so far (−3), which is exactly what one Undo takes back. Two players tapping at once each keep their own.

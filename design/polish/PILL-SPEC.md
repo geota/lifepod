@@ -1,6 +1,6 @@
 # The centre pill stays one row: design spec
 
-**Status:** proposal for the owner's review, 24 November 2026, against main `8b98903`. Nothing here is built.
+**Status:** option A is built, only where it's needed (§12, as built, 24 November 2026). The rest was the proposal for the owner's review, 24 November 2026, against main `8b98903`.
 
 - The mock-ups are drawn on the real app (CSS and DOM injected with Playwright, served by `scripts/serve.mjs`). Undo, the magnifier and the classic-T mana button are injected as MANA-UNDO-SPEC.md and the `card-lookup` branch draw them. The review page is `design-pill/index.html` in this session's scratchpad, and each figure below names its image there.
 - The pill's lengths below are measured on those mocks, not computed.
@@ -224,3 +224,28 @@ This reads the owner's "one tabbed page" literally.
 | P4 | **✕ in Track:** discard the whole visit across tabs (proposed), or only the open tab's changes? | The whole visit: one mode, one ✓, one ✕. |
 | P5 | **Undo crossing tabs:** when the step it undoes is in another tab, switch to that tab (proposed), or undo it out of sight? | Switch, so the change is visible. |
 | P6 | **The 3-player board at 568 × 320** also overflows with eight buttons (seat 3 loses 100px of its face). Is that confirmation enough that the fix should cover every count, not only 2 players? | Yes. A covers it. |
+
+## 12. As built (24 November 2026)
+
+The owner approved A with a twist: "Yes, but can we do this only when its needed. E.g. on small phones or layouts that require it." SPEC.md §14 describes the build; this is what differs from §3 and §10 above.
+
+- **Only where it's needed.** The three buttons stay wherever every button the pill can show fits along its seam at full size; Track takes their place only where they don't (`pillFit` in `logic/rules.js`). The 44px shrink is the fallback only where even Track doesn't fit. The decision is made when the board is measured, from the window, the player count and the switches, and the pill changes form only at rest: a resize while a mode is open waits for it to close.
+- **The room** is the seam less 4px at each end: the board's height with 2 players, otherwise the split columns' width. "Fits" counts the pill at rest and in the mode it opens, so Track's mode (three tabs, Undo, ✓, ✕) counts too.
+- **Where it collapses**, everything on and Turns on, across the sweep's sizes at 2–6 players (`tests/track.test.mjs`):
+
+| Window | Without the magnifier | With the magnifier counted (`pillTools` + 1) |
+|---|---|---|
+| 568 × 320 and 320 × 568 | 2 players; 3 players at 44px (Track's mode is 288px against 275px of room) | 2 players; 3 at 44px; 5 players |
+| 640 × 360 | 3 players | 2 and 3 players |
+| 375 × 667 (board 667 × 375) | 3 players | 2 and 3 players |
+| 841 × 701 (64px buttons) | 3 players | 3 players |
+| 952 × 427, 852 × 393, 1366 × 1024 | none | none |
+
+  - 4 and 6 players never collapse: their seam is the board's whole width.
+  - **3 players at 568 × 320 still shrinks to 44px.** §1's "288px, as today" was 5px into the end seat; the build doesn't let any pill pass its seam, and Track's mode is six buttons there. At rest it's five 44px buttons (220px).
+- **Commander alone has two tabs,** damage and counters, because commander tax is a counter, so §2's "typical (Commander only)" pill is Track with two tabs where it collapses, not today's button.
+- **Track's name** lists what it tracks, as the owner's brief put it: "Track: commander damage, counters, mana" (plus ", 3 mana floating"), rather than §3.5's "Track: commander damage" for the tab it opens. The face still shows the tab it opens.
+- **The remembered tab** follows any editing mode that opens, in either form, so a pill that changes form opens where the players last were.
+- **Undo crossing tabs** switches tab first and announces it; the undo's own announcement follows.
+- **Not built:** §9's one-time "Switch with the tabs in the centre" hint. The page dots, the remembered tab and the tiles' chips carry it, and it would need a saved "seen" flag.
+- **Ready for the magnifier:** the tools are a count, `pillTools` in `logic/data.js` (Undo, d20, settings); card lookup adds one there and in the pill's markup before `#dice-button`, and the threshold and the tests' "with the magnifier" table follow. MANA-UNDO-SPEC §6.6's `data-tight` rule now covers any player count, not only the upright 2-player pill.
