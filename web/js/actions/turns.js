@@ -1,5 +1,6 @@
 // Turns (design/polish/SPEC.md §8): stepping forward and back, by round or turn by turn, starting a player's turn, and
-// the steps kept so a hold steps back exactly.
+// the steps kept so a hold steps back exactly. Each is an undo step too (MANA-UNDO-SPEC §6.5): Undo is the general tool,
+// and the hold stays because it's about the turn alone.
 
 import { maxCount } from '../logic/data.js';
 import { turnBack, turnForward } from '../logic/rules.js';
@@ -11,10 +12,12 @@ import { autoEmptyPools } from './mana.js';
 import { maybeAskFirst, setAskFirst } from './mode.js';
 import { remind, turnStarted } from './reminders.js';
 
-// Shows a turn step on every tile and the pill, saves it at once and announces it. A turn chip passed from the keyboard
-// is gone, and focus follows the turn to the chip that has it now (render/badges.js).
-function showTurn() {
-  commit({ badges: 'all', pill: true });
+// Shows a turn step on every tile and the pill, saves it at once as one undo step, with any pools it emptied
+// (MANA-UNDO-SPEC §6.2), and announces it. A turn chip passed from the keyboard is gone, and focus follows the turn to
+// the chip that has it now (render/badges.js).
+/** @param {import('../logic/data.js').StepKind} kind */
+function showTurn(kind) {
+  commit({ badges: 'all', pill: true, step: { kind } });
   haptic();
   const { active, round } = game.turn;
   announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `${seatName(active)}'s turn, round ${round}` : `Round ${round}`));
@@ -41,7 +44,7 @@ export function stepTurn() {
   if (!next) return;
   game.turn = next;
   recordStep(before, autoEmptyPools());
-  showTurn();
+  showTurn('turn');
   if (game.turns === 'turns') {
     // The monarch draws at the beginning of their end step, so passing the turn reminds them, and the initiative's
     // holder ventures at the beginning of their upkeep, so their turn starting reminds them.
@@ -56,7 +59,7 @@ export function startTurn(index) {
   game.turn.active = index;
   game.turn.first ??= index;
   recordStep(before, null);
-  showTurn();
+  showTurn('start');
   turnStarted();
 }
 
@@ -75,5 +78,6 @@ export function stepBack() {
     if (!back) return;
     game.turn = back;
   }
-  showTurn();
+  // The hold steps back through the turn only, and is a step of its own, so Undo can take it back too.
+  showTurn('turnBack');
 }

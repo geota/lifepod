@@ -8,27 +8,31 @@ import { commit } from './js/actions/commit.js';
 import {
   chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity, undoEdit,
 } from './js/actions/edits.js';
-import { clearPool, spendMana, undoClear } from './js/actions/mana.js';
+import { dismissUndoToast, openHistory, redo, undo } from './js/actions/history.js';
+import { clearPool, spendMana } from './js/actions/mana.js';
 import {
   cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst, skipFirst,
 } from './js/actions/mode.js';
 import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
 import { measureBoard, syncBoardTurn } from './js/layout/board.js';
+import { editingModes } from './js/logic/data.js';
 import { loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
 import { fitAllCompactSwitches } from './js/layout/settings.js';
 import { announceModeEnd } from './js/render/announce.js';
 import { applyBadgeSize, applyStyle, applyTileColours } from './js/render/appearance.js';
 import { setBadgeActions } from './js/render/badges.js';
+import { renderLifeDelta } from './js/render/history.js';
 import { setModeActions } from './js/render/modes.js';
 import { syncPill } from './js/render/pill.js';
 import {
   android, ios, portraitQuery, setReduceTransparency, setTextScale, syncWakeLock, systemTextScale,
 } from './js/state/platform.js';
+import { onBurstChange } from './js/state/history.js';
 import { boardMode, editStartHolders, game, syncBackHandling } from './js/state/state.js';
 import {
-  board, cancelButton, countersButton, damageButton, discardDialog, manaButton, resetZoom, roundBackButton, roundButton,
-  saveButton, shuffleButton, undoButton,
+  board, cancelButton, countersButton, damageButton, discardDialog, manaButton, redoButton, resetZoom, roundBackButton,
+  roundButton, saveButton, shuffleButton, undoButton,
 } from './js/ui/dom.js';
 import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
@@ -55,7 +59,11 @@ manaButton.addEventListener('click', () => setBoardMode('mana'));
 bindStep(roundButton, stepTurn, stepBack);
 roundBackButton.addEventListener('click', stepBack);
 bindRelease(shuffleButton, shuffleFirst);
-undoButton.addEventListener('click', undoEdit);
+// Undo: at rest, back one step through the game, and a hold opens History (MANA-UNDO-SPEC §6.6); in an editing mode, the
+// mode's last edit, held or not. The hidden button beside it redoes, for keyboards and screen readers.
+const editing = () => editingModes.includes(boardMode);
+bindStep(undoButton, () => (editing() ? undoEdit() : undo()), () => (editing() ? undoEdit() : openHistory()));
+redoButton.addEventListener('click', redo);
 saveButton.addEventListener('click', () => {
   commit();
   // Whoever took the initiative in the mode, by commander damage or a tap, ventures into Undercity.
@@ -138,7 +146,9 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
 }));
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.
-setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, undoClear, dismissReminder, setBoardMode });
+setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, dismissReminder, setBoardMode, redo, dismissUndoToast });
+// A total's running delta follows its burst of quick taps (MANA-UNDO-SPEC §6.2b).
+onBurstChange(renderLifeDelta);
 setModeActions({ stepDamage, chooseColour, toggleIdentity, stepCount, toggleDesignation, stepMana, chooseFirst });
 applyTileColours();
 applyBadgeSize();

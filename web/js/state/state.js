@@ -1,6 +1,6 @@
-// What the page holds while it runs: the game, which is what's saved, and the state that isn't saved (SPEC §10.1): the
-// open board mode and its edits, the turn steps a hold steps back through, the turn reminders showing and the pools
-// that "Undo clear" can put back. Module-level lets are read live by importers; only this module writes them.
+// What the page holds while it runs: the game, which is what's saved, with its undo history, and the state that isn't
+// saved (SPEC §10.1): the open board mode and its edits, the turn steps a hold steps back through, the turn reminders
+// showing and the strips being tapped. The history's own unsaved state is in history.js. Module-level lets are read live by importers; only this module writes them.
 
 import { designationKinds, editingModes } from '../logic/data.js';
 import { loadGame } from '../logic/save.js';
@@ -36,8 +36,6 @@ export function openBoardMode(mode) {
 export const turnSteps = [];
 // Turn reminders showing on each tile, by player: designation kind → its timer. Not saved.
 export const shownReminders = new Map();
-// Pools cleared with the eraser in the last 5 seconds, by player, so "Undo clear" can put them back. Not saved.
-export const clearedPools = new Map();
 // Strips being tapped, by player: the colours the strip showed when the taps began, which keep their places (at 0 once
 // spent) until stripHoldTime after the last tap, and that timer. Not saved.
 /** @type {Map<number, { colours: Set<string>, timer: ReturnType<typeof setTimeout> }>} */

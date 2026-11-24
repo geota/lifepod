@@ -262,7 +262,9 @@ async function checkPill(t, engine, style, screens) {
       for (const rotations of pillRotations) {
         const view = `${width} × ${height}, ${count} players, seats ${rotations ? rotations.slice(0, count).join('') : 'as dealt'}`;
         await seedGame(page, pillGame(count, rotations, style));
-        assert.equal(await page.locator('#board-controls .pill-button:not([hidden])').count(), 6, `${view}: the pill is at its widest`);
+        // Every button the pill can hold at rest shows (restPillButtons in web/js/logic/rules.js counts them).
+        const widest = await page.evaluate(async () => (await import('/js/logic/rules.js')).restPillButtons((await import('/js/state/state.js')).game));
+        assert.equal(await page.locator('#board-controls .pill-button:not([hidden])').count(), widest, `${view}: the pill is at its widest`);
         assert.deepEqual(await underPill(page), [], `${view}: nothing is under the pill`);
         // The board modes, at the target and the stress size.
         if ((width === 952 || width === 568) && rotations !== pillRotations[2]) {

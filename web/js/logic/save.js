@@ -7,6 +7,7 @@ import {
   identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, quarterTurns, reminderKinds,
   styleOrder, swatches, tileSetOrder, trackers, turnModes,
 } from './data.js';
+import { emptyHistory, fitHistory } from './history.js';
 
 /** @typedef {import('./data.js').BadgeSize} BadgeSize */
 /** @typedef {import('./data.js').CountKind} CountKind */
@@ -17,6 +18,7 @@ import {
 /** @typedef {import('./data.js').TileSet} TileSet */
 /** @typedef {import('./data.js').Trackers} Trackers */
 /** @typedef {import('./data.js').TurnMode} TurnMode */
+/** @typedef {import('./history.js').History} History */
 
 // One distinct swatch per player. Valid saved choices are kept in seat order. A seat with no choice, or with
 // one already taken, gets its default if that's free and otherwise the first free swatch.
@@ -197,6 +199,7 @@ function fitReminders(saved) {
  * @property {number | null} monarch The monarch's seat, or null for nobody.
  * @property {number | null} initiative The initiative holder's seat, or null for nobody.
  * @property {Reminders} reminders
+ * @property {History} history The undo history (logic/history.js): its steps, oldest first, and how many are applied.
  */
 /**
  * @typedef {object} IdentitySettings
@@ -230,7 +233,7 @@ export function loadGame(read, landscapeAngle) {
     counters: fitTrackers(), .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)]))),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
     manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, shuffleColours: false,
-    badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(),
+    badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(), history: emptyHistory(),
   };
   try {
     const snapshot = read();
@@ -277,6 +280,9 @@ export function loadGame(read, landscapeAngle) {
       monarch: fitSeat(board.monarch, count),
       initiative: fitSeat(board.initiative, count),
       reminders: fitReminders(saved.reminders),
+      // A save from before Undo, or a history that's corrupt, gets an empty one; the game itself is never touched
+      // (fitHistory in history.js).
+      history: fitHistory(saved.history, count),
     };
   } catch {
     return defaults;

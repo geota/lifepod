@@ -15,13 +15,14 @@ import { commit } from './commit.js';
 
 /** @typedef {import('../logic/rules.js').Edit} Edit */
 
-// Colours mode saves each choice at once.
+// Colours mode saves each choice at once. Like identities, it isn't a game step (MANA-UNDO-SPEC §6.3): picked at setup
+// and toggled back, it would flood the history.
 export function chooseColour(index, colour) {
   if (game.colors.includes(colour)) return;
   game.colors[index] = colour;
   paintColours();
   syncAllSwatches();
-  commit();
+  commit({ step: false });
   haptic();
 }
 
@@ -30,7 +31,7 @@ export function toggleIdentity(index, id) {
   const identity = game.identities[index];
   game.identities[index] = identity.includes(id) ? identity.replace(id, '') : normalizeIdentity(identity + id);
   syncIdentity();
-  commit({ badges: [index] });
+  commit({ badges: [index], step: false });
   haptic();
 }
 
@@ -60,7 +61,8 @@ function showEdit(edit) {
     syncCounterCells(player);
     syncManaCells(player);
   }
-  commit({ scores: players, badges: players, pill: true });
+  // A mode's edits stay on its own stack until the mode closes; the history doesn't record them yet.
+  commit({ scores: players, badges: players, pill: true, step: false });
   haptic();
 }
 

@@ -96,11 +96,11 @@ export function hasCountersMode(game) {
   return shownCounters(game).length > 0 || trackedDesignations(game).length > 0;
 }
 
-// How many buttons the pill holds at rest: the round, commander damage, counters and mana when they're on, then dice
-// and setup.
+// How many buttons the pill holds at rest: the round, commander damage, counters and mana when they're on, then Undo,
+// dice and setup.
 /** @param {Game} game */
 export function restPillButtons(game) {
-  return 2 + Number(game.turns !== 'off') + Number(game.counters.commander) + Number(hasCountersMode(game)) + Number(game.manaPool);
+  return 3 + Number(game.turns !== 'off') + Number(game.counters.commander) + Number(hasCountersMode(game)) + Number(game.manaPool);
 }
 
 /**

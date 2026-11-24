@@ -74,6 +74,9 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* app.js places the pill on a seam that only far rows face (design/polish/FINAL-REVIEW.md #1). With 2 players that's the
    middle seam, so the pill stands upright along it, and the round's two copies face the two players. */
 .board-controls[data-vertical] { transform: translate(-50%, -50%) rotate(90deg); }
+/* Where the pill would pass the board's short side, its buttons shrink to 44px (MANA-UNDO-SPEC §6.6): only the upright
+   2-player pill on a 568 × 320 phone, whose seven buttons at rest are 308px of its 320px. measureBoard sets it. */
+.board-controls[data-tight] { --setup-button: var(--tap-min); }
 /* One pill behind the visible buttons, with a divider between neighbours. Each button is a 48px target, or up to
    64px on tablets. app.js shows the buttons each state needs: counters (when a counter is on), dice and setup at rest. */
 .board-controls::before {
@@ -130,9 +133,11 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .save-button:active::before { background: var(--accent-pressed); }
 #board-controls .save-button::after, #board-controls .save-button:not([hidden]) + .pill-button::after { content: none; }
 .pill-button:disabled { opacity: .38; cursor: default; }
+/* Undo at rest with nothing to undo: dimmed like a disabled button, but still a button, so a hold opens History. */
+.pill-button[aria-disabled="true"] > .icon { opacity: .38; }
 /* "Back one turn" for keyboards and screen readers: hidden beside the round button, and shown as a ‹ button there while
    it has keyboard focus. */
-#round-back:focus-visible {
+#round-back:focus-visible, #redo-button:focus-visible {
   position: relative;
   display: grid;
   place-items: center;

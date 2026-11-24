@@ -13,7 +13,8 @@ Go through this before asking for review, beside [AGENTS.md](../AGENTS.md). Each
 - [ ] Every change to `game` is followed by a save and a redraw of everything that reads it: score, badges, pill, mode cells. If a `commit()` helper lands, check that its `dirty` argument names the right tiles.
 - [ ] A new `game` field is in the `Game` typedef, in `loadGame` with a fallback, in `startGame`'s reset or keep list (SPEC §10.2), and in `tests/logic.test.mjs`'s validator and generator.
 - [ ] An old save still loads. If a field's meaning changed, there's a version and a migration, and a test that loads the old shape.
-- [ ] Nothing new that should survive a relaunch is kept outside `game`. Nothing that shouldn't (undo stacks, timers) is put in it.
+- [ ] Nothing new that should survive a relaunch is kept outside `game`. Nothing that shouldn't (the mode edit stacks, open bursts, timers) is put in it; the undo history is, on purpose, so it's written with the game.
+- [ ] A new `game` field is in exactly one of `historyFields` (undo restores it) and `settingsFields` in `logic/data.js`. A game change goes through `commit()`; one that isn't a game step passes `step: false`, and a setting saved without `commit()` rebases the history (`saveGame` in `sheets/options.js`).
 
 **Presses and redraws**
 

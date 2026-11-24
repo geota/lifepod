@@ -5,7 +5,7 @@
 import { clockwiseEdges, faceAngles, faceEdges, seatLayouts } from '../logic/data.js';
 import { restPillButtons, seatGrid, shownCounters, trackedDesignations } from '../logic/rules.js';
 import { isPortraitWindow, readScreen } from '../state/platform.js';
-import { game } from '../state/state.js';
+import { boardMode, game } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
 import { growPixel, layoutStats, requestFit } from './fit.js';
 import { keepLifeEditorInView, placeSettingsSections, settingsDialog, syncSettingsCue } from './settings.js';
@@ -52,8 +52,12 @@ export function measureBoard() {
   // A new player count is measured once its tiles are drawn.
   if (faces.length !== game.scores.length || !board.clientWidth || !board.clientHeight) return;
   const buttons = /** @type {HTMLElement[]} */ ([...boardControls.querySelectorAll('.pill-button')]);
-  const size = Math.max(...buttons.map(button => button.offsetWidth));
   const shown = buttons.filter(button => !button.hidden).length;
+  // The upright 2-player pill takes 44px buttons where its buttons at full size would pass the board's short side
+  // (MANA-UNDO-SPEC §6.6), before anything is read from the pill.
+  const natural = Math.min(64, Math.max(48, 48 * growPixel()));
+  boardControls.toggleAttribute('data-tight', game.scores.length === 2 && Math.max(shown, restPillButtons(game)) * natural > board.clientHeight);
+  const size = Math.max(...buttons.map(button => button.offsetWidth));
   const area = { width: board.clientWidth, height: board.clientHeight, left: board.offsetLeft, top: board.offsetTop };
   /** @type {Tile[]} */
   const tiles = faces.map((face) => {
@@ -68,7 +72,10 @@ export function measureBoard() {
   const grow = growPixel();
   const seamGap = parseFloat(getComputedStyle(board).getPropertyValue('--space-4')) || 16;
   syncBoardDigits();
-  const readings = JSON.stringify([area, size, shown, seamGap, restPillButtons(game), grow, game.reminders.gestures,
+  // Colours mode covers the face with its swatches, which aren't sized for the far edge's clearance as rest content is,
+  // so there a far edge costs what it takes (centreClearance).
+  const farDiscount = boardMode === 'colours' ? 0 : size / 2 + 2;
+  const readings = JSON.stringify([area, size, shown, seamGap, restPillButtons(game), grow, game.reminders.gestures, farDiscount,
     shownCounters(game).length + trackedDesignations(game).length, tiles.map(tile => [tile.edge, tile.left, tile.top, tile.right, tile.bottom, tile.faceWidth, tile.faceHeight])]);
   if (readings === measured) return;
   measured = readings;
@@ -78,7 +85,7 @@ export function measureBoard() {
   // reaches costs only what it reaches past that.
   const farClear = size / 2 + 2;
   const usable = tiles.map((tile) => {
-    const clear = centreClearance(tile, pill, farClear);
+    const clear = centreClearance(tile, pill, farDiscount);
     return { ...tile, clear, width: tile.faceWidth - clear.start - clear.end, height: tile.faceHeight - clear.near - Math.max(0, clear.far - farClear) };
   });
   const farOffsets = farRowOffsets(usable, game.scores.length === 2 ? seamGap : 0);
@@ -156,7 +163,8 @@ function placePill(size, shown, area, tiles) {
 }
 
 // The clearance a face needs from the pill on each of its edges. Where the pill reaches into a tile past two edges (at
-// a corner), clearing the edge it reaches least far past is enough, and the far edge costs least (measureBoard).
+// a corner), clearing the edge it reaches least far past is enough, and the far edge costs least, by the farClear its
+// content already keeps (measureBoard).
 /**
  * @param {Tile} tile
  * @param {{ left: number, right: number, top: number, bottom: number }} pill

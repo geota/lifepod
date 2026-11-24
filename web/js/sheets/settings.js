@@ -248,7 +248,8 @@ function resetList() {
 restartButton.addEventListener('click', () => {
   document.querySelector('#restart-message').textContent = `For ${game.scores.length} players. This resets:`;
   document.querySelector('#restart-resets').replaceChildren(...resetList().map(item => element('li', '', item)));
-  document.querySelector('#restart-keeps').textContent = game.shuffleColours ? 'Settings and seats stay.' : 'Settings, seats and tile colours stay.';
+  // A new game is an undo step (MANA-UNDO-SPEC §6.9, Q5), so the confirmation says how to get the old one back.
+  document.querySelector('#restart-keeps').textContent = `${game.shuffleColours ? 'Settings and seats stay.' : 'Settings, seats and tile colours stay.'} You can undo a new game from the centre.`;
   restart.returnValue = 'cancel';
   showDialog(restart);
 });

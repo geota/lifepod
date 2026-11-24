@@ -391,7 +391,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - **The icon is Mana's untap symbol `\e61b`** (decided): every turn begins by untapping, it's one glyph, and it reads instantly to players.
 - **Both modes:**
   - The pill leads with a round button, the number printed twice like a card index so both sides can read it. Tap does the same as the chip, so anyone can act; hold steps back.
-  - Turn steps save at once and aren't in any mode's Undo.
+  - Turn steps save at once, and each is one step of the game's history (MANA-UNDO-SPEC §6), with the pools it emptied; the hold stays, and is a step of its own. *As built (M4):* an undo or redo of a turn step empties the hold-back buffer, so a hold after it steps back by the play order, as after a relaunch.
   - The last round is 999 (`maxRound`). Play holds there rather than start round 1000: in Rounds the flag stays at 999, and turn by turn the turn stays with the last player before the first player's seat.
   - **Off** hides everything about turns but keeps the state, so switching back on mid-game resumes. Only the Off → on change asks "Who goes first?" again, for a game with no first player.
 
@@ -434,7 +434,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - The turn chip stays in the near row, so it never meets the strip.
   - Strip items are 44px tall:
     - **Tap a symbol to spend 1** of that colour. It saves at once. A colour that reaches 0 keeps its place, dimmed, until 800ms after the strip's last tap, then the strip reflows, so a quick extra tap can't land on whatever would have slid under the finger. The tile's − and + ignore touches for that time too.
-    - **The eraser clears the pool** and leaves "Undo clear" in the strip's place for 5 seconds; a tap restores the pool.
+    - **The eraser clears the pool** as one undo step (MANA-UNDO-SPEC §6.5): Undo in the centre restores it. *As built (M4):* "Undo clear" is retired; the strip holds its place, its colours at 0, for the 800ms after a tap, so a second tap lands on the eraser again and does nothing.
 - **Automatic emptying:**
   - Setting: "Empty mana pools when the turn passes", default on. It's shown while Mana pool is on and Turns isn't Off.
   - Each round step (Rounds) or turn pass (Turn by turn) empties every pool.
@@ -465,11 +465,12 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 - Unchanged: `scores`, `startingLife`, `rotations`, `keepAwake`, `landscapeAngle`, `poison`, `casts`, `identities`, `commanderDamage`.
 - *As built:* each field falls back on its own. `startingLife` must be a whole number from 1 to 999 (`maxStartingLife`, the slider's range), or it's 40. A score that isn't a safe whole number starts at the starting life. Only when `scores` doesn't give a known player count (2–6) does the save get the default 4-player board; the fields that don't depend on the count, such as the settings, are still kept.
 - Changing the player count resizes every array and resets `turn`.
-- Not saved: the mode edit stacks, the "Undo clear" buffer and the hold-back buffer of a turn step.
+- `history` (MANA-UNDO-SPEC §10): `{ v: 1, at, base, steps }`, checked by `fitHistory` in `logic/history.js`; anything wrong drops steps or the whole history, never the game.
+- Not saved: the mode edit stacks and the hold-back buffer of a turn step.
 
 ### 10.2 New game
 
-- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and "Undo clear".
+- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
 - **Opens** "Who goes first?" if Turns isn't Off.
 - **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
 - **Shuffle tile colours each game** (Settings → Table, off by default, `game.shuffleColours`): when on, a new game gives every player a random, distinct swatch instead, from `crypto.getRandomValues` through `randomBelow` (no modulo bias), with each seat in a different colour family of the tile set while families last (`tileSets[…].families`, six per set, found by `design/polish/tiles7.mjs`; TILES.md). `loadGame` keeps it only if it was saved as exactly `true`.

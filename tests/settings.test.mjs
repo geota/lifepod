@@ -391,7 +391,7 @@ for (const [name, engine] of Object.entries(engines)) {
     // It lists what resets, naming only what this game shows, and what stays.
     assert.equal(await page.locator('#restart-message').textContent(), 'For 4 players. This resets:');
     assert.deepEqual(await page.locator('#restart-resets li').allTextContents(), ['Life totals, back to 40', 'Colour identities']);
-    assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings, seats and tile colours stay.');
+    assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings, seats and tile colours stay. You can undo a new game from the centre.');
     // Discard's style: the destructive action in the danger tint, and Cancel the focused primary.
     assert.equal(await page.locator('#restart button[value="restart"]').getAttribute('class'), 'secondary danger');
     assert.equal(await page.locator('#restart button[value="cancel"]').getAttribute('class'), 'primary');
@@ -424,7 +424,7 @@ for (const [name, engine] of Object.entries(engines)) {
       'Life totals, back to 30', 'Counters and commander tax', 'Commander damage', 'Floating mana', 'Turns, back to round 1',
       'The monarch and the initiative', 'Colour identities', 'Tile colours, shuffled',
     ]);
-    assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings and seats stay.');
+    assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings and seats stay. You can undo a new game from the centre.');
     assert.equal(await page.locator('#restart').getAttribute('aria-describedby'), 'restart-message restart-resets restart-keeps');
   });
 }

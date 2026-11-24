@@ -11,6 +11,7 @@ import { announceMode, announceModeEnd, clearAnnouncements, seatName } from '../
 import { renderBadges } from '../render/badges.js';
 import { renderModeLayer } from '../render/modes.js';
 import { syncPill } from '../render/pill.js';
+import { clearToasts, closeBursts } from '../state/history.js';
 import { haptic, reducedMotion } from '../state/platform.js';
 import {
   boardMode, editStartHolders, edits, game, openBoardMode, syncBackHandling, turnSteps,
@@ -19,7 +20,6 @@ import { board, boardControls, discardDialog, icon, setupButton } from '../ui/do
 import { cancelPresses } from '../ui/press.js';
 import { commit } from './commit.js';
 import { showDialog } from './dialog.js';
-import { endUndoClears } from './mana.js';
 import { turnStarted } from './reminders.js';
 
 /** @typedef {import('../logic/data.js').BoardMode} BoardMode */
@@ -51,7 +51,7 @@ export function chooseFirst(index) {
   game.turn.first = index;
   game.turn.active = index;
   turnSteps.length = 0;
-  commit();
+  commit({ step: { kind: 'first' } });
   haptic();
   board.dataset.picked = '';
   [...board.children].forEach((player, seat) => player.toggleAttribute('data-lit', seat === index));
@@ -70,8 +70,8 @@ export function skipFirst() {
   if (game.turn.first === null) {
     game.turn = fitTurn(null, game.scores.length);
     turnSteps.length = 0;
-    // Saved now; closing the mode redraws the tiles and the pill.
-    commit();
+    // Saved now; closing the mode redraws the tiles and the pill. A skip that changes nothing records nothing.
+    commit({ step: { kind: 'first' } });
   }
   setBoardMode(null);
 }
@@ -118,8 +118,10 @@ export function setBoardMode(mode) {
   clearTimeout(shuffleTimer);
   for (const flag of ['data-picked', 'data-shuffling']) board.removeAttribute(flag);
   for (const player of board.children) player.removeAttribute('data-lit');
-  // Opening mana mode settles any "Undo clear": the cleared pool stays empty.
-  if (mode === 'mana') endUndoClears();
+  // A mode is a context of its own: opening or closing one ends every burst of quick taps (MANA-UNDO-SPEC §6.2a), and
+  // an undo's toasts go.
+  closeBursts();
+  clearToasts();
   openBoardMode(mode);
   [...board.children].forEach((player, index) => {
     player.querySelector('.controls').inert = mode !== null;
@@ -185,7 +187,7 @@ export function cancelEditing() {
 export function discardEdits() {
   const changes = /** @type {Edit[]} */ (edits);
   while (changes.length) applyEdit(game, /** @type {Edit} */ (changes.pop()), -1);
-  commit({ scores: 'all' });
+  commit({ scores: 'all', step: false });
   setBoardMode(null);
   // What the discarded changes said is no longer true.
   clearAnnouncements();
