@@ -27,29 +27,24 @@ const sweep = {
   '952 × 427': [952, 427], '852 × 393': [852, 393], '640 × 360': [640, 360], '568 × 320': [568, 320],
   '375 × 667': [375, 667], '320 × 568': [320, 568], '841 × 701': [841, 701], '1366 × 1024': [1366, 1024],
 };
-// Where the pill takes Track with everything on, by size and player count, and where even Track needs 44px buttons;
-// then the same with card lookup's magnifier counted as a fourth tool (the card-lookup branch).
+// Where the pill takes Track with everything on, by size and player count, and where even Track needs 44px buttons,
+// with its four tools: Undo, card lookup's magnifier, the dice and settings.
 const collapses = {
-  '640 × 360': [3], '568 × 320': [2, 3], '375 × 667': [3], '320 × 568': [2, 3], '841 × 701': [3],
-};
-const tight = { '568 × 320': [3], '320 × 568': [3] };
-const collapsesWithLookup = {
   '640 × 360': [2, 3], '568 × 320': [2, 3, 5], '375 × 667': [2, 3], '320 × 568': [2, 3, 5], '841 × 701': [3],
 };
+const tight = { '568 × 320': [3], '320 × 568': [3] };
 
 // What the pill is now: its form, its buttons, and its box against the board's.
 function readPill(page) {
   return page.evaluate(async () => {
     const { pillCollapsed, pillRoom } = await import('/js/layout/board.js');
-    const { pillFit } = await import('/js/logic/rules.js');
-    const { pillTools } = await import('/js/logic/data.js');
     const { game } = await import('/js/state/state.js');
     const controls = document.querySelector('#board-controls');
     const buttons = [...controls.querySelectorAll('.pill-button')].filter(node => !node.hidden && node.checkVisibility());
     const box = controls.getBoundingClientRect();
     const board = document.querySelector('#board').getBoundingClientRect();
     return {
-      collapsed: pillCollapsed, tight: controls.hasAttribute('data-tight'), lookup: pillFit(game, pillRoom.room, pillRoom.natural, pillTools + 1).collapsed,
+      collapsed: pillCollapsed, tight: controls.hasAttribute('data-tight'),
       track: !document.querySelector('#track-button').hidden, modes: ['damage', 'counters', 'mana'].filter(mode => !document.querySelector(`#${mode}-button`).hidden),
       tabs: [...controls.querySelectorAll('[role="tab"]')].filter(tab => !tab.hidden).map(tab => tab.dataset.tab),
       count: buttons.length, smallest: Math.min(...buttons.flatMap(node => [node.offsetWidth, node.offsetHeight])),
@@ -73,12 +68,11 @@ for (const [name, engine] of Object.entries(engines)) {
         const rest = await readPill(page);
         const collapsed = collapses[size]?.includes(count) ?? false;
         const shrunk = tight[size]?.includes(count) ?? false;
-        found[view] = { collapsed: rest.collapsed, tight: rest.tight, lookup: rest.lookup };
+        found[view] = { collapsed: rest.collapsed, tight: rest.tight };
         assert.equal(rest.collapsed, collapsed, `${view}: ${collapsed ? 'Track' : 'three buttons'}`);
         assert.equal(rest.tight, shrunk, `${view}: ${shrunk ? '44px' : 'full-size'} buttons`);
-        assert.equal(rest.lookup, collapsesWithLookup[size]?.includes(count) ?? false, `${view}, with the magnifier: ${rest.lookup ? 'Track' : 'three buttons'}`);
         assert.deepEqual({ track: rest.track, modes: rest.modes }, collapsed ? { track: true, modes: [] } : { track: false, modes: ['damage', 'counters', 'mana'] }, `${view}: the pill's buttons`);
-        assert.equal(rest.count, collapsed ? 5 : 7, `${view}: the round, ${collapsed ? 'Track' : 'three modes'}, Undo, dice and settings`);
+        assert.equal(rest.count, collapsed ? 6 : 8, `${view}: the round, ${collapsed ? 'Track' : 'three modes'}, Undo, the magnifier, dice and settings`);
         assert.ok(rest.smallest >= (shrunk ? 43.5 : 47.5), `${view}: ${rest.smallest}px buttons`);
         assert.ok(rest.inside, `${view}: the pill is inside the board`);
         if (!shrunk) assert.ok(rest.length <= rest.room + 0.5, `${view}: the pill (${rest.length}px) fits its seam (${rest.room}px)`);

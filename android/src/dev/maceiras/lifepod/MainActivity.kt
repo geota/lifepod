@@ -309,7 +309,8 @@ class MainActivity : Activity() {
             val mimeType = path?.let { MIME_TYPES[it.substringAfterLast('.', "")] }
             if (path != null && mimeType != null) {
                 try {
-                    val encoding = if (mimeType == "image/png" || mimeType.startsWith("font/")) null else "UTF-8"
+                    val binary = mimeType == "image/png" || mimeType == "application/gzip" || mimeType.startsWith("font/")
+                    val encoding = if (binary) null else "UTF-8"
                     return WebResourceResponse(mimeType, encoding, assets.open(path))
                 } catch (_: IOException) {
                     // Treat a missing asset like an unavailable URL.
@@ -356,7 +357,8 @@ class MainActivity : Activity() {
 
         // The types of file the app serves from web/, by extension; keep it in step with mimeTypes in
         // ios/LifePodApp.swift. Scripts are text/javascript: the WebView runs a module script only with a JavaScript
-        // type.
+        // type. Card lookup's data is gzip, which the page unpacks itself, so it's served as is, with no
+        // Content-Encoding; aapt2 stores .gz files without compressing them again.
         val MIME_TYPES =
             mapOf(
                 "html" to "text/html",
@@ -368,6 +370,7 @@ class MainActivity : Activity() {
                 "svg" to "image/svg+xml",
                 "woff2" to "font/woff2",
                 "txt" to "text/plain",
+                "gz" to "application/gzip",
             )
     }
 }

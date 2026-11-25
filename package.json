@@ -1,6 +1,7 @@
 {
   "name": "lifepod",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "lint": "npm run lint:web && npm run lint:android && npm run lint:ios",
@@ -15,7 +16,8 @@
     "preview": "node scripts/preview.mjs",
     "store:images": "node store/render.mjs",
     "screenshots:readme": "node scripts/readme-screenshots.mjs",
-    "font:subset": "node scripts/subset-mana.mjs"
+    "font:subset": "node scripts/subset-mana.mjs",
+    "cards:update": "node scripts/cards-update.mjs"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

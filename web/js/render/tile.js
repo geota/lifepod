@@ -36,7 +36,7 @@ export function inColourOf(node, player) {
 }
 
 // The colour indicator printed on cards: one disc split into the identity's colours.
-function colourIndicator(identity) {
+export function colourIndicator(identity) {
   const indicator = element('span', 'ci');
   indicator.dataset.ci = identity;
   indicator.dataset.count = identity.length;

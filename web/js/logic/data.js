@@ -93,9 +93,9 @@ export const trackTabInfo = {
   counters: { name: 'Counters', words: 'counters', discard: ['counters'] },
   mana: { name: 'Mana pool', words: 'mana', discard: ['mana pools'] },
 };
-// The pill's tools, the buttons after the modes that show at rest whatever is on: Undo, the dice and settings. A new
-// tool, such as card lookup's magnifier, counts here, and the pill's fit (pillFit in logic/rules.js) follows.
-export const pillTools = 3;
+// The pill's tools, the buttons after the modes that show at rest whatever is on: Undo, card lookup's magnifier, the
+// dice and settings. The pill's fit (pillFit in logic/rules.js) follows the count.
+export const pillTools = 4;
 // The pill stands this far clear of each end of the seam it sits on.
 export const pillMargin = 4;
 // Player counters (design/polish/SPEC.md §6), in the order they appear everywhere: counters mode, the near badge row,

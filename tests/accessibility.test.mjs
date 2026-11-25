@@ -321,7 +321,7 @@ for (const [name, engine] of Object.entries(engines)) {
       assert.deepEqual(body, { scrolls: true, overflow: 'auto' }, 'settings scrolls');
       assert.equal(await page.locator('#settings').evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth), true, 'and never sideways');
       await page.keyboard.press('Escape');
-      for (const [opener, dialog] of [['Roll dice', '#dice']]) {
+      for (const [opener, dialog] of [['Roll dice', '#dice'], ['Card lookup', '#cards']]) {
         await button(page, opener).click();
         const fits = await page.locator(dialog).evaluate((node) => {
           const box = node.getBoundingClientRect();

@@ -7,7 +7,7 @@
        only settings and the dialogs zoom, and closing one puts the scale back (resetZoom in js/ui/dom.js). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111213">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <title>LifePod</title>
   <link rel="icon" href="favicon-32.png" sizes="32x32">
   <link rel="icon" href="icon.png" sizes="192x192">
@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="css/modes.css">
   <link rel="stylesheet" href="css/badges.css">
   <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/cards.css">
   <link rel="stylesheet" href="css/dice.css">
   <script src="dice.js" defer></script>
   <script src="app.js" type="module"></script>
@@ -50,6 +51,7 @@
            while it has keyboard focus. -->
       <button class="pill-button" type="button" id="undo-button" aria-label="Undo"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z"/></svg></button>
       <button class="visually-hidden" type="button" id="redo-button"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg></button>
+      <button class="pill-button" type="button" id="lookup-button" aria-label="Card lookup" aria-haspopup="dialog"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></svg></button>
       <button class="pill-button" type="button" id="dice-button" aria-label="Roll dice" aria-haspopup="dialog"><span class="icon mana-icon" data-glyph="d20" aria-hidden="true"></span></button>
       <button class="pill-button" type="button" id="setup-button" aria-label="Settings" aria-haspopup="dialog">
         <span class="setup-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M40,92H70.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24H137.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24Zm64-24A12,12,0,1,1,92,80,12,12,0,0,1,104,68Zm112,96H201.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24h94.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24Zm-48,24a12,12,0,1,1,12-12A12,12,0,0,1,168,188Z"/></svg></span>
@@ -128,6 +130,37 @@
       </div>
       <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </div>
+  </dialog>
+
+  <!-- Card lookup (js/sheets/cards.js), behind the pill's magnifier: every paper card's rules text, from Scryfall,
+       loaded the first time it opens. The search field is a combobox over the results; arrows move through them and Enter
+       opens one. Narrow, the card replaces the results; wide, it sits beside them. -->
+  <dialog id="cards" aria-labelledby="cards-title">
+    <div class="sheet cards-sheet" id="cards-sheet" data-view="list">
+      <div class="sheet-header">
+        <h2 id="cards-title">Card lookup</h2>
+        <button class="close" type="button" data-close aria-label="Close card lookup"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+      </div>
+      <div class="card-search">
+        <label class="card-field">
+          <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></svg>
+          <span class="visually-hidden">Search cards</span>
+          <input type="search" id="card-query" placeholder="Card name" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="card-results" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+        </label>
+        <button class="secondary card-text-toggle" type="button" id="card-text" aria-pressed="false">Rules text</button>
+      </div>
+      <p class="card-status" id="card-status" aria-hidden="true"></p>
+      <div class="card-body" id="card-body">
+        <div class="card-results" id="card-results" role="listbox" aria-label="Cards"></div>
+        <article class="card-panel" id="card-panel" aria-labelledby="card-name">
+          <button class="secondary card-back" type="button" id="card-back"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z"/></svg>Results</button>
+          <div class="card-sheet" id="card-sheet"></div>
+        </article>
+      </div>
+      <p class="card-credit">Card data from Scryfall, <span data-cards-date>23 November 2026</span></p>
+      <p class="visually-hidden" id="card-count" aria-live="polite"></p>
+    </div>
+    <p class="visually-hidden" data-announcer aria-live="polite"></p>
   </dialog>
 
   <!-- Settings (design/polish/SETTINGS-SPEC.md): one full-screen page, facing the phone rather than the board. The header
@@ -362,6 +395,7 @@
               <h4>Credits</h4>
               <p>LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>
               <p>Mana symbols from the Mana font by Andrew Gioia, under the SIL Open Font License 1.1.</p>
+              <p>Card data from Scryfall (scryfall.com), updated <span data-cards-date>23 November 2026</span>. LifePod isn't produced by or endorsed by Scryfall.</p>
             </div>
           </section>
         </div>

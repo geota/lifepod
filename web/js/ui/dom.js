@@ -6,6 +6,7 @@ export const playerTemplate = /** @type {HTMLTemplateElement} */ (document.query
 export const boardControls = /** @type {HTMLDivElement} */ (document.querySelector('#board-controls'));
 export const setupButton = /** @type {HTMLButtonElement} */ (document.querySelector('#setup-button'));
 export const diceButton = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-button'));
+export const lookupButton = /** @type {HTMLButtonElement} */ (document.querySelector('#lookup-button'));
 export const damageButton = /** @type {HTMLButtonElement} */ (document.querySelector('#damage-button'));
 export const countersButton = /** @type {HTMLButtonElement} */ (document.querySelector('#counters-button'));
 export const roundButton = /** @type {HTMLButtonElement} */ (document.querySelector('#round-button'));

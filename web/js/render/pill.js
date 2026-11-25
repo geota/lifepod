@@ -9,8 +9,9 @@ import {
 } from '../logic/rules.js';
 import { boardMode, editStart, game } from '../state/state.js';
 import {
-  boardControls, cancelButton, countersButton, damageButton, diceButton, manaButton, redoButton, roundBackButton,
-  roundButton, saveButton, setupButton, shuffleButton, trackButton, trackTabButtons, trackTabList, undoButton,
+  boardControls, cancelButton, countersButton, damageButton, diceButton, lookupButton, manaButton, redoButton,
+  roundBackButton, roundButton, saveButton, setupButton, shuffleButton, trackButton, trackTabButtons, trackTabList,
+  undoButton,
 } from '../ui/dom.js';
 
 /** @typedef {import('../logic/data.js').TrackTab} TrackTab */
@@ -24,7 +25,7 @@ export function trackShown() {
   return pillCollapsed && trackTabs(game).length > 1;
 }
 
-// The centre pill: the round, commander damage, counters and mana (or Track), Undo, dice and setup at rest; Track's
+// The centre pill: the round, commander damage, counters and mana (or Track), Undo, card lookup, dice and setup at rest; Track's
 // tabs, Undo, save and ✕ while editing.
 export function syncPill() {
   // A form the board asked for while a mode was open is taken now that the board is at rest.
@@ -41,6 +42,7 @@ export function syncPill() {
   trackTabList.hidden = !editing || !track;
   // Each tab hides with its list, so the pill counts only the buttons it shows.
   for (const tab of trackTabButtons) tab.hidden = trackTabList.hidden || !trackTabs(game).includes(/** @type {TrackTab} */ (tab.dataset.tab));
+  lookupButton.hidden = boardMode !== null;
   diceButton.hidden = boardMode !== null;
   setupButton.hidden = editing || first;
   shuffleButton.hidden = !first;

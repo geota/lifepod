@@ -168,6 +168,12 @@ const modes = {
     await click(page, '#settings-close');
   },
   dice: page => click(page, '#dice-button'),
+  // Card lookup, with results for "sol" listed.
+  cards: async (page) => {
+    await click(page, '#lookup-button');
+    await page.locator('#card-query').fill('sol');
+    await page.waitForFunction(() => document.querySelector('#card-results').children.length > 0);
+  },
   // Turn reminders on every tile, the monarch's and the initiative's in turn (remind() from the page's modules).
   reminders: page => page.evaluate(inPage(remindersJs)),
   // Settings (design/polish/SETTINGS-SPEC.md): at the top, scrolled to the end, with a new game pending, with the life
@@ -308,8 +314,9 @@ function audit() {
     if (!box.width) continue;
     const frame = tileOf(el) ?? el.closest('dialog') ?? document.documentElement;
     let frameBox = frame === document.documentElement ? { left: 0, top: 0, right: innerWidth, bottom: innerHeight } : rect(frame);
-    // The settings body scrolls, so text above or below the part in view isn't cut off; only its sideways fit counts.
-    const scroller = el.closest('.fs-body');
+    // The settings body and card lookup's lists scroll, so text above or below the part in view isn't cut off; only its
+    // sideways fit counts.
+    const scroller = el.closest('.fs-body, .card-results, .card-sheet');
     if (scroller) frameBox = { left: rect(scroller).left, right: rect(scroller).right, top: -Infinity, bottom: Infinity };
     // A sheet that scrolls with a cue at the bottom (About) shows the rest when scrolled; that's covered by the scroll check.
     const cued = frame.matches?.('dialog') && frame.querySelector('.scroll-cue[data-more]') && box.left >= frameBox.left - 1 && box.right <= frameBox.right + 1;
@@ -592,7 +599,7 @@ async function shots() {
   );
   // Glass: the board, a mode, settings and the dialogs, at the target and the stress size.
   for (const size of ['target', 'stress']) {
-    for (const mode of ['rest', 'counters', 'identity', 'settings', 'settings-end', 'dice', 'new-game']) list.push({ size, count: 4, seed: 'everything', mode, style: 'glass' });
+    for (const mode of ['rest', 'counters', 'identity', 'settings', 'settings-end', 'dice', 'cards', 'new-game']) list.push({ size, count: 4, seed: 'everything', mode, style: 'glass' });
   }
   const bySize = Object.groupBy(list, s => s.size);
   const report = [];
@@ -642,7 +649,7 @@ async function shots() {
 // the seed can show, measured but not saved as screenshots.
 async function sweep() {
   const boardModes = ['rest', 'damage', 'counters', 'mana', 'colours', 'identity', 'rotate', 'first', 'reminders'];
-  const dialogModes = ['dice', 'settings', 'settings-end', 'settings-pending', 'settings-edit', 'settings-flipped', 'new-game', 'discard'];
+  const dialogModes = ['dice', 'settings', 'settings-end', 'settings-pending', 'settings-edit', 'settings-flipped', 'new-game', 'discard', 'cards'];
   let runs = 0;
   await Promise.all(Object.keys(sizes).flatMap(size => styles.map(async (style) => {
     const page = await openSize(size);

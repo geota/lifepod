@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { button, engines, faceBoxes, openPage, savedGame, test, tileProblems } from './helpers.mjs';
+import { button, engines, faceBoxes, openFromPill, openPage, savedGame, test, tileProblems } from './helpers.mjs';
 
 // Centring (design/polish/SPEC.md §3.1): a tile keeps clear of the centre pill only on the edges the pill actually
 // reaches, as measured (--clear-far, --clear-end, --clear-near and --clear-start), and centres everything else in what's
@@ -68,8 +68,8 @@ function centringProblems(faces, { far = false, layer = false } = {}) {
 // The seat turns checked: as dealt, each seat turned a different way, and every seat turned to face across the table.
 const rotationSets = [[0, 0, 0, 0, 0, 0], [1, 2, 3, 0, 1, 3], [2, 2, 2, 2, 2, 2]];
 const modes = [
-  ['damage', page => button(page, 'Commander damage').tap()],
-  ['counters', page => button(page, 'Counters').tap()],
+  ['damage', page => openFromPill(page, 'damage')],
+  ['counters', page => openFromPill(page, 'counters')],
   ['colours', async (page) => {
     await button(page, 'Settings').tap();
     await button(page, 'Choose tile colours on the board').tap();

@@ -1,0 +1,195 @@
+/* Card lookup, behind the pill's magnifier: the search field, the results, the card as text, the mana symbols in costs
+   and rules text, and the compact layout for a short view or an open keyboard. */
+
+/* The sheet is a fixed size, so the list doesn't jump as results come and go: up to 880 × 680, inside the window.
+   The lists scroll inside it, and the sheet itself never does. */
+#cards { width: min(880px, calc(100% - 32px)); max-width: none; height: min(680px, calc(100% - 24px)); overflow: hidden; }
+#cards .cards-sheet {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "header" "search" "status" "body" "credit";
+  gap: var(--space-2);
+  height: 100%;
+  padding: var(--space-3) var(--space-4);
+  container: cards / inline-size;
+}
+.cards-sheet .sheet-header { grid-area: header; }
+.card-search { grid-area: search; display: flex; gap: var(--space-2); min-width: 0; }
+.card-field { position: relative; flex: 1; min-width: 0; }
+.card-field > .icon { position: absolute; top: 50%; left: 14px; width: 18px; height: 18px; color: var(--muted); transform: translateY(-50%); pointer-events: none; }
+/* 16px at least, or iOS zooms the page when the field takes focus. */
+.card-field input {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3) 0 42px;
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--button-radius);
+  background: var(--control-fill);
+  color: var(--text);
+  font-size: max(16px, var(--rem));
+  -webkit-appearance: none;
+  appearance: none;
+}
+.card-field input::placeholder { color: var(--muted); opacity: 1; }
+.card-field input::-webkit-search-decoration { -webkit-appearance: none; }
+.card-text-toggle { flex: none; padding-inline: var(--space-4); font-size: var(--type-label); white-space: nowrap; }
+.card-text-toggle[aria-pressed="true"] { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); box-shadow: var(--chosen-ring); }
+.card-status { grid-area: status; min-height: 1.35em; color: var(--muted); font-size: var(--type-small); }
+.card-credit { grid-area: credit; color: var(--muted); font-size: var(--type-small); }
+
+/* Results and the card share the body: one at a time when narrow, side by side when wide. Narrow, an open card takes
+   the search row's and the credit's place too, so a short phone has room for its text; Results brings them back. */
+.card-body { grid-area: body; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
+.cards-sheet[data-view="card"] :is(.card-results, .card-search, .card-status, .card-credit), .cards-sheet[data-view="list"] .card-panel { display: none; }
+.card-results { position: relative; display: grid; align-content: start; gap: 4px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 4px; }
+.card-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "name cost" "type type";
+  align-items: center;
+  align-content: center;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the grid gap, not multi-column layout, which the partial note is about. */
+  column-gap: var(--space-2);
+  min-height: 52px;
+  padding: 6px var(--space-3);
+  border-radius: var(--row-radius);
+  background: var(--row-fill);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  /* A row is a control: a long press or a quick second tap opens the card rather than selecting a word of it. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+.card-row:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
+.card-row[aria-selected="true"] { background: var(--chosen-fill); box-shadow: var(--chosen-ring); }
+/* A long name or type line wraps rather than being cut short, on a small phone or with large text. */
+.card-row-name { grid-area: name; min-width: 0; font-size: calc(.9375 * var(--rem)); font-weight: var(--weight-semibold); line-height: 1.25; overflow-wrap: anywhere; }
+.card-row[aria-selected="true"] .card-row-name { color: var(--chosen-ink); }
+.card-row > .card-cost { grid-area: cost; }
+.card-row-type { grid-area: type; min-width: 0; color: var(--muted); font-size: var(--type-small); line-height: 1.25; overflow-wrap: anywhere; }
+
+/* The card: text on the page's background, like the dice stage, in a rounded panel that scrolls on its own. */
+.card-panel { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }
+.card-back { flex: none; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; padding-inline: var(--space-3) var(--space-4); font-size: var(--type-label); }
+.card-back .icon { width: 16px; height: 16px; }
+.card-sheet {
+  position: relative;
+  display: grid;
+  flex: 0 1 auto;
+  gap: var(--space-3);
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--card-radius);
+  background: var(--background);
+}
+.card-sheet h4 { margin: 0; }
+.card-sheet:empty { display: none; }
+.card-head, .card-face-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+.card-name { font-size: calc(1.25 * var(--rem)); font-weight: var(--weight-heavy); letter-spacing: -.015em; outline: none; }
+.card-name:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.card-face { display: grid; gap: var(--space-2); }
+.card-face + .card-face { padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.card-face-name { font-size: calc(1.0625 * var(--rem)); font-weight: var(--weight-heavy); }
+.card-type { color: var(--text-soft); font-size: var(--type-label); font-weight: var(--weight-semibold); }
+.card-text { display: grid; gap: .45em; line-height: 1.45; }
+.card-text .reminder { color: var(--muted); }
+.card-stats { justify-self: end; padding: 2px var(--space-3); border-radius: var(--radius-full); background: var(--raised); font-weight: var(--weight-heavy); font-variant-numeric: tabular-nums; }
+.card-facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--muted); font-size: var(--type-label); }
+.card-facts .ci { font-size: 1.25em; }
+.card-banned { color: var(--danger-text); font-weight: var(--weight-semibold); }
+
+/* Wide: the results on the left, the card on the right, with no Back. */
+@container cards (min-width: 620px) {
+  .card-body { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3); }
+  .cards-sheet[data-view] .card-results { position: relative; display: grid; }
+  .cards-sheet[data-view] .card-search { display: flex; }
+  .cards-sheet[data-view] :is(.card-status, .card-credit) { display: block; }
+  .cards-sheet[data-view] .card-panel { display: flex; }
+  .card-back { display: none; }
+  .card-sheet:empty { display: grid; place-items: center; min-height: 160px; }
+  .card-sheet:empty::before { color: var(--muted); content: 'Choose a card to read it'; font-size: var(--type-label); }
+}
+
+/* Short: an open keyboard on a landscape phone. The title and the credit give way, and ✕ joins the field. */
+#cards[data-compact] { height: calc(100% - 12px); }
+#cards[data-compact] .cards-sheet {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: "search close" "status status" "body body";
+  gap: 2px var(--space-2);
+  padding: 6px var(--space-2);
+}
+/* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the partial notes are about buttons and other semantic elements losing their role; this is a plain div. */
+#cards[data-compact] .cards-sheet .sheet-header { display: contents; }
+#cards[data-compact] .cards-sheet :is(.sheet-header h2, .card-credit) { display: none; }
+#cards[data-compact] .cards-sheet .close { grid-area: close; }
+#cards[data-compact] .card-status { min-height: 0; line-height: 1.2; }
+#cards[data-compact] .card-row { min-height: var(--tap-min); padding-block: 2px; }
+/* iOS shrinks only the visual viewport for its keyboard, so the sheet is placed in what's left (js/sheets/cards.js). */
+#cards[data-keyboard] { height: calc(var(--view-height, 100%) - 12px); margin: calc(var(--view-top, 0px) + 6px) auto auto; }
+
+/* Mana symbols in costs and rules text. A cost is a row of discs; in text they sit on the line. The coloured discs and
+   their glyphs are in badges.css (.pip, data-pip W U B R G C); these add the numbers, X, tap and the rest, hybrids
+   split diagonally like Mana's own cost style, and Phyrexian mana's phi on the colour. */
+.card-cost { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: end; gap: 2px; font-size: var(--rem); }
+.card-cost .pip { --pip-size: 1.15em; }
+.cost-divider { padding-inline: 2px; color: var(--muted); font-size: var(--type-small); }
+.card-text .pip { --pip-size: 1.05em; display: inline-grid; margin-inline: .06em; vertical-align: -.17em; }
+.sym-text { color: var(--muted); font-size: .85em; }
+.pip[data-pip="0"] { --pip: var(--pip-c); --glyph: '\e605'; }
+.pip[data-pip="1"] { --pip: var(--pip-c); --glyph: '\e606'; }
+.pip[data-pip="2"] { --pip: var(--pip-c); --glyph: '\e607'; }
+.pip[data-pip="3"] { --pip: var(--pip-c); --glyph: '\e608'; }
+.pip[data-pip="4"] { --pip: var(--pip-c); --glyph: '\e609'; }
+.pip[data-pip="5"] { --pip: var(--pip-c); --glyph: '\e60a'; }
+.pip[data-pip="6"] { --pip: var(--pip-c); --glyph: '\e60b'; }
+.pip[data-pip="7"] { --pip: var(--pip-c); --glyph: '\e60c'; }
+.pip[data-pip="8"] { --pip: var(--pip-c); --glyph: '\e60d'; }
+.pip[data-pip="9"] { --pip: var(--pip-c); --glyph: '\e60e'; }
+.pip[data-pip="10"] { --pip: var(--pip-c); --glyph: '\e60f'; }
+.pip[data-pip="11"] { --pip: var(--pip-c); --glyph: '\e610'; }
+.pip[data-pip="12"] { --pip: var(--pip-c); --glyph: '\e611'; }
+.pip[data-pip="13"] { --pip: var(--pip-c); --glyph: '\e612'; }
+.pip[data-pip="14"] { --pip: var(--pip-c); --glyph: '\e613'; }
+.pip[data-pip="15"] { --pip: var(--pip-c); --glyph: '\e614'; }
+.pip[data-pip="16"] { --pip: var(--pip-c); --glyph: '\e62a'; }
+.pip[data-pip="17"] { --pip: var(--pip-c); --glyph: '\e62b'; }
+.pip[data-pip="18"] { --pip: var(--pip-c); --glyph: '\e62c'; }
+.pip[data-pip="19"] { --pip: var(--pip-c); --glyph: '\e62d'; }
+.pip[data-pip="20"] { --pip: var(--pip-c); --glyph: '\e62e'; }
+.pip[data-pip="100"] { --pip: var(--pip-c); --glyph: '\e900'; }
+.pip[data-pip="1000000"] { --pip: var(--pip-c); --glyph: '\e901'; }
+.pip[data-pip="½"] { --pip: var(--pip-c); --glyph: '\e902'; }
+.pip[data-pip="∞"] { --pip: var(--pip-c); --glyph: '\e903'; }
+.pip[data-pip="X"] { --pip: var(--pip-c); --glyph: '\e615'; }
+.pip[data-pip="Y"] { --pip: var(--pip-c); --glyph: '\e616'; }
+.pip[data-pip="Z"] { --pip: var(--pip-c); --glyph: '\e617'; }
+.pip[data-pip="S"] { --pip: var(--pip-c); --glyph: '\e619'; }
+.pip[data-pip="H"] { --pip: var(--pip-c); --glyph: '\e618'; }
+/* Tap is the modern arrow printed since Eighth Edition, not the old-school T (U+E61C) the pill can use. */
+.pip[data-pip="T"] { --pip: var(--pip-c); --glyph: '\e61a'; }
+.pip[data-pip="Q"] { --pip: var(--pip-c); --glyph: '\e61b'; }
+.pip[data-second] { position: relative; background: linear-gradient(135deg, var(--pip) 50%, var(--pip-2) 50%); }
+.pip[data-second]::before, .pip[data-second]::after { position: absolute; font: normal normal normal calc(var(--pip-size) * .48)/1 Mana; speak: never; }
+.pip[data-second]::before { top: 9%; left: 11%; }
+.pip[data-second]::after { right: 11%; bottom: 9%; content: var(--glyph-2); }
+.pip[data-second="W"] { --pip-2: var(--pip-w); --glyph-2: '\e600'; }
+.pip[data-second="U"] { --pip-2: var(--pip-u); --glyph-2: '\e601'; }
+.pip[data-second="B"] { --pip-2: var(--pip-b); --glyph-2: '\e602'; }
+.pip[data-second="R"] { --pip-2: var(--pip-r); --glyph-2: '\e603'; }
+.pip[data-second="G"] { --pip-2: var(--pip-g); --glyph-2: '\e604'; }
+.pip[data-second="C"] { --pip-2: var(--pip-c); --glyph-2: '\e904'; }
+.pip[data-phyrexian] { --glyph: '\e618'; --glyph-2: '\e618'; }
+/* Symbols printed without a disc: energy, tickets, acorns, chaos, paw prints, and the legendary and land-drop marks. */
+.sym { display: inline-block; font: normal normal normal 1.1em/1 Mana; vertical-align: -.12em; }
+.sym::before { content: var(--glyph); speak: never; }
+.sym[data-sym="E"] { --glyph: '\e907'; }
+.sym[data-sym="TK"] { --glyph: '\e9c4'; }
+.sym[data-sym="A"] { --glyph: '\e929'; }
+.sym[data-sym="CHAOS"] { --glyph: '\e61d'; }
+.sym[data-sym="P"] { --glyph: '\ea32'; }
+.sym[data-sym="L"] { --glyph: '\ea2d'; }
+.sym[data-sym="D"] { --glyph: '\ea2e'; }

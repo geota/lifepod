@@ -1,6 +1,6 @@
 // LifePod's entry point, the page's one module script (index.html). It loads the modules under js/ (AGENTS.md, "Modules"),
 // whose dependencies run one way: logic → state → layout → render → actions → sheets → here. Importing the sheets wires
-// the settings page and the dice sheet; this file wires the pill's other buttons, back and Escape, the window and the
+// the settings page, the dice sheet and card lookup; this file wires the pill's other buttons, back and Escape, the window and the
 // fonts, passes the renderers the actions their buttons call, and draws the board.
 
 import { renderBoard } from './js/actions/board.js';
@@ -40,6 +40,7 @@ import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 import './js/sheets/settings.js';
 import './js/sheets/dice.js';
 import { openHistorySheet } from './js/sheets/history.js';
+import './js/sheets/cards.js';
 
 // The iOS app passes Reduce Transparency in before the page loads, and calls this whenever it changes.
 window.setReduceTransparency = setReduceTransparency;
@@ -54,7 +55,7 @@ window.setTextScale = (scale) => {
   fitAllCompactSwitches();
 };
 
-// The pill's buttons (the setup button is settings.js's, and the dice button dice.js's).
+// The pill's buttons (the setup button is settings.js's, the dice button dice.js's and the magnifier cards.js's).
 damageButton.addEventListener('click', () => setBoardMode('damage'));
 countersButton.addEventListener('click', () => setBoardMode('counters'));
 manaButton.addEventListener('click', () => setBoardMode('mana'));

@@ -25,6 +25,7 @@
 - Every seat faces its player, and the board stays put when the phone turns.
 - Rotate any seat to fit your table.
 - Roll a d4, d6, d8, d10, d12 or d20 from the device's secure random number generator.
+- Look up any card offline: every paper Magic card's rules text, with mana symbols, both faces of double-faced cards and the colour identity. Search names as you type, or rules text too.
 - **New game**, in the Settings header, resets life, counters, commander damage, mana, turns, the monarch and the initiative, and identities. Settings and seats stay.
 - Keeps the screen awake and saves the game between launches.
 
@@ -110,5 +111,7 @@ LifePod works offline. The Android app has no internet permission, and neither a
 LifePod's code is under the [MIT License](LICENSE).
 
 The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)). The mana, colour indicator, guild, clan and family symbols belong to Wizards of the Coast.
+
+Card data from [Scryfall](https://scryfall.com), updated <span data-cards-date>23 November 2026</span>. LifePod isn't produced by or endorsed by Scryfall. Card names, mana costs and rules text belong to Wizards of the Coast.
 
 LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.

@@ -279,7 +279,8 @@ private struct TrackerView: UIViewRepresentable {
 @MainActor
 private final class WebFolderSchemeHandler: NSObject, WKURLSchemeHandler {
     // The types of file the app serves from web/, by extension; keep it in step with MIME_TYPES in MainActivity.kt.
-    // Scripts are text/javascript: WebKit runs a module script only with a JavaScript type.
+    // Scripts are text/javascript: WebKit runs a module script only with a JavaScript type. Card lookup's data is gzip,
+    // which the page unpacks itself, so it's served as is, with no Content-Encoding.
     static let mimeTypes = [
         "html": "text/html",
         "css": "text/css",
@@ -290,6 +291,7 @@ private final class WebFolderSchemeHandler: NSObject, WKURLSchemeHandler {
         "svg": "image/svg+xml",
         "woff2": "font/woff2",
         "txt": "text/plain",
+        "gz": "application/gzip",
     ]
 
     private let root = Bundle.main.resourceURL?.appending(path: "web", directoryHint: .isDirectory)
