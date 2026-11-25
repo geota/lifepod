@@ -1,0 +1,65 @@
+name: Card data refresh
+
+# Every Monday, and on demand: refresh card lookup's data from Scryfall with the same script and checks a release uses
+# (scripts/cards-release.mjs), and when it changed, open a pull request with it (or update the one already open), so
+# main stays close to what releases ship. It uses the default GITHUB_TOKEN and no other secret. Two repository settings
+# matter: "Allow GitHub Actions to create and approve pull requests" must be on, and a pull request opened with
+# GITHUB_TOKEN doesn't start the CI workflow, so run CI on it by hand (Actions → LifePod CI → Run workflow on the
+# branch) or push to it before merging.
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cards-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh card data and open a pull request
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # The token stays in the checkout, since this job pushes its branch.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Refresh the card data from Scryfall
+        id: refresh
+        run: node scripts/cards-release.mjs
+      # The checks failed or Scryfall was out of reach: the committed data is back in place and there's nothing to
+      # propose. The summary says why.
+      - name: Open or update the pull request
+        if: steps.refresh.outputs.source == 'scryfall'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CARDS_DATE: ${{ steps.refresh.outputs.date }}
+          CARDS_COUNT: ${{ steps.refresh.outputs.count }}
+        run: |
+          if git diff --quiet -- data/cards.json; then
+            echo "Card data is up to date: Scryfall, $CARDS_DATE." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          branch=automation/card-data
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add data/cards.json web/data/cards.json.gz web/index.html README.md
+          git commit -m "Card data: Scryfall, $CARDS_DATE" -m "$CARDS_COUNT cards, from npm run cards:update (scripts/cards-release.mjs)."
+          git push --force origin "$branch"
+          title="Card data: Scryfall, $CARDS_DATE"
+          body="Scryfall's Oracle cards from $CARDS_DATE: $CARDS_COUNT cards, checked by tests/cards-data.test.mjs, the card count and the known cards. Opened by the Card data refresh workflow; run CI on this branch before merging."
+          if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -q OPEN; then
+            gh pr edit "$branch" --title "$title" --body "$body"
+          else
+            gh pr create --base main --head "$branch" --title "$title" --body "$body"
+          fi
+          echo "$title: pull request opened or updated." >> "$GITHUB_STEP_SUMMARY"

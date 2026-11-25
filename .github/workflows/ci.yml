@@ -16,14 +16,65 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Card lookup's data, refreshed from Scryfall for a release (scripts/cards-release.mjs): one bulk download, checked
+  # by tests/cards-data.test.mjs, a card count within 5% of the committed data's and a few known cards. If Scryfall is
+  # down or slow, or a check fails, the committed data ships, with a warning in the job summary; a release never fails
+  # over it. The web, Android and iOS jobs build from this one copy. Off a tag the job is skipped, and every build uses
+  # the committed data/cards.json, so CI on main and pull requests stays reproducible.
+  card-data:
+    name: Card data for a release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Refresh the card data from Scryfall, or keep the committed data
+        id: refresh
+        run: node scripts/cards-release.mjs
+      - uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: card-data
+          path: |
+            data/cards.json
+            web/data/cards.json.gz
+            web/index.html
+            README.md
+          if-no-files-found: error
+    outputs:
+      source: ${{ steps.refresh.outputs.source }}
+      date: ${{ steps.refresh.outputs.date }}
+      count: ${{ steps.refresh.outputs.count }}
+
   web:
     name: Web lint, seating tests, and bundle
+    needs: card-data
+    # Runs whether the card-data job ran, was skipped (not a tag) or failed (the committed data ships).
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      # A release ships the card data the card-data job refreshed, the same in every artifact. Off a tag, or if that job
+      # failed, the committed data stays (scripts/cards-release.mjs).
+      - name: Use the release's card data
+        id: cards
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        continue-on-error: true
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: card-data
+          path: .
+      - if: steps.cards.outcome == 'failure'
+        run: echo '::warning title=Card data::The refreshed card data is missing, so this build ships the committed data.'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -63,12 +114,26 @@ jobs:
 
   android:
     name: Android ktlint, Android Lint, APK, and App Bundle
+    needs: card-data
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      # A release ships the card data the card-data job refreshed, the same in every artifact. Off a tag, or if that job
+      # failed, the committed data stays (scripts/cards-release.mjs).
+      - name: Use the release's card data
+        id: cards
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        continue-on-error: true
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: card-data
+          path: .
+      - if: steps.cards.outcome == 'failure'
+        run: echo '::warning title=Card data::The refreshed card data is missing, so this build ships the committed data.'
       - uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6.0.0
         with:
           distribution: temurin
@@ -177,12 +242,26 @@ jobs:
   ios:
     name: iOS lint, WebKit seating tests, and builds
     # Xcode 27 (iOS 27 SDK) is on GitHub's preview image; move to the standard macOS runner once it ships Xcode 27.
+    needs: card-data
+    if: ${{ !cancelled() }}
     runs-on: xcode-27
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      # A release ships the card data the card-data job refreshed, the same in every artifact. Off a tag, or if that job
+      # failed, the committed data stays (scripts/cards-release.mjs).
+      - name: Use the release's card data
+        id: cards
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        continue-on-error: true
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: card-data
+          path: .
+      - if: steps.cards.outcome == 'failure'
+        run: echo '::warning title=Card data::The refreshed card data is missing, so this build ships the committed data.'
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
@@ -227,8 +306,9 @@ jobs:
 
   release:
     name: Publish GitHub prerelease
-    if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: [web, android, ios]
+    # Every build must have passed; the card-data job may have failed, since the builds then ship the committed data.
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref_type == 'tag' && needs.web.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
+    needs: [card-data, web, android, ios]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -242,15 +322,26 @@ jobs:
       - name: Publish preview assets
         env:
           GH_TOKEN: ${{ github.token }}
+          CARDS_SOURCE: ${{ needs.card-data.outputs.source }}
+          CARDS_DATE: ${{ needs.card-data.outputs.date }}
+          CARDS_COUNT: ${{ needs.card-data.outputs.count }}
         run: |
+          if [[ "$CARDS_SOURCE" == scryfall ]]; then
+            cards="Card data: Scryfall, $CARDS_DATE ($CARDS_COUNT cards), downloaded for this release."
+          elif [[ -n "$CARDS_DATE" ]]; then
+            cards="Card data: the committed data from Scryfall, $CARDS_DATE ($CARDS_COUNT cards); the refresh failed."
+          else
+            cards='Card data: the committed data; the refresh job failed.'
+          fi
+          echo "$cards" >> "$GITHUB_STEP_SUMMARY"
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "LifePod $GITHUB_REF_NAME" --verify-tag --prerelease --generate-notes \
-            --notes 'Signed Android APK for Obtainium, iOS Simulator app, and offline web bundle.' \
+            --notes "Signed Android APK for Obtainium, iOS Simulator app, and offline web bundle. $cards" \
             assets/lifepod.apk assets/lifepod-ios-simulator.zip assets/lifepod-web.zip
 
   google-play:
     name: Upload to Google Play
-    if: github.event_name == 'push' && github.ref_type == 'tag' && needs.android.outputs.play_ready == 'true'
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref_type == 'tag' && needs.web.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' && needs.android.outputs.play_ready == 'true' }}
     needs: [web, android, ios]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -285,7 +376,7 @@ jobs:
 
   testflight:
     name: Upload to TestFlight
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    if: ${{ !cancelled() && github.event_name == 'push' && github.ref_type == 'tag' && needs.web.result == 'success' && needs.android.result == 'success' && needs.ios.result == 'success' }}
     needs: [web, android, ios]
     # App Store Connect requires the iOS 27 SDK from April 2027.
     runs-on: xcode-27
@@ -309,6 +400,17 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      # The same card data as the other builds (the card-data job), or the committed data if it's missing.
+      - name: Use the release's card data
+        id: cards
+        if: steps.key.outputs.ready == 'true'
+        continue-on-error: true
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          name: card-data
+          path: .
+      - if: steps.cards.outcome == 'failure'
+        run: echo '::warning title=Card data::The refreshed card data is missing, so TestFlight gets the committed data.'
       # App Store versions are numbers only, so v0.1.0-alpha.3 uploads as version 0.1.0 with the run number as
       # its build number.
       - name: Show the Xcode and iOS SDK in use
