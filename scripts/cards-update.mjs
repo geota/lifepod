@@ -28,14 +28,22 @@ const { version } = JSON.parse(readFileSync(new URL('package.json', root), 'utf8
 const headers = { 'User-Agent': `LifePod/${version}`, Accept: 'application/json' };
 
 // What isn't a card a player looks up mid-game: art cards, tokens, emblems, Planechase planes, Archenemy schemes,
-// Vanguard avatars, Jumpstart's theme cards, helper cards (type line "Card", such as Poison Counter), and cards printed
-// only for MTG Arena or Magic Online. The predefined artifact tokens that rules text names without explaining
-// (Treasure, Food, Clue and the rest) are kept.
+// Vanguard avatars, Jumpstart's theme cards, helper cards (type line "Card", such as Poison Counter), the cards Scryfall
+// hides by default (memorabilia and playtest cards), and cards only for MTG Arena or Magic Online. The predefined
+// artifact tokens that rules text names without explaining (Treasure, Food, Clue and the rest) are kept.
+//
+// A card is on paper if the printing the Oracle file holds is, or if a paper format lists it as legal, banned or
+// restricted: for 1,062 real paper cards the file's printing is an MTGO one (Masters Edition, Tempest Remastered,
+// Vintage Masters), among them the ten original dual lands, Mox Diamond and Palinchron
+// (design/polish/SCRYFALL-SYNTAX-SPEC.md §5.1).
 const skippedLayouts = new Set(['art_series', 'token', 'double_faced_token', 'emblem', 'planar', 'scheme', 'vanguard', 'front_card']);
+const paperFormats = ['standard', 'future', 'pioneer', 'modern', 'legacy', 'pauper', 'vintage', 'commander', 'oathbreaker',
+  'paupercommander', 'duel', 'oldschool', 'premodern', 'predh'];
 const keptTokens = new Set(['Blood', 'Clue', 'Food', 'Gold', 'Junk', 'Lander', 'Map', 'Mutagen', 'Powerstone', 'Treasure']);
 // Layouts whose faces each have their own rules text: double-faced, split, adventure, flip and prepare cards.
 const facedLayouts = new Set(['transform', 'modal_dfc', 'split', 'adventure', 'flip', 'prepare']);
-const pairing = /^(?:Partner|Friends forever|Choose a Background|Doctor's companion)/;
+// Scryfall writes some in lower case after the first word ("Choose a background"), so the match ignores case.
+const pairing = /^(?:Partner|Friends forever|Choose a Background|Doctor's companion)/i;
 const colourOrder = 'WUBRG';
 const inColourOrder = colours => [...new Set(colours)].sort((a, b) => colourOrder.indexOf(a) - colourOrder.indexOf(b)).join('');
 // Rarity as one letter. The Oracle file holds one printing of each card, so this is that printing's rarity.
@@ -58,7 +66,10 @@ function face(source) {
 
 /** Whether Scryfall's card belongs in the lookup. */
 export function keepCard(card) {
-  if (!card.games?.includes('paper') || card.type_line === 'Card') return false;
+  if (card.type_line === 'Card' || card.set_type === 'memorabilia' || card.promo_types?.includes('playtest')) return false;
+  const paper = card.games?.includes('paper')
+    || paperFormats.some(format => ['legal', 'banned', 'restricted'].includes(card.legalities?.[format]));
+  if (!paper) return false;
   if (card.layout === 'token') return keptTokens.has(card.name);
   return !skippedLayouts.has(card.layout);
 }

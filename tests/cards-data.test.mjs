@@ -59,6 +59,11 @@ test('node: the card data file has one card per line, in order, with only the fi
   assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u' });
   assert.equal(card('Treasure').t, 'Token Artifact — Treasure', 'the predefined tokens are kept');
   assert.equal(card('Soldier'), undefined, 'other tokens are not');
+  // Paper cards whose Oracle printing is an MTGO one are kept, because paper formats list them; the cards Scryfall hides
+  // by default are not (design/polish/SCRYFALL-SYNTAX-SPEC.md §5.1).
+  for (const name of ['Underground Sea', 'Badlands', 'Mox Diamond', 'Palinchron']) assert.ok(card(name), `${name} is in the data`);
+  assert.equal(card('Phyrexian Broodstar'), undefined, 'a playtest card is not');
+  assert.equal(card('Alora, Merry Thief').pair, 1, '"Choose a background", in Scryfall\'s lower case, is a pairing keyword');
   assert.equal(card('Delver of Secrets // Insectile Aberration').f[1].p, '3/2');
 });
 
@@ -96,9 +101,15 @@ const bulk = [
   { name: 'Grizzly Bears', layout: 'art_series', games: ['paper'], type_line: 'Card // Card', color_identity: [], keywords: [], rarity: 'common', legalities: {} },
   { name: 'Arena Only', layout: 'normal', games: ['arena'], type_line: 'Instant', color_identity: [], keywords: [], rarity: 'rare', legalities: {} },
   { name: 'Poison Counter', layout: 'normal', games: ['paper'], type_line: 'Card', color_identity: [], keywords: [], rarity: 'common', legalities: {} },
+  { name: 'Badlands', layout: 'normal', games: ['mtgo'], mana_cost: '', cmc: 0, type_line: 'Land — Swamp Mountain', oracle_text: '({T}: Add {B} or {R}.)', colors: [], color_identity: ['B', 'R'], keywords: [], rarity: 'rare', legalities: { legacy: 'legal', commander: 'legal', historic: 'not_legal' } },
+  { name: 'Playtest Pal', layout: 'normal', games: ['paper'], promo_types: ['playtest'], type_line: 'Creature — Test', color_identity: [], keywords: [], rarity: 'rare', legalities: {} },
+  { name: 'Oversized Memento', layout: 'normal', games: ['paper'], set_type: 'memorabilia', type_line: 'Artifact', color_identity: [], keywords: [], rarity: 'rare', legalities: {} },
+  { name: 'Background Buddy', layout: 'normal', games: ['paper'], mana_cost: '{1}{U}', cmc: 2, type_line: 'Legendary Creature — Halfling', oracle_text: 'Choose a background', colors: ['U'], color_identity: ['U'], keywords: ['Choose a background'], rarity: 'uncommon', legalities: { commander: 'legal' } },
 ];
-const expected = `{"about":{"source":"Scryfall Oracle cards bulk data, scryfall.com","updated":"2026-11-23T22:02:34.594+00:00","count":5},
+const expected = `{"about":{"source":"Scryfall Oracle cards bulk data, scryfall.com","updated":"2026-11-23T22:02:34.594+00:00","count":7},
 "cards":[
+{"n":"Background Buddy","m":"{1}{U}","t":"Legendary Creature — Halfling","o":"Choose a background","k":"background buddy","c":"U","v":2,"r":"u","lead":1,"kw":["Choose a background"],"pair":1},
+{"n":"Badlands","t":"Land — Swamp Mountain","o":"({T}: Add {B} or {R}.)","k":"badlands","c":"BR","co":"-","r":"r"},
 {"n":"Delver of Secrets // Insectile Aberration","m":"{U}","t":"Creature — Human Wizard // Creature — Human Insect","k":"delver of secrets insectile aberration","c":"U","v":1,"r":"c","f":[{"n":"Delver of Secrets","m":"{U}","t":"Creature — Human Wizard","o":"At the beginning of your upkeep, look at the top card of your library.","p":"1/1"},{"n":"Insectile Aberration","t":"Creature — Human Insect","o":"Flying","p":"3/2"}],"kw":["Flying","Transform"]},
 {"n":"Grizzly Bears","m":"{1}{G}","t":"Creature — Bear","p":"2/2","k":"grizzly bears","c":"G","v":2,"r":"c"},
 {"n":"Lim-Dûl's Vault","m":"{U}{B}","t":"Instant","o":"Look at the top five cards of your library.","k":"lim duls vault","c":"UB","v":2,"r":"u"},
