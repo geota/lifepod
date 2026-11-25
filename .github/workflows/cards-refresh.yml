@@ -44,7 +44,7 @@ jobs:
           CARDS_DATE: ${{ steps.refresh.outputs.date }}
           CARDS_COUNT: ${{ steps.refresh.outputs.count }}
         run: |
-          if git diff --quiet -- data/cards.json; then
+          if git diff --quiet -- data/cards.json data/tags.json; then
             echo "Card data is up to date: Scryfall, $CARDS_DATE." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -52,7 +52,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
-          git add data/cards.json web/data/cards.json.gz web/index.html README.md
+          git add data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz web/index.html README.md
           git commit -m "Card data: Scryfall, $CARDS_DATE" -m "$CARDS_COUNT cards, from npm run cards:update (scripts/cards-release.mjs)."
           git push --force origin "$branch"
           title="Card data: Scryfall, $CARDS_DATE"

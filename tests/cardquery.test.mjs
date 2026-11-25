@@ -66,8 +66,8 @@ test('node: malformed queries are mended or dropped, with a note, never a throw'
   assert.deepEqual(noteTexts('t>elf'), ['error: t: only takes :, so t>elf is left out.']);
   assert.deepEqual(parseQuery('e:war t:elf').notes.map(note => [note.kind, note.text, note.group]), [['cut', 'e:war', 'printing']]);
   assert.deepEqual(parseQuery('in:ja').notes.map(note => note.group), ['language']);
-  assert.deepEqual(parseQuery('usd>1 a:avon cube:vintage unique:prints include:extras otag:ramp').notes.map(note => note.group),
-    ['prices', 'art', 'cube', 'display', 'extras', 'tags']);
+  assert.deepEqual(parseQuery('usd>1 a:avon cube:vintage unique:prints include:extras otag:ramp').notes.map(note => note.group), // otag: is a term, not a cut
+    ['prices', 'art', 'cube', 'display', 'extras']);
 });
 
 // Pieces that stress the tokeniser: keywords, brackets, quotes (straight and curly), patterns, escapes and operators.

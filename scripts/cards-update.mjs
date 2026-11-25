@@ -26,6 +26,10 @@ const cache = new URL('node_modules/.cache/lifepod-cards/', root);
 const bulkFile = new URL('oracle-cards.jsonl.gz', cache);
 const metaFile = new URL('oracle-cards.json', cache);
 const nicknameFile = new URL('land-nicknames.json', cache);
+const tagsBulkFile = new URL('oracle-tags.jsonl.gz', cache);
+const tagsMetaFile = new URL('oracle-tags.json', cache);
+const tagsOutput = new URL('data/tags.json', root);
+const tagsShipped = new URL('web/data/tags.json.gz', root);
 const { version } = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 const headers = { 'User-Agent': `LifePod/${version}`, Accept: 'application/json' };
 
@@ -131,6 +135,15 @@ export function toCard(card) {
  * @param {Record<string, string[]>} [nicknames] Each land nickname's card names, from Scryfall's search (`lc`).
  */
 export async function buildCards(lines, updated, nicknames = {}) {
+  return (await buildData(lines, updated, nicknames)).text;
+}
+/**
+ * The data file's text, and each card's place in it by Oracle id, which the tags file points at.
+ * @param {AsyncIterable<string> | Iterable<string>} lines
+ * @param {string} updated
+ * @param {Record<string, string[]>} [nicknames]
+ */
+export async function buildData(lines, updated, nicknames = {}) {
   /** @type {Map<string, string[]>} */
   const cycles = new Map();
   for (const nickname of landNicknames) {
@@ -144,12 +157,50 @@ export async function buildCards(lines, updated, nicknames = {}) {
     if (!keepCard(card)) continue;
     const record = toCard(card);
     if (cycles.has(card.name)) record.lc = cycles.get(card.name);
-    cards.push(record);
+    cards.push({ record, id: card.oracle_id });
   }
-  const rows = cards.map(card => ({ card, json: JSON.stringify(card) }));
+  const rows = cards.map(({ record, id }) => ({ card: record, id, json: JSON.stringify(record) }));
   rows.sort((a, b) => (a.card.k < b.card.k ? -1 : a.card.k > b.card.k ? 1 : a.json < b.json ? -1 : a.json > b.json ? 1 : 0));
   const about = { source: 'Scryfall Oracle cards bulk data, scryfall.com', updated, count: rows.length, formats };
-  return `{"about":${JSON.stringify(about)},\n"cards":[\n${rows.map(row => row.json).join(',\n')}\n]}\n`;
+  const text = `{"about":${JSON.stringify(about)},\n"cards":[\n${rows.map(row => row.json).join(',\n')}\n]}\n`;
+  return { text, places: new Map(rows.map((row, at) => [row.id, at])) };
+}
+
+/**
+ * The tags file (design/polish/SCRYFALL-SYNTAX-SPEC.md §5.4): Scryfall's Oracle tags, one per line, sorted by slug, each
+ * with its parents' slugs, its aliases, and its cards' places in data/cards.json as gaps (each place less the one before).
+ * Its places are only valid with the cards.json written in the same run; `about.cards` is that file's card count.
+ * @param {AsyncIterable<string> | Iterable<string>} lines Scryfall's oracle_tags bulk file
+ * @param {string} updated
+ * @param {Map<string, number>} places
+ * @param {number} cardCount
+ */
+export async function buildTags(lines, updated, places, cardCount) {
+  const tags = [];
+  for await (const line of lines) {
+    const text = line.trim().replace(/,$/, '');
+    if (text.startsWith('{')) tags.push(JSON.parse(text));
+  }
+  const slugs = new Map(tags.map(tag => [tag.id, tag.slug]));
+  const rows = [];
+  for (const tag of tags) {
+    const at = [...new Set((tag.taggings ?? []).map(tagging => places.get(tagging.oracle_id)).filter(place => place !== undefined))].sort((a, b) => a - b);
+    if (!at.length && !(tag.child_ids ?? []).length) continue;
+    const parents = (tag.parent_ids ?? []).map(id => slugs.get(id)).filter(Boolean).sort();
+    const aliases = [...(tag.aliases ?? [])].sort();
+    rows.push(compact({ s: tag.slug, p: parents.length ? parents : undefined, a: aliases.length ? aliases : undefined, c: at.length ? at.map((place, i) => (i ? place - at[i - 1] : place)) : undefined }));
+  }
+  rows.sort((a, b) => (a.s < b.s ? -1 : a.s > b.s ? 1 : 0));
+  const about = { source: 'Scryfall Oracle tags bulk data, scryfall.com', updated, cards: cardCount, count: rows.length };
+  return `{"about":${JSON.stringify(about)},\n"tags":[\n${rows.map(row => JSON.stringify(row)).join(',\n')}\n]}\n`;
+}
+/** The cached Oracle tags file, or null. */
+export function cachedTags() {
+  try {
+    return { path: fileURLToPath(tagsBulkFile), ...JSON.parse(readFileSync(tagsMetaFile, 'utf8')) };
+  } catch {
+    return null;
+  }
 }
 
 /** The lines of a bulk file on disk, gzipped or not. */
@@ -189,9 +240,24 @@ async function fetchWithRetries(url, init, timeout) {
   }
 }
 
+// Downloads a bulk file into the cache unless the cached one is the latest. Each file is downloaded at most once a run.
+async function downloadBulk(entry, file, meta, cached) {
+  const uri = entry?.jsonl_download_uri ?? entry?.download_uri;
+  if (!uri) throw new Error(`Scryfall lists no ${entry?.type ?? 'bulk'} file`);
+  if (cached?.updated_at === entry.updated_at) return;
+  console.log(`Downloading ${uri}`);
+  const response = await fetchWithRetries(uri, { headers: { ...headers, Accept: '*/*' } }, 180000);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  mkdirSync(cache, { recursive: true });
+  writeFileSync(file, bytes);
+  writeFileSync(meta, `${JSON.stringify({ updated_at: entry.updated_at, uri }, null, 2)}\n`);
+}
+
 async function download() {
   const response = await fetchWithRetries(`${api}/bulk-data`, { headers }, 30000);
-  const entry = (await response.json()).data.find(item => item.type === 'oracle_cards');
+  const list = (await response.json()).data;
+  await downloadBulk(list.find(item => item.type === 'oracle_tags'), tagsBulkFile, tagsMetaFile, cachedTags());
+  const entry = list.find(item => item.type === 'oracle_cards');
   const uri = entry?.jsonl_download_uri ?? entry?.download_uri;
   if (!uri) throw new Error('Scryfall lists no oracle_cards file');
   const cached = cachedBulk();
@@ -269,10 +335,18 @@ async function main() {
   if (!bulk) throw new Error('No cached bulk file yet: run `npm run cards:update` once with a network connection');
   const nicknames = offline ? cachedNicknames()?.lists ?? {} : await fetchNicknames(bulk.updated_at);
   if (offline && !cachedNicknames()) console.warn('No cached land nicknames: is:shockland and the rest will find nothing until an online update.');
-  const text = await buildCards(readBulk(bulk.path), bulk.updated_at, nicknames);
+  const { text, places } = await buildData(readBulk(bulk.path), bulk.updated_at, nicknames);
   mkdirSync(new URL('./', output), { recursive: true });
   mkdirSync(new URL('./', shipped), { recursive: true });
   writeFileSync(output, text);
+  const tagBulk = cachedTags();
+  if (tagBulk) {
+    const tags = await buildTags(readBulk(tagBulk.path), tagBulk.updated_at, places, places.size);
+    writeFileSync(tagsOutput, tags);
+    const packedTags = packCards(tags);
+    writeFileSync(tagsShipped, packedTags);
+    console.log(`web/data/tags.json.gz: ${JSON.parse(tags).about.count} tags, ${(packedTags.length / 1024).toFixed(0)} KB`);
+  } else console.warn('No cached Oracle tags file: otag: keeps the last tags written.');
   const packed = packCards(text);
   writeFileSync(shipped, packed);
   writeDates(bulk.updated_at);

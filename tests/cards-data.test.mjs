@@ -239,3 +239,28 @@ test('node: a release refreshes the card data only when the new data looks right
   assert.match(checkRelease('<html>503</html>', dataText).join(), /isn't JSON/);
   for (const name of knownCards) assert.ok(data.cards.some(card => card.n === name), `${name} is in the committed data`);
 });
+
+// Scryfall's Oracle tags for otag: (design/polish/SCRYFALL-SYNTAX-SPEC.md §5.4), written with the cards in the same run.
+test('node: the tags file points at the cards written with it, one tag per line, gzipped the same', () => {
+  const tagsText = read('data/tags.json');
+  const tags = JSON.parse(tagsText);
+  assert.equal(tags.about.cards, data.about.count, 'written for these cards');
+  assert.equal(tags.about.count, tags.tags.length);
+  assert.equal(tagsText.split('\n').length - 4, tags.tags.length, 'one tag per line');
+  assert.equal(gunzipSync(readFileSync(new URL('../web/data/tags.json.gz', import.meta.url))).toString('utf8'), tagsText);
+  let previous = '';
+  const slugs = new Set();
+  for (const tag of tags.tags) {
+    assert.ok(tag.s > previous, `sorted: ${previous} then ${tag.s}`);
+    previous = tag.s;
+    slugs.add(tag.s);
+    let place = -1;
+    for (const [at, gap] of (tag.c ?? []).entries()) {
+      place = at ? place + gap : gap;
+      assert.ok((at ? gap > 0 : gap >= 0) && place < data.cards.length, `${tag.s}: places rise and stay in the file`);
+    }
+  }
+  assert.ok(tags.tags.length > 4000, `${tags.tags.length} tags`);
+  assert.ok(tags.tags.some(tag => tag.p?.includes('removal')), 'removal has tags below it');
+  for (const tag of tags.tags) for (const parent of tag.p ?? []) assert.ok(slugs.has(parent), `${tag.s}'s parent ${parent} is a tag`);
+});

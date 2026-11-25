@@ -68,7 +68,7 @@ export const cutGroups = {
   display: { keys: ['unique', 'display', 'prefer'], text: 'Display options don’t apply here, so {terms} is ignored.', short: '{terms} ignored' },
   extras: { keys: ['include'], text: 'Tokens, planes and other extras aren’t in card lookup, so {terms} is ignored.', short: '{terms} ignored' },
   sort: { keys: [], text: '{terms} isn’t available offline. Sorted by name instead.', short: 'Sorted by name' },
-  tags: { keys: [], text: 'Community tags (otag:) aren’t in the offline data yet. Showing results without {terms}.', short: 'Without {terms} (tags)' },
+  tags: { keys: [], text: 'Community tags couldn’t load. Showing results without {terms}.', short: 'Without {terms} (tags)' },
 };
 /** @type {Record<string, string>} */
 const cutGroupOf = Object.fromEntries(Object.entries(cutGroups).flatMap(([group, { keys }]) => keys.map(key => [key, group])));
@@ -175,7 +175,6 @@ export function parseQuery(input) {
       const source = text.slice(at, end);
       let group = cutGroupOf[keyword];
       if (keyword === 'in' && languages.has(value.toLowerCase())) group = 'language';
-      if (key === 'otag') group = 'tags';
       if (group) {
         note('cut', at, end, source, group);
         return null;

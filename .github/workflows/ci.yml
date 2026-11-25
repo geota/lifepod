@@ -44,6 +44,8 @@ jobs:
           path: |
             data/cards.json
             web/data/cards.json.gz
+            data/tags.json
+            web/data/tags.json.gz
             web/index.html
             README.md
           if-no-files-found: error

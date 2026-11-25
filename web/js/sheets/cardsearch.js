@@ -3,7 +3,7 @@
 // syntax is parsed and evaluated. sheets/cards.js draws what this finds; this module holds no DOM.
 
 import { fold, foldText, rankResults, searchNames, searchText, textMinimum } from '../logic/cards.js';
-import { warmColumns } from '../logic/cardcolumns.js';
+import { setTags, warmColumns } from '../logic/cardcolumns.js';
 import { runQuery, slowQuery } from '../logic/cardfilter.js';
 import { parseQuery } from '../logic/cardquery.js';
 import { closeNames, typoBelow, typoBuilder, typoMinimum } from '../logic/cardtypos.js';
@@ -26,6 +26,10 @@ import { closeNames, typoBelow, typoBuilder, typoMinimum } from '../logic/cardty
 
 // A slow syntax query (rules text, patterns, ~) waits this long after the last keystroke, so typing stays quick.
 const slowDelay = 150;
+// Scryfall's Oracle tags, gzipped, fetched the first time a query uses otag: (design/polish/SCRYFALL-SYNTAX-SPEC.md §5.4).
+const tagsUrl = new URL('../../data/tags.json.gz', import.meta.url);
+/** @type {Promise<void> | null} */
+let tagsLoading = null;
 
 /** @type {CardIndex | null} */
 let index = null;
@@ -86,8 +90,11 @@ export function search(query, withText) {
     const cards = index;
     const run = () => {
       if (cards !== index) return;
-      const { hits, notes, sort } = runQuery(cards, parsed, query);
+      const { hits, notes, sort, needsTags } = runQuery(cards, parsed, query);
       show({ query, syntax: true, count: hits.length, page: limit => hits.slice(0, limit), close: [], notes, sort });
+      if (needsTags) loadTags(cards).then(() => {
+        if (cards === index && last?.query === query) search(query, withText);
+      });
     };
     // A slow query waits for typing to pause; the list keeps its last results meanwhile.
     if (slowQuery(parsed)) {
@@ -107,6 +114,19 @@ export function search(query, withText) {
       show(plainFound(query, names, searchText(searched, query)));
     }, 0);
   }
+}
+
+// The tags load once; if they can't, otag: terms are left out with a note.
+/** @param {CardIndex} cards */
+function loadTags(cards) {
+  tagsLoading ??= fetch(tagsUrl)
+    .then((response) => {
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+      return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).json();
+    })
+    .then(data => setTags(cards, data))
+    .catch(() => setTags(cards, null));
+  return tagsLoading;
 }
 
 /** @param {Found} found */

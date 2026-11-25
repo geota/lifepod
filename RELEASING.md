@@ -68,7 +68,7 @@ gh secret list --repo geota/lifepod
 
 ## Card data in a release
 
-A version tag refreshes card lookup's data on its own. CI's **Card data for a release** job runs `scripts/cards-release.mjs`: one download of Scryfall's latest Oracle cards file (`npm run cards:update`, with a 30-second limit on the list, 3 minutes on the file, and two retries), then `tests/cards-data.test.mjs`, a card count within 5% of the committed data's, and a few cards every lookup needs (Sol Ring, Atraxa, Delver of Secrets, Lightning Bolt, Treasure). The web bundle, the APK and App Bundle, the iOS builds and TestFlight all build from that one copy, credit dates included, and the release notes and the job summary say which data shipped and its date.
+A version tag refreshes card lookup's data on its own. CI's **Card data for a release** job runs `scripts/cards-release.mjs`: one download of Scryfall's latest Oracle cards file (`npm run cards:update`, with a 30-second limit on the list, 3 minutes on the file, and two retries), then `tests/cards-data.test.mjs`, a card count within 5% of the committed data's, and a few cards every lookup needs (Sol Ring, Atraxa, Delver of Secrets, Lightning Bolt, Treasure). The same run refreshes Scryfall's Oracle tags (`data/tags.json`, `web/data/tags.json.gz`), which `otag:` reads. The web bundle, the APK and App Bundle, the iOS builds and TestFlight all build from that one copy, credit dates included, and the release notes and the job summary say which data shipped and its date.
 
 If Scryfall is down or slow, or a check fails, the release ships the committed `data/cards.json` instead, with a warning in the job summary and the release notes. A release never fails over card data.
 
@@ -78,9 +78,9 @@ To refresh by hand:
 
 ```sh
 npm run cards:update     # writes data/cards.json, web/data/cards.json.gz and the credit dates
-git diff --stat data/cards.json web/index.html README.md
+git diff --stat data/cards.json data/tags.json web/index.html README.md
 npm run check
-git commit -m 'Card data: Scryfall, <date>' data/cards.json web/data/cards.json.gz web/index.html README.md
+git commit -m 'Card data: Scryfall, <date>' data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz web/index.html README.md
 ```
 
 ## GitHub prerelease and Obtainium

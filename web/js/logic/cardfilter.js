@@ -6,7 +6,7 @@
 import { fold, searchNames } from './cards.js';
 import {
   columnsOf, costs, facesOf, faceKeys, fullText, joined, keywordLists, legalities, lowerName, lowerNames, oracleText, pips, scan,
-  squashedNames, tildeText, typeLines,
+  squashedNames, tagMatches, tagsOf, tildeText, typeLines,
 } from './cardcolumns.js';
 import { kindOf } from './cardkinds.js';
 import { cutGroups, leaves, printingValues } from './cardquery.js';
@@ -171,6 +171,22 @@ function compileTerm(index, node, note) {
       note('hint', `is:${value} isn’t a search keyword. Showing results without it.`);
       return null;
     }
+    case 'otag': {
+      // Community tags load the first time a query asks for one (sheets/cardsearch.js), and the query runs again.
+      const tags = tagsOf(index);
+      if (!tags) {
+        note('hint', 'Loading community tags…', 'loading-tags');
+        return null;
+      }
+      if (tags.failed) {
+        note('cut', `${node.keyword}:${value}`, 'tags');
+        return null;
+      }
+      const slug = lower.replace(/\s+/g, '-');
+      const mask = tagMatches(index, slug);
+      if (!mask) return fail(`${value} isn’t a community tag.`);
+      return { cost: 1, test: at => mask[at] === 1, all: () => mask };
+    }
     default: return fail(`${node.keyword}: isn’t available yet.`);
   }
 }
@@ -271,7 +287,7 @@ const cacheKey = node => (node.k === 'name' ? `name ${node.exact ? '!' : ''}${no
  * @param {CardIndex} index
  * @param {ParsedQuery} parsed
  * @param {string} query What was typed, for the exact-name boost.
- * @returns {{ hits: number[], notes: ShownNote[], sort: string | null }}
+ * @returns {{ hits: number[], notes: ShownNote[], sort: string | null, needsTags: boolean }}
  */
 export function runQuery(index, parsed, query) {
   const columns = columnsOf(index);
@@ -354,7 +370,7 @@ export function runQuery(index, parsed, query) {
     }
   } else hits = orderHits(index, parsed, matches, query);
   const notes = shownNotes(raised, { empty: !mask, nothing: !hits.length, ast: parsed.ast });
-  return { hits, notes, sort };
+  return { hits, notes, sort, needsTags: raised.some(note => note.group === 'loading-tags') };
 }
 
 // Sorts by a field (§3.8), ties by name, which is the file's order; cards without the field go last either way.
@@ -430,7 +446,7 @@ function shownNotes(raised, { empty, nothing, ast }) {
   for (const note of raised.filter(item => item.kind === 'error')) add({ kind: 'error', text: note.text, terms: [], short: note.text });
   /** @type {Map<string, string[]>} */
   const groups = new Map();
-  for (const note of raised.filter(item => item.kind === 'cut')) {
+  for (const note of raised.filter(item => item.kind === 'cut' && item.group !== 'loading-tags')) {
     const group = note.group ?? 'printing';
     groups.set(group, [...(groups.get(group) ?? []), note.text]);
   }

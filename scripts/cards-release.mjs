@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { shownDate } from './cards-update.mjs';
 
 const root = new URL('../', import.meta.url);
-export const releaseFiles = ['data/cards.json', 'web/data/cards.json.gz', 'web/index.html', 'README.md'];
+export const releaseFiles = ['data/cards.json', 'web/data/cards.json.gz', 'data/tags.json', 'web/data/tags.json.gz', 'web/index.html', 'README.md'];
 // Cards any data worth shipping has: a common one, a double-faced one, a Commander staple and a kept token.
 export const knownCards = ['Sol Ring', 'Atraxa, Praetors\' Voice', 'Delver of Secrets // Insectile Aberration', 'Lightning Bolt', 'Treasure'];
 // How far the card count may move from the committed data's before the new data is suspect.

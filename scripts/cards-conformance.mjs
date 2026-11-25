@@ -12,6 +12,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { indexCards } from '../web/js/logic/cards.js';
+import { setTags, tagsOf } from '../web/js/logic/cardcolumns.js';
 import { runQuery } from '../web/js/logic/cardfilter.js';
 import { parseQuery } from '../web/js/logic/cardquery.js';
 
@@ -45,6 +46,7 @@ export const readResults = () => JSON.parse(readFileSync(resultsFile, 'utf8'));
  * @param {{ names: string[], complete: boolean }} saved
  */
 export function compare(index, query, saved) {
+  if (!tagsOf(index)) setTags(index, JSON.parse(readFileSync(new URL('data/tags.json', root), 'utf8')));
   const universe = new Set(index.cards.filter(card => !card.t.startsWith('Token')).map(card => card.n));
   const { hits, notes } = runQuery(index, parseQuery(query), query);
   const theirs = saved.names.filter(name => universe.has(name));

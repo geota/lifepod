@@ -187,3 +187,52 @@ export function scan(source, needle, mask) {
   }
   return mask;
 }
+
+// ---- Oracle tags ------------------------------------------------------------------------------------------------------------
+
+/**
+ * Scryfall's Oracle tags (web/data/tags.json.gz, design/polish/SCRYFALL-SYNTAX-SPEC.md §5.4), loaded the first time a
+ * query uses otag:. Each tag's cards are places in this index's cards; `children` follows the tag tree down.
+ * @typedef {{ places: Map<string, number[]>, children: Map<string, string[]>, aliases: Map<string, string>, failed: boolean }} TagIndex
+ */
+/** @type {WeakMap<CardIndex, TagIndex>} */
+const tagIndexes = new WeakMap();
+/**
+ * Keeps the tags for these cards, or that they couldn't load. Tags written for another cards file (a different card
+ * count) are refused, since their places would point at the wrong cards.
+ * @param {CardIndex} index
+ * @param {{ about: { cards: number }, tags: { s: string, p?: string[], a?: string[], c?: number[] }[] } | null} data
+ */
+export function setTags(index, data) {
+  /** @type {TagIndex} */
+  const tags = { places: new Map(), children: new Map(), aliases: new Map(), failed: !data || data.about.cards !== index.cards.length };
+  if (!tags.failed && data) {
+    for (const tag of data.tags) {
+      let place = 0;
+      tags.places.set(tag.s, (tag.c ?? []).map((gap, at) => (place = at ? place + gap : gap)));
+      for (const parent of tag.p ?? []) tags.children.set(parent, [...(tags.children.get(parent) ?? []), tag.s]);
+      for (const alias of tag.a ?? []) tags.aliases.set(alias, tag.s);
+    }
+  }
+  tagIndexes.set(index, tags);
+}
+/** @param {CardIndex} index @returns {TagIndex | undefined} */
+export const tagsOf = index => tagIndexes.get(index);
+// A tag's cards and its descendants' (otag:removal has no cards of its own, but its children do), as a mask.
+/** @param {CardIndex} index @param {string} slug @returns {Uint8Array | null} null for a tag that doesn't exist */
+export function tagMatches(index, slug) {
+  const tags = tagIndexes.get(index);
+  if (!tags) return null;
+  const start = tags.aliases.get(slug) ?? slug;
+  if (!tags.places.has(start) && !tags.children.has(start)) return null;
+  const mask = new Uint8Array(index.cards.length);
+  const seen = new Set();
+  const visit = (/** @type {string} */ tag) => {
+    if (seen.has(tag)) return;
+    seen.add(tag);
+    for (const at of tags.places.get(tag) ?? []) mask[at] = 1;
+    for (const child of tags.children.get(tag) ?? []) visit(child);
+  };
+  visit(start);
+  return mask;
+}

@@ -340,7 +340,27 @@ async function checkHelp(t, engine) {
   assert.ok(line, 'on the status line');
 }
 
+// Community tags load only when a query first asks for one, and the query then runs with them (§5.4).
+async function checkTags(t, engine) {
+  const page = await openPage(t, engine, { viewport: { width: 952, height: 427 } });
+  const fetched = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/data/')) fetched.push(new URL(request.url()).pathname);
+  });
+  await openCards(page);
+  await search(page, 't:instant c:w mv<=1');
+  assert.deepEqual(fetched, ['/data/cards.json.gz'], 'no tags until a query asks');
+  await page.locator('#card-query').fill('otag:removal c:w mv<=1 t:instant');
+  await eventually(async () => /^\d+ cards$/.test(await statusText(page)) && !(await page.locator('#card-notes').textContent()).includes('Loading'), true, 'the tags load and the query runs');
+  assert.deepEqual(fetched, ['/data/cards.json.gz', '/data/tags.json.gz']);
+  const count = Number((await statusText(page)).replace(/\D/g, ''));
+  assert.ok(count >= 40 && count <= 60, `${count} white removal instants of mana value 1 or less`);
+  await page.locator('#card-query').fill('otag:no-such-tag t:elf');
+  await eventually(async () => page.locator('#card-notes .card-note-text').first().textContent(), 'no-such-tag isn’t a community tag.', 'an unknown tag');
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: community tags load the first time a query asks for one`, t => checkTags(t, engine));
   test(`${name}: Search help opens in the list's place, and its examples run`, t => checkHelp(t, engine));
   test(`${name}: a syntax query shows notes for cut keywords and mistakes, and announces them`, t => checkNotes(t, engine));
   test(`${name}: a plain query with a typing slip lists close spellings after its matches`, t => checkCloseSpellings(t, engine));
