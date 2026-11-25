@@ -173,7 +173,7 @@
 #cards[data-compact] .cards-sheet .close { grid-area: close; }
 #cards[data-compact] .card-status { min-height: 0; line-height: 1.2; }
 /* Compact, the notes join the count on its one line in their short forms, and the first is enough. */
-#cards[data-compact] .card-state { display: flex; gap: var(--space-2); overflow: hidden; white-space: nowrap; }
+#cards[data-compact] .card-state { display: flex; align-items: baseline; gap: var(--space-2); overflow: hidden; white-space: nowrap; }
 #cards[data-compact] .cards-sheet[data-view="card"] .card-state { display: none; }
 #cards[data-compact] .card-status { flex: none; }
 #cards[data-compact] .card-notes { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }

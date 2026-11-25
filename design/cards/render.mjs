@@ -1,4 +1,4 @@
-// Renders card lookup for review: the pill with its magnifier (on a 4-player board, and on the fullest 2-player pill at
+// Renders card lookup for review: the query language's notes, close spellings and Search help, the pill with its magnifier (on a 4-player board, and on the fullest 2-player pill at
 // the stress size, both ways up), the sheet empty, typing, a card open (double-faced, and a creature with power and
 // toughness), rules text and the keyboard open on a landscape phone, in both styles at 952 × 427, 568 × 320 and an iPad.
 //
@@ -31,6 +31,14 @@ async function type(page, text) {
   await page.locator('#card-query').fill(text);
   await page.waitForFunction(() => document.querySelector('#card-results').children.length > 0);
 }
+// Types a query and waits for its results, past the debounce of a slow query.
+async function settle(page, query) {
+  await page.locator('#card-query').fill(query);
+  await page.waitForTimeout(400);
+  await page.waitForFunction(() => !/Searching|Loading/.test(document.querySelector('#card-status').textContent));
+  await page.locator('#card-query').blur();
+  await page.waitForTimeout(100);
+}
 async function openCard(page, name) {
   await type(page, name);
   await page.locator('#card-results .card-row', { hasText: name }).first().tap();
@@ -61,6 +69,20 @@ for (const style of styles) {
     await type(page, 'create a treasure');
     await page.waitForTimeout(50);
     await page.screenshot({ path: name('rules-text-treasure') });
+    await page.locator('#card-text').tap();
+    // The query language (design/polish/SCRYFALL-SYNTAX-SPEC.md): a syntax query, a cut keyword's note, a mistake's
+    // note, a typing slip's close spelling, and Search help.
+    await settle(page, 't:creature c:g mv<=3 order:cmc');
+    await page.screenshot({ path: name('syntax-query') });
+    await settle(page, 'e:war t:elf');
+    await page.screenshot({ path: name('syntax-cut-note') });
+    await settle(page, 't:instant (c:u o:"draw a card');
+    await page.screenshot({ path: name('syntax-error-note') });
+    await settle(page, 'smothering tihte');
+    await page.screenshot({ path: name('typo-close-spelling') });
+    await page.locator('#card-help-button').tap();
+    await page.waitForTimeout(150);
+    await page.screenshot({ path: name('search-help') });
     await page.close();
 
     if (size.width > size.height) {
@@ -72,6 +94,9 @@ for (const style of styles) {
       await page.locator('#card-query').focus();
       await page.waitForTimeout(100);
       await page.screenshot({ path: name('keyboard-open') });
+      await settle(page, 'e:war t:elf');
+      await page.locator('#card-query').focus();
+      await page.screenshot({ path: name('keyboard-open-notes') });
       await page.close();
     }
     shots.push(`${style} ${sizeName}`);

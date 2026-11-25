@@ -51,6 +51,9 @@ let found = null;
 /** @type {number[]} */
 let shown = [];
 let active = -1;
+// The card open beside the list, by its place in the data, or -1.
+let openAt = -1;
+let openQuery = '';
 let countTimer = 0;
 
 // ---- Opening --------------------------------------------------------------------------------------------------------
@@ -130,6 +133,11 @@ function showResults(fresh) {
     return;
   }
   shown = [...page, ...found.close];
+  // A card that isn't in the new results leaves the panel beside them, which asks for a card again.
+  if (openAt >= 0 && found.query !== openQuery && !shown.includes(openAt)) {
+    cardSheet.replaceChildren();
+    openAt = -1;
+  }
   const close = found.close.length ? [closeGroup(found.close.map(at => resultRow(cards[at], at)))] : [];
   resultList.replaceChildren(...added, ...close);
   resultList.scrollTop = 0;
@@ -182,6 +190,8 @@ function openCard(at) {
   if (!index) return;
   const card = index.cards[at];
   cardSheet.replaceChildren(...cardNodes(card));
+  openAt = at;
+  openQuery = found?.query ?? '';
   cardsSheet.dataset.view = 'card';
   const place = shown.indexOf(at);
   if (place >= 0) setActive(place);
