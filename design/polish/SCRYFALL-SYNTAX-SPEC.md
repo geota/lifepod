@@ -1,6 +1,6 @@
 # Card lookup: Scryfall search syntax
 
-**Status:** spec, not built. Written 25 November 2026 for the `card-lookup` branch (read at its rebase in progress, 9908742 plus the card lookup commits). It turns the owner's decisions below into a design and a build plan.
+**Status:** built on `card-lookup` (milestones M1 to M5), with the owner's answers to §11 applied: see "As built" at the end. Written 25 November 2026 for the `card-lookup` branch (read at its rebase in progress, 9908742 plus the card lookup commits). It turns the owner's decisions below into a design and a build plan.
 
 **The owner's decisions:**
 
@@ -138,11 +138,11 @@ A query is a **syntax query** when parsing finds any of these:
 - a `!` at the start of a term;
 - a bracket;
 - a quote;
-- an uppercase `OR`.
+- `or` or `OR` between terms (as built: the owner chose Scryfall's reading, open question 4).
 
-Everything else is a **plain name query**: words, unknown `word:` runs, and a lowercase `or` or `and` between plain words. A plain query keeps today's `searchNames` ranking, the Rules text toggle and the typo pass.
+Everything else is a **plain name query**: words, unknown `word:` runs, and `and` between plain words. A plain query keeps today's `searchNames` ranking, the Rules text toggle and the typo pass.
 
-*Reason:* names contain "or" and "and" ("Death or Glory", "Fight or Flight", "Sword of War and Peace"). Scryfall reads them as operators, which buries the card among hundreds of names that contain one of the two words. Uppercase `OR`, or a lowercase `or` next to any other syntax, is the operator (open question 4).
+*As built (open question 4):* `or` is the operator in any case, exactly as on Scryfall: `death or glory` and `Death or Glory` both give Scryfall's 220 cards. Inside quotation marks it's text: `"death or glory"` is the one card, `"sol ring" or "mana crypt"` two, and `o:"draw or discard"` a literal phrase. **Our one deliberate addition:** when the whole query, folded, is a card's name, that card is listed first, so typing "Death or Glory" still finds it at the top. `and` is ignored as on Scryfall, and doesn't make a query a syntax query.
 
 ### 2.7 Malformed input
 
@@ -454,7 +454,7 @@ The prototype built everything at once in 317 to 385 ms at 4×, so a single buil
 - **Syntax query with `order:`:** that field (§3.8), ties by name.
 - **Syntax query without `order:`, with positive bare name words:** rank the hits by `searchNames`'s buckets for those words joined, then by name. `sol t:artifact` lists Sol Ring first, not Sol Talisman.
 - **Otherwise:** by name, which is the file's order, so there's no sort.
-- **The Rules text toggle in a syntax query** means that bare words also match rules text: name or text, as in a plain query (open question 5). With the toggle off, which is the default, bare words match names only, as on Scryfall.
+- **The Rules text toggle doesn't change a syntax query** (as built, open question 5): its bare words search names, exactly as on Scryfall, whatever the toggle says. The toggle affects only plain, non-syntax searches.
 
 ### 6.5 Detection and flow in `sheets/cards.js`
 
@@ -716,3 +716,16 @@ Run M0 first: it changes what every later milestone's fixtures compare against.
 6. **Land nicknames from Scryfall at update time.** 25 search requests, about 13 s, are added to `cards:update`, cached for `--offline`. *Recommendation:* yes, rather than 25 Oracle-text regexes.
 7. **Long regexes.** Rejecting nested quantifiers also rejects a few harmless patterns. The alternative is evaluating regex terms in a module Worker with a timeout: the CSP's `worker-src` falls back to `script-src 'self'`, so a worker file is allowed. That's more code and a second copy of the columns. *Recommendation:* reject them now, and revisit only if someone hits it.
 8. **The M0 card set change.** It adds 1,062 cards back and drops 870 memorabilia and playtest cards (Hero's Path, World Championship ads, playtest cards). *Recommendation:* yes. It matches what Scryfall shows players, and the missing dual lands are a bug today.
+
+## As built
+
+The owner's answers to §11, applied on `card-lookup`:
+
+1. **EDHREC rank:** exact for every card, +93 KB gzipped (`exactRanks` in `cards-update.mjs` is `Infinity`; 1000 would round past the top thousand).
+2. **Oracle tags:** yes, as the separate lazily loaded `web/data/tags.json.gz` (M5), refreshed with the cards at release time and in the weekly pull request.
+3. **Rarity from every printing:** no, for now. One printing, with the caveat note.
+4. **`or`:** always the operator, as on Scryfall, with the exact-name boost (§2.6).
+5. **Rules text and syntax:** the toggle affects only plain searches (§6.4).
+6. **Land nicknames:** from Scryfall's search at update time, 600 ms apart, cached for `--offline`.
+7. **Catastrophic patterns:** rejected with a note.
+8. **The card set fix:** done (M0).

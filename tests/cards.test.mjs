@@ -252,7 +252,40 @@ async function checkCloseSpellings(t, engine) {
   await eventually(async () => page.locator('#card-results [role="group"]').count(), 0, 'no close spellings with many matches');
 }
 
+// A syntax query lists what Scryfall would, with notes for what card lookup can't answer and for mistakes; the live
+// region says the count and then the notes, once typing pauses (design/polish/SCRYFALL-SYNTAX-SPEC.md §7.1, §7.6).
+async function checkNotes(t, engine) {
+  const page = await openPage(t, engine, { clock: true, viewport: { width: 952, height: 427 } });
+  await openCards(page);
+  await page.locator('#card-query').fill('e:war t:elf');
+  await eventually(async () => /^\d+ cards$/.test(await statusText(page)), true, 'the elves are counted');
+  const count = Number((await statusText(page)).replace(/\D/g, ''));
+  assert.ok(count > 600, `${count} elves`);
+  const note = page.locator('#card-notes .card-note');
+  assert.equal(await note.count(), 1);
+  assert.equal(await note.getAttribute('data-kind'), 'cut');
+  assert.equal(await note.locator('.card-note-text').textContent(), 'Sets and printings aren’t in the offline data. Showing results without e:war.');
+  assert.equal(await note.locator('code').textContent(), 'e:war', 'the term in monospace');
+  assert.equal(await page.locator('#card-query').getAttribute('aria-describedby'), 'card-notes');
+  await page.clock.runFor(500);
+  assert.equal(await page.locator('#card-count').textContent(), `${count} cards. Sets and printings aren’t in the offline data. Showing results without e:war.`);
+  // A mistake is mended with an error note, and nothing throws (the harness fails on a page error).
+  await page.locator('#card-query').fill('o:"draw a card t:instant');
+  await eventually(async () => page.locator('#card-notes .card-note[data-kind="error"]').count(), 1, 'the error note');
+  assert.match(await page.locator('#card-notes .card-note-text').first().textContent(), /^Missing closing quote/);
+  // "or" is the operator, and the card named by the whole query comes first.
+  await page.locator('#card-query').fill('death or glory');
+  await eventually(async () => (await rowNames(page))[0], 'Death or Glory', 'the exact name first');
+  assert.ok(Number((await statusText(page)).replace(/\D/g, '')) > 100, 'either word');
+  // Rules text doesn't change a syntax query: its bare words are names.
+  await button(page, 'Rules text').click();
+  await page.locator('#card-query').fill('treasure t:artifact');
+  await page.clock.runFor(1);
+  await eventually(async () => (await rowNames(page)).every(row => /treasure/i.test(row)), true, 'only names with Treasure');
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a syntax query shows notes for cut keywords and mistakes, and announces them`, t => checkNotes(t, engine));
   test(`${name}: a plain query with a typing slip lists close spellings after its matches`, t => checkCloseSpellings(t, engine));
   test(`${name}: card lookup takes no undo step and leaves History as it was`, t => checkNoHistory(t, engine));
   test(`${name}: card lookup loads when first shown, searches as you type and works from the keyboard`, t => checkLookup(t, engine));

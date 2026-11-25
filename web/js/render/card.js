@@ -2,9 +2,10 @@
 // results, and the card itself, as text with no art. css/cards.css styles all three.
 
 import { costText, splitSymbols } from '../logic/cards.js';
+import { formatAt, readLegalities } from '../logic/cardterms.js';
 import { identityNames } from '../logic/data.js';
 import { identityText } from '../logic/rules.js';
-import { element, visuallyHidden } from '../ui/dom.js';
+import { element, icon, visuallyHidden } from '../ui/dom.js';
 import { colourIndicator } from './tile.js';
 
 /** @typedef {import('../logic/cards.js').Card} Card */
@@ -108,7 +109,8 @@ export function cardNodes(card) {
   shown.setAttribute('aria-hidden', 'true');
   const facts = element('p', 'card-facts', colourIndicator(identity), shown,
     visuallyHidden(identity ? identityText(identity) : 'Colourless, no colour identity'));
-  if (card.edh) facts.append(element('span', 'card-banned', card.edh === 'banned' ? 'Banned in Commander' : 'Not legal in Commander'));
+  const commander = card.t.startsWith('Token') ? 'l' : readLegalities(card.lg)[formatAt('commander')];
+  if (commander !== 'l') facts.append(element('span', 'card-banned', commander === 'b' ? 'Banned in Commander' : 'Not legal in Commander'));
   return [head, ...faces, facts];
 }
 
@@ -122,4 +124,35 @@ export function closeGroup(rows) {
   group.setAttribute('role', 'group');
   group.setAttribute('aria-label', 'Close spellings');
   return group;
+}
+
+/** @typedef {import('../logic/cardfilter.js').ShownNote} ShownNote */
+// One note under the search field: an info circle for a cut keyword, hint or caveat, a warning for an error, and the
+// query terms it names in monospace. The short form is for the compact layout, which shows one line.
+/** @param {ShownNote} note */
+function noteNode(note) {
+  const line = element('p', 'card-note', icon(note.kind === 'error' ? 'warning' : 'info'));
+  line.dataset.kind = note.kind;
+  const text = element('span', 'card-note-text');
+  let rest = note.text;
+  for (const term of note.terms) {
+    const at = rest.indexOf(term);
+    if (at < 0) continue;
+    text.append(rest.slice(0, at), element('code', '', term));
+    rest = rest.slice(at + term.length);
+  }
+  text.append(rest);
+  line.append(text, element('span', 'card-note-short', note.short));
+  return line;
+}
+// The notes for a query: the first two, and a button for the rest, which shows them in its place.
+/** @param {ShownNote[]} notes */
+export function noteNodes(notes) {
+  const lines = notes.map(noteNode);
+  if (lines.length <= 2) return lines;
+  const rest = lines.slice(2);
+  const more = element('button', 'card-notes-more', `${rest.length} more ${rest.length === 1 ? 'note' : 'notes'}`);
+  more.type = 'button';
+  more.addEventListener('click', () => more.replaceWith(...rest));
+  return [...lines.slice(0, 2), more];
 }

@@ -17,6 +17,7 @@ import { createInterface } from 'node:readline';
 import { constants, createGunzip, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { fold } from '../web/js/logic/cards.js';
+import { formats, writeLegalities } from '../web/js/logic/cardterms.js';
 
 const root = new URL('../', import.meta.url);
 const output = new URL('data/cards.json', root);
@@ -48,10 +49,10 @@ const colourOrder = 'WUBRG';
 const inColourOrder = colours => [...new Set(colours)].sort((a, b) => colourOrder.indexOf(a) - colourOrder.indexOf(b)).join('');
 // Rarity as one letter. The Oracle file holds one printing of each card, so this is that printing's rarity.
 const rarities = { common: 'c', uncommon: 'u', rare: 'r', mythic: 'm', special: 's', bonus: 'b' };
-// The EDHREC rank, 1 the most played: exact up to this rank, then rounded to two significant figures, so a monthly
-// update rewrites far fewer lines as ranks drift (+47 KB gzipped, against +93 KB exact). Set it to Infinity to keep
-// every rank exact. `edhrec<=100` stays exact either way; `edhrec>5000` is off by at most 5% at the edge.
-export const exactRanks = 1000;
+// The EDHREC rank, 1 the most played: exact up to this rank, then rounded to two significant figures. The owner chose
+// exact ranks for every card (+93 KB gzipped, and most lines change at each update as ranks drift); 1000 here would
+// round past the top thousand instead (+47 KB, and far fewer changed lines).
+export const exactRanks = Infinity;
 /** @param {number} rank */
 export function roundRank(rank) {
   if (rank <= exactRanks) return rank;
@@ -91,7 +92,6 @@ export function toCard(card) {
   const frontType = front.type_line ?? card.type_line;
   const keywords = [...(card.keywords ?? [])].sort();
   const colours = card.colors ?? (card.card_faces ?? []).flatMap(side => side.colors ?? []);
-  const commander = card.legalities?.commander;
   const record = faced
     ? { n: card.name, m: card.mana_cost || front.mana_cost, t: card.type_line }
     : face(card);
@@ -104,12 +104,22 @@ export function toCard(card) {
     v: card.cmc ? card.cmc : undefined,
     r: rarities[card.rarity],
     f: faced ? card.card_faces.map(face) : undefined,
-    edh: commander && commander !== 'legal' && card.layout !== 'token' ? commander : undefined,
     lead: /\bLegendary\b/.test(frontType) && /\bCreature\b/.test(frontType)
       || /can be your commander/.test(front.oracle_text ?? '') ? 1 : undefined,
     kw: keywords.length ? keywords : undefined,
     pair: keywords.some(keyword => pairing.test(keyword)) ? 1 : undefined,
     er: card.edhrec_rank ? roundRank(card.edhrec_rank) : undefined,
+    // For the query language (design/polish/SCRYFALL-SYNTAX-SPEC.md §5.2): the legalities, one letter per format in
+    // cardterms.js's order; the colours of mana it can make; the layout when it isn't normal; a meld result; Game
+    // Changer, Reserved List, a colour indicator and a funny set as flags.
+    lg: card.layout === 'token' ? undefined : writeLegalities(card.legalities),
+    pm: inColourOrder(card.produced_mana ?? []).replace(/[^WUBRG]/g, '') + ((card.produced_mana ?? []).includes('C') ? 'C' : ''),
+    ly: card.layout !== 'normal' ? card.layout : undefined,
+    mr: card.all_parts?.some(part => part.component === 'meld_result' && part.id === card.id) ? 1 : undefined,
+    gc: card.game_changer ? 1 : undefined,
+    rs: card.reserved ? 1 : undefined,
+    ci: card.color_indicator || card.card_faces?.some(side => side.color_indicator) ? 1 : undefined,
+    fun: card.set_type === 'funny' ? 1 : undefined,
   }) };
 }
 
@@ -128,7 +138,7 @@ export async function buildCards(lines, updated) {
   }
   const rows = cards.map(card => ({ card, json: JSON.stringify(card) }));
   rows.sort((a, b) => (a.card.k < b.card.k ? -1 : a.card.k > b.card.k ? 1 : a.json < b.json ? -1 : a.json > b.json ? 1 : 0));
-  const about = { source: 'Scryfall Oracle cards bulk data, scryfall.com', updated, count: rows.length };
+  const about = { source: 'Scryfall Oracle cards bulk data, scryfall.com', updated, count: rows.length, formats };
   return `{"about":${JSON.stringify(about)},\n"cards":[\n${rows.map(row => row.json).join(',\n')}\n]}\n`;
 }
 

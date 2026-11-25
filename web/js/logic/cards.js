@@ -22,9 +22,13 @@
  * - `v`: the mana value; none is 0. `r`: the rarity of the printing Scryfall's Oracle file holds (c, u, r, m, s or b).
  * - `kw`: Scryfall's keywords, sorted; `pair` marks a pairing keyword (Partner, Friends forever, Choose a Background,
  *   Doctor's companion).
- * - `edh`: the Commander legality when it isn't legal; `lead` marks a card that can be a commander.
- * - `er`: the EDHREC rank, 1 the most played, exact to 1,000 and then to two significant figures (`roundRank` in
- *   scripts/cards-update.mjs); none for a card EDHREC doesn't rank.
+ * - `lead` marks a card that can be a commander.
+ * - `lg`: the legalities, one letter per format in `about.formats` (cardterms.js `formats`): lower case legal, upper
+ *   case banned, `+x` restricted, absent not legal. `pm`: the mana it can make, in W U B R G C order. `ly`: the layout
+ *   when it isn't normal. `mr` a meld result; `gc` a Game Changer; `rs` on the Reserved List; `ci` a colour indicator;
+ *   `fun` from a funny set.
+ * - `er`: the EDHREC rank, 1 the most played, exact (`exactRanks` in scripts/cards-update.mjs can round it); none for a
+ *   card EDHREC doesn't rank.
  * These fields are there for a structured query (`c:r t:creature o:treasure mv<=3`) to be built on the matching below.
  * @typedef {CardFace & {
  *   k: string,
@@ -33,16 +37,24 @@
  *   v?: number,
  *   r?: string,
  *   f?: CardFace[],
- *   edh?: string,
  *   lead?: number,
  *   kw?: string[],
  *   pair?: number,
  *   er?: number,
+ *   lg?: string,
+ *   pm?: string,
+ *   ly?: string,
+ *   mr?: number,
+ *   gc?: number,
+ *   rs?: number,
+ *   ci?: number,
+ *   fun?: number,
  * }} Card
  */
 /**
  * @typedef {object} CardData
- * @property {{ source: string, updated: string, count: number }} about Where the data is from and the bulk file's date.
+ * @property {{ source: string, updated: string, count: number, formats: string[] }} about Where the data is from, the
+ *   bulk file's date, and the formats in `lg`'s order.
  * @property {Card[]} cards Sorted by `k`, then by the rest of the card, so the file's order is stable between updates.
  */
 

@@ -17,12 +17,12 @@ const index = indexCards(data.cards);
 const names = (query, options) => searchCards(index, query, options).results.map(at => data.cards[at].n);
 
 const faceKeys = new Set(['n', 'm', 't', 'o', 'p', 'l', 'd']);
-const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'edh', 'lead', 'kw', 'pair', 'er']);
+const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun']);
 const inColourOrder = /^W?U?B?R?G?$/;
 
 test('node: the card data file has one card per line, in order, with only the fields the lookup reads', () => {
   const lines = dataText.split('\n');
-  assert.match(lines[0], /^\{"about":\{"source":"Scryfall[^"]*","updated":"\d{4}-\d\d-\d\dT[^"]+","count":\d+\},$/);
+  assert.match(lines[0], /^\{"about":\{"source":"Scryfall[^"]*","updated":"\d{4}-\d\d-\d\dT[^"]+","count":\d+,"formats":\["standard"[^\]]*\]\},$/);
   assert.equal(lines[1], '"cards":[');
   assert.equal(lines.at(-2), ']}');
   assert.equal(lines.length - 4, data.cards.length, 'one card per line, for readable diffs');
@@ -45,7 +45,8 @@ test('node: the card data file has one card per line, in order, with only the fi
     if (card.co !== undefined) assert.ok(card.co === '-' || inColourOrder.test(card.co), `${card.n}: colours ${card.co}`);
     if (card.v !== undefined) assert.ok(typeof card.v === 'number' && card.v > 0, `${card.n}: mana value`);
     if (card.r !== undefined) assert.match(card.r, /^[curmsb]$/, `${card.n}: rarity`);
-    if (card.edh !== undefined) assert.match(card.edh, /^(banned|not_legal|restricted)$/);
+    if (card.lg !== undefined) assert.match(card.lg, /^(\+?[a-wA-W])+$/, `${card.n}: legalities`);
+    if (card.pm !== undefined) assert.match(card.pm, /^W?U?B?R?G?C?$/, `${card.n}: produced mana`);
     if (card.kw) assert.deepEqual(card.kw, [...card.kw].sort(), `${card.n}: keywords sorted`);
     if (card.f) {
       assert.ok(card.f.length >= 2, `${card.n}: a card with faces has two or more`);
@@ -56,7 +57,7 @@ test('node: the card data file has one card per line, in order, with only the fi
   }
   // A few cards the lookup must have, as Scryfall prints them.
   const card = name => data.cards.find(entry => entry.n === name);
-  assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u', er: 1 });
+  assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u', er: 1, lg: 'H+jlMSvW', pm: 'C' });
   assert.equal(card('Treasure').t, 'Token Artifact — Treasure', 'the predefined tokens are kept');
   assert.equal(card('Soldier'), undefined, 'other tokens are not');
   // Paper cards whose Oracle printing is an MTGO one are kept, because paper formats list them; the cards Scryfall hides
@@ -106,15 +107,15 @@ const bulk = [
   { name: 'Oversized Memento', layout: 'normal', games: ['paper'], set_type: 'memorabilia', type_line: 'Artifact', color_identity: [], keywords: [], rarity: 'rare', legalities: {} },
   { name: 'Background Buddy', layout: 'normal', games: ['paper'], mana_cost: '{1}{U}', cmc: 2, type_line: 'Legendary Creature — Halfling', oracle_text: 'Choose a background', colors: ['U'], color_identity: ['U'], keywords: ['Choose a background'], rarity: 'uncommon', legalities: { commander: 'legal' } },
 ];
-const expected = `{"about":{"source":"Scryfall Oracle cards bulk data, scryfall.com","updated":"2026-11-23T22:02:34.594+00:00","count":7},
+const expected = `{"about":{"source":"Scryfall Oracle cards bulk data, scryfall.com","updated":"2026-11-23T22:02:34.594+00:00","count":7,"formats":["standard","future","historic","timeless","gladiator","pioneer","modern","legacy","pauper","vintage","penny","commander","oathbreaker","standardbrawl","brawl","competitivebrawl","alchemy","paupercommander","duel","oldschool","premodern","predh","tlr"]},
 "cards":[
-{"n":"Background Buddy","m":"{1}{U}","t":"Legendary Creature — Halfling","o":"Choose a background","k":"background buddy","c":"U","v":2,"r":"u","lead":1,"kw":["Choose a background"],"pair":1},
-{"n":"Badlands","t":"Land — Swamp Mountain","o":"({T}: Add {B} or {R}.)","k":"badlands","c":"BR","co":"-","r":"r"},
-{"n":"Delver of Secrets // Insectile Aberration","m":"{U}","t":"Creature — Human Wizard // Creature — Human Insect","k":"delver of secrets insectile aberration","c":"U","v":1,"r":"c","f":[{"n":"Delver of Secrets","m":"{U}","t":"Creature — Human Wizard","o":"At the beginning of your upkeep, look at the top card of your library.","p":"1/1"},{"n":"Insectile Aberration","t":"Creature — Human Insect","o":"Flying","p":"3/2"}],"kw":["Flying","Transform"]},
-{"n":"Grizzly Bears","m":"{1}{G}","t":"Creature — Bear","p":"2/2","k":"grizzly bears","c":"G","v":2,"r":"c"},
-{"n":"Lim-Dûl's Vault","m":"{U}{B}","t":"Instant","o":"Look at the top five cards of your library.","k":"lim duls vault","c":"UB","v":2,"r":"u"},
-{"n":"Partner Pal","m":"{2}{W}","t":"Legendary Creature — Human","o":"Partner","p":"2/3","k":"partner pal","c":"W","v":3,"r":"r","edh":"banned","lead":1,"kw":["Partner"],"pair":1},
-{"n":"Treasure","t":"Token Artifact — Treasure","o":"{T}, Sacrifice this token: Add one mana of any color.","k":"treasure","r":"c"}
+{"n":"Background Buddy","m":"{1}{U}","t":"Legendary Creature — Halfling","o":"Choose a background","k":"background buddy","c":"U","v":2,"r":"u","lead":1,"kw":["Choose a background"],"pair":1,"lg":"l"},
+{"n":"Badlands","t":"Land — Swamp Mountain","o":"({T}: Add {B} or {R}.)","k":"badlands","c":"BR","co":"-","r":"r","lg":"hl"},
+{"n":"Delver of Secrets // Insectile Aberration","m":"{U}","t":"Creature — Human Wizard // Creature — Human Insect","k":"delver of secrets insectile aberration","c":"U","v":1,"r":"c","f":[{"n":"Delver of Secrets","m":"{U}","t":"Creature — Human Wizard","o":"At the beginning of your upkeep, look at the top card of your library.","p":"1/1"},{"n":"Insectile Aberration","t":"Creature — Human Insect","o":"Flying","p":"3/2"}],"kw":["Flying","Transform"],"lg":"l","ly":"transform"},
+{"n":"Grizzly Bears","m":"{1}{G}","t":"Creature — Bear","p":"2/2","k":"grizzly bears","c":"G","v":2,"r":"c","lg":"l"},
+{"n":"Lim-Dûl's Vault","m":"{U}{B}","t":"Instant","o":"Look at the top five cards of your library.","k":"lim duls vault","c":"UB","v":2,"r":"u","lg":"l"},
+{"n":"Partner Pal","m":"{2}{W}","t":"Legendary Creature — Human","o":"Partner","p":"2/3","k":"partner pal","c":"W","v":3,"r":"r","lead":1,"kw":["Partner"],"pair":1,"lg":"L"},
+{"n":"Treasure","t":"Token Artifact — Treasure","o":"{T}, Sacrifice this token: Add one mana of any color.","k":"treasure","r":"c","ly":"token"}
 ]}
 `;
 

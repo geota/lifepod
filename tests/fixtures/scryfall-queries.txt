@@ -1,0 +1,123 @@
+# Queries checked against Scryfall's own results (tests/cards-conformance.test.mjs). `## family` starts a group for the
+# scores; `# tolerance 0.80: reason` after a query lowers its Jaccard floor from 0.97. Refresh the saved results with
+# `node scripts/cards-conformance.mjs --fetch` (600 ms between requests), after `npm run cards:update`.
+
+## colours
+c:rg
+c>=uw -c:red
+id<=esper t:instant
+id:c t:land
+c=2 is:bear
+c:m t:enchantment mv<=2
+id=wu
+c<=g t:creature mv=1
+c:azorius t:creature mv<=2
+
+## types and text
+t:merfolk t:legend
+t:goblin -t:creature
+o:draw t:creature mv<=2
+kw:flying -t:creature
+fo:"attach to target creature you control"
+o:"draw or discard"
+
+## names
+!fire
+!"sift through sands"
+through (depths or sands or mists)
+-fire c:r t:instant mv=1
+lightning
+"death or glory"
+"sol ring" or "mana crypt"
+death or glory
+
+## mana
+mana:{G}{U}
+m:2WW
+m=2WW
+m>3WU
+m:{R/P}
+c:u mv=5 t:instant
+mv:odd t:sorcery c:b mv<=3
+is:hybrid
+is:phyrexian
+
+## stats
+pow>=8
+pow>tou c:w t:creature mv<=3
+t:planeswalker loy=3
+pt>=15 # tolerance 0.90: back faces of double-faced cards count differently
+
+## layouts and flags
+is:split
+is:flip
+is:transform
+is:mdfc
+is:meld
+is:leveler
+is:gamechanger
+is:reserved t:creature
+has:indicator
+is:funny t:creature c:r # tolerance 0.75: the funny flag is from one printing's set
+
+## formats and rarity
+f:pauper c:g t:creature mv=3
+banned:legacy
+restricted:vintage
+banned:commander
+r>=m t:dragon # tolerance 0.85: rarity is from one printing of each card
+
+## combining
+t:fish or t:bird
+t:legendary (t:goblin or t:elf)
+t:elf t:warrior or t:goblin
+
+## kinds of card
+is:vanilla
+is:frenchvanilla # tolerance 0.78: Scryfall's keyword rules for French vanilla aren't public
+is:bear c:g
+is:historic t:creature mv=1
+is:party c:w mv=2
+is:outlaw c:b mv=2
+is:modal
+is:commander c:w
+is:partner # tolerance 0.90: Scryfall's partner set is hand-curated
+is:companion # tolerance 0.90: one card Scryfall counts differently
+is:spell t:artifact mv=0
+is:permanent t:rebel
+
+## mana, more
+devotion:{u/b}{u/b}{u/b}
+produces=wu
+edhrecrank<=100
+
+## patterns and ~
+o:"~ enters tapped"
+t:creature o:/^{T}:/ c:g
+t:instant o:/\spp/ c:w
+name:/\bizzet\b/
+o:/\bdraw\b(?!s)/ t:instant c:u mv=1
+
+## land nicknames
+is:manland
+is:dual
+is:fetchland
+is:shockland
+is:painland
+is:checkland
+is:triome
+is:bounceland
+is:storageland
+is:filterland
+is:canopyland
+
+## sorting
+t:dragon c:r mv>=7 order:cmc
+t:goblin c:r pow>=4 order:power
+t:angel c:w mv>=6 order:rarity
+t:sphinx order:edhrec
+t:elemental c:g mv>=6 order:color
+
+## tags
+otag:removal c:w mv<=1 t:instant
+function:ramp t:creature c:g mv<=2

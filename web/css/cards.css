@@ -34,13 +34,23 @@
 .card-field input::-webkit-search-decoration { -webkit-appearance: none; }
 .card-text-toggle { flex: none; padding-inline: var(--space-4); font-size: var(--type-label); white-space: nowrap; }
 .card-text-toggle[aria-pressed="true"] { border-color: var(--chosen-fill); background: var(--chosen-fill); color: var(--chosen-ink); box-shadow: var(--chosen-ring); }
-.card-status { grid-area: status; min-height: 1.35em; color: var(--muted); font-size: var(--type-small); }
+.card-state { grid-area: status; display: grid; gap: 2px; min-width: 0; }
+.card-status { min-height: 1.35em; color: var(--muted); font-size: var(--type-small); }
+/* Notes about the query, one line each: an icon, then the text, with the query's terms in monospace. */
+.card-notes { display: grid; gap: 2px; }
+.card-notes:empty { display: none; }
+.card-note { display: flex; align-items: flex-start; gap: 6px; color: var(--text-soft); font-size: var(--type-small); line-height: 1.3; }
+.card-note .icon { flex: none; width: 1.15em; height: 1.15em; margin-top: .1em; color: var(--muted); }
+.card-note[data-kind="error"] .icon { color: var(--danger-text); }
+.card-note code { font-family: SFMono-Regular, Menlo, Consolas, 'Roboto Mono', monospace; font-size: .95em; overflow-wrap: anywhere; }
+.card-note-short { display: none; }
+.card-notes-more { justify-self: start; min-height: var(--tap-min); padding: 0 var(--space-3); border: var(--control-edge) solid var(--control-border); border-radius: var(--button-radius); background: var(--control-fill); color: var(--text); font-size: var(--type-small); font-weight: var(--weight-semibold); }
 .card-credit { grid-area: credit; color: var(--muted); font-size: var(--type-small); }
 
 /* Results and the card share the body: one at a time when narrow, side by side when wide. Narrow, an open card takes
    the search row's and the credit's place too, so a short phone has room for its text; Results brings them back. */
 .card-body { grid-area: body; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
-.cards-sheet[data-view="card"] :is(.card-results, .card-search, .card-status, .card-credit), .cards-sheet[data-view="list"] .card-panel { display: none; }
+.cards-sheet[data-view="card"] :is(.card-results, .card-search, .card-state, .card-credit), .cards-sheet[data-view="list"] .card-panel { display: none; }
 .card-results { position: relative; display: grid; align-content: start; gap: 4px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 4px; }
 .card-row {
   display: grid;
@@ -109,7 +119,8 @@
   .card-body { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3); }
   .cards-sheet[data-view] .card-results { position: relative; display: grid; }
   .cards-sheet[data-view] .card-search { display: flex; }
-  .cards-sheet[data-view] :is(.card-status, .card-credit) { display: block; }
+  .cards-sheet[data-view] .card-state { display: grid; }
+  .cards-sheet[data-view] .card-credit { display: block; }
   .cards-sheet[data-view] .card-panel { display: flex; }
   .card-back { display: none; }
   .card-sheet:empty { display: grid; place-items: center; min-height: 160px; }
@@ -130,6 +141,15 @@
 #cards[data-compact] .cards-sheet :is(.sheet-header h2, .card-credit) { display: none; }
 #cards[data-compact] .cards-sheet .close { grid-area: close; }
 #cards[data-compact] .card-status { min-height: 0; line-height: 1.2; }
+/* Compact, the notes join the count on its one line in their short forms, and the first is enough. */
+#cards[data-compact] .card-state { display: flex; gap: var(--space-2); overflow: hidden; white-space: nowrap; }
+#cards[data-compact] .cards-sheet[data-view="card"] .card-state { display: none; }
+#cards[data-compact] .card-status { flex: none; }
+#cards[data-compact] .card-notes { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#cards[data-compact] .card-note:not(:first-child), #cards[data-compact] .card-notes-more, #cards[data-compact] .card-note-text, #cards[data-compact] .card-note .icon { display: none; }
+#cards[data-compact] .card-note { display: inline; line-height: 1.2; }
+#cards[data-compact] .card-note-short { display: inline; }
+#cards[data-compact] .card-note-short::before { content: '· '; }
 #cards[data-compact] .card-row { min-height: var(--tap-min); padding-block: 2px; }
 /* iOS shrinks only the visual viewport for its keyboard, so the sheet is placed in what's left (js/sheets/cards.js). */
 #cards[data-keyboard] { height: calc(var(--view-height, 100%) - 12px); margin: calc(var(--view-top, 0px) + 6px) auto auto; }
