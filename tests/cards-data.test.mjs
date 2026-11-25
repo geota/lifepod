@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from './helpers.mjs';
 import { gunzipSync } from 'node:zlib';
-import { buildCards, cachedBulk, packCards, readBulk, shownDate } from '../scripts/cards-update.mjs';
+import { buildCards, cachedBulk, cachedNicknames, packCards, readBulk, shownDate } from '../scripts/cards-update.mjs';
 import {
   colourMask, costText, faceStats, fold, indexCards, rankResults, readSymbol, searchCards, searchNames, searchText, splitSymbols,
 } from '../web/js/logic/cards.js';
@@ -17,7 +17,7 @@ const index = indexCards(data.cards);
 const names = (query, options) => searchCards(index, query, options).results.map(at => data.cards[at].n);
 
 const faceKeys = new Set(['n', 'm', 't', 'o', 'p', 'l', 'd']);
-const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun']);
+const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun', 'lc']);
 const inColourOrder = /^W?U?B?R?G?$/;
 
 test('node: the card data file has one card per line, in order, with only the fields the lookup reads', () => {
@@ -138,7 +138,7 @@ test('node: the committed data file is what the cached bulk file builds', async 
     t.skip(`the cache is from ${cached.updated_at}, the data from ${data.about.updated}`);
     return;
   }
-  assert.equal(await buildCards(readBulk(cached.path), cached.updated_at), dataText);
+  assert.equal(await buildCards(readBulk(cached.path), cached.updated_at, cachedNicknames()?.lists ?? {}), dataText);
 });
 
 test('node: search ranks the whole name, then a word prefix, a prefix, word starts and contains', () => {

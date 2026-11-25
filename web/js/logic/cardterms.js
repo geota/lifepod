@@ -167,11 +167,65 @@ export function compareCosts(have, want, op) {
 
 // ---- Names and text -------------------------------------------------------------------------------------------------------
 
-// Reminder text, in parentheses, which o: leaves out and fo: keeps.
-export const reminderText = /\s*\([^()]*\)/g;
-// Lower case with accents folded but punctuation kept, for quoted names.
-/** @param {string} text */
-export const lowerName = text => text.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
 // A name or word with its spaces and punctuation removed: "lim-dul's" and "limduls" are the same.
 /** @param {string} text */
 export const squash = text => fold(text).replace(/ /g, '');
+
+// ---- Patterns -------------------------------------------------------------------------------------------------------------
+
+// Scryfall's pattern shorthands (§2.3), longest first so \smr isn't read as \sm and an r.
+const shorthands = [
+  ['\\smr', '(?:\\{w\\}\\{w\\}|\\{u\\}\\{u\\}|\\{b\\}\\{b\\}|\\{r\\}\\{r\\}|\\{g\\}\\{g\\}|\\{c\\}\\{c\\})'],
+  ['\\smh', '\\{[^}/]+\\/[^}]+\\}'],
+  ['\\smp', '\\{(?:[^}]*\\/)?p\\}'],
+  ['\\spt', '[-+]?(?:\\d+|\\*|x)\\/[-+]?(?:\\d+|\\*|x)'],
+  ['\\spp', '\\+(?:\\d+|x)\\/\\+(?:\\d+|x)'],
+  ['\\smm', '-(?:\\d+|x)\\/-(?:\\d+|x)'],
+  ['\\sm', '\\{[^}]+\\}'],
+  ['\\sc', '\\{(?:[wubrg](?:\\/[^}]+)?|[^}]*\\/[wubrg][^}]*)\\}'],
+  ['\\ss', '\\{[^}]+\\}'],
+];
+/**
+ * A Scryfall pattern as a JavaScript RegExp (flags `im`): its shorthands expanded, braces that aren't a {m,n}
+ * quantifier taken literally (so `{T}` works), and back-references and nested quantifiers refused, since a pattern
+ * can't be stopped once it runs.
+ * @param {string} source
+ * @returns {{ pattern: RegExp, tilde: boolean } | { error: string }}
+ */
+export function readPattern(source) {
+  if (/\\[1-9]/.test(source)) return { error: 'Back-references aren’t supported.' };
+  let out = '';
+  for (let at = 0; at < source.length; at++) {
+    const rest = source.slice(at);
+    const shorthand = shorthands.find(([name]) => rest.startsWith(name));
+    if (shorthand) {
+      out += shorthand[1];
+      at += shorthand[0].length - 1;
+    } else if (rest[0] === '\\') {
+      out += rest.slice(0, 2);
+      at++;
+    } else if (rest[0] === '{' && !/^\{\d+(,\d*)?\}/.test(rest)) out += '\\{';
+    else if (rest[0] === '}' && !/\{\d+(,\d*)?$/.test(out)) out += '\\}';
+    else out += rest[0];
+  }
+  // A quantified group that holds a quantifier, such as (a+)+, can backtrack for ever.
+  if (/\((?:[^()\\]|\\.)*[*+}](?:[^()\\]|\\.)*\)[*+{]/.test(out)) return { error: 'This pattern could take too long. Try it without a repeated group.' };
+  try {
+    return { pattern: new RegExp(out, 'im'), tilde: source.includes('~') };
+  } catch (error) {
+    return { error: `Invalid pattern: ${String(/** @type {Error} */ (error).message).replace(/^Invalid regular expression: (\/.*\/[a-z]*: )?/, '')}` };
+  }
+}
+
+// ---- Land nicknames ---------------------------------------------------------------------------------------------------------
+
+// The land cycles Scryfall names (§3.7), as `is:` values, with their aliases. scripts/cards-update.mjs asks Scryfall for
+// each one's cards and writes them into each card's `lc`.
+export const landNicknames = ['bikeland', 'bondland', 'bounceland', 'canopyland', 'checkland', 'creatureland', 'dual', 'fastland',
+  'fetchland', 'filterland', 'gainland', 'manland', 'painland', 'pathway', 'scryland', 'surveilland', 'shadowland', 'shockland',
+  'slowland', 'storageland', 'tangoland', 'tricycleland', 'triland'];
+/** @type {Record<string, string>} */
+export const nicknameAliases = {
+  cycleland: 'bikeland', bicycleland: 'bikeland', crowdland: 'bondland', bbdland: 'bondland', battlebondland: 'bondland', karoo: 'bounceland',
+  canland: 'canopyland', snarl: 'shadowland', battleland: 'tangoland', trikeland: 'tricycleland', triome: 'tricycleland',
+};

@@ -115,3 +115,39 @@ test('node: colour sets and mana costs compare as subsets and supersets', () => 
   assert.ok(compareCosts(readCost('{2}'), readCost('1'), ':'), 'm:1 matches {2}');
   assert.ok(compareCosts(readCost('{U/W}'), readCost('{W/U}'), '='), 'hybrid halves in either order');
 });
+
+test('node: patterns, the card\'s own name, devotion, produced mana, EDHREC rank and sorting', () => {
+  assert.ok(has('t:creature o:/^{T}:/ c:g mv=1', 'Llanowar Elves'), 'a pattern with a literal {T}');
+  assert.ok(has('t:instant o:/\\spp/ c:w mv=1', 'Gods Willing') === false && has('t:instant o:/\\spp/ c:w', 'Brute Force') === false, 'shorthands read');
+  assert.ok(has('name:/\\bizzet\\b/', 'Izzet Charm') && !has('name:/\\bizzet\\b/', 'Izzetisdead'), 'a name pattern');
+  assert.ok(has('o:"~ enters tapped" t:land', 'Azorius Chancery'), '~ is the card\'s name, or "this land"');
+  assert.ok(has('devotion:{u/b}{u/b}{u/b}', 'Arcanis the Omnipotent'), 'a {U} counts toward {u/b}');
+  assert.ok(has('produces=wu', 'Azorius Chancery') && !has('produces=wu', 'Command Tower'), 'produces= exactly');
+  assert.ok(has('edhrec<=10', 'Sol Ring') && !has('edhrec<=10', 'Storm Crow'), 'EDHREC rank');
+  assert.deepEqual(names('t:dragon c:r mv>=9 order:cmc direction:desc').slice(0, 1).map(name => run(`!"${name}"`).hits.length > 0), [true]);
+  const byPower = run('t:goblin c:r pow>=4 order:power');
+  assert.equal(byPower.sort, 'power');
+  const powers = byPower.hits.map(at => Number.parseFloat(data.cards[at].p ?? data.cards[at].f?.[0].p ?? 'NaN'));
+  assert.deepEqual(powers, [...powers].sort((a, b) => a - b), 'lowest power first, as on Scryfall');
+  assert.match(run('t:elf order:usd').notes[0].text, /^Prices aren’t in the offline data/);
+  assert.match(run('t:elf order:set').notes[0].text, /^order:set isn’t available offline\. Sorted by name instead\./);
+});
+
+test('node: the kinds of card and the land nicknames', () => {
+  assert.ok(has('is:vanilla t:bear mv=2', 'Grizzly Bears') && has('is:bear c:g', 'Grizzly Bears'), 'vanilla and bear');
+  assert.ok(has('is:commander c:w mv=3', 'Thalia\'s Lieutenant') === false && has('is:commander t:human c:w', 'Thalia, Guardian of Thraben'), 'commander');
+  assert.ok(has('is:partner', 'Abdel Adrian, Gorion\'s Ward'), '"Choose a background" in lower case');
+  assert.ok(has('is:companion', 'Lurrus of the Dream-Den'), 'companion');
+  assert.ok(has('is:modal t:instant', 'Abzan Charm'), 'modal');
+  assert.ok(has('is:historic t:artifact mv=0', 'Ornithopter') && has('is:spell t:artifact mv=0', 'Ornithopter') && !has('is:spell', 'Forest'), 'historic and spell');
+  assert.deepEqual(names('is:dual').sort(), ['Badlands', 'Bayou', 'Plateau', 'Savannah', 'Scrubland', 'Taiga', 'Tropical Island', 'Tundra', 'Underground Sea', 'Volcanic Island']);
+  assert.ok(has('is:triome', 'Ketria Triome') && has('is:tricycleland', 'Ketria Triome'), 'an alias');
+  assert.ok(has('is:shockland', 'Breeding Pool') && has('is:fetchland', 'Misty Rainforest'), 'shock and fetch lands');
+});
+
+test('node: a pattern that would take too long, or uses a back-reference, is left out with a note', () => {
+  assert.deepEqual(run('o:/(a+)+b/ t:elf').notes.map(note => note.text), ['This pattern could take too long. Try it without a repeated group.']);
+  assert.deepEqual(run('o:/(draw)\\1/ t:elf').notes.map(note => note.text), ['Back-references aren’t supported.']);
+  assert.match(run('o:/(draw/ t:elf').notes[0].text, /^Invalid pattern/);
+  assert.ok(run('o:/(a+)+b/ t:elf').hits.length > 600, 'the rest of the query still runs');
+});

@@ -1,14 +1,17 @@
 // Evaluates a parsed card query (logic/cardquery.js) over the cards (design/polish/SCRYFALL-SYNTAX-SPEC.md §6.3, §6.4).
-// No DOM; the only state is what it builds on a CardIndex the first time it's needed, such as the columns it reads, and
-// the last few terms' matches. Each term's matches are a Uint8Array over the cards; AND runs its cheapest terms first
-// and gives the slow ones only the cards still in, OR joins, NOT inverts. It never throws: a term it can't read becomes
-// a note and is left out.
+// No DOM; the only state is on the CardIndex (logic/cardcolumns.js): the columns it reads and the last few terms'
+// matches. Each term's matches are a Uint8Array over the cards; AND runs its cheapest terms first and gives the slow ones
+// only the cards still in, OR joins, NOT inverts. It never throws: a term it can't read becomes a note and is left out.
 
-import { colourMask, faceStats, fold, searchNames } from './cards.js';
+import { fold, searchNames } from './cards.js';
+import {
+  columnsOf, costs, facesOf, faceKeys, fullText, joined, keywordLists, legalities, lowerName, lowerNames, oracleText, pips, scan,
+  squashedNames, tildeText, typeLines,
+} from './cardcolumns.js';
+import { kindOf } from './cardkinds.js';
 import { cutGroups, leaves, printingValues } from './cardquery.js';
 import {
-  colourCount, compareCosts, compareNumbers, compareSets, formatAt, lowerName, rarityOrder, readColours, readCost,
-  readLegalities, reminderText, squash,
+  colourCount, compareCosts, compareNumbers, compareSets, formatAt, rarityOrder, readColours, readCost, readPattern, squash,
 } from './cardterms.js';
 
 /** @typedef {import('./cards.js').Card} Card */
@@ -16,145 +19,36 @@ import {
 /** @typedef {import('./cardquery.js').QueryNode} QueryNode */
 /** @typedef {import('./cardquery.js').QueryNote} QueryNote */
 /** @typedef {import('./cardquery.js').ParsedQuery} ParsedQuery */
-/** @typedef {import('./cardterms.js').Cost} Cost */
 /**
  * A note as the sheet shows it: its kind, its text, the query terms it names (set in monospace), and a short form for
  * the compact layout.
  * @typedef {{ kind: QueryNote['kind'], text: string, terms: string[], short: string }} ShownNote
  */
 /**
- * @typedef {object} Columns
- * @property {Uint8Array} colours
- * @property {Uint8Array} identity
- * @property {Float32Array} mv
- * @property {Float32Array[]} power Two faces' power, NaN for none; likewise toughness and loyalty.
- * @property {Float32Array[]} toughness
- * @property {Float32Array[]} loyalty
- * @property {Map<string, any>} lazy The columns built at first use: type lines, rules text, costs and the rest.
- * @property {Map<string, Uint8Array>} cache The last terms' matches, by the term.
- */
-
-/** @type {WeakMap<CardIndex, Columns>} */
-const built = new WeakMap();
-// How many terms' matches are kept, so that typing a third term doesn't recompute the first two.
-const cacheSize = 16;
-
-/** @param {Card} card */
-const facesOf = card => card.f ?? [card];
-
-/** @param {CardIndex} index @returns {Columns} */
-export function columnsOf(index) {
-  const known = built.get(index);
-  if (known) return known;
-  const { cards } = index;
-  const count = cards.length;
-  const nan = () => new Float32Array(count).fill(NaN);
-  /** @type {Columns} */
-  const columns = {
-    colours: new Uint8Array(count), identity: new Uint8Array(count), mv: new Float32Array(count),
-    power: [nan(), nan()], toughness: [nan(), nan()], loyalty: [nan(), nan()], lazy: new Map(), cache: new Map(),
-  };
-  cards.forEach((card, at) => {
-    columns.identity[at] = colourMask(card.c);
-    columns.colours[at] = card.co === '-' ? 0 : colourMask(card.co ?? card.c);
-    columns.mv[at] = card.v ?? 0;
-    facesOf(card).slice(0, 2).forEach((face, side) => {
-      const stats = faceStats(face);
-      if (stats.power !== null) columns.power[side][at] = stats.power;
-      if (stats.toughness !== null) columns.toughness[side][at] = stats.toughness;
-      if (stats.loyalty !== null) columns.loyalty[side][at] = stats.loyalty;
-    });
-  });
-  built.set(index, columns);
-  return columns;
-}
-
-// A column built the first time a term needs it, then kept.
-/** @template T @param {CardIndex} index @param {string} name @param {(card: Card) => T} make @returns {T[]} */
-function lazy(index, name, make) {
-  const { lazy: store } = columnsOf(index);
-  if (!store.has(name)) store.set(name, index.cards.map(make));
-  return store.get(name);
-}
-/** @param {CardIndex} index */
-const typeLines = index => lazy(index, 'types', card => [card.t, ...(card.f ?? []).map(face => face.t)].join('\n').toLowerCase());
-/** @param {CardIndex} index */
-const fullText = index => lazy(index, 'full', card => facesOf(card).map(face => face.o ?? '').join('\n').toLowerCase());
-/** @param {CardIndex} index */
-const oracleText = index => lazy(index, 'oracle', card => facesOf(card).map(face => (face.o ?? '').replace(reminderText, '')).join('\n').toLowerCase());
-/** @param {CardIndex} index */
-const squashedNames = index => lazy(index, 'squashed', card => card.k.replace(/ /g, ''));
-/** @param {CardIndex} index */
-const lowerNames = index => lazy(index, 'lower', card => lowerName(card.n));
-/** @param {CardIndex} index */
-const faceKeys = index => lazy(index, 'faceKeys', card => (card.f ?? []).map(face => fold(face.n)));
-/** @param {CardIndex} index */
-const keywordLists = index => lazy(index, 'keywords', card => (card.kw ?? []).map(keyword => keyword.toLowerCase()));
-/** @param {CardIndex} index */
-const legalities = index => lazy(index, 'legal', card => readLegalities(card.lg));
-/** @param {CardIndex} index */
-const costs = index => lazy(index, 'costs', card => (card.f ? card.f.filter(face => face.m) : [card]).map(face => readCost(face.m)));
-/** @param {CardIndex} index */
-const costText = index => lazy(index, 'costText', card => facesOf(card).map(face => face.m ?? '').join(' ') + (card.m ?? ''));
-
-// Text joined into one string with each card's start, which indexOf searches faster than 33,000 short strings.
-/** @param {CardIndex} index @param {string} name @param {string[]} texts */
-function joined(index, name, texts) {
-  const { lazy: store } = columnsOf(index);
-  if (!store.has(name)) {
-    const starts = new Int32Array(texts.length + 1);
-    for (let at = 0; at < texts.length; at++) starts[at + 1] = starts[at] + texts[at].length + 1;
-    store.set(name, { text: texts.join('\u0001'), starts });
-  }
-  return /** @type {{ text: string, starts: Int32Array }} */ (store.get(name));
-}
-/** @param {{ text: string, starts: Int32Array }} source @param {string} needle @param {Uint8Array} mask */
-function scan(source, needle, mask) {
-  const { text, starts } = source;
-  let found = text.indexOf(needle);
-  let card = 0;
-  while (found >= 0) {
-    let low = card;
-    let high = starts.length - 2;
-    while (low < high) {
-      const middle = (low + high + 1) >> 1;
-      if (starts[middle] <= found) low = middle;
-      else high = middle - 1;
-    }
-    card = low;
-    mask[card] = 1;
-    found = text.indexOf(needle, starts[card + 1]);
-  }
-  return mask;
-}
-
-// ---- Terms ----------------------------------------------------------------------------------------------------------------
-
-/**
  * A term ready to run: its cost (cheap terms run first in an AND), a test for one card, and optionally a way to find
  * every match at once that's faster than testing each card.
  * @typedef {{ cost: number, test: (at: number) => boolean, all?: () => Uint8Array }} Compiled
  */
-// The layout and flag values of is: that M2 answers, and has:indicator.
-/** @type {Record<string, (card: Card, at: number, index: CardIndex) => boolean>} */
-export const isValues = {
-  split: card => card.ly === 'split',
-  flip: card => card.ly === 'flip',
-  transform: card => card.ly === 'transform',
-  tdfc: card => card.ly === 'transform',
-  mdfc: card => card.ly === 'modal_dfc',
-  dfc: card => card.ly === 'transform' || card.ly === 'modal_dfc' || card.ly === 'meld',
-  meld: card => card.ly === 'meld',
-  meldpart: card => card.ly === 'meld' && !card.mr,
-  meldresult: card => Boolean(card.mr),
-  leveler: card => card.ly === 'leveler',
-  adventure: card => card.ly === 'adventure',
-  hybrid: (_, at, index) => /\{[^}/]+\/[^}P]+\}/i.test(costText(index)[at]),
-  phyrexian: (_, at, index) => /\/p\}/i.test(costText(index)[at]) || /\/p\}/.test(fullText(index)[at]),
-  gamechanger: card => Boolean(card.gc),
-  reserved: card => Boolean(card.rs),
-  funny: card => Boolean(card.fun),
+
+// How many terms' matches are kept, so that typing a third term doesn't recompute the first two.
+const cacheSize = 16;
+// The sorts card lookup can do (§3.8): the field, its default direction, and how the status line says it.
+/** @type {Record<string, { by: string, descending: boolean }>} */
+export const sorts = {
+  name: { by: 'name', descending: false }, cmc: { by: 'mana value', descending: false }, mv: { by: 'mana value', descending: false },
+  power: { by: 'power', descending: false }, pow: { by: 'power', descending: false }, toughness: { by: 'toughness', descending: false },
+  tou: { by: 'toughness', descending: false }, rarity: { by: 'rarity', descending: true }, color: { by: 'colour', descending: false },
+  colour: { by: 'colour', descending: false }, edhrec: { by: 'EDHREC rank', descending: false },
 };
+// A query whose terms take long enough to wait for typing to pause (§6.5): rules text of three letters or more, any
+// pattern, the card's own name (~), and French vanilla.
+/** @param {ParsedQuery} parsed */
+export function slowQuery(parsed) {
+  return leaves(parsed.ast).some(node => node.k === 'term' && (node.regex || node.value.includes('~')
+    || ((node.key === 'o' || node.key === 'fo') && node.value.length >= 3) || (node.key === 'is' && node.value.toLowerCase() === 'frenchvanilla')));
+}
+
+// ---- Terms ----------------------------------------------------------------------------------------------------------------
 
 /**
  * @param {CardIndex} index
@@ -171,6 +65,11 @@ function compileTerm(index, node, note) {
     note('error', text);
     return null;
   };
+  const pattern = () => {
+    const read = readPattern(value);
+    if ('error' in read) return fail(read.error);
+    return read;
+  };
   switch (key) {
     case 'c': case 'id': {
       const want = readColours(value);
@@ -185,15 +84,32 @@ function compileTerm(index, node, note) {
     }
     case 't': {
       const types = typeLines(index);
+      if (node.regex) {
+        const read = pattern();
+        return read && { cost: 10, test: at => read.pattern.test(types[at]) };
+      }
       const start = new RegExp(`(?:^|[^a-z0-9])${lower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
       return { cost: 2, test: at => start.test(types[at]) };
     }
     case 'o': case 'fo': {
-      const texts = key === 'o' ? oracleText(index) : fullText(index);
+      const plain = key === 'o' ? oracleText(index) : fullText(index);
+      if (node.regex) {
+        const read = pattern();
+        if (!read) return null;
+        const texts = read.tilde ? tildeText(index, key) : plain;
+        return { cost: 10, test: at => read.pattern.test(texts[at]) };
+      }
       const needle = lower.replace(/\s+/g, ' ');
-      return { cost: 5, test: at => texts[at].includes(needle), all: () => scan(joined(index, `${key}-joined`, texts), needle, new Uint8Array(cards.length)) };
+      const texts = needle.includes('~') ? tildeText(index, key) : plain;
+      return { cost: 5, test: at => texts[at].includes(needle), all: () => scan(joined(index, `${key}-${needle.includes('~') ? 'tilde' : 'joined'}`, texts), needle, new Uint8Array(cards.length)) };
     }
-    case 'name': return nameTerm(index, { value, quoted: node.quoted });
+    case 'name': {
+      if (node.regex) {
+        const read = pattern();
+        return read && { cost: 10, test: at => read.pattern.test(cards[at].n) };
+      }
+      return nameTerm(index, { value, quoted: node.quoted });
+    }
     case 'kw': {
       const lists = keywordLists(index);
       return { cost: 2, test: at => lists[at].includes(lower) };
@@ -201,7 +117,8 @@ function compileTerm(index, node, note) {
     case 'm': {
       const want = readCost(value);
       const list = costs(index);
-      return { cost: 3, test: at => (list[at].length ? list[at] : [readCost('')]).some(cost => compareCosts(cost, want, op)) };
+      const none = [readCost('')];
+      return { cost: 3, test: at => (list[at].length ? list[at] : none).some(cost => compareCosts(cost, want, op)) };
     }
     case 'mv': {
       if (lower === 'even') return { cost: 1, test: at => columns.mv[at] % 2 === 0 };
@@ -211,6 +128,18 @@ function compileTerm(index, node, note) {
       return { cost: 1, test: at => compareNumbers(columns.mv[at], number, op) };
     }
     case 'pow': case 'tou': case 'pt': case 'loy': return statTerm(index, node, fail);
+    case 'devotion': return devotionTerm(index, node, fail);
+    case 'produces': {
+      const want = readColours(value.replace(/c/gi, ''));
+      if (!want || want.mask === undefined) return fail(`${value} isn’t a set of colours.`);
+      const mask = want.mask | (/c/i.test(value) ? 32 : 0);
+      return { cost: 1, test: at => columns.produces[at] !== 0 && compareSets(columns.produces[at], mask, op === ':' ? '>=' : op) };
+    }
+    case 'edhrec': {
+      const number = Number(lower);
+      if (!lower || !Number.isFinite(number)) return fail('EDHREC rank needs a number.');
+      return { cost: 1, test: at => cards[at].er !== undefined && compareNumbers(/** @type {number} */ (cards[at].er), number, op) };
+    }
     case 'f': case 'banned': case 'restricted': {
       const at = formatAt(lower);
       if (at < 0) return fail(`${value} isn’t a format card lookup knows.`);
@@ -233,8 +162,8 @@ function compileTerm(index, node, note) {
         }
         return fail(`has:${value} isn’t a search keyword, so it’s left out.`);
       }
-      const test = isValues[lower];
-      if (test) return { cost: 2, test: at => test(cards[at], at, index) };
+      const kind = kindOf(lower);
+      if (kind) return { cost: lower === 'frenchvanilla' ? 8 : 2, test: at => kind(cards[at], at, index) };
       if (printingValues.has(lower)) {
         note('cut', `is:${value}`, 'printing');
         return null;
@@ -290,6 +219,26 @@ function statTerm(index, node, fail) {
   return { cost: 1, test: at => [0, 1].some(side => !Number.isNaN(mine(side, at)) && compareNumbers(mine(side, at), number, op)) };
 }
 
+// Devotion (§3.3): permanents only, counting the front face's mana symbols that hold any of the query's colours, so a
+// {U} counts toward {u/b}. The value is one colour or one hybrid pair, repeated.
+/** @param {CardIndex} index @param {QueryNode & { k: 'term' }} node @param {(text: string) => null} fail @returns {Compiled | null} */
+function devotionTerm(index, node, fail) {
+  const want = readCost(node.value);
+  const symbols = [...want.symbols.keys()];
+  if (symbols.length !== 1 || want.generic) return fail('Devotion takes one colour or one hybrid pair, such as {u/b}{u/b}.');
+  const colours = new Set(symbols[0].split('/').filter(part => 'WUBRG'.includes(part)));
+  const count = /** @type {number} */ (want.symbols.get(symbols[0]));
+  const front = pips(index);
+  const permanent = /** @type {(card: Card, at: number, index: CardIndex) => boolean} */ (kindOf('permanent'));
+  const op = node.op === ':' ? '>=' : node.op;
+  return { cost: 3, test: (at) => {
+    if (!permanent(index.cards[at], at, index)) return false;
+    let devotion = 0;
+    for (const parts of front[at]) if (parts.some(part => colours.has(part))) devotion++;
+    return compareNumbers(devotion, count, op);
+  } };
+}
+
 // A name word, phrase or exact name (§2.5): a bare word's letters anywhere in the name's, with spaces and punctuation
 // gone; a quoted phrase in the name in lower case; an exact name, the whole name or one face's.
 /** @param {CardIndex} index @param {{ value: string, quoted?: boolean, exact?: boolean }} name @returns {Compiled | null} */
@@ -317,11 +266,12 @@ const cacheKey = node => (node.k === 'name' ? `name ${node.exact ? '!' : ''}${no
   : node.k === 'term' ? `${node.key}${node.op}${node.regex ? '/' : ''}${node.value}` : '');
 
 /**
- * Runs a parsed query: the matching cards' places, in the order they're listed (§6.4), and the notes to show.
+ * Runs a parsed query: the matching cards' places, in the order they're listed (§6.4), the notes to show, and the sort
+ * for the status line ("by mana value"), if any.
  * @param {CardIndex} index
  * @param {ParsedQuery} parsed
  * @param {string} query What was typed, for the exact-name boost.
- * @returns {{ hits: number[], notes: ShownNote[] }}
+ * @returns {{ hits: number[], notes: ShownNote[], sort: string | null }}
  */
 export function runQuery(index, parsed, query) {
   const columns = columnsOf(index);
@@ -389,14 +339,53 @@ export function runQuery(index, parsed, query) {
   /** @type {number[]} */
   const matches = [];
   if (mask) for (let at = 0; at < count; at++) if (mask[at]) matches.push(at);
-  const hits = orderHits(index, parsed, matches, query);
+  /** @type {string | null} */
+  let sort = null;
+  let hits;
+  if (parsed.order) {
+    const known = sorts[parsed.order];
+    if (known) {
+      hits = sortHits(index, matches, parsed.order, parsed.direction ? parsed.direction === 'desc' : known.descending);
+      sort = known.by;
+    } else {
+      const group = /^(?:usd|eur|tix)$/.test(parsed.order) ? 'prices' : 'sort';
+      raised.push({ kind: 'cut', at: 0, end: 0, text: `order:${parsed.order}`, group });
+      hits = matches;
+    }
+  } else hits = orderHits(index, parsed, matches, query);
   const notes = shownNotes(raised, { empty: !mask, nothing: !hits.length, ast: parsed.ast });
-  return { hits, notes };
+  return { hits, notes, sort };
 }
 
-// The order a syntax query lists its cards in (§6.4): a card whose name is the whole query first (so "Death or Glory"
-// finds itself, though "or" is the operator); then, by the plain search's ranking of the query's name words, the cards
-// those words find; then the rest in name order, which is the file's.
+// Sorts by a field (§3.8), ties by name, which is the file's order; cards without the field go last either way.
+/** @param {CardIndex} index @param {number[]} matches @param {string} order @param {boolean} descending */
+function sortHits(index, matches, order, descending) {
+  const columns = columnsOf(index);
+  const { cards } = index;
+  /** @type {Record<string, (at: number) => number>} */
+  const fields = {
+    name: at => at, cmc: at => columns.mv[at], mv: at => columns.mv[at],
+    power: at => columns.power[0][at], pow: at => columns.power[0][at], toughness: at => columns.toughness[0][at], tou: at => columns.toughness[0][at],
+    rarity: at => (cards[at].r === undefined ? NaN : rarityOrder[/** @type {string} */ (cards[at].r)]),
+    color: at => colourPlace(columns.colours[at]), colour: at => colourPlace(columns.colours[at]),
+    edhrec: at => cards[at].er ?? NaN,
+  };
+  const value = fields[order];
+  const sign = descending ? -1 : 1;
+  return [...matches].sort((a, b) => {
+    const left = value(a);
+    const right = value(b);
+    if (Number.isNaN(left) !== Number.isNaN(right)) return Number.isNaN(left) ? 1 : -1;
+    return (Number.isNaN(left) ? 0 : sign * (left - right)) || a - b;
+  });
+}
+// W U B R G alone, then multicolour, then colourless.
+/** @param {number} mask */
+const colourPlace = mask => (mask === 0 ? 6 : colourCount(mask) > 1 ? 5 : Math.log2(mask));
+
+// The order a syntax query without order: lists its cards in (§6.4): a card whose name is the whole query first (so
+// "Death or Glory" finds itself, though "or" is the operator); then, by the plain search's ranking of the query's name
+// words, the cards those words find; then the rest in name order, which is the file's.
 /** @param {CardIndex} index @param {ParsedQuery} parsed @param {number[]} matches @param {string} query */
 function orderHits(index, parsed, matches, query) {
   const { keys } = index;
@@ -413,9 +402,7 @@ function orderHits(index, parsed, matches, query) {
   if (whole) matches.filter(at => keys[at] === whole).forEach(take);
   const words = positiveNames(parsed.ast).join(' ');
   if (words) {
-    for (const bucket of searchNames(index, words)) {
-      [...bucket].sort((a, b) => keys[a].length - keys[b].length).forEach(take);
-    }
+    for (const bucket of searchNames(index, words)) [...bucket].sort((a, b) => keys[a].length - keys[b].length).forEach(take);
   }
   matches.forEach(take);
   return ordered;
@@ -450,7 +437,7 @@ function shownNotes(raised, { empty, nothing, ast }) {
   for (const [group, terms] of groups) {
     const { text, short } = cutGroups[group];
     const list = [...new Set(terms)].join(' and ');
-    const allCut = empty && ast === null;
+    const allCut = empty && ast === null && group !== 'sort';
     const full = allCut && groups.size === 1 && !raised.some(item => item.kind === 'error')
       ? `${text.split('.')[0]}, and nothing else in this search is. Try a name, type or rules text.`
       : text.replace('{terms}', list);

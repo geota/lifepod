@@ -287,7 +287,7 @@ Scryfall's sets are small and fixed: 6 to 22 cards each, 51 for `manland`.
 |---|---|---|
 | `name` | name; the data file's order, so no sort is needed | ascending |
 | `cmc`, `mv` | mana value | ascending |
-| `power`, `toughness` | front face's stat; cards without one go last | descending |
+| `power`, `toughness` | front face's stat; cards without one go last | ascending (as built: Scryfall's saved results sort lowest first) |
 | `rarity` | §3.6 order | descending, mythic first |
 | `color` | WUBRG single colours, then multicolour, then colourless | ascending |
 | `edhrec` | rank; unranked cards go last | ascending, rank 1 first |

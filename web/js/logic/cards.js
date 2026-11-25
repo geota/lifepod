@@ -26,7 +26,7 @@
  * - `lg`: the legalities, one letter per format in `about.formats` (cardterms.js `formats`): lower case legal, upper
  *   case banned, `+x` restricted, absent not legal. `pm`: the mana it can make, in W U B R G C order. `ly`: the layout
  *   when it isn't normal. `mr` a meld result; `gc` a Game Changer; `rs` on the Reserved List; `ci` a colour indicator;
- *   `fun` from a funny set.
+ *   `fun` from a funny set. `lc`: the land cycles Scryfall names it in, such as `shockland` (cardterms.js `landNicknames`).
  * - `er`: the EDHREC rank, 1 the most played, exact (`exactRanks` in scripts/cards-update.mjs can round it); none for a
  *   card EDHREC doesn't rank.
  * These fields are there for a structured query (`c:r t:creature o:treasure mv<=3`) to be built on the matching below.
@@ -49,6 +49,7 @@
  *   rs?: number,
  *   ci?: number,
  *   fun?: number,
+ *   lc?: string[],
  * }} Card
  */
 /**

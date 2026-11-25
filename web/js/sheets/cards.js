@@ -104,7 +104,11 @@ function runSearch() {
 }
 onFound((next) => {
   found = next;
+  resultList.removeAttribute('aria-busy');
   showResults(true);
+}, () => {
+  resultList.setAttribute('aria-busy', 'true');
+  statusLine.textContent = 'Searching…';
 });
 
 // Draws the first page of results, or (`fresh` false) adds the next page below the ones shown. Close spellings, when
@@ -128,7 +132,7 @@ function showResults(fresh) {
   setActive(-1);
   queryField.setAttribute('aria-expanded', String(shown.length > 0));
   notesBlock.replaceChildren(...noteNodes(found.notes));
-  showStatus(found.query.trim() ? found.count : null, found.close.length);
+  showStatus(found.query.trim() ? found.count : null, found.close.length, found.sort);
   showList();
 }
 const matchesShown = () => shown.length - (found?.close.length ?? 0);
@@ -136,15 +140,15 @@ const moreToShow = () => matchesShown() < (found?.count ?? 0);
 
 // The line under the field, and what screen readers hear once typing pauses: the count, then the notes, errors first.
 // The live region speaks only when that text changes.
-/** @param {number | null} [count] @param {number} [close] */
-function showStatus(count = null, close = 0) {
+/** @param {number | null} [count] @param {number} [close] @param {string | null} [sort] */
+function showStatus(count = null, close = 0, sort = null) {
   const spellings = close === 1 ? '1 close spelling.' : `${close} close spellings.`;
   const text = loadFailed ? 'The cards couldn’t load. Close and open card lookup to try again.'
     : !index ? 'Loading cards…'
       : count === null ? `${index.cards.length.toLocaleString('en')} cards. Type a name${textOn() ? ' or rules text' : ''}.`
         : count === 0 && close ? `No exact matches. ${spellings}`
           : count === 0 ? 'No cards match'
-            : `${count === 1 ? '1 card' : `${count.toLocaleString('en')} cards`}${close ? `. ${spellings}` : ''}`;
+            : `${count === 1 ? '1 card' : `${count.toLocaleString('en')} cards`}${sort ? `, by ${sort}` : ''}${close ? `. ${spellings}` : ''}`;
   statusLine.textContent = text;
   const spoken = [text, ...(count === null ? [] : found?.notes ?? []).map(note => note.text)].join('. ').replace(/\.\./g, '.');
   clearTimeout(countTimer);

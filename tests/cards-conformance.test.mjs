@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test } from './helpers.mjs';
 import { compare, meanTolerance, readQueries, readResults } from '../scripts/cards-conformance.mjs';
 import { indexCards } from '../web/js/logic/cards.js';
-import { leaves, parseQuery } from '../web/js/logic/cardquery.js';
+import { parseQuery } from '../web/js/logic/cardquery.js';
 
 // Card lookup's query language against Scryfall's saved results (design/polish/SCRYFALL-SYNTAX-SPEC.md §9.3), offline:
 // every query in tests/fixtures/scryfall-queries.txt, compared in the cards both have. Each query must reach its
@@ -15,17 +15,8 @@ const index = indexCards(data.cards);
 const results = readResults();
 
 // What isn't built yet: queries that use it wait for their milestone.
-const pendingKeys = new Set(['devotion', 'produces', 'edhrec']);
-const pendingIs = new Set(['vanilla', 'frenchvanilla', 'bear', 'spell', 'permanent', 'historic', 'party', 'outlaw', 'modal', 'commander',
-  'partner', 'companion', 'brawler', 'duelcommander', 'oathbreaker', 'manland', 'dual', 'fetchland', 'shockland', 'painland', 'checkland',
-  'triome', 'bounceland', 'storageland', 'filterland', 'canopyland']);
 /** @param {string} query */
-function built(query) {
-  const parsed = parseQuery(query);
-  if (parsed.order || parsed.notes.some(note => note.group === 'tags')) return false;
-  return leaves(parsed.ast).every(node => node.k !== 'term'
-    || (!pendingKeys.has(node.key) && !node.regex && !node.value.includes('~') && !(node.key === 'is' && pendingIs.has(node.value.toLowerCase()))));
-}
+const built = query => !parseQuery(query).notes.some(note => note.group === 'tags');
 
 test('node: card lookup agrees with Scryfall on every saved query it answers', (t) => {
   if (results.data !== data.about.updated) t.diagnostic(`The saved results are for data from ${results.data}; the data is from ${data.about.updated}.`);
@@ -34,11 +25,13 @@ test('node: card lookup agrees with Scryfall on every saved query it answers', (
   for (const { query, family, tolerance } of readQueries()) {
     const saved = results.queries[query];
     if (!saved || !built(query)) continue;
-    const { jaccard, missing, extra } = compare(index, query, saved);
+    const { jaccard, missing, extra, order } = compare(index, query, saved);
     scores.push(jaccard);
     if (jaccard < tolerance) low.push(`${family}: ${query} ${jaccard.toFixed(3)} < ${tolerance}; missing ${missing.slice(0, 4).join(' | ')}; extra ${extra.slice(0, 4).join(' | ')}`);
+    // A sorted query also lists its first cards in Scryfall's order, its default direction included.
+    if (order !== null && order < 0.85) low.push(`${family}: ${query} has ${Math.round(order * 100)}% of its first 20 in Scryfall's order`);
   }
-  assert.ok(scores.length >= 40, `${scores.length} queries compared`);
+  assert.ok(scores.length >= 90, `${scores.length} queries compared`);
   assert.deepEqual(low, []);
   const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
   assert.ok(mean >= meanTolerance, `mean ${mean.toFixed(3)}`);

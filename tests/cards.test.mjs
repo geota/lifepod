@@ -271,12 +271,23 @@ async function checkNotes(t, engine) {
   assert.equal(await page.locator('#card-count').textContent(), `${count} cards. Sets and printings aren’t in the offline data. Showing results without e:war.`);
   // A mistake is mended with an error note, and nothing throws (the harness fails on a page error).
   await page.locator('#card-query').fill('o:"draw a card t:instant');
+  await page.clock.runFor(150);
   await eventually(async () => page.locator('#card-notes .card-note[data-kind="error"]').count(), 1, 'the error note');
   assert.match(await page.locator('#card-notes .card-note-text').first().textContent(), /^Missing closing quote/);
   // "or" is the operator, and the card named by the whole query comes first.
   await page.locator('#card-query').fill('death or glory');
   await eventually(async () => (await rowNames(page))[0], 'Death or Glory', 'the exact name first');
   assert.ok(Number((await statusText(page)).replace(/\D/g, '')) > 100, 'either word');
+  // A slow query (rules text, patterns, ~) waits for typing to pause; meanwhile the list keeps its results, busy.
+  await page.locator('#card-query').fill('o:"draw a card" t:instant');
+  assert.equal(await statusText(page), 'Searching…');
+  assert.equal(await page.locator('#card-results').getAttribute('aria-busy'), 'true');
+  await page.clock.runFor(150);
+  await eventually(async () => /^\d+ cards$/.test(await statusText(page)), true, 'the slow query runs once typing pauses');
+  assert.equal(await page.locator('#card-results').getAttribute('aria-busy'), null);
+  // A sorted query says how it's sorted.
+  await page.locator('#card-query').fill('t:dragon c:r order:cmc');
+  await eventually(async () => /^\d+ cards, by mana value$/.test(await statusText(page)), true, 'the sort in the status line');
   // Rules text doesn't change a syntax query: its bare words are names.
   await button(page, 'Rules text').click();
   await page.locator('#card-query').fill('treasure t:artifact');
@@ -349,10 +360,29 @@ test('chromium: a keystroke searches 33,000 names and draws the results within a
     const typos = buildTypoIndex(index.keys);
     const slips = ['smothering tihte', 'atraxa praetors vocie', 'ulamog the ceasless', 'mana crpyt', 'farseak', 'lightnig bolt'];
     const close = slips.map(slip => time(() => closeNames(typos, fold(slip), { rank: at => data.cards[at].er ?? Infinity })));
-    return { names: median(names), namesMax: Math.max(...names), keystroke: median(keystrokes), text: median(text), close: median(close), closeMax: Math.max(...close) };
+    // Syntax queries (design/polish/SCRYFALL-SYNTAX-SPEC.md §8): each with no cached terms, once the columns are built.
+    const { runQuery } = await import('/js/logic/cardfilter.js');
+    const { columnsOf } = await import('/js/logic/cardcolumns.js');
+    const { parseQuery } = await import('/js/logic/cardquery.js');
+    const query = (text) => {
+      columnsOf(index).cache.clear();
+      return runQuery(index, parseQuery(text), text);
+    };
+    const warm = ['o:x', 'fo:x', 'o:"~ x"', 'devotion:{u}', 'm:1', 'is:frenchvanilla', 'f:legacy', 'kw:x', 'name:"x"', '!x', 'is:hybrid'];
+    warm.forEach(query);
+    const quick = ['c:rg', 'm:2WW', 't:creature', 'is:manland', 't:legendary (t:goblin or t:elf)', 'f:commander id<=esper t:instant', 'pow>tou c:w t:creature', 't:creature c:g mv<=3'];
+    const slow = ['o:draw', 'o:"~ enters tapped"', 'fo:"create a treasure"', 'devotion:{u/b}{u/b}{u/b}', 'o:/\\bdraw\\b(?!s)/ t:instant', 'o:/^{T}:/'];
+    const syntax = quick.map(text => time(() => query(text)));
+    const debounced = slow.map(text => time(() => query(text)));
+    return {
+      names: median(names), namesMax: Math.max(...names), keystroke: median(keystrokes), text: median(text), close: median(close),
+      closeMax: Math.max(...close), syntax: median(syntax), syntaxMax: Math.max(...syntax), slow: median(debounced), slowMax: Math.max(...debounced),
+    };
   });
-  t.diagnostic(`at 4× slowdown: name search ${timings.names.toFixed(1)}ms median (${timings.namesMax.toFixed(1)}ms max), a keystroke with drawing ${timings.keystroke.toFixed(1)}ms, rules text ${timings.text.toFixed(1)}ms, close spellings ${timings.close.toFixed(1)}ms (${timings.closeMax.toFixed(1)}ms max)`);
+  t.diagnostic(`at 4× slowdown: name search ${timings.names.toFixed(1)}ms median (${timings.namesMax.toFixed(1)}ms max), a keystroke with drawing ${timings.keystroke.toFixed(1)}ms, rules text ${timings.text.toFixed(1)}ms, close spellings ${timings.close.toFixed(1)}ms (${timings.closeMax.toFixed(1)}ms max), syntax ${timings.syntax.toFixed(1)}ms (${timings.syntaxMax.toFixed(1)}ms max), slow syntax ${timings.slow.toFixed(1)}ms (${timings.slowMax.toFixed(1)}ms max)`);
   assert.ok(timings.close < 5, `close spellings ${timings.close}ms`);
+  assert.ok(timings.syntax < 16, `a quick syntax query ${timings.syntax}ms`);
+  assert.ok(timings.slowMax < 50, `a slow syntax query, once typing pauses, ${timings.slowMax}ms`);
   assert.ok(timings.names < 16, `name search ${timings.names}ms`);
   assert.ok(timings.namesMax < 32, `the slowest, one letter, ${timings.namesMax}ms`);
   // Drawing adds DOM work that varies more with the machine than the search does: alone it measures about 9–11ms, and

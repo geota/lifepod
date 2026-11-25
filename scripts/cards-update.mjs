@@ -17,7 +17,7 @@ import { createInterface } from 'node:readline';
 import { constants, createGunzip, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { fold } from '../web/js/logic/cards.js';
-import { formats, writeLegalities } from '../web/js/logic/cardterms.js';
+import { formats, landNicknames, writeLegalities } from '../web/js/logic/cardterms.js';
 
 const root = new URL('../', import.meta.url);
 const output = new URL('data/cards.json', root);
@@ -25,6 +25,7 @@ const shipped = new URL('web/data/cards.json.gz', root);
 const cache = new URL('node_modules/.cache/lifepod-cards/', root);
 const bulkFile = new URL('oracle-cards.jsonl.gz', cache);
 const metaFile = new URL('oracle-cards.json', cache);
+const nicknameFile = new URL('land-nicknames.json', cache);
 const { version } = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 const headers = { 'User-Agent': `LifePod/${version}`, Accept: 'application/json' };
 
@@ -127,14 +128,23 @@ export function toCard(card) {
  * Builds the data file's text from the bulk file's lines (JSON Lines, or a JSON array with one card per line).
  * @param {AsyncIterable<string> | Iterable<string>} lines
  * @param {string} updated The bulk file's `updated_at`.
+ * @param {Record<string, string[]>} [nicknames] Each land nickname's card names, from Scryfall's search (`lc`).
  */
-export async function buildCards(lines, updated) {
+export async function buildCards(lines, updated, nicknames = {}) {
+  /** @type {Map<string, string[]>} */
+  const cycles = new Map();
+  for (const nickname of landNicknames) {
+    for (const name of nicknames[nickname] ?? []) cycles.set(name, [...(cycles.get(name) ?? []), nickname]);
+  }
   const cards = [];
   for await (const line of lines) {
     const text = line.trim().replace(/,$/, '');
     if (!text.startsWith('{')) continue;
     const card = JSON.parse(text);
-    if (keepCard(card)) cards.push(toCard(card));
+    if (!keepCard(card)) continue;
+    const record = toCard(card);
+    if (cycles.has(card.name)) record.lc = cycles.get(card.name);
+    cards.push(record);
   }
   const rows = cards.map(card => ({ card, json: JSON.stringify(card) }));
   rows.sort((a, b) => (a.card.k < b.card.k ? -1 : a.card.k > b.card.k ? 1 : a.json < b.json ? -1 : a.json > b.json ? 1 : 0));
@@ -224,11 +234,42 @@ function writeDates(updated) {
   }
 }
 
+// The land cycles Scryfall names (`is:shockland` and the rest, design/polish/SCRYFALL-SYNTAX-SPEC.md §3.7): one search
+// per nickname, 600 ms apart, as Scryfall asks, every page. Kept next to the bulk file, so --offline rebuilds them.
+export function cachedNicknames() {
+  try {
+    return JSON.parse(readFileSync(nicknameFile, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+export async function fetchNicknames(updated) {
+  const cached = cachedNicknames();
+  if (cached?.updated_at === updated) return cached.lists;
+  /** @type {Record<string, string[]>} */
+  const lists = {};
+  for (const nickname of landNicknames) {
+    let url = `${api}/cards/search?q=${encodeURIComponent(`is:${nickname}`)}`;
+    lists[nickname] = [];
+    while (url) {
+      await new Promise(resolve => setTimeout(resolve, 600));
+      const body = await (await fetchWithRetries(url, { headers }, 30000)).json();
+      lists[nickname].push(...body.data.map(card => card.name));
+      url = body.has_more ? body.next_page : null;
+    }
+  }
+  mkdirSync(cache, { recursive: true });
+  writeFileSync(nicknameFile, `${JSON.stringify({ updated_at: updated, lists }, null, 1)}\n`);
+  return lists;
+}
+
 async function main() {
   const offline = process.argv.includes('--offline');
   const bulk = offline ? cachedBulk() : await download();
   if (!bulk) throw new Error('No cached bulk file yet: run `npm run cards:update` once with a network connection');
-  const text = await buildCards(readBulk(bulk.path), bulk.updated_at);
+  const nicknames = offline ? cachedNicknames()?.lists ?? {} : await fetchNicknames(bulk.updated_at);
+  if (offline && !cachedNicknames()) console.warn('No cached land nicknames: is:shockland and the rest will find nothing until an online update.');
+  const text = await buildCards(readBulk(bulk.path), bulk.updated_at, nicknames);
   mkdirSync(new URL('./', output), { recursive: true });
   mkdirSync(new URL('./', shipped), { recursive: true });
   writeFileSync(output, text);

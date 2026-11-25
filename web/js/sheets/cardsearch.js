@@ -3,7 +3,8 @@
 // syntax is parsed and evaluated. sheets/cards.js draws what this finds; this module holds no DOM.
 
 import { fold, foldText, rankResults, searchNames, searchText, textMinimum } from '../logic/cards.js';
-import { runQuery } from '../logic/cardfilter.js';
+import { warmColumns } from '../logic/cardcolumns.js';
+import { runQuery, slowQuery } from '../logic/cardfilter.js';
 import { parseQuery } from '../logic/cardquery.js';
 import { closeNames, typoBelow, typoBuilder, typoMinimum } from '../logic/cardtypos.js';
 
@@ -20,7 +21,11 @@ import { closeNames, typoBelow, typoBuilder, typoMinimum } from '../logic/cardty
  * @property {(limit: number) => number[]} page
  * @property {number[]} close
  * @property {ShownNote[]} notes
+ * @property {string | null} sort How a sorted syntax query is sorted, for the status line ("by mana value").
  */
+
+// A slow syntax query (rules text, patterns, ~) waits this long after the last keystroke, so typing stays quick.
+const slowDelay = 150;
 
 /** @type {CardIndex | null} */
 let index = null;
@@ -28,23 +33,31 @@ let index = null;
 let typos = null;
 /** @type {(found: Found) => void} */
 let listener = () => {};
+/** @type {() => void} */
+let waiting = () => {};
 let textTimer = 0;
+let slowTimer = 0;
 /** @type {Found | null} */
 let last = null;
 
-/** @param {(found: Found) => void} show */
-export function onFound(show) {
+/** @param {(found: Found) => void} show @param {() => void} wait called when a slow search will follow */
+export function onFound(show, wait) {
   listener = show;
+  waiting = wait;
 }
 
 // The cards, once loaded. The close-spellings index is built in steps of 2,000 names, one task each, so the sheet stays
 // responsive (about 230 ms in all on a phone-speed CPU); a query that wanted close spellings before it was ready runs
-// again when it is.
+// again when it is. Then the syntax search's columns are built the same way, a slice at a time, so a first syntax query
+// finds them ready; one that comes sooner builds what it needs itself.
 /** @param {CardIndex} cards @param {() => void} again */
 export function setCards(cards, again) {
   index = cards;
   typos = null;
   const builder = typoBuilder(cards.keys);
+  const warm = () => {
+    if (cards === index && !warmColumns(cards)) setTimeout(warm, 0);
+  };
   const step = () => {
     if (cards !== index) return;
     const ready = builder.step();
@@ -54,6 +67,7 @@ export function setCards(cards, again) {
     }
     typos = ready;
     if (last && !last.syntax && !last.close.length && wantsTypos(last.query, last.count)) again();
+    setTimeout(warm, 0);
   };
   setTimeout(step, 0);
 }
@@ -65,11 +79,21 @@ const wantsTypos = (query, count) => count < typoBelow && fold(query).length >= 
 /** @param {string} query @param {boolean} withText */
 export function search(query, withText) {
   clearTimeout(textTimer);
+  clearTimeout(slowTimer);
   if (!index) return;
   const parsed = parseQuery(query);
   if (parsed.syntax) {
-    const { hits, notes } = runQuery(index, parsed, query);
-    show({ query, syntax: true, count: hits.length, page: limit => hits.slice(0, limit), close: [], notes });
+    const cards = index;
+    const run = () => {
+      if (cards !== index) return;
+      const { hits, notes, sort } = runQuery(cards, parsed, query);
+      show({ query, syntax: true, count: hits.length, page: limit => hits.slice(0, limit), close: [], notes, sort });
+    };
+    // A slow query waits for typing to pause; the list keeps its last results meanwhile.
+    if (slowQuery(parsed)) {
+      waiting();
+      slowTimer = setTimeout(run, slowDelay);
+    } else run();
     return;
   }
   // A plain query: names at once; rules text, the slower search, in its own task just after, so neither keeps a
@@ -101,5 +125,5 @@ function plainFound(query, names, texts) {
     const skip = new Set([...names.flat(), ...texts]);
     close = closeNames(typos, fold(query), { limit: 25, skip, rank: at => cards.cards[at].er ?? Infinity });
   }
-  return { query, syntax: false, count, page: limit => rankResults(cards, names, texts, limit).results, close, notes: [] };
+  return { query, syntax: false, count, page: limit => rankResults(cards, names, texts, limit).results, close, notes: [], sort: null };
 }
