@@ -1,13 +1,14 @@
 // What screen readers hear about the board (#announcer, or an open dialog's own live region): changes are announced
 // once a burst of them settles, each player's news in seat order, rather than on every step of a hold.
 
-import { designations, tileSets } from '../logic/data.js';
-import { poolText } from '../logic/rules.js';
+import { designations, tileSets, trackTabInfo } from '../logic/data.js';
+import { poolText, trackTabs } from '../logic/rules.js';
 import { game } from '../state/state.js';
 import { announcer } from '../ui/dom.js';
 
 /** @typedef {import('../logic/data.js').BoardMode} BoardMode */
 /** @typedef {import('../logic/data.js').Designation} Designation */
+/** @typedef {import('../logic/data.js').TrackTab} TrackTab */
 
 // A seat as a screen reader hears it: its number and its tile colour, such as "Player 3, Sky". Nothing on screen shows
 // the number, so the colour, which the players can see, ties the voice to a tile. Each tile set names its own colours.
@@ -32,6 +33,17 @@ const modeNames = {
   damage: 'Commander damage', counters: 'Counters', mana: 'Mana pool', colours: 'Tile colours', identity: 'Identities',
   rotate: 'Rotate seats', first: 'Who goes first?',
 };
+
+// How to use each of Track's tabs, and where it is among them (design/polish/PILL-SPEC.md §3.5).
+/** @type {Record<TrackTab, string>} */
+const tabHowTo = {
+  damage: 'Press a commander on a tile to add one damage', counters: 'Press a counter to add one', mana: 'Press a colour to add one mana',
+};
+/** @param {TrackTab} tab */
+function tabPlace(tab) {
+  const tabs = trackTabs(game);
+  return `tab ${tabs.indexOf(tab) + 1} of ${tabs.length}`;
+}
 
 let announceTimer;
 const pendingAnnouncements = new Map();
@@ -80,10 +92,20 @@ export function announceLife(index) {
 /**
  * @param {BoardMode} mode The mode opening, or null when one closes.
  * @param {BoardMode} closed The mode that closed.
+ * @param {boolean} [track] Whether the mode is, or was, a tab of Track's, with the others beside it.
  */
-export function announceMode(mode, closed) {
-  if (mode) announceNow(modeIntros[mode]);
-  else if (closed) announceNow(`${modeNames[closed]} closed`);
+export function announceMode(mode, closed, track = false) {
+  if (mode && track && mode in tabHowTo) {
+    const tab = /** @type {TrackTab} */ (mode);
+    announceNow(`Track, ${trackTabInfo[tab].words}, ${tabPlace(tab)}. ${tabHowTo[tab]}. Switch tabs, Undo, Save or Cancel in the centre`);
+  } else if (mode) announceNow(modeIntros[mode]);
+  else if (closed) announceNow(`${track && closed in tabHowTo ? 'Track' : modeNames[closed]} closed`);
+}
+
+// Another of Track's tabs opening, from its tab or an undo of a step on it.
+/** @param {TrackTab} tab */
+export function announceTrackTab(tab) {
+  announceNow(`${trackTabInfo[tab].name}, ${tabPlace(tab)}. ${tabHowTo[tab]}`);
 }
 
 /** @param {string} words Such as "Saved" or "Changes discarded". */

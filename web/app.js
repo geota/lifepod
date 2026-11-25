@@ -11,11 +11,12 @@ import {
 import { dismissUndoToast, redo, takeBackTo, undo } from './js/actions/history.js';
 import { clearPool, spendMana } from './js/actions/mana.js';
 import {
-  cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, setBoardMode, shuffleFirst, skipFirst,
+  cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, openTrack, setBoardMode, shuffleFirst, skipFirst,
+  switchTrackTab,
 } from './js/actions/mode.js';
 import { dismissReminder, remind } from './js/actions/reminders.js';
 import { startTurn, stepBack, stepTurn } from './js/actions/turns.js';
-import { measureBoard, syncBoardTurn } from './js/layout/board.js';
+import { measureBoard, onPillFormChange, syncBoardTurn } from './js/layout/board.js';
 import { editingModes } from './js/logic/data.js';
 import { loadedFaces, requestFit, resetDrops } from './js/layout/fit.js';
 import { fitAllCompactSwitches } from './js/layout/settings.js';
@@ -32,7 +33,7 @@ import { onBurstChange } from './js/state/history.js';
 import { boardMode, editStart, editStartHolders, game, syncBackHandling } from './js/state/state.js';
 import {
   board, cancelButton, countersButton, damageButton, discardDialog, manaButton, redoButton, resetZoom, roundBackButton,
-  roundButton, saveButton, shuffleButton, undoButton,
+  roundButton, saveButton, shuffleButton, trackButton, trackTabButtons, trackTabList, undoButton,
 } from './js/ui/dom.js';
 import { bindRelease, bindStep, cancelPresses } from './js/ui/press.js';
 
@@ -57,6 +58,24 @@ window.setTextScale = (scale) => {
 damageButton.addEventListener('click', () => setBoardMode('damage'));
 countersButton.addEventListener('click', () => setBoardMode('counters'));
 manaButton.addEventListener('click', () => setBoardMode('mana'));
+// Track, where the pill holds those three as one button, and its tabs (design/polish/PILL-SPEC.md §3.5): a tap opens a
+// tab; the arrow keys, either way since the 2-player pill stands upright, move to the next or previous tab and open it,
+// and Home and End to the first and last.
+trackButton.addEventListener('click', openTrack);
+for (const tab of trackTabButtons) {
+  tab.addEventListener('click', () => switchTrackTab(/** @type {import('./js/logic/data.js').TrackTab} */ (tab.dataset.tab)));
+}
+trackTabList.addEventListener('keydown', (event) => {
+  const tabs = trackTabButtons.filter(tab => !tab.hidden);
+  const at = tabs.indexOf(/** @type {HTMLButtonElement} */ (document.activeElement));
+  const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[event.key];
+  const target = event.key === 'Home' ? tabs[0] : event.key === 'End' ? tabs.at(-1)
+    : step && at >= 0 ? tabs[(at + step + tabs.length) % tabs.length] : null;
+  if (!target) return;
+  event.preventDefault();
+  target.click();
+  target.focus();
+});
 bindStep(roundButton, stepTurn, stepBack);
 roundBackButton.addEventListener('click', stepBack);
 bindRelease(shuffleButton, shuffleFirst);
@@ -149,6 +168,7 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
 }));
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.
+onPillFormChange(syncPill);
 setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, dismissReminder, setBoardMode, redo, dismissUndoToast });
 // A total's running delta follows its burst of quick taps (MANA-UNDO-SPEC §6.2b).
 onBurstChange(renderLifeDelta);

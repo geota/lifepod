@@ -17,6 +17,7 @@ import { cancelPresses } from '../ui/press.js';
 import { renderBoard } from './board.js';
 import { commit } from './commit.js';
 import { endStripHolds } from './mana.js';
+import { showUndoneTab } from './mode.js';
 import { clearReminders } from './reminders.js';
 
 /** @typedef {import('../logic/history.js').Step} Step */
@@ -125,12 +126,14 @@ function feedback(steps, verb) {
 
 // Back one step (Undo in the centre). Any press still held ends first, and every open burst closes, so an undo
 // mid-burst takes back the whole burst so far (§6.9). In an editing mode, Undo stops at what was there when the mode
-// opened (§6.5), and the cells change in place with no toast; other modes have no Undo.
+// opened (§6.5), and the cells change in place with no toast; other modes have no Undo. In Track, a step taken on another
+// tab opens that tab first, so the change is seen (PILL-SPEC.md §3.2).
 export function undo() {
   const editing = editingModes.includes(boardMode);
   if (boardMode !== null && !editing) return;
   if (editing && game.history.at <= editStart) return;
   cancelPresses();
+  if (editing) showUndoneTab();
   const step = takeBack();
   if (!step) return;
   redraw([step.d]);

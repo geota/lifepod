@@ -141,14 +141,22 @@ const click = async (page, selector) => {
   }
 };
 const openSetup = page => click(page, '#setup-button');
+// Commander damage, counters or mana from the pill: its own button, or Track and then its tab where the pill has one
+// Track button (design/polish/PILL-SPEC.md, as built).
+const openFromPill = async (page, mode) => {
+  if (await page.locator('#track-button').isVisible()) {
+    await click(page, '#track-button');
+    if (await page.locator(`#track-tab-${mode}`).getAttribute('aria-selected') !== 'true') await click(page, `#track-tab-${mode}`);
+  } else await click(page, `#${mode}-button`);
+};
 // The page code the modes run, for tests/design.test.mjs.
 const remindersJs = "game.scores.forEach((_, index) => remind(index, index % 2 ? 'initiative' : 'monarch'));";
 export const snippets = () => ({ reminders: { js: remindersJs } });
 const modes = {
   rest: async () => {},
-  damage: page => click(page, '#damage-button'),
-  counters: page => click(page, '#counters-button'),
-  mana: page => click(page, '#mana-button'),
+  damage: page => openFromPill(page, 'damage'),
+  counters: page => openFromPill(page, 'counters'),
+  mana: page => openFromPill(page, 'mana'),
   colours: async (page) => { await openSetup(page); await click(page, '#tile-colours'); },
   identity: async (page) => { await openSetup(page); await click(page, '#choose-identities'); },
   rotate: async (page) => { await openSetup(page); await click(page, '#rotate-seats'); },
@@ -172,7 +180,7 @@ const modes = {
   'new-game': async (page) => { await openSetup(page); await click(page, '#restart-button'); },
   // Discard: one edit in counters mode, then ✕.
   discard: async (page) => {
-    await click(page, '#counters-button');
+    await openFromPill(page, 'counters');
     await click(page, '.counter-cell');
     await click(page, '#cancel-button');
   },

@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
-import { button, engines, openPage, seedGame, stripProblems, test, tileProblems } from './helpers.mjs';
+import {
+  button, engines, openFromPill, openPage, seedGame, stripProblems, test, tileProblems,
+} from './helpers.mjs';
 
 // The size checks, run once per style (the Style setting, design/polish/STYLE.md) and split by concern, so each file is
 // short and the files run side by side: sizes-fit, sizes-settings and sizes-pill run them in Material, and the -glass
@@ -262,17 +264,18 @@ async function checkPill(t, engine, style, screens) {
       for (const rotations of pillRotations) {
         const view = `${width} × ${height}, ${count} players, seats ${rotations ? rotations.slice(0, count).join('') : 'as dealt'}`;
         await seedGame(page, pillGame(count, rotations, style));
-        // Every button the pill can hold at rest shows (restPillButtons in web/js/logic/rules.js counts them).
-        const widest = await page.evaluate(async () => (await import('/js/logic/rules.js')).restPillButtons((await import('/js/state/state.js')).game));
+        // Every button the pill can hold at rest shows (restPillButtons in web/js/logic/rules.js counts them), as three
+        // mode buttons or one Track button, whichever the board took (design/polish/PILL-SPEC.md, as built).
+        const widest = await page.evaluate(async () => (await import('/js/logic/rules.js')).restPillButtons((await import('/js/state/state.js')).game,
+          { collapsed: (await import('/js/layout/board.js')).pillCollapsed }));
         assert.equal(await page.locator('#board-controls .pill-button:not([hidden])').count(), widest, `${view}: the pill is at its widest`);
         assert.deepEqual(await underPill(page), [], `${view}: nothing is under the pill`);
-        // The board modes, at the target and the stress size.
+        // The board modes, at the target and the stress size, from their buttons or Track's tabs.
         if ((width === 952 || width === 568) && rotations !== pillRotations[2]) {
-          for (const [open, close] of [['Commander damage', 'Cancel'], ['Counters', 'Cancel'], ['Mana pool', 'Cancel']]) {
-            // The mana button's name goes on to say how much is floating.
-            await page.locator('#board-controls').getByRole('button', { name: new RegExp(`^${open}(,|$)`) }).tap();
+          for (const open of ['damage', 'counters', 'mana']) {
+            await openFromPill(page, open);
             assert.deepEqual(await underPill(page), [], `${view}, ${open}: every target is clear of the pill and inside its tile`);
-            await button(page, close).tap();
+            await button(page, 'Cancel').tap();
           }
           for (const [row, done] of [[['Choose tile colours on the board'], 'Done choosing colours'], [['Choose identities on the board'], 'Done choosing identities'], [['Rotate seats on the board'], 'Done rotating seats']]) {
             await button(page, 'Settings').tap();

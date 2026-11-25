@@ -30,6 +30,7 @@
 11. Build plan
 12. Questions resolved
 13. The monarch and the initiative (added after the build)
+14. The centre pill and Track (added 24 November 2026)
 
 ---
 
@@ -335,6 +336,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - Each circle shows the icon over the count. Tap +1; hold −1 with repeat (500ms, then every 100ms), the map's rule. The hint is "Tap +1 · hold −1", hidden on short tiles.
   - Cell size: `clamp(44px, min((ui − 20px)/3, (ub − 58px)/2), 92 × grow)`. That's 78px on the target at 4 or 6 players, 61px at 640 × 360 and 50px at 568 × 320 (6 players).
   - Undo, ✓ and ✕ work as today. Counts are 0–99, and tax shows +2n.
+  - *As built (24 November 2026):* where the pill can't hold its buttons, counters mode is a tab of Track's (§14).
 - **Icons:** poison is Mana infect `\ea73` (shipped), tax Mana's commander symbol `\e9c6` (`data-glyph="commander"`; it was the Phosphor crown until the crown went to the monarch, §13), energy Mana `\e907`, rad Mana `\ea50`, experience the **Phosphor graduation cap (fill)**.
 
 ![Experience](renders/spec-experience.png)
@@ -461,6 +463,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | `tileColours` | `'classic' \| 'soft' \| 'jewel' \| 'clear'` (SETTINGS-SPEC.md §7) | `'clear'` | enum (`tileSetOrder`) |
 | `badgeSize` | `'default' \| 'large' \| 'larger'` (SETTINGS-SPEC.md §10) | `'default'` | enum (`badgeSizeOrder`) |
 | `style` | `'material' \| 'glass'` or null (SETTINGS-SPEC.md §9) | null: the platform's default | enum, anything else is null |
+| `trackTab` | `'damage' \| 'counters' \| 'mana'` (§14) | `'damage'` | enum (`trackTabKinds`); Track opens on the first tab that's on when it's off |
 
 - Unchanged: `scores`, `startingLife`, `rotations`, `keepAwake`, `landscapeAngle`, `poison`, `casts`, `identities`, `commanderDamage`.
 - *As built:* each field falls back on its own. `startingLife` must be a whole number from 1 to 999 (`maxStartingLife`, the slider's range), or it's 40. A score that isn't a safe whole number starts at the starting life. Only when `scores` doesn't give a known player count (2–6) does the save get the default 4-player board; the fields that don't depend on the count, such as the settings, are still kept.
@@ -472,7 +475,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 - **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
 - **Opens** "Who goes first?" if Turns isn't Off.
-- **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
+- **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the tab Track opens on (§14), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
 - **Shuffle tile colours each game** (Settings → Table, off by default, `game.shuffleColours`): when on, a new game gives every player a random, distinct swatch instead, from `crypto.getRandomValues` through `randomBelow` (no modulo bias), with each seat in a different colour family of the tile set while families last (`tileSets[…].families`, six per set, found by `design/polish/tiles7.mjs`; TILES.md). `loadGame` keeps it only if it was saved as exactly `true`.
 - **Where:** New game sits in the settings page's fixed header, beside Done. It opens a confirmation in the Discard dialog's style (the destructive **Start new game** in the danger tint, **Cancel** the focused primary), which lists what resets, naming only what this game shows, and what stays. While players or life are changed in Settings it hides, and Done reads **Start new game** and starts it without asking (P1).
 
@@ -480,7 +483,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 1. The topmost dialog closes: New game's confirmation over settings first, History over settings, then settings (dropping a pending new game), the dice, History and other dialogs. (Updated for the settings page; there are no sub-sheets any more.)
 2. Rotate, colours and identity modes end, keeping their changes.
-3. Counters, damage and mana modes behave like ✕: they ask when there are edits.
+3. Counters, damage and mana modes behave like ✕: they ask when there are edits. In Track (§14) that's the whole visit, across its tabs.
 4. "Who goes first?" is skipped.
 5. At rest, back goes to the system.
 
@@ -491,7 +494,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | Where | How |
 |---|---|
 | **Anything at rest:** life, spending floating mana, the eraser, turn steps (with what they emptied), "Who goes first?", New game | **Undo** in the centre: back one step per tap. Quick taps on one tile and count are one step while each comes within 1.5s of the last; the running delta shows it. **Redo** on the toast after an undo, beside Undo for keyboards, or in History. Any new game action ends Redo. |
-| Counters, commander damage and mana in their modes | The same history. The mode's Undo stops at what was changed in the mode; ✓ closes; ✕ asks, then undoes the mode's changes (which Redo can bring back). Transfers of the monarch and the initiative are in the step that caused them. |
+| Counters, commander damage and mana in their modes | The same history. The mode's Undo stops at what was changed in the mode; ✓ closes; ✕ asks, then undoes the mode's changes (which Redo can bring back). Transfers of the monarch and the initiative are in the step that caused them. In Track (§14), one visit across its tabs is one mode: Undo switches to the tab its step was taken on. |
 | Many steps at once | Hold Undo (or Settings → Game → History): the list, Back and Forward, or tap a row to go back to it. |
 | Turn steps, the turn chip or pill held | Steps back one turn, restoring what that pass emptied. It's a step of its own, so Undo can take it back. |
 | Settings, Rotate seats, tile colours, identities | Instant, and not in the history. Toggle back. A New game's resets of them are undone with the New game. |
@@ -596,3 +599,33 @@ From the Comprehensive Rules effective 6 November 2026: the monarch (CR 726) and
   - It sits on its own line above the near edge where that's 4px clear of the total, the glyphs and the "Out" tag; on a tile too short for that it takes the near edge (the near row steps aside; the mana strip is at the far edge, §9) for its seconds. Too long for its tile, it drops its label, then wraps.
 - **Settings → Reminders** (SETTINGS-SPEC.md): Turn reminders, Pass-it-on hints and Gesture hints (the "Tap +1 · hold −1" and "Tap your colours" lines in counters, mana, commander damage and identity modes). All on by default, saved in `game.reminders`.
 - **Data:** `monarch` and `initiative` are seat indexes or null, validated in `loadGame()` (anything but a seat on the board is nobody). A new game clears both, which also covers a change of player count.
+
+## 14. The centre pill and Track (added 24 November 2026)
+
+The owner chose PILL-SPEC.md's option A, Track, "only when it's needed. E.g. on small phones or layouts that require it." The pill stays one row.
+
+- **The pill at rest:** the round (with Turns on), commander damage, counters and mana (each while it's on), Undo, the d20 and settings, in that order, 48px each on phones and up to 64px on tablets (`--setup-button`). In a mode it's Undo, ✓ and ✕, as before.
+- **Where it doesn't fit, Track:** commander damage, counters and mana become one **Track** button in their place, and their modes become tabs of one Track mode.
+  - At rest: round · Track · Undo · d20 · settings. Track's face is the icon of the tab it will open, raised over a dot for each tab that's on, that tab's dot lit; the mana dot shows on it while its face is mana and mana floats. Its name lists what it tracks: "Track: commander damage, counters, mana", then ", 3 mana floating" while mana floats.
+  - In its mode: [damage | counters | mana] ‖ Undo · ✓ · ✕. Only the tabs whose features are on show. Commander alone gives two, since commander tax is a counter. With one on there's nothing to merge, and that one keeps its own button.
+  - The open tab is in the chosen tint (Accent L3: `--chosen-fill`, `--chosen-ink`, `--chosen-ring`), never solid lime, and its mana pip takes an accent ring. A 2px rule in `--text-soft` at 45% sets the tabs off from Undo.
+  - A tap on a tab switches the tiles' layers in place. It isn't a step, and it saves no edit.
+  - **Undo, ✓ and ✕ cover the whole visit across tabs.** Undo goes back newest first, and a step taken on another tab opens that tab first (`stepTab` in `logic/history.js`), so the change is seen; it stops at the visit's start. ✕ asks "Discard N changes?" and names what goes back: "Commander damage, life, counters and mana pools go back to how they were when you opened Track." ✓ saves and closes. Android back is ✕.
+  - **Re-entry opens the last tab,** saved as `game.trackTab` (§10.1), or the first that's still on. A tile's chip opens its own tab directly (the mana strip's folded chip opens mana, "Pass it on" opens counters), and that becomes the remembered tab. Any editing mode opening, from a button, Track or a chip, becomes the remembered tab, in either form of the pill.
+- **When it collapses** (`pillFit` in `logic/rules.js`, decided by `measureBoard()`):
+  - The pill's room is the seam it sits on, less 4px at each end: the board's height with 2 players (the pill stands upright), and otherwise the columns whose seats split into two rows (3 players: one column, 283px at 568 × 320).
+  - Every button the pill can show, at rest or in a mode it opens, must fit that room at full size. If the three buttons fit, they stay. If not, Track. Only where even Track doesn't fit do the buttons shrink to 44px (`data-tight`).
+  - The tools are a count (`pillTools` in `logic/data.js`: Undo, the d20 and settings), so card lookup's magnifier adds one there and the threshold follows.
+  - The inputs are the window, the player count and the switches, read when the board is measured. The tiles don't move with the pill, so its form can't feed back into its room, and needs no hysteresis. A redraw doesn't measure, so it can't flip the form.
+  - **Never mid-mode:** a resize across the threshold while any mode is open keeps the pill's form until the mode closes (`settlePillForm`). Closing gives focus back to the closed mode's button where Track went, or to Track where the buttons went.
+- **Where it collapses, everything on, Turns on** (the sweep's sizes, 2–6 players; `tests/track.test.mjs`):
+
+| Window | 2 players | 3 players | 4 players | 5 players | 6 players |
+|---|---|---|---|---|---|
+| 952 × 427, 852 × 393, 1366 × 1024 | buttons | buttons | buttons | buttons | buttons |
+| 640 × 360 | buttons (magnifier: Track) | Track | buttons | buttons | buttons |
+| 568 × 320 and 320 × 568 | Track | Track at 44px | buttons | buttons (magnifier: Track) | buttons |
+| 375 × 667 | buttons (magnifier: Track) | Track | buttons | buttons | buttons |
+| 841 × 701 | buttons | Track | buttons | buttons | buttons |
+
+- **Accessibility:** the tabs are a `div role="tablist" aria-label="Track"` of `button role="tab"` elements with `aria-selected`, `aria-controls="board"` and `aria-orientation` (vertical with 2 players). Only the open tab is in the Tab order. The arrow keys, either way, move to the next or previous tab and open it, wrapping; Home and End go to the first and last. Focus stays on the tab. Opening announces "Track, commander damage, tab 1 of 3. Press a commander on a tile to add one damage. Switch tabs, Undo, Save or Cancel in the centre"; a switch, "Counters, tab 2 of 3. Press a counter to add one"; ✕ with no changes, "Track closed".

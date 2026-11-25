@@ -206,6 +206,16 @@ export function stepCells(d) {
   return cells;
 }
 
+// The Track tab a step taken in an editing mode belongs to (PILL-SPEC.md §3.2): commander damage (which changes life,
+// and can pass the monarch or the initiative), mana pools, or counters (the counts and the designations).
+/**
+ * @param {Step} step
+ * @returns {import('./data.js').TrackTab}
+ */
+export function stepTab(step) {
+  return 'commanderDamage' in step.d ? 'damage' : 'pools' in step.d ? 'mana' : 'counters';
+}
+
 // Whether two steps touch any cell in common.
 /** @param {Map<string, Set<string> | 'all'>} a @param {Map<string, Set<string> | 'all'>} b */
 export function overlaps(a, b) {

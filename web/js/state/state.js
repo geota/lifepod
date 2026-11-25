@@ -31,6 +31,13 @@ export function openBoardMode(mode) {
   editStartHolders = Object.fromEntries(designationKinds.map(kind => [kind, game[kind]]));
 }
 
+// Moves an open Track visit to another of its tabs (another editing mode), keeping where its edits began, so its Undo,
+// ✓ and ✕ cover the whole visit (PILL-SPEC.md §3.2).
+/** @param {BoardMode} mode */
+export function switchBoardMode(mode) {
+  boardMode = mode;
+}
+
 // Turn steps, newest last, so holding the turn chip or the pill steps back exactly, restoring any pools the step
 // emptied. Not saved: after a relaunch, a hold steps back by the play order instead. Cleared in place.
 export const turnSteps = [];

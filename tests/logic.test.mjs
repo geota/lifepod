@@ -6,15 +6,15 @@ import fc from 'fast-check';
 import {
   badgeSizeOrder, countKinds, designationKinds, historyBytes, historyCap, historyFields, historyVersion, identityBackgrounds,
   identityParts, identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playOrders, playerCounts,
-  reminderKinds, settingsFields, stepKinds, styleOrder, swatches, tileSetOrder, trackers, turnModes,
+  pillTools, reminderKinds, settingsFields, stepKinds, styleOrder, swatches, tileSetOrder, trackers, trackTabKinds, turnModes,
 } from '../web/js/logic/data.js';
 import {
   applyStep, boardOf, composeChanges, describeStep, diffBoard, emptyHistory, fitHistory, mergeStep, overlaps, stepCells,
-  stepText, trimHistory,
+  stepTab, stepText, trimHistory,
 } from '../web/js/logic/history.js';
 import {
-  applyEdit, applyNewEdit, countEdit, damageEdit, designationEdit, isOut, leavingTransfers, manaEdit, nextTurn, outPlayers,
-  playOrder, previousTurn, turnBack, turnForward,
+  applyEdit, applyNewEdit, countEdit, damageEdit, designationEdit, isOut, leavingTransfers, manaEdit, nextTurn, openingTab,
+  outPlayers, pillFit, playOrder, previousTurn, restPillButtons, trackTabs, turnBack, turnForward, widestPill,
 } from '../web/js/logic/rules.js';
 import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, loadGame } from '../web/js/logic/save.js';
 import { test } from './helpers.mjs';
@@ -49,6 +49,7 @@ function gameProblems(g) {
   if (!(g.style === null || styleOrder.includes(g.style))) p.push('style');
   if (!seatOrNull(g.monarch, n) || !seatOrNull(g.initiative, n)) p.push('designations');
   if (!reminderKinds.every(k => typeof g.reminders[k] === 'boolean')) p.push('reminders');
+  if (!trackTabKinds.includes(g.trackTab)) p.push('trackTab');
   if (historyProblems(g.history, n).length) p.push('history');
   return p;
 }
@@ -108,6 +109,7 @@ const gameOf = n => fc.record({
   monarch: seat(n),
   initiative: seat(n),
   reminders: boolRecord(reminderKinds),
+  trackTab: fc.constantFrom(...trackTabKinds),
   history: fc.constant(0).map(() => emptyHistory()),
 });
 
@@ -728,4 +730,65 @@ test('node: describeStep and stepText say what each kind of step changed', () =>
   const rounds = { ...g, turns: 'rounds' };
   assert.equal(stepText({ t: 0, k: 'turn', d: { turn: [{ first: 0, active: null, round: 2 }, { first: 0, active: null, round: 3 }], pools: { 0: { 0: [1, 0] } } } }, rounds), 'round 2 → 3. mana pools emptied');
   assert.deepEqual(describeStep({ t: 0, k: 'turn', d: { turn: [{ first: 0, active: 0, round: 1 }, { first: 0, active: 1, round: 1 }] } }, g).label, 'turn pass');
+});
+
+// ---- The centre pill's form (design/polish/PILL-SPEC.md, as built) --------------------------------------------------
+
+// Three buttons for commander damage, counters and mana where every button the pill can show fits its seam at full size;
+// otherwise one Track button with a tab for each in its mode; and 44px buttons only where even Track doesn't fit.
+test('node: the pill keeps separate buttons where they fit, takes Track where they don\'t, and shrinks only past that', () => {
+  const all = load(JSON.stringify({ scores: [40, 40], counters: { commander: true, poison: true }, manaPool: true, turns: 'turns' }));
+  assert.deepEqual(trackTabs(all), ['damage', 'counters', 'mana']);
+  assert.equal(restPillButtons(all), 4 + pillTools, 'the round, three modes and the tools');
+  assert.equal(restPillButtons(all, { collapsed: true }), 2 + pillTools, 'the round, Track and the tools');
+  assert.equal(widestPill(all, { collapsed: true }), 6, 'Track\'s mode: three tabs, Undo, save and ✕');
+  assert.equal(widestPill(all, { collapsed: true, tools: pillTools + 1 }), 6, 'with a magnifier, the pill at rest is as long as Track\'s mode');
+  // 568 × 320 with 2 players: 312px of seam.
+  assert.deepEqual(pillFit(all, 312, 48), { collapsed: true, tight: false }, '7 buttons are 336px, Track\'s 6 are 288px');
+  assert.deepEqual(pillFit(all, 312, 48, pillTools + 1), { collapsed: true, tight: false }, 'with the magnifier too');
+  // 568 × 320 with 3 players: the 283px seam column.
+  assert.deepEqual(pillFit(all, 275, 48), { collapsed: true, tight: true }, 'Track\'s mode is 288px, so 44px buttons');
+  // 952 × 427 with 4 players.
+  assert.deepEqual(pillFit(all, 944, 48, pillTools + 1), { collapsed: false, tight: false });
+  // 640 × 360 with 2 players: seven fit at 48px, eight don't.
+  assert.deepEqual(pillFit(all, 352, 48), { collapsed: false, tight: false });
+  assert.deepEqual(pillFit(all, 352, 48, pillTools + 1), { collapsed: true, tight: false });
+  // Exactly at the boundary, it fits.
+  assert.equal(pillFit(all, 7 * 48, 48).collapsed, false);
+  assert.equal(pillFit(all, 7 * 48 - 1, 48).collapsed, true);
+  // Commander alone has two tabs, since commander tax is a counter.
+  const commander = { ...all, counters: { ...all.counters, poison: false }, manaPool: false };
+  assert.deepEqual(trackTabs(commander), ['damage', 'counters']);
+  // One mode on: Track would be its own button, so there's nothing to collapse, only the shrink.
+  const one = { ...commander, counters: { ...commander.counters, commander: false }, manaPool: true };
+  assert.deepEqual(trackTabs(one), ['mana']);
+  assert.deepEqual(pillFit(one, 200, 48), { collapsed: false, tight: true });
+  // None on: the round and the tools.
+  const none = { ...one, manaPool: false };
+  assert.equal(widestPill(none, { collapsed: true }), 1 + pillTools);
+});
+
+test('node: the pill\'s form follows only its inputs, and more room never takes Track where less room kept the buttons', () => {
+  fc.assert(fc.property(anyGame, fc.integer({ min: 100, max: 1400 }), fc.integer({ min: 0, max: 200 }), fc.constantFrom(48, 56, 64), fc.constantFrom(pillTools, pillTools + 1), (g, room, more, natural, tools) => {
+    const small = pillFit(g, room, natural, tools);
+    assert.deepEqual(pillFit(g, room, natural, tools), small, 'the same inputs, the same form');
+    const large = pillFit(g, room + more, natural, tools);
+    if (!small.collapsed) assert.equal(large.collapsed, false);
+    if (!small.tight) assert.equal(large.tight, false);
+    if (small.collapsed) assert.ok(trackTabs(g).length > 1, 'Track only with two or more tabs');
+  }), opts);
+});
+
+test('node: Track opens on the tab it last showed, or the first that\'s still on, and Undo knows each step\'s tab', () => {
+  const g = load(JSON.stringify({ scores: [40, 40], counters: { commander: true, poison: true }, manaPool: true }));
+  assert.equal(g.trackTab, 'damage', 'a save from before Track opens on its first tab');
+  assert.equal(load(JSON.stringify({ trackTab: 'treasure' })).trackTab, 'damage', 'an unknown tab is the first');
+  assert.equal(load(JSON.stringify({ trackTab: 'mana' })).trackTab, 'mana');
+  assert.equal(openingTab({ ...g, trackTab: 'mana' }), 'mana');
+  assert.equal(openingTab({ ...g, trackTab: 'mana', manaPool: false }), 'damage', 'a tab switched off falls back to the first');
+  assert.equal(openingTab({ ...g, trackTab: 'damage', counters: { commander: false, poison: true } }), 'counters');
+  assert.equal(stepTab({ t: 0, d: { commanderDamage: { 1: { 0: [0, 1] } }, scores: { 1: [40, 39] }, monarch: [0, 1] } }), 'damage');
+  assert.equal(stepTab({ t: 0, d: { pools: { 0: { 2: [0, 1] } } } }), 'mana');
+  assert.equal(stepTab({ t: 0, d: { poison: { 0: [0, 1] } } }), 'counters');
+  assert.equal(stepTab({ t: 0, d: { initiative: [null, 1] } }), 'counters');
 });

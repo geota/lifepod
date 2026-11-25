@@ -355,9 +355,10 @@ for (const [name, engine] of Object.entries(engines)) {
 
   // Every new target is at least 44px (§9): the 7-button pill at 568 × 320 with 2 players takes 44px buttons and stays
   // inside the board's short side, 48px elsewhere; the toast's Redo is a 64 × 44 target inside its tile.
-  test(`${name}: Undo's pill fits at 44px on the smallest phone, and the toast's Redo is a whole target`, async (t) => {
+  // On the smallest phone the pill takes Track (design/polish/PILL-SPEC.md, as built) rather than 44px buttons.
+  test(`${name}: Undo's pill fits at full size on the smallest phone, and the toast's Redo is a whole target`, async (t) => {
     const busy = { counters: { commander: true, poison: true, monarch: true }, manaPool: true, turns: 'rounds', turn: { first: 0, active: null, round: 1 } };
-    for (const [width, height, count, expected] of [[568, 320, 2, 44], [640, 360, 2, 48], [568, 320, 4, 48], [952, 427, 2, 48]]) {
+    for (const [width, height, count, expected] of [[568, 320, 2, 48], [640, 360, 2, 48], [568, 320, 4, 48], [952, 427, 2, 48]]) {
       const page = await openPage(t, engine, { clock: true, viewport: { width, height }, orientation: 90, game: savedGame(count, busy) });
       const pill = await page.locator('#board-controls').evaluate((controls) => {
         const buttons = [...controls.querySelectorAll('.pill-button')].filter(button => !button.hidden);

@@ -335,6 +335,16 @@ export function button(page, name) {
   return page.getByRole('button', { name, exact: true });
 }
 
+// Opens commander damage, counters or mana ('damage', 'counters' or 'mana') from the pill: its own button, or, where the
+// pill has one Track button instead (design/polish/PILL-SPEC.md, as built), Track and then its tab.
+export async function openFromPill(page, mode) {
+  if (await page.locator('#track-button').isVisible()) {
+    await page.locator('#track-button').tap();
+    const tab = page.locator(`#track-tab-${mode}`);
+    if (await tab.getAttribute('aria-selected') !== 'true') await tab.tap();
+  } else await page.locator(`#${mode}-button`).tap();
+}
+
 export async function startGame(page, count) {
   await button(page, 'Settings').tap();
   await button(page, `${count} players`).tap();
