@@ -58,6 +58,30 @@ A version tag such as `v0.1.0-alpha.1` publishes a GitHub prerelease with the si
 - `npm run screenshots:readme` renders the README's screenshots into `screenshots/readme/` from the real app (`scripts/readme-screenshots.mjs`). Name files to render just those: `npm run screenshots:readme -- turn.png`.
 - `npm run store:images` renders the Google Play and App Store images into `store/`.
 
+## Card data
+
+Card lookup reads `web/data/cards.json.gz`, a gzipped copy of `data/cards.json`: every paper card in Scryfall's Oracle cards bulk file, without art cards, tokens (but Treasure, Food, Clue and the other predefined artifact tokens), emblems, planes, schemes, Vanguard, Jumpstart theme cards, helper cards and digital-only cards. That's 33,262 cards on 23 November 2026: 9.85 MB as JSON, 2.12 MB gzipped. Each card keeps its name, folded search key, mana cost, type line, rules text, stats, faces, colour identity and, for a later structured query, mana value, colours, rarity and keywords (the `Card` typedef in `web/js/logic/cards.js`). The query fields cost 0.79 MB raw and 0.17 MB gzipped.
+
+- `npm run cards:update` downloads the latest file (with the User-Agent `LifePod/<version>` and nothing else about you), keeps it in `node_modules/.cache/lifepod-cards/`, and writes the data and the credit dates. `npm run cards:update -- --offline` rebuilds from the cache. A failed or slow request is tried three times in all; only a failure repeats it, so a run downloads the bulk file once.
+- A version tag refreshes the data for its release in CI and falls back to the committed data if Scryfall or a check fails (`scripts/cards-release.mjs`, RELEASING.md "Card data in a release"); a weekly workflow proposes the change to main. Everything else, CI on main and pull requests included, uses the committed `data/cards.json`, so a build is reproducible from its commit. `LIFEPOD_SCRYFALL_API=http://127.0.0.1:9 node scripts/cards-release.mjs` tries the fallback locally.
+- `data/cards.json` has one card per line, sorted by name, so an update's diff shows the cards that changed. It isn't shipped: only `web/` is.
+- The page fetches `web/data/cards.json.gz` the first time card lookup opens (the CSP's `connect-src 'self'`) and unpacks it with `DecompressionStream` (iOS 16.4, Chrome 80). Both apps serve `.gz` as `application/gzip` with no `Content-Encoding`, so the WebView passes the bytes through as they are. aapt2 stores it in the APK without compressing it again, and iOS keeps it at 2.1 MB in the app rather than 10 MB. The gzip header carries no time and an "unknown" OS byte, so a Mac and Linux write the same file.
+
+**Search speed**, measured in Chromium with the CPU slowed 4×, as `tests/cards.test.mjs` does:
+
+| Step | Time |
+|---|---|
+| Fetch, unpack and decode the file | 115–125 ms, once (the same as the plain file: unpacking costs no more than reading 10 MB) |
+| `JSON.parse` | 65–95 ms, once |
+| Index the names | 5–6 ms, once |
+| Name search, per keystroke | 3–5 ms median; 12 ms for one letter, which matches 25,000 names |
+| Drawing 25 results | about 7 ms |
+| Rules text index (one joined string) | 35 ms, the first time rules text is searched |
+| Rules text, a fresh query | 6–15 ms (`indexOf` over the joined text) |
+| Rules text, as the query grows | 1–2 ms (it checks only the last query's matches) |
+
+Rules text runs in its own task after the names are drawn, so each keystroke's work stays under a frame. A trigram index, as SQLite's FTS5 uses, answers a rules-text query in under 2 ms but took 670 ms to build and 20 MB of memory at load, so it isn't used. SQLite itself isn't: it would need WebAssembly, which needs `'wasm-unsafe-eval'` in the CSP, and about 1 MB more, for read-only data that a scan already searches within a frame.
+
 ## The Mana font
 
-`web/fonts/mana.woff2` is a subset of [Mana](https://github.com/andrewgioia/mana) 1.18 with only the symbols LifePod draws, made by `scripts/subset-mana.mjs` (`npm run font:subset`) from the original release in `design/fonts/`. The font is under the SIL Open Font License 1.1 (`web/fonts/OFL.txt`).
+`web/fonts/mana.woff2` (33.8 KB, from 28.2 KB before card lookup's symbols) is a subset of [Mana](https://github.com/andrewgioia/mana) 1.18 with only the symbols LifePod draws, made by `scripts/subset-mana.mjs` (`npm run font:subset`) from the original release in `design/fonts/`. The font is under the SIL Open Font License 1.1 (`web/fonts/OFL.txt`).

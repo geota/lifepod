@@ -66,6 +66,23 @@ done
 gh secret list --repo geota/lifepod
 ```
 
+## Card data in a release
+
+A version tag refreshes card lookup's data on its own. CI's **Card data for a release** job runs `scripts/cards-release.mjs`: one download of Scryfall's latest Oracle cards file (`npm run cards:update`, with a 30-second limit on the list, 3 minutes on the file, and two retries), then `tests/cards-data.test.mjs`, a card count within 5% of the committed data's, and a few cards every lookup needs (Sol Ring, Atraxa, Delver of Secrets, Lightning Bolt, Treasure). The web bundle, the APK and App Bundle, the iOS builds and TestFlight all build from that one copy, credit dates included, and the release notes and the job summary say which data shipped and its date.
+
+If Scryfall is down or slow, or a check fails, the release ships the committed `data/cards.json` instead, with a warning in the job summary and the release notes. A release never fails over card data.
+
+The tag's own commit is unchanged, so the refreshed data exists only in that release's artifacts. To keep main close to what ships, the **Card data refresh** workflow (`.github/workflows/cards-refresh.yml`) runs the same script every Monday and on demand, and opens or updates a pull request on `automation/card-data` when the data changed. A pull request opened by a workflow doesn't start CI: run **LifePod CI** on that branch from the Actions tab before merging. The repository setting "Allow GitHub Actions to create and approve pull requests" must be on.
+
+To refresh by hand:
+
+```sh
+npm run cards:update     # writes data/cards.json, web/data/cards.json.gz and the credit dates
+git diff --stat data/cards.json web/index.html README.md
+npm run check
+git commit -m 'Card data: Scryfall, <date>' data/cards.json web/data/cards.json.gz web/index.html README.md
+```
+
 ## GitHub prerelease and Obtainium
 
 Push a version tag from a tested commit on `main`:
