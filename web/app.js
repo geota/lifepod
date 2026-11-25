@@ -111,7 +111,8 @@ discardDialog.addEventListener('close', () => {
 window.closeOpenDialog = () => {
   const openDialog = [.../** @type {NodeListOf<HTMLDialogElement>} */ (document.querySelectorAll('dialog[open]'))].at(-1);
   if (openDialog) {
-    openDialog.close('cancel');
+    // A dialog can keep itself open for back, as Escape's cancel can (card lookup's Search help goes back to its list).
+    if (openDialog.dispatchEvent(new Event('cancel', { cancelable: true }))) openDialog.close('cancel');
     return true;
   }
   if (!boardMode) return false;

@@ -51,6 +51,36 @@
    the search row's and the credit's place too, so a short phone has room for its text; Results brings them back. */
 .card-body { grid-area: body; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
 .cards-sheet[data-view="card"] :is(.card-results, .card-search, .card-state, .card-credit), .cards-sheet[data-view="list"] .card-panel { display: none; }
+/* Search help takes the list's place, as a card does, at every width. */
+.card-help { display: none; flex-direction: column; gap: var(--space-2); min-height: 0; }
+.cards-sheet[data-view="help"] .card-help { display: flex; }
+.cards-sheet[data-view="help"] :is(.card-results, .card-panel, .card-search, .card-state, .card-credit) { display: none; }
+.card-help .card-back { display: inline-flex; }
+.help-body { min-height: 0; padding: var(--space-3) var(--space-4) var(--space-4); overflow-y: auto; overscroll-behavior: contain; border-radius: var(--card-radius); background: var(--background); }
+.help-body h3 { font-size: calc(1.125 * var(--rem)); font-weight: var(--weight-heavy); outline: none; }
+.help-body h3:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.help-body h4 { margin: var(--space-4) 0 var(--space-1); color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
+.help-note { margin: var(--space-1) 0 0; color: var(--muted); font-size: var(--type-small); }
+.help-rows { display: grid; gap: 4px; }
+.help-row {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  align-items: center;
+  /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the grid gap, not multi-column layout, which the partial note is about. */
+  column-gap: var(--space-3);
+  min-height: var(--tap-min);
+  padding: 4px var(--space-3);
+  border: var(--control-edge) solid var(--control-border);
+  border-radius: var(--row-radius);
+  background: var(--row-fill);
+  color: var(--text);
+  text-align: start;
+}
+.help-row:active { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
+.help-row code, .help-offline code { font-family: SFMono-Regular, Menlo, Consolas, 'Roboto Mono', monospace; font-size: var(--type-small); overflow-wrap: anywhere; }
+.help-row span { color: var(--text-soft); font-size: var(--type-small); }
+.help-offline { display: grid; gap: 4px; margin: 0; padding-inline-start: 1.2em; color: var(--text-soft); font-size: var(--type-small); }
+.card-help-button { flex: none; }
 .card-results { position: relative; display: grid; align-content: start; gap: 4px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scroll-padding-block: 4px; }
 .card-row {
   display: grid;
@@ -117,12 +147,13 @@
 /* Wide: the results on the left, the card on the right, with no Back. */
 @container cards (min-width: 620px) {
   .card-body { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: var(--space-3); }
-  .cards-sheet[data-view] .card-results { position: relative; display: grid; }
-  .cards-sheet[data-view] .card-search { display: flex; }
-  .cards-sheet[data-view] .card-state { display: grid; }
-  .cards-sheet[data-view] .card-credit { display: block; }
-  .cards-sheet[data-view] .card-panel { display: flex; }
-  .card-back { display: none; }
+  .cards-sheet[data-view="help"] .card-body { grid-template-columns: minmax(0, 1fr); }
+  .cards-sheet:is([data-view="list"], [data-view="card"]) .card-results { position: relative; display: grid; }
+  .cards-sheet:is([data-view="list"], [data-view="card"]) .card-search { display: flex; }
+  .cards-sheet:is([data-view="list"], [data-view="card"]) .card-state { display: grid; }
+  .cards-sheet:is([data-view="list"], [data-view="card"]) .card-credit { display: block; }
+  .cards-sheet:is([data-view="list"], [data-view="card"]) .card-panel { display: flex; }
+  .card-panel .card-back { display: none; }
   .card-sheet:empty { display: grid; place-items: center; min-height: 160px; }
   .card-sheet:empty::before { color: var(--muted); content: 'Choose a card to read it'; font-size: var(--type-label); }
 }
@@ -151,6 +182,10 @@
 #cards[data-compact] .card-note-short { display: inline; }
 #cards[data-compact] .card-note-short::before { content: '· '; }
 #cards[data-compact] .card-row { min-height: var(--tap-min); padding-block: 2px; }
+/* Compact, Search help puts Back beside its text rather than above it, so the text keeps the height there is. */
+#cards[data-compact] .card-help { flex-direction: row; align-items: stretch; }
+#cards[data-compact] .card-help .card-back { align-self: flex-start; }
+#cards[data-compact] .help-body { flex: 1; padding: var(--space-2) var(--space-3); }
 /* iOS shrinks only the visual viewport for its keyboard, so the sheet is placed in what's left (js/sheets/cards.js). */
 #cards[data-keyboard] { height: calc(var(--view-height, 100%) - 12px); margin: calc(var(--view-top, 0px) + 6px) auto auto; }
 

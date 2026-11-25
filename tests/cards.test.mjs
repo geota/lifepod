@@ -181,8 +181,12 @@ async function checkTargets(t, engine, style) {
     await page.setViewportSize({ width, height });
     await button(page, opener).click();
     await search(page, 'sol');
-    for (const view of ['list', 'card']) {
+    for (const view of ['list', 'card', 'help']) {
       if (view === 'card') await page.locator('#card-results [role="option"]').first().click();
+      if (view === 'help') {
+        if (await page.locator('#card-back').isVisible()) await page.locator('#card-back').click();
+        await button(page, 'Search help').click();
+      }
       const found = await page.evaluate(() => {
         const dialog = document.querySelector('#cards').getBoundingClientRect();
         const issues = [];
@@ -193,16 +197,21 @@ async function checkTargets(t, engine, style) {
           const box = node.getBoundingClientRect();
           const label = node.id || node.getAttribute('aria-label') || node.textContent.trim().slice(0, 20);
           if (box.width < 43.5 || box.height < 43.5) issues.push(`${label} is ${Math.round(box.width)}×${Math.round(box.height)}`);
-          if (node.matches('button, input') && (box.left < dialog.left - 0.5 || box.right > dialog.right + 0.5 || box.top < dialog.top - 0.5 || box.bottom > dialog.bottom + 0.5)) issues.push(`${label} is outside the sheet`);
+          // Search help's rows scroll inside it, so only their size counts.
+          if (node.matches('button, input') && !node.closest('.help-body') && (box.left < dialog.left - 0.5 || box.right > dialog.right + 0.5 || box.top < dialog.top - 0.5 || box.bottom > dialog.bottom + 0.5)) issues.push(`${label} is outside the sheet`);
         }
         const rows = [...document.querySelectorAll('#card-results [role="option"]')].filter(visible);
         const list = document.querySelector('#card-results');
         if (list.checkVisibility() && !rows.some(row => row.getBoundingClientRect().bottom <= list.getBoundingClientRect().bottom + 0.5)) issues.push('no whole result shows');
         if (document.querySelector('#card-name')?.checkVisibility() === false && document.querySelector('#cards-sheet').dataset.view === 'card') issues.push('the open card is hidden');
+        const help = document.querySelector('.help-body');
+        if (document.querySelector('#cards-sheet').dataset.view === 'help' && !(help.checkVisibility() && help.getBoundingClientRect().height >= 44)) issues.push('Search help has no room');
         return issues;
       });
       problems.push(...found.map(issue => `${width}×${height} ${view}: ${issue}`));
     }
+    // Escape leaves Search help for the list, then closes the sheet.
+    await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
   }
   assert.deepEqual(problems, []);
@@ -295,7 +304,44 @@ async function checkNotes(t, engine) {
   await eventually(async () => (await rowNames(page)).every(row => /treasure/i.test(row)), true, 'only names with Treasure');
 }
 
+// Search help takes the list's place; Back, Escape and Android's back return to the list with focus in the field, and an
+// example fills the field and runs (§7.3). On a short screen, the notes shrink to one line beside the count (§7.4).
+async function checkHelp(t, engine) {
+  const page = await openPage(t, engine, { viewport: { width: 852, height: 393 } });
+  await openCards(page);
+  await button(page, 'Search help').click();
+  assert.equal(await page.locator('#cards-sheet').getAttribute('data-view'), 'help');
+  assert.equal(await activeId(page), 'card-help-title', 'the heading takes focus');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#cards').evaluate(dialog => dialog.open), true, 'Escape leaves the help, not the sheet');
+  assert.equal(await page.locator('#cards-sheet').getAttribute('data-view'), 'list');
+  assert.equal(await activeId(page), 'card-query');
+  await button(page, 'Search help').click();
+  assert.equal(await page.evaluate(() => window.closeOpenDialog()), true);
+  assert.equal(await page.locator('#cards').evaluate(dialog => dialog.open), true, 'Android back leaves the help too');
+  assert.equal(await page.locator('#cards-sheet').getAttribute('data-view'), 'list');
+  await button(page, 'Search help').click();
+  await page.locator('.help-row', { hasText: 'red and green, maybe more' }).click();
+  assert.equal(await page.locator('#card-query').inputValue(), 'c:rg');
+  await eventually(async () => /^\d+ cards$/.test(await statusText(page)), true, 'the example runs');
+  await button(page, 'Search help').click();
+  await button(page, 'Results').click();
+  assert.equal(await activeId(page), 'card-query', 'Back returns to the field');
+  // Short, as with a phone's keyboard open in landscape: the count and the note's short form share one line.
+  await page.setViewportSize({ width: 568, height: 160 });
+  await page.locator('#card-query').fill('e:war t:elf');
+  await eventually(async () => page.locator('#card-notes .card-note-short').first().isVisible(), true, 'the short form shows');
+  assert.equal(await page.locator('#card-notes .card-note-short').first().textContent(), 'Without e:war (sets)');
+  const line = await page.evaluate(() => {
+    const status = document.querySelector('#card-status').getBoundingClientRect();
+    const note = document.querySelector('#card-notes .card-note-short').getBoundingClientRect();
+    return note.top < status.bottom && note.bottom > status.top && note.left >= status.right;
+  });
+  assert.ok(line, 'on the status line');
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: Search help opens in the list's place, and its examples run`, t => checkHelp(t, engine));
   test(`${name}: a syntax query shows notes for cut keywords and mistakes, and announces them`, t => checkNotes(t, engine));
   test(`${name}: a plain query with a typing slip lists close spellings after its matches`, t => checkCloseSpellings(t, engine));
   test(`${name}: card lookup takes no undo step and leaves History as it was`, t => checkNoHistory(t, engine));

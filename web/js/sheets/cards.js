@@ -23,6 +23,10 @@ const countRegion = /** @type {HTMLParagraphElement} */ (document.querySelector(
 const resultList = /** @type {HTMLDivElement} */ (document.querySelector('#card-results'));
 const cardSheet = /** @type {HTMLDivElement} */ (document.querySelector('#card-sheet'));
 const backButton = /** @type {HTMLButtonElement} */ (document.querySelector('#card-back'));
+const helpButton = /** @type {HTMLButtonElement} */ (document.querySelector('#card-help-button'));
+const helpBack = /** @type {HTMLButtonElement} */ (document.querySelector('#help-back'));
+const helpTitle = /** @type {HTMLHeadingElement} */ (document.querySelector('#card-help-title'));
+const helpBody = /** @type {HTMLDivElement} */ (document.querySelector('#help-body'));
 
 // The data file, gzipped, next to index.html: a same-origin fetch, which the CSP's connect-src 'self' allows, unpacked
 // with DecompressionStream (docs/DEVELOPING.md, "Card data").
@@ -213,9 +217,32 @@ resultList.addEventListener('click', (event) => {
   const row = /** @type {HTMLElement | null} */ (/** @type {HTMLElement} */ (event.target).closest('[role="option"]'));
   if (row) openCard(Number(row.dataset.at));
 });
-backButton.addEventListener('click', () => {
+backButton.addEventListener('click', backToList);
+function backToList() {
   showList();
   queryField.focus();
+}
+
+// Search help (design/polish/SCRYFALL-SYNTAX-SPEC.md §7.3) takes the list's place; its heading takes focus. Back,
+// Escape and Android's back return to the list with focus in the field; an example runs and returns too.
+helpButton.addEventListener('click', () => {
+  cardsSheet.dataset.view = 'help';
+  helpBody.scrollTop = 0;
+  helpTitle.focus();
+});
+helpBack.addEventListener('click', backToList);
+helpBody.addEventListener('click', (event) => {
+  const row = /** @type {HTMLButtonElement | null} */ (/** @type {HTMLElement} */ (event.target).closest('[data-example]'));
+  if (!row) return;
+  queryField.value = /** @type {string} */ (row.dataset.example);
+  backToList();
+  runSearch();
+});
+// Escape, or Android's back (app.js sends a cancel event first), in the help leaves the help, not the sheet.
+cardsDialog.addEventListener('cancel', (event) => {
+  if (cardsSheet.dataset.view !== 'help') return;
+  event.preventDefault();
+  backToList();
 });
 textToggle.addEventListener('click', () => {
   textToggle.setAttribute('aria-pressed', String(!textOn()));
