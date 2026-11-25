@@ -18,7 +18,7 @@ Tap the die in the center to roll a d4, d6, d8, d10, d12 or d20. Each die is dra
 
 ## Card lookup
 
-Tap the magnifier in the center. Type part of a card's name, in any case and without accents: "sol r" finds Sol Ring, and "lim dul" finds Lim-Dûl's Vault. Names that start with what you typed come first, then names with a word that starts with it, then names that contain it. Turn on **Rules text** to find cards by what they do, such as "create a Treasure", after the name matches.
+Tap the magnifier in the center. Type part of a card's name, in any case and without accents: "sol r" finds Sol Ring, and "lim dul" finds Lim-Dûl's Vault. Names that start with what you typed come first, then names with a word that starts with it, then names that contain it. Turn on **Rules text** to find cards by what they do, such as "create a Treasure", after the name matches. A slip in a name of four letters or more still finds the card: when fewer than three cards match, the closest spellings follow under **Close spellings**, so "smothering tihte" finds Smothering Tithe.
 
 Tap a card, or use the arrow keys and Enter, to read it: its mana cost, type line, rules text with the mana symbols, power and toughness or loyalty, both faces of a double-faced, split or adventure card, its colour identity, and whether it's banned in Commander. On a phone, **Results** goes back to the list; on a tablet or a wide screen, the card shows beside the list. It works offline: every paper card, but no art, is in the app. Card data is from Scryfall, and the date it was updated is under the list and in Settings → About.
 

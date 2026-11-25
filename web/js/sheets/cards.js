@@ -2,13 +2,15 @@
 // results, and a card's text. Importing this module wires the sheet and the button.
 
 import { showDialog } from '../actions/dialog.js';
-import { foldText, indexCards, rankResults, searchNames, searchText, textMinimum } from '../logic/cards.js';
-import { cardNodes, resultRow } from '../render/card.js';
+import { fold, foldText, indexCards, rankResults, searchNames, searchText, textMinimum } from '../logic/cards.js';
+import { closeNames, typoBelow, typoBuilder, typoMinimum } from '../logic/cardtypos.js';
+import { cardNodes, closeGroup, resultRow } from '../render/card.js';
 import { syncBackHandling } from '../state/state.js';
 import { lookupButton } from '../ui/dom.js';
 
 /** @typedef {import('../logic/cards.js').CardData} CardData */
 /** @typedef {import('../logic/cards.js').CardIndex} CardIndex */
+/** @typedef {import('../logic/cardtypos.js').TypoIndex} TypoIndex */
 
 const cardsDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#cards'));
 const cardsSheet = /** @type {HTMLDivElement} */ (document.querySelector('#cards-sheet'));
@@ -37,10 +39,13 @@ let index = null;
 /** @type {Promise<void> | null} */
 let loading = null;
 let loadFailed = false;
-/** @type {{ names: number[][], texts: number[], query: string } | null} */
+/** @type {{ names: number[][], texts: number[], query: string, close: number[] } | null} */
 let found = null;
+// The cards drawn, in the list's order: the matches, then any close spellings.
 /** @type {number[]} */
 let shown = [];
+/** @type {TypoIndex | null} */
+let typos = null;
 let matches = 0;
 let active = -1;
 let textTimer = 0;
@@ -78,6 +83,7 @@ function loadCards() {
     .then((data) => {
       index = indexCards(data.cards);
       search();
+      buildTypos(index);
     })
     .catch(() => {
       loadFailed = true;
@@ -87,6 +93,26 @@ function loadCards() {
       loading = null;
     });
 }
+
+// The close-spellings index, built in steps of 2,000 names, one task each, so the sheet stays responsive while it's
+// built (about 230 ms in all on a phone-speed CPU). A query that wanted close spellings before it was ready runs again.
+/** @param {CardIndex} built */
+function buildTypos(built) {
+  const builder = typoBuilder(built.keys);
+  const step = () => {
+    if (built !== index) return;
+    const ready = builder.step();
+    if (!ready) {
+      setTimeout(step, 0);
+      return;
+    }
+    typos = ready;
+    if (found && !found.close.length && wantsTypos(found.query, matches)) search();
+  };
+  setTimeout(step, 0);
+}
+/** @param {string} query @param {number} count */
+const wantsTypos = (query, count) => count < typoBelow && fold(query).length >= typoMinimum;
 
 // ---- Search ---------------------------------------------------------------------------------------------------------
 
@@ -102,48 +128,69 @@ function search() {
   }
   const query = queryField.value;
   const names = searchNames(index, query);
-  found = { names, texts: [], query };
+  found = { names, texts: [], query, close: [] };
+  addCloseSpellings(found);
   showResults(true);
   if (textOn() && foldText(query).length >= textMinimum) {
     const searched = found;
     textTimer = setTimeout(() => {
       if (searched !== found || !index) return;
       searched.texts = searchText(index, query);
+      addCloseSpellings(searched);
       showResults(true);
     }, 0);
   }
 }
 
-// Draws the first page of results, or (`fresh` false) adds the next page below the ones shown.
+// A plain query that finds fewer than 3 cards also lists the names within a few typing slips of it, after the
+// matches (design/polish/SCRYFALL-SYNTAX-SPEC.md §6.6), popular cards first among equals.
+/** @param {{ names: number[][], texts: number[], query: string, close: number[] }} search */
+function addCloseSpellings(search) {
+  search.close = [];
+  if (!index || !typos) return;
+  const cards = index.cards;
+  const count = search.names.reduce((sum, bucket) => sum + bucket.length, 0) + search.texts.length;
+  if (!wantsTypos(search.query, count)) return;
+  const skip = new Set([...search.names.flat(), ...search.texts]);
+  search.close = closeNames(typos, fold(search.query), { limit: pageSize, skip, rank: at => cards[at].er ?? Infinity });
+}
+
+// Draws the first page of results, or (`fresh` false) adds the next page below the ones shown. Close spellings, when
+// there are any, follow the matches (which are then fewer than a page) in a group of their own.
 /** @param {boolean} fresh */
 function showResults(fresh) {
   if (!index || !found) return;
-  const ranked = rankResults(index, found.names, found.texts, fresh ? pageSize : shown.length + pageSize);
+  const ranked = rankResults(index, found.names, found.texts, fresh ? pageSize : matchesShown() + pageSize);
   const cards = index.cards;
-  const added = ranked.results.slice(fresh ? 0 : shown.length).map(at => resultRow(cards[at], at));
-  shown = ranked.results;
+  const added = ranked.results.slice(fresh ? 0 : matchesShown()).map(at => resultRow(cards[at], at));
   matches = ranked.count;
   if (!fresh) {
+    shown = ranked.results;
     resultList.append(...added);
     return;
   }
-  resultList.replaceChildren(...added);
+  shown = [...ranked.results, ...found.close];
+  const close = found.close.length ? [closeGroup(found.close.map(at => resultRow(cards[at], at)))] : [];
+  resultList.replaceChildren(...added, ...close);
   resultList.scrollTop = 0;
   setActive(-1);
   queryField.setAttribute('aria-expanded', String(shown.length > 0));
-  showStatus(found.query.trim() ? matches : null);
+  showStatus(found.query.trim() ? matches : null, found.close.length);
   showList();
 }
-const moreToShow = () => shown.length < matches;
+const matchesShown = () => shown.length - (found?.close.length ?? 0);
+const moreToShow = () => matchesShown() < matches;
 
 // The line under the field, and what screen readers hear once typing pauses.
-/** @param {number | null} [count] */
-function showStatus(count = null) {
+/** @param {number | null} [count] @param {number} [close] */
+function showStatus(count = null, close = 0) {
+  const spellings = close === 1 ? '1 close spelling.' : `${close} close spellings.`;
   const text = loadFailed ? 'The cards couldn’t load. Close and open card lookup to try again.'
     : !index ? 'Loading cards…'
       : count === null ? `${index.cards.length.toLocaleString('en')} cards. Type a name${textOn() ? ' or rules text' : ''}.`
-        : count === 0 ? 'No cards match'
-          : count === 1 ? '1 card' : `${count.toLocaleString('en')} cards`;
+        : count === 0 && close ? `No exact matches. ${spellings}`
+          : count === 0 ? 'No cards match'
+            : `${count === 1 ? '1 card' : `${count.toLocaleString('en')} cards`}${close ? `. ${spellings}` : ''}`;
   statusLine.textContent = text;
   clearTimeout(countTimer);
   countTimer = setTimeout(() => {
@@ -155,7 +202,7 @@ function showStatus(count = null) {
 function setActive(next) {
   resultList.querySelector('[aria-selected="true"]')?.setAttribute('aria-selected', 'false');
   active = next;
-  const row = active >= 0 ? resultList.children[active] : null;
+  const row = active >= 0 ? resultList.querySelectorAll('[role="option"]')[active] : null;
   if (row) {
     row.setAttribute('aria-selected', 'true');
     queryField.setAttribute('aria-activedescendant', row.id);

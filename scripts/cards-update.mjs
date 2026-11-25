@@ -48,6 +48,16 @@ const colourOrder = 'WUBRG';
 const inColourOrder = colours => [...new Set(colours)].sort((a, b) => colourOrder.indexOf(a) - colourOrder.indexOf(b)).join('');
 // Rarity as one letter. The Oracle file holds one printing of each card, so this is that printing's rarity.
 const rarities = { common: 'c', uncommon: 'u', rare: 'r', mythic: 'm', special: 's', bonus: 'b' };
+// The EDHREC rank, 1 the most played: exact up to this rank, then rounded to two significant figures, so a monthly
+// update rewrites far fewer lines as ranks drift (+47 KB gzipped, against +93 KB exact). Set it to Infinity to keep
+// every rank exact. `edhrec<=100` stays exact either way; `edhrec>5000` is off by at most 5% at the edge.
+export const exactRanks = 1000;
+/** @param {number} rank */
+export function roundRank(rank) {
+  if (rank <= exactRanks) return rank;
+  const step = 10 ** (Math.floor(Math.log10(rank)) - 1);
+  return Math.round(rank / step) * step;
+}
 
 /** Drops the fields that are undefined or empty, so the file only holds what a card has. */
 const compact = record => Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined && value !== ''));
@@ -99,6 +109,7 @@ export function toCard(card) {
       || /can be your commander/.test(front.oracle_text ?? '') ? 1 : undefined,
     kw: keywords.length ? keywords : undefined,
     pair: keywords.some(keyword => pairing.test(keyword)) ? 1 : undefined,
+    er: card.edhrec_rank ? roundRank(card.edhrec_rank) : undefined,
   }) };
 }
 

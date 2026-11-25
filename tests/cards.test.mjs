@@ -232,7 +232,28 @@ async function checkNoHistory(t, engine) {
   assert.equal((await scores(page))[0], 40);
 }
 
+// A plain query with a typing slip lists the close spellings after its matches, under their own heading, and the
+// keyboard reaches them (design/polish/SCRYFALL-SYNTAX-SPEC.md §6.6). The index builds in steps after the data loads.
+async function checkCloseSpellings(t, engine) {
+  const page = await openPage(t, engine, { viewport: { width: 852, height: 393 } });
+  await openCards(page);
+  await page.locator('#card-query').fill('smothering tihte');
+  await eventually(() => statusText(page), 'No exact matches. 1 close spelling.', 'the close spelling is found once the index is built');
+  const group = page.locator('#card-results [role="group"]');
+  assert.equal(await group.getAttribute('aria-label'), 'Close spellings');
+  assert.deepEqual(await group.locator('.card-row-name').allTextContents(), ['Smothering Tithe']);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#card-name').textContent(), 'Smothering Tithe');
+  // Exact matches come first, then the close ones; three or more matches need no guessing.
+  await page.locator('#card-query').fill('sol rign');
+  await eventually(async () => (await rowNames(page))[0], 'Sol Ring', 'a half-typed name with a slip');
+  await page.locator('#card-query').fill('bolt');
+  await eventually(async () => page.locator('#card-results [role="group"]').count(), 0, 'no close spellings with many matches');
+}
+
 for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: a plain query with a typing slip lists close spellings after its matches`, t => checkCloseSpellings(t, engine));
   test(`${name}: card lookup takes no undo step and leaves History as it was`, t => checkNoHistory(t, engine));
   test(`${name}: card lookup loads when first shown, searches as you type and works from the keyboard`, t => checkLookup(t, engine));
   test(`${name}: a card reads as text, with both faces, its symbols and its identity`, t => checkCardText(t, engine));
@@ -289,9 +310,16 @@ test('chromium: a keystroke searches 33,000 names and draws the results within a
       last = index.last;
       return spent;
     });
-    return { names: median(names), namesMax: Math.max(...names), keystroke: median(keystrokes), text: median(text) };
+    // Close spellings: the index is built once, in steps, then each slip is looked up.
+    const { buildTypoIndex, closeNames } = await import('/js/logic/cardtypos.js');
+    const { fold } = await import('/js/logic/cards.js');
+    const typos = buildTypoIndex(index.keys);
+    const slips = ['smothering tihte', 'atraxa praetors vocie', 'ulamog the ceasless', 'mana crpyt', 'farseak', 'lightnig bolt'];
+    const close = slips.map(slip => time(() => closeNames(typos, fold(slip), { rank: at => data.cards[at].er ?? Infinity })));
+    return { names: median(names), namesMax: Math.max(...names), keystroke: median(keystrokes), text: median(text), close: median(close), closeMax: Math.max(...close) };
   });
-  t.diagnostic(`at 4× slowdown: name search ${timings.names.toFixed(1)}ms median (${timings.namesMax.toFixed(1)}ms max), a keystroke with drawing ${timings.keystroke.toFixed(1)}ms, rules text ${timings.text.toFixed(1)}ms`);
+  t.diagnostic(`at 4× slowdown: name search ${timings.names.toFixed(1)}ms median (${timings.namesMax.toFixed(1)}ms max), a keystroke with drawing ${timings.keystroke.toFixed(1)}ms, rules text ${timings.text.toFixed(1)}ms, close spellings ${timings.close.toFixed(1)}ms (${timings.closeMax.toFixed(1)}ms max)`);
+  assert.ok(timings.close < 5, `close spellings ${timings.close}ms`);
   assert.ok(timings.names < 16, `name search ${timings.names}ms`);
   assert.ok(timings.namesMax < 32, `the slowest, one letter, ${timings.namesMax}ms`);
   // Drawing adds DOM work that varies more with the machine than the search does: alone it measures about 9–11ms, and

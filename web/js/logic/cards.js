@@ -23,6 +23,8 @@
  * - `kw`: Scryfall's keywords, sorted; `pair` marks a pairing keyword (Partner, Friends forever, Choose a Background,
  *   Doctor's companion).
  * - `edh`: the Commander legality when it isn't legal; `lead` marks a card that can be a commander.
+ * - `er`: the EDHREC rank, 1 the most played, exact to 1,000 and then to two significant figures (`roundRank` in
+ *   scripts/cards-update.mjs); none for a card EDHREC doesn't rank.
  * These fields are there for a structured query (`c:r t:creature o:treasure mv<=3`) to be built on the matching below.
  * @typedef {CardFace & {
  *   k: string,
@@ -35,6 +37,7 @@
  *   lead?: number,
  *   kw?: string[],
  *   pair?: number,
+ *   er?: number,
  * }} Card
  */
 /**

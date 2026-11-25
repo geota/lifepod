@@ -17,7 +17,7 @@ const index = indexCards(data.cards);
 const names = (query, options) => searchCards(index, query, options).results.map(at => data.cards[at].n);
 
 const faceKeys = new Set(['n', 'm', 't', 'o', 'p', 'l', 'd']);
-const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'edh', 'lead', 'kw', 'pair']);
+const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'edh', 'lead', 'kw', 'pair', 'er']);
 const inColourOrder = /^W?U?B?R?G?$/;
 
 test('node: the card data file has one card per line, in order, with only the fields the lookup reads', () => {
@@ -56,7 +56,7 @@ test('node: the card data file has one card per line, in order, with only the fi
   }
   // A few cards the lookup must have, as Scryfall prints them.
   const card = name => data.cards.find(entry => entry.n === name);
-  assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u' });
+  assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u', er: 1 });
   assert.equal(card('Treasure').t, 'Token Artifact — Treasure', 'the predefined tokens are kept');
   assert.equal(card('Soldier'), undefined, 'other tokens are not');
   // Paper cards whose Oracle printing is an MTGO one are kept, because paper formats list them; the cards Scryfall hides

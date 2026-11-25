@@ -68,6 +68,9 @@
 .card-row[aria-selected="true"] .card-row-name { color: var(--chosen-ink); }
 .card-row > .card-cost { grid-area: cost; }
 .card-row-type { grid-area: type; min-width: 0; color: var(--muted); font-size: var(--type-small); line-height: 1.25; overflow-wrap: anywhere; }
+/* Close spellings: their own group after the matches, under a quiet heading. */
+.card-close { display: grid; gap: 4px; }
+.card-close-head { padding: var(--space-2) var(--space-3) 0; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-semibold); }
 
 /* The card: text on the page's background, like the dice stage, in a rounded panel that scrolls on its own. */
 .card-panel { display: flex; flex-direction: column; gap: var(--space-2); min-height: 0; }

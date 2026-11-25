@@ -111,3 +111,15 @@ export function cardNodes(card) {
   if (card.edh) facts.append(element('span', 'card-banned', card.edh === 'banned' ? 'Banned in Commander' : 'Not legal in Commander'));
   return [head, ...faces, facts];
 }
+
+// Close spellings, after a plain query's matches: a group of rows under a small heading, which a screen reader hears
+// as the group's name when it arrows into it.
+/** @param {HTMLElement[]} rows */
+export function closeGroup(rows) {
+  const heading = element('div', 'card-close-head', 'Close spellings');
+  heading.setAttribute('aria-hidden', 'true');
+  const group = element('div', 'card-close', heading, ...rows);
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', 'Close spellings');
+  return group;
+}
