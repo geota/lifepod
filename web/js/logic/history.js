@@ -80,30 +80,33 @@ export function diffBoard(before, after) {
   /** @type {Changes} */
   const d = {};
   for (const field of historyFields) {
-    const b = before[field];
-    const a = after[field];
-    if (isScalar(field) || !Array.isArray(b) || !Array.isArray(a) || b.length !== a.length) {
-      if (!same(b, a)) d[field] = [copy(b), copy(a)];
-      continue;
-    }
-    /** @type {Record<string, any>} */
-    const cells = {};
-    if (isGrid(field)) {
-      if (b.some((row, i) => row.length !== a[i].length)) {
-        d[field] = [copy(b), copy(a)];
-        continue;
-      }
-      b.forEach((row, i) => row.forEach((/** @type {any} */ value, /** @type {number} */ j) => {
-        if (value !== a[i][j]) (cells[i] ??= {})[j] = [value, a[i][j]];
-      }));
-    } else {
-      b.forEach((value, i) => {
-        if (value !== a[i]) cells[i] = [value, a[i]];
-      });
-    }
-    if (Object.keys(cells).length) d[field] = cells;
+    const change = diffField(field, before[field], after[field]);
+    if (change !== undefined) d[field] = change;
   }
   return d;
+}
+
+// One field's change, in its smallest form: per-player and grid fields as their changed cells while the shape is the
+// same, a whole [before, after] pair otherwise; undefined when nothing changed. diffBoard and composeChanges share it,
+// so a step reads the same however it was made.
+/** @param {string} field @param {any} b @param {any} a */
+function diffField(field, b, a) {
+  if (isScalar(field) || !Array.isArray(b) || !Array.isArray(a) || b.length !== a.length) {
+    return same(b, a) ? undefined : [copy(b), copy(a)];
+  }
+  /** @type {Record<string, any>} */
+  const cells = {};
+  if (isGrid(field)) {
+    if (b.some((row, i) => row.length !== a[i].length)) return [copy(b), copy(a)];
+    b.forEach((row, i) => row.forEach((/** @type {any} */ value, /** @type {number} */ j) => {
+      if (value !== a[i][j]) (cells[i] ??= {})[j] = [value, a[i][j]];
+    }));
+  } else {
+    b.forEach((value, i) => {
+      if (value !== a[i]) cells[i] = [value, a[i]];
+    });
+  }
+  return Object.keys(cells).length ? cells : undefined;
 }
 
 // Sets a per-player or grid field's cells to one side of their pairs (0 before, 1 after), in place.
@@ -156,7 +159,9 @@ export function composeChanges(first, second) {
         setCells(before, x, 0, grid);
         pair = [before, copy(y[1])];
       }
-      if (!same(pair[0], pair[1])) d[field] = pair;
+      // Back in the same shape, the whole pair shrinks to its changed cells, as diffBoard would write it.
+      const change = diffField(field, pair[0], pair[1]);
+      if (change !== undefined) d[field] = change;
       continue;
     }
     /** @type {Record<string, any>} */

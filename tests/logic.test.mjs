@@ -628,6 +628,17 @@ test('node: composing two deltas is the delta across both, whatever the fields a
   }), opts);
 });
 
+test('node: a field that changes shape and back composes to its changed cells, as diffBoard writes it', () => {
+  // The shrunk counterexample from CI (seed 190349689): five players, then a different count, then five again.
+  const board = (scores, startingLife) => ({ ...boardOf(fc.sample(anyGame, { numRuns: 1, seed: 1 })[0]), scores, startingLife });
+  const a = board([300, 300, 300, 300, 300], 300);
+  const b = board([189, 189, 189, 189], 189);
+  const c = board([189, 189, 189, 189, 189], 189);
+  const composed = composeChanges(diffBoard(a, b), diffBoard(b, c));
+  assert.equal(json(composed), json(diffBoard(a, c)));
+  assert.deepEqual(composed.scores, { 0: [300, 189], 1: [300, 189], 2: [300, 189], 3: [300, 189], 4: [300, 189] });
+});
+
 test('node: steps overlap exactly when they touch a cell in common', () => {
   const life2 = stepCells({ scores: { 2: [40, 39] } });
   assert.equal(overlaps(life2, stepCells({ scores: { 3: [40, 39] } })), false, 'another tile\'s life');
