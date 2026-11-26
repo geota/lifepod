@@ -178,6 +178,25 @@ export function hasMana(game, index) {
   return game.pools[index].some(amount => amount > 0);
 }
 
+// Whether pools empty as the turn passes (design/polish/SPEC.md §9): with the Mana and Treasure switch and "Empty mana
+// pools when the turn passes" on, and Turns not Off. Only then does a player's Keep mean anything, so only then does it
+// show (MANA-SPEC-v2 §4.2).
+/** @param {Game} game */
+export function poolsCanEmpty(game) {
+  return game.manaPool && game.autoEmpty && game.turns !== 'off';
+}
+
+// The players whose pools the turn passing empties, and those it keeps: everyone with mana floating, split by their
+// Keep (MANA-SPEC-v2 §4.3). Treasure is never emptied. Nobody's, while pools can't empty.
+/**
+ * @param {Game} game
+ * @returns {{ emptied: number[], kept: number[] }}
+ */
+export function turnPassPools(game) {
+  const floating = poolsCanEmpty(game) ? game.pools.map((_, index) => index).filter(index => hasMana(game, index)) : [];
+  return { emptied: floating.filter(index => !game.keepMana[index]), kept: floating.filter(index => game.keepMana[index]) };
+}
+
 // ---- Out of the game ------------------------------------------------------------------------------------------------
 
 // Close to losing: a warning from 15 commander damage or 7 poison, and out at 21 or 10.

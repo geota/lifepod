@@ -14,9 +14,10 @@ import {
 } from '../web/js/logic/history.js';
 import {
   applyEdit, applyNewEdit, countEdit, damageEdit, designationEdit, isOut, leavingTransfers, manaEdit, nextTurn, openingTab,
-  outPlayers, pillFit, playOrder, previousTurn, restPillButtons, trackTabs, turnBack, turnForward, widestPill,
+  outPlayers, pillFit, playOrder, poolsCanEmpty, previousTurn, restPillButtons, trackTabs, turnBack, turnForward, turnPassPools,
+  widestPill,
 } from '../web/js/logic/rules.js';
-import { fitColors, fitCounts, fitDamage, fitIdentities, fitPools, fitTurn, loadGame } from '../web/js/logic/save.js';
+import { fitColors, fitCounts, fitDamage, fitFlags, fitIdentities, fitPools, fitTurn, loadGame } from '../web/js/logic/save.js';
 import { test } from './helpers.mjs';
 
 const opts = { numRuns: Number(process.env.PBT_RUNS ?? 500) };
@@ -41,6 +42,8 @@ function gameProblems(g) {
   if (!(g.commanderDamage.length === n && g.commanderDamage.every((row, d) => countRow(row, n) && row[d] === 0))) p.push('commanderDamage');
   if (typeof g.manaPool !== 'boolean' || typeof g.autoEmpty !== 'boolean') p.push('mana switches');
   if (!(g.pools.length === n && g.pools.every(row => countRow(row, manaColours.length)))) p.push('pools');
+  if (!countRow(g.treasure, n)) p.push('treasure');
+  if (!(Array.isArray(g.keepMana) && g.keepMana.length === n && g.keepMana.every(v => typeof v === 'boolean'))) p.push('keepMana');
   if (!turnModes.includes(g.turns)) p.push('turns');
   if (!(seatOrNull(g.turn.first, n) && seatOrNull(g.turn.active, n) && Number.isInteger(g.turn.round) && g.turn.round >= 1 && g.turn.round <= maxRound)) p.push('turn');
   if (!tileSetOrder.includes(g.tileColours)) p.push('tileColours');
@@ -72,7 +75,7 @@ function historyProblems(h, n) {
 }
 
 // The fields that hold one entry per seat, so they mean nothing without a board to fit them to, and the rest.
-const perPlayerFields = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools', 'turn', 'monarch', 'initiative', 'history'];
+const perPlayerFields = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools', 'treasure', 'keepMana', 'turn', 'monarch', 'initiative', 'history'];
 
 // ---- Generators ---------------------------------------------------------------------------------------------------
 
@@ -100,6 +103,8 @@ const gameOf = n => fc.record({
   manaPool: fc.boolean(),
   autoEmpty: fc.boolean(),
   pools: rowOf(rowOf(count, manaColours.length), n),
+  treasure: rowOf(count, n),
+  keepMana: rowOf(fc.boolean(), n),
   turns: fc.constantFrom(...turnModes),
   turn: fc.record({ first: seat(n), active: seat(n), round }),
   tileColours: fc.constantFrom(...tileSetOrder),
@@ -117,8 +122,9 @@ const gameOf = n => fc.record({
 
 // One game action, as random numbers read against the board when it's applied, since a new game can change the player
 // count: a life change, a counter, commander damage (with its handoffs), a mana count, a designation, a turn step that
-// empties the pools, a new game (with a new count, sometimes), an identity, or a seat's rotation and a colour swap.
-const actionArb = fc.record({ kind: fc.nat(9), a: fc.nat(30), b: fc.nat(30), c: fc.integer({ min: -12, max: 12 }) });
+// empties the pools nobody keeps, a new game (with a new count, sometimes), an identity, a seat's rotation and a colour
+// swap, a Treasure count, or a Keep toggle.
+const actionArb = fc.record({ kind: fc.nat(11), a: fc.nat(30), b: fc.nat(30), c: fc.integer({ min: -12, max: 12 }) });
 const clamp = v => Math.min(maxCount, Math.max(0, v));
 function act(g, { kind, a, b, c }) {
   const n = g.scores.length;
@@ -134,7 +140,7 @@ function act(g, { kind, a, b, c }) {
   else if (kind === 4) applyNewEdit(g, designationEdit(g, designationKinds[b % 2], i));
   else if (kind === 5) {
     g.turn = turnForward(g) ?? { ...g.turn, round: Math.min(maxRound, g.turn.round + 1) };
-    g.pools = fitPools([], n);
+    for (const index of turnPassPools(g).emptied) g.pools[index] = fitCounts([], manaColours.length);
   } else if (kind === 6) {
     const count = b % 3 === 0 ? playerCounts[b % playerCounts.length] : n;
     if (count !== n) g.rotations = Array(count).fill(0);
@@ -143,12 +149,16 @@ function act(g, { kind, a, b, c }) {
     g.identities = fitIdentities([], count);
     g.commanderDamage = fitDamage([], count);
     g.pools = fitPools([], count);
+    g.treasure = fitCounts([], count);
+    g.keepMana = fitFlags([], count);
     g.turn = fitTurn(null, count);
     g.monarch = null;
     g.initiative = null;
     g.startingLife = 1 + (a * 37 + b) % maxStartingLife;
     g.scores = Array(count).fill(g.startingLife);
   } else if (kind === 7) g.identities[i] = ['', 'W', 'UB', 'BRG', 'WUBRG'][b % 5];
+  else if (kind === 10) g.treasure[i] = clamp(g.treasure[i] + (c || 1));
+  else if (kind === 11) g.keepMana[i] = !g.keepMana[i];
   else {
     g.rotations[i] = (g.rotations[i] + 1) % 4;
     const free = [...swatches.keys()].find(colour => !g.colors.includes(colour));
@@ -677,7 +687,7 @@ test('node: the history stays within 500 steps and 64 KB, dropping the oldest', 
 test('node: fitHistory accepts anything without throwing, and gives a valid history', () => {
   const cell = fc.oneof(fc.anything(), fc.tuple(nearMiss, nearMiss), fc.dictionary(fc.constantFrom('0', '1', '2', '7', '-1', 'x'), fc.tuple(nearMiss, nearMiss)));
   const weird = fc.oneof(fc.anything(), fc.jsonValue(), fc.record({ v: fc.constant(1), at: fc.anything(), base: fc.anything(), steps: fc.array(fc.anything()) }),
-    fc.record({ v: fc.constant(1), at: fc.nat(5), base: fc.nat(), steps: fc.array(fc.record({ t: fc.anything(), k: fc.anything(), n: fc.anything(), d: fc.dictionary(fc.constantFrom(...historyFields, 'treasure', 'x'), cell) })) }));
+    fc.record({ v: fc.constant(1), at: fc.nat(5), base: fc.nat(), steps: fc.array(fc.record({ t: fc.anything(), k: fc.anything(), n: fc.anything(), d: fc.dictionary(fc.constantFrom(...historyFields, 'gold', 'x'), cell) })) }));
   fc.assert(fc.property(weird, fc.constantFrom(...playerCounts), (saved, n) => {
     const fitted = fitHistory(saved, n);
     assert.deepEqual(historyProblems(fitted, n), []);
@@ -705,7 +715,17 @@ test('node: a corrupt step drops itself and every step further from at; at is cl
   assert.deepEqual(fit(bad, 1), { v: 1, at: 1, base: 5, steps: [life(0, 40, 39)] }, 'ahead of at, everything newer goes');
   assert.deepEqual(fit([life(0, 40, '39')], 1).steps, [], 'a value that fails its field\'s check');
   assert.deepEqual(fit([{ t: 0, d: { scores: { 0: [40, 40] } } }], 1).steps, [], 'a cell that doesn\'t change');
-  assert.deepEqual(fit([{ t: 0, d: { treasure: { 0: [0, 1] }, scores: { 0: [40, 39] } } }], 1).steps, [life(0, 40, 39)], 'a field it doesn\'t know is left out');
+  assert.deepEqual(fit([{ t: 0, d: { gold: { 0: [0, 1] }, scores: { 0: [40, 39] } } }], 1).steps, [life(0, 40, 39)], 'a field it doesn\'t know is left out');
+  // Treasure and Keep (MANA-SPEC-v2 §9): a count from 0 to maxCount, and true or false.
+  const treasure = { t: 0, d: { treasure: { 1: [3, 2] } } };
+  const keep = { t: 0, d: { keepMana: { 2: [false, true] } } };
+  assert.deepEqual(fit([treasure, keep], 2).steps, [treasure, keep], 'Treasure and Keep steps are kept');
+  for (const d of [{ treasure: { 0: [0, -1] } }, { treasure: { 0: [99, 100] } }, { treasure: { 0: [1, 1.5] } }, { treasure: { 4: [0, 1] } },
+    { keepMana: { 0: [false, 1] } }, { keepMana: { 0: [true, true] } }, { keepMana: { 0: ['false', true] } }, { keepMana: [[false], [true]] }]) {
+    assert.deepEqual(fit([{ t: 0, d }], 1).steps, [], `a bad step is dropped: ${json(d)}`);
+  }
+  assert.equal(fit([{ t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [40, 40]], treasure: [[3, 0, 0, 1], [0, 0]], keepMana: [[true, false, false, false], [false, false]] } }], 1, 2).steps.length, 1,
+    'a new game\'s whole Treasure and Keep, across a change of player count'); 
   // Across a new game from 4 players to 6: the steps before it are checked against 4 players, the ones after against 6.
   const newGame = { t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [30, 30, 30, 30, 30, 30]] } };
   assert.equal(fit([life(3, 40, 39), newGame, life(5, 30, 29)], 3, 6).steps.length, 3, 'each side of a count change has its own count');
@@ -731,6 +751,10 @@ test('node: describeStep and stepText say what each kind of step changed', () =>
     [{ commanderDamage: { 1: { 0: [0, 5] } }, scores: { 1: [33, 28] } }, 'Player 2, Sky, 5 commander damage from Player 1, life 33 → 28'],
     [{ commanderDamage: { 1: { 0: [5, 3] } } }, 'Player 2, Sky, commander damage from Player 1 5 → 3'],
     [{ pools: { 3: { 3: [1, 0] } } }, 'Player 4, Violet, red mana 1 → 0'],
+    [{ treasure: { 2: [3, 2] } }, 'Player 3, Coral, Treasure 3 → 2'],
+    [{ treasure: { 0: [0, 3] }, pools: { 0: { 4: [0, 1] } } }, 'Player 1, Sage, green mana 0 → 1, Treasure 0 → 3'],
+    [{ keepMana: { 1: [false, true] } }, 'Player 2, Sky, Keep mana on'],
+    [{ keepMana: { 3: [true, false] } }, 'Player 4, Violet, Keep mana off'],
     [{ monarch: [3, 1] }, 'Player 2, Sky, monarch: Player 4 → Player 2. Player 4, Violet, monarch: Player 4 → Player 2'],
     [{ initiative: [null, 0] }, 'Player 1, Sage, initiative: nobody → Player 1'],
     [{ turn: [{ first: 0, active: 0, round: 3 }, { first: 0, active: 1, round: 3 }] }, 'turn: Player 1 → Player 2, round 3'],
@@ -801,6 +825,42 @@ test('node: Track opens on the tab it last showed, or the first that\'s still on
   assert.equal(openingTab({ ...g, trackTab: 'damage', counters: { commander: false, poison: true } }), 'counters');
   assert.equal(stepTab({ t: 0, d: { commanderDamage: { 1: { 0: [0, 1] } }, scores: { 1: [40, 39] }, monarch: [0, 1] } }), 'damage');
   assert.equal(stepTab({ t: 0, d: { pools: { 0: { 2: [0, 1] } } } }), 'mana');
+  assert.equal(stepTab({ t: 0, d: { treasure: { 0: [2, 1] } } }), 'mana', 'Treasure is the mana tab\'s (MANA-SPEC-v2 §5.3)');
+  assert.equal(stepTab({ t: 0, d: { keepMana: { 1: [false, true] } } }), 'mana', 'and Keep');
   assert.equal(stepTab({ t: 0, d: { poison: { 0: [0, 1] } } }), 'counters');
   assert.equal(stepTab({ t: 0, d: { initiative: [null, 1] } }), 'counters');
+});
+
+// Keep (MANA-SPEC-v2 §4): a turn pass empties the pool of everyone with mana who hasn't kept it, keeps the rest, and
+// never touches Treasure; while pools can't empty (Mana and Treasure off, auto-empty off or Turns Off), it empties
+// nothing. The step it makes holds only the pools it emptied, so Undo puts back exactly those.
+test('node: a turn pass empties only the pools nobody kept, and its step holds only those', () => {
+  fc.assert(fc.property(anyGame, (g) => {
+    const { emptied, kept } = turnPassPools(g);
+    const floating = g.pools.map((_, index) => index).filter(index => g.pools[index].some(amount => amount > 0));
+    if (!poolsCanEmpty(g)) assert.deepEqual([emptied, kept], [[], []], 'nothing empties while pools can\'t');
+    else {
+      assert.deepEqual([...emptied, ...kept].sort(), floating, 'everyone with mana is emptied or kept');
+      assert.ok(emptied.every(index => !g.keepMana[index]) && kept.every(index => g.keepMana[index]), 'Keep decides which');
+    }
+    const before = boardOf(g);
+    for (const index of emptied) g.pools[index] = fitCounts([], manaColours.length);
+    const d = diffBoard(before, boardOf(g));
+    assert.deepEqual(Object.keys(d.pools ?? {}).map(Number), emptied, 'the step holds exactly the emptied pools');
+    assert.equal(d.treasure, undefined, 'Treasure is never emptied');
+  }), opts);
+  const g = load(JSON.stringify({ scores: [40, 40, 40], manaPool: true, turns: 'rounds', pools: [[1, 0, 0, 0, 0, 0], [0, 2, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]], keepMana: [false, true, true], treasure: [3, 3, 3] }));
+  assert.deepEqual(turnPassPools(g), { emptied: [0], kept: [1] }, 'Player 2 keeps theirs; Player 3 has none to keep');
+  assert.deepEqual(turnPassPools({ ...g, autoEmpty: false }), { emptied: [], kept: [] }, 'auto-empty off');
+  assert.deepEqual(turnPassPools({ ...g, turns: 'off' }), { emptied: [], kept: [] }, 'Turns Off');
+  assert.deepEqual(turnPassPools({ ...g, manaPool: false }), { emptied: [], kept: [] }, 'Mana and Treasure off');
+});
+
+test('node: an old save loads with no Treasure and nobody\'s pool kept, and only true keeps a pool', () => {
+  const old = load(JSON.stringify({ startingLife: 40, scores: [40, 40, 40], manaPool: true, pools: [[1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]] }));
+  assert.deepEqual([old.treasure, old.keepMana], [[0, 0, 0], [false, false, false]]);
+  const bad = load(JSON.stringify({ scores: [40, 40, 40, 40], treasure: [3, -1, 100, '2'], keepMana: [true, 1, 'true', null] }));
+  assert.deepEqual([bad.treasure, bad.keepMana], [[3, 0, 0, 0], [true, false, false, false]]);
+  assert.deepEqual(load(JSON.stringify({ scores: [40, 40], treasure: [5], keepMana: 'yes' })).treasure, [5, 0], 'a short row is filled');
+  assert.deepEqual(fitFlags([true, false, true], 2), [true, false]);
 });

@@ -165,6 +165,9 @@ export const identityColours = [
 ];
 // Floating mana (design/polish/SPEC.md §9): one count per colour in each player's pool, in W U B R G C order.
 export const manaColours = [...identityColours, { id: 'C', name: 'colourless' }];
+// Treasure (MANA-SPEC-v2 §1) is a count per player in game.treasure, 0 to maxCount, shown with the Mana and Treasure switch
+// (game.manaPool). It lasts for turns, so nothing empties it but a new game: not the turn passing, the eraser or Keep.
+// Each player's Keep (game.keepMana, §4) stops the turn passing from emptying their pool.
 // Turns (design/polish/SPEC.md §8): off, rounds (the first player's flag counts rounds) or turn by turn.
 export const turnModes = ['off', 'rounds', 'turns'];
 // Play order is clockwise on screen, which is passing to the left. Seat rotation doesn't change it.
@@ -196,7 +199,7 @@ export const outLabels = { life: 'out', poison: 'out on poison', commander: 'out
 // (tests/logic.test.mjs), so a new field can't be forgotten.
 export const historyFields = [
   'startingLife', 'scores', 'rotations', 'colors', 'poison', 'casts', 'energy', 'experience', 'rad', 'identities',
-  'commanderDamage', 'pools', 'turn', 'monarch', 'initiative',
+  'commanderDamage', 'pools', 'treasure', 'keepMana', 'turn', 'monarch', 'initiative',
 ];
 export const settingsFields = [
   'keepAwake', 'landscapeAngle', 'counters', 'identity', 'manaPool', 'autoEmpty', 'turns', 'tileColours',
