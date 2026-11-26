@@ -16,6 +16,14 @@ Choose **Rotate seats** in Settings → **Table**, then tap a tile to turn it 90
 
 Tap the die in the center to roll a d4, d6, d8, d10, d12 or d20. Each die is drawn in its own shape, and every roll comes from the device's cryptographic random number generator, so no face is favoured.
 
+## Card lookup
+
+Tap the magnifier in the center. Type part of a card's name, in any case and without accents: "sol r" finds Sol Ring, and "lim dul" finds Lim-Dûl's Vault. Names that start with what you typed come first, then names with a word that starts with it, then names that contain it. Turn on **Rules text** to find cards by what they do, such as "create a Treasure", after the name matches. A slip in a name of four letters or more still finds the card: when fewer than three cards match, the closest spellings follow under **Close spellings**, so "smothering tihte" finds Smothering Tithe.
+
+Scryfall's search syntax works too, offline: `c:rg t:creature mv<=3`, `o:"draw a card" -t:instant`, `f:pauper r:common`, `t:elf or t:goblin`, `!"lightning bolt"`. Anything card lookup can't answer, such as sets, prices or artists (`e:war`, `usd>1`, `a:avon`), is left out with a note under the field, and the rest of the search still runs; a mistake, such as a missing quote or bracket, gets a note too and is searched as if it were fixed. As on Scryfall, `or` between words means either, and the **Rules text** switch doesn't change a search that uses syntax. The **?** button beside the field opens **Search help**: examples for names, types and text, colours, mana, stats, formats, kinds of card, combining and sorting, each of which runs when you press it, and the list of what isn't available offline. `otag:` and `function:` search Scryfall's community tags, such as `otag:removal`; they load the first time you use one.
+
+Tap a card, or use the arrow keys and Enter, to read it: its mana cost, type line, rules text with the mana symbols, power and toughness or loyalty, both faces of a double-faced, split or adventure card, its colour identity, and whether it's banned in Commander. On a phone, **Results** goes back to the list; on a tablet or a wide screen, the card shows beside the list. It works offline: every paper card, but no art, is in the app. Card data is from Scryfall, and the date it was updated is under the list and in Settings → About.
+
 ## Settings
 
 Tap the sliders beside the die to open **Settings**, a full-screen page in sections: **Game**, **Track**, **Identity**, **Table**, **Reminders** and **About**, in two columns on a landscape phone and one on narrow screens. It faces the phone rather than the board; the turn button in its header flips it round for a player across the table.

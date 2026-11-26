@@ -7,7 +7,7 @@
        only settings and the dialogs zoom, and closing one puts the scale back (resetZoom in js/ui/dom.js). -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#111213">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
   <title>LifePod</title>
   <link rel="icon" href="favicon-32.png" sizes="32x32">
   <link rel="icon" href="icon.png" sizes="192x192">
@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="css/modes.css">
   <link rel="stylesheet" href="css/badges.css">
   <link rel="stylesheet" href="css/settings.css">
+  <link rel="stylesheet" href="css/cards.css">
   <link rel="stylesheet" href="css/dice.css">
   <script src="dice.js" defer></script>
   <script src="app.js" type="module"></script>
@@ -50,6 +51,7 @@
            while it has keyboard focus. -->
       <button class="pill-button" type="button" id="undo-button" aria-label="Undo"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M228,128a100,100,0,0,1-98.66,100H128a99.39,99.39,0,0,1-68.62-27.29,12,12,0,0,1,16.48-17.45,76,76,0,1,0-1.57-109c-.13.13-.25.25-.39.37L54.89,92H72a12,12,0,0,1,0,24H24a12,12,0,0,1-12-12V56a12,12,0,0,1,24,0V76.72L57.48,57.06A100,100,0,0,1,228,128Z"/></svg></button>
       <button class="visually-hidden" type="button" id="redo-button"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M244,56v48a12,12,0,0,1-12,12H184a12,12,0,1,1,0-24H201.1l-19-17.38c-.13-.12-.26-.24-.38-.37A76,76,0,1,0,127,204h1a75.53,75.53,0,0,0,52.15-20.72,12,12,0,0,1,16.49,17.45A99.45,99.45,0,0,1,128,228h-1.37A100,100,0,1,1,198.51,57.06L220,76.72V56a12,12,0,0,1,24,0Z"/></svg></button>
+      <button class="pill-button" type="button" id="lookup-button" aria-label="Card lookup" aria-haspopup="dialog"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></svg></button>
       <button class="pill-button" type="button" id="dice-button" aria-label="Roll dice" aria-haspopup="dialog"><span class="icon mana-icon" data-glyph="d20" aria-hidden="true"></span></button>
       <button class="pill-button" type="button" id="setup-button" aria-label="Settings" aria-haspopup="dialog">
         <span class="setup-icon" aria-hidden="true"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M40,92H70.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24H137.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24Zm64-24A12,12,0,1,1,92,80,12,12,0,0,1,104,68Zm112,96H201.94a36,36,0,0,0-67.88,0H40a12,12,0,0,0,0,24h94.06a36,36,0,0,0,67.88,0H216a12,12,0,0,0,0-24Zm-48,24a12,12,0,1,1,12-12A12,12,0,0,1,168,188Z"/></svg></span>
@@ -128,6 +130,134 @@
       </div>
       <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </div>
+  </dialog>
+
+  <!-- Card lookup (js/sheets/cards.js), behind the pill's magnifier: every paper card's rules text, from Scryfall,
+       loaded the first time it opens. The search field is a combobox over the results; arrows move through them and Enter
+       opens one. Narrow, the card replaces the results; wide, it sits beside them. -->
+  <dialog id="cards" aria-labelledby="cards-title">
+    <div class="sheet cards-sheet" id="cards-sheet" data-view="list">
+      <div class="sheet-header">
+        <h2 id="cards-title">Card lookup</h2>
+        <button class="close" type="button" data-close aria-label="Close card lookup"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+      </div>
+      <div class="card-search">
+        <label class="card-field">
+          <svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M232.49,215.51,185,168a92.12,92.12,0,1,0-17,17l47.53,47.54a12,12,0,0,0,17-17ZM44,112a68,68,0,1,1,68,68A68.07,68.07,0,0,1,44,112Z"/></svg>
+          <span class="visually-hidden">Search cards</span>
+          <input type="search" id="card-query" placeholder="Card name" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="card-results" aria-describedby="card-notes" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search">
+        </label>
+        <button class="secondary card-text-toggle" type="button" id="card-text" aria-pressed="false">Rules text</button>
+        <button class="close card-help-button" type="button" id="card-help-button" aria-label="Search help"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M144,180a16,16,0,1,1-16-16A16,16,0,0,1,144,180Zm92-52A108,108,0,1,1,128,20,108.12,108.12,0,0,1,236,128Zm-24,0a84,84,0,1,0-84,84A84.09,84.09,0,0,0,212,128ZM128,64c-24.26,0-44,17.94-44,40v4a12,12,0,0,0,24,0v-4c0-8.82,9-16,20-16s20,7.18,20,16-9,16-20,16a12,12,0,0,0-12,12v8a12,12,0,0,0,23.73,2.56C158.31,137.88,172,122.37,172,104,172,81.94,152.26,64,128,64Z"/></svg></button>
+      </div>
+      <!-- The count, and the notes about the query: cut keywords, errors, hints (js/render/card.js noteNodes). -->
+      <div class="card-state">
+        <p class="card-status" id="card-status" aria-hidden="true"></p>
+        <div class="card-notes" id="card-notes"></div>
+      </div>
+      <div class="card-body" id="card-body">
+        <div class="card-results" id="card-results" role="listbox" aria-label="Cards"></div>
+        <article class="card-panel" id="card-panel" aria-labelledby="card-name">
+          <button class="secondary card-back" type="button" id="card-back"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z"/></svg>Results</button>
+          <div class="card-sheet" id="card-sheet"></div>
+        </article>
+        <!-- Search help (design/polish/SCRYFALL-SYNTAX-SPEC.md §7.3): it takes the list's place. Each example runs when
+             pressed and the list comes back. -->
+        <section class="card-help" id="card-help" aria-labelledby="card-help-title">
+          <button class="secondary card-back" type="button" id="help-back"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M168.49,199.51a12,12,0,0,1-17,17l-80-80a12,12,0,0,1,0-17l80-80a12,12,0,0,1,17,17L97,128Z"/></svg>Results</button>
+          <div class="help-body" id="help-body">
+          <h3 id="card-help-title" tabindex="-1">Search help</h3>
+          <p class="help-note">Card lookup reads Scryfall's search syntax, offline. Press an example to try it.</p>
+          <h4>Names</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="sol ring"><code>sol ring</code><span>names with every word</span></button>
+            <button class="help-row" type="button" data-example="&quot;death or glory&quot;"><code>&quot;death or glory&quot;</code><span>this phrase in a name</span></button>
+            <button class="help-row" type="button" data-example="!&quot;lightning bolt&quot;"><code>!&quot;lightning bolt&quot;</code><span>this exact name</span></button>
+          </div>
+          <h4>Types and text</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="t:legendary t:elf"><code>t:legendary t:elf</code><span>type line</span></button>
+            <button class="help-row" type="button" data-example="o:&quot;draw a card&quot;"><code>o:&quot;draw a card&quot;</code><span>rules text</span></button>
+            <button class="help-row" type="button" data-example="fo:&quot;attach to target&quot;"><code>fo:&quot;attach to target&quot;</code><span>rules and reminder text</span></button>
+            <button class="help-row" type="button" data-example="kw:flying"><code>kw:flying</code><span>a keyword</span></button>
+            <button class="help-row" type="button" data-example="o:&quot;~ enters tapped&quot;"><code>o:&quot;~ enters tapped&quot;</code><span>~ is the card’s own name</span></button>
+            <button class="help-row" type="button" data-example="o:/^{T}:/"><code>o:/^{T}:/</code><span>a pattern</span></button>
+          </div>
+          <h4>Colours</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="c:rg"><code>c:rg</code><span>red and green, maybe more</span></button>
+            <button class="help-row" type="button" data-example="c=rg"><code>c=rg</code><span>exactly red and green</span></button>
+            <button class="help-row" type="button" data-example="id&lt;=esper"><code>id&lt;=esper</code><span>fits an Esper deck</span></button>
+            <button class="help-row" type="button" data-example="c:m"><code>c:m</code><span>two or more colours</span></button>
+            <button class="help-row" type="button" data-example="id:c t:land"><code>id:c t:land</code><span>colourless lands</span></button>
+          </div>
+          <h4>Mana</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="m:2WW"><code>m:2WW</code><span>this cost, or more</span></button>
+            <button class="help-row" type="button" data-example="mv&lt;=3"><code>mv&lt;=3</code><span>mana value 3 or less</span></button>
+            <button class="help-row" type="button" data-example="mv:even"><code>mv:even</code><span>even mana value</span></button>
+            <button class="help-row" type="button" data-example="devotion:{g}{g}{g}"><code>devotion:{g}{g}{g}</code><span>devotion to green</span></button>
+            <button class="help-row" type="button" data-example="produces=wu"><code>produces=wu</code><span>makes white or blue mana</span></button>
+            <button class="help-row" type="button" data-example="is:hybrid"><code>is:hybrid</code><span>hybrid mana in its cost</span></button>
+          </div>
+          <h4>Stats</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="pow&gt;=5"><code>pow&gt;=5</code><span>power 5 or more</span></button>
+            <button class="help-row" type="button" data-example="pow&gt;tou"><code>pow&gt;tou</code><span>more power than toughness</span></button>
+            <button class="help-row" type="button" data-example="pt&gt;=10"><code>pt&gt;=10</code><span>power plus toughness</span></button>
+            <button class="help-row" type="button" data-example="loy=3"><code>loy=3</code><span>starting loyalty</span></button>
+          </div>
+          <h4>Formats and Commander</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="f:pauper"><code>f:pauper</code><span>legal in a format</span></button>
+            <button class="help-row" type="button" data-example="banned:commander"><code>banned:commander</code><span>banned in a format</span></button>
+            <button class="help-row" type="button" data-example="is:commander"><code>is:commander</code><span>can be your commander</span></button>
+            <button class="help-row" type="button" data-example="is:partner"><code>is:partner</code><span>partners and backgrounds</span></button>
+            <button class="help-row" type="button" data-example="edhrec&lt;=100"><code>edhrec&lt;=100</code><span>the 100 most played</span></button>
+            <button class="help-row" type="button" data-example="r:mythic"><code>r:mythic</code><span>printed at mythic</span></button>
+          </div>
+          <h4>Kinds of card</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="is:vanilla"><code>is:vanilla</code><span>creatures with no rules text</span></button>
+            <button class="help-row" type="button" data-example="is:modal"><code>is:modal</code><span>choose one or more</span></button>
+            <button class="help-row" type="button" data-example="is:dfc"><code>is:dfc</code><span>double-faced</span></button>
+            <button class="help-row" type="button" data-example="is:shockland"><code>is:shockland</code><span>a land cycle</span></button>
+            <button class="help-row" type="button" data-example="is:party"><code>is:party</code><span>cleric, rogue, warrior or wizard</span></button>
+          </div>
+          <h4>Combining</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="t:elf t:warrior"><code>t:elf t:warrior</code><span>both</span></button>
+            <button class="help-row" type="button" data-example="t:elf or t:goblin"><code>t:elf or t:goblin</code><span>either</span></button>
+            <button class="help-row" type="button" data-example="-t:creature"><code>-t:creature</code><span>not</span></button>
+            <button class="help-row" type="button" data-example="t:legend (t:elf or t:goblin)"><code>t:legend (t:elf or t:goblin)</code><span>brackets group</span></button>
+          </div>
+          <h4>What it does</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="otag:removal c:w mv&lt;=2"><code>otag:removal c:w mv&lt;=2</code><span>Scryfall’s community tags</span></button>
+            <button class="help-row" type="button" data-example="function:ramp t:creature"><code>function:ramp t:creature</code><span>creatures that ramp</span></button>
+          </div>
+          <h4>Sorting</h4>
+          <div class="help-rows">
+            <button class="help-row" type="button" data-example="t:dragon order:cmc"><code>t:dragon order:cmc</code><span>by mana value</span></button>
+            <button class="help-row" type="button" data-example="t:elf order:edhrec"><code>t:elf order:edhrec</code><span>most played first</span></button>
+            <button class="help-row" type="button" data-example="t:giant order:power direction:desc"><code>t:giant order:power direction:desc</code><span>highest power first</span></button>
+          </div>
+          <h4>Not available offline</h4>
+          <ul class="help-offline">
+            <li>Sets and printings: <code>e:</code> <code>s:</code> <code>year:</code> <code>is:foil</code></li>
+            <li>Prices: <code>usd:</code> <code>eur:</code> <code>tix:</code></li>
+            <li>Artists, flavor text and print details: <code>a:</code> <code>ft:</code> <code>wm:</code> <code>frame:</code></li>
+            <li>Languages: <code>lang:</code>; card lookup has English cards only</li>
+            <li>Cubes and display options: <code>cube:</code> <code>unique:</code> <code>prefer:</code></li>
+          </ul>
+          <p class="help-note">These are left out with a note, and the rest of the search still runs.</p>
+          </div>
+        </section>
+      </div>
+      <p class="card-credit">Card data from Scryfall, <span data-cards-date>23 November 2026</span></p>
+      <p class="visually-hidden" id="card-count" aria-live="polite"></p>
+    </div>
+    <p class="visually-hidden" data-announcer aria-live="polite"></p>
   </dialog>
 
   <!-- Settings (design/polish/SETTINGS-SPEC.md): one full-screen page, facing the phone rather than the board. The header
@@ -362,6 +492,7 @@
               <h4>Credits</h4>
               <p>LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>
               <p>Mana symbols from the Mana font by Andrew Gioia, under the SIL Open Font License 1.1.</p>
+              <p>Card data from Scryfall (scryfall.com), updated <span data-cards-date>23 November 2026</span>. LifePod isn't produced by or endorsed by Scryfall.</p>
             </div>
           </section>
         </div>

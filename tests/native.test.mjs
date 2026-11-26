@@ -27,7 +27,7 @@ function loadedFiles() {
     const source = read(`web/${path}`);
     const references = path.endsWith('.html') ? matches(source, /\s(?:src|href)="([^"#:]+)"/g)
       : path.endsWith('.css') ? matches(source, /url\(['"]?([^'")]+)['"]?\)/g)
-        : matches(source, /['"`]([\w./-]+\.(?:css|js|json|png|svg|webp|woff2|html))['"`]/g);
+        : matches(source, /['"`]([\w./-]+\.(?:css|js|json|png|svg|webp|woff2|html|gz))['"`]/g);
     const folder = path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
     for (const reference of references) {
       if (/^(?:data|https?|blob):/.test(reference)) continue;
@@ -74,12 +74,13 @@ test('node: every file the page loads is served by the Android and iOS apps and 
 // The page's CSP (AGENTS.md, "Invariants"): every fetch directive is 'self', the app's own origin, or 'none'. Both apps
 // serve the page from a real origin (lifepod://app/, https://appassets.androidplatform.net/) and the tests over http, so
 // nothing needs file:, and a network source such as https:, http:, data:, blob: or * would let the page reach outside it.
+// connect-src lets card lookup fetch its own data file, web/data/cards.json, and nothing else.
 test('node: the CSP loads nothing but the app\'s own files', () => {
   const csp = read('web/index.html').match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)">/)[1];
   const directives = Object.fromEntries(csp.split(';').map(part => part.trim().split(/\s+/)).map(([name, ...sources]) => [name, sources]));
   assert.deepEqual(directives, {
     'default-src': ["'none'"], 'script-src': ["'self'"], 'style-src': ["'self'"], 'font-src': ["'self'"], 'img-src': ["'self'"],
-    'base-uri': ["'none'"], 'form-action': ["'none'"],
+    'connect-src': ["'self'"], 'base-uri': ["'none'"], 'form-action': ["'none'"],
   });
   // Neither app injects a policy of its own.
   for (const source of [kotlin, swift]) assert.doesNotMatch(source, /Content-Security-Policy/);

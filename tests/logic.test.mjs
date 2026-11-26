@@ -742,20 +742,21 @@ test('node: the pill keeps separate buttons where they fit, takes Track where th
   assert.equal(restPillButtons(all), 4 + pillTools, 'the round, three modes and the tools');
   assert.equal(restPillButtons(all, { collapsed: true }), 2 + pillTools, 'the round, Track and the tools');
   assert.equal(widestPill(all, { collapsed: true }), 6, 'Track\'s mode: three tabs, Undo, save and ✕');
-  assert.equal(widestPill(all, { collapsed: true, tools: pillTools + 1 }), 6, 'with a magnifier, the pill at rest is as long as Track\'s mode');
+  assert.equal(pillTools, 4, 'Undo, card lookup\'s magnifier, the dice and settings');
+  assert.equal(widestPill(all, { collapsed: true, tools: 3 }), 6, 'without the magnifier, Track\'s mode is the longest');
   // 568 × 320 with 2 players: 312px of seam.
-  assert.deepEqual(pillFit(all, 312, 48), { collapsed: true, tight: false }, '7 buttons are 336px, Track\'s 6 are 288px');
-  assert.deepEqual(pillFit(all, 312, 48, pillTools + 1), { collapsed: true, tight: false }, 'with the magnifier too');
+  assert.deepEqual(pillFit(all, 312, 48), { collapsed: true, tight: false }, '8 buttons are 384px, Track\'s 6 are 288px');
+  assert.deepEqual(pillFit(all, 312, 48, 3), { collapsed: true, tight: false }, 'without the magnifier too');
   // 568 × 320 with 3 players: the 283px seam column.
   assert.deepEqual(pillFit(all, 275, 48), { collapsed: true, tight: true }, 'Track\'s mode is 288px, so 44px buttons');
   // 952 × 427 with 4 players.
-  assert.deepEqual(pillFit(all, 944, 48, pillTools + 1), { collapsed: false, tight: false });
-  // 640 × 360 with 2 players: seven fit at 48px, eight don't.
-  assert.deepEqual(pillFit(all, 352, 48), { collapsed: false, tight: false });
-  assert.deepEqual(pillFit(all, 352, 48, pillTools + 1), { collapsed: true, tight: false });
+  assert.deepEqual(pillFit(all, 944, 48), { collapsed: false, tight: false });
+  // 640 × 360 with 2 players: seven fit at 48px, the eight with the magnifier don't.
+  assert.deepEqual(pillFit(all, 352, 48, 3), { collapsed: false, tight: false });
+  assert.deepEqual(pillFit(all, 352, 48), { collapsed: true, tight: false });
   // Exactly at the boundary, it fits.
-  assert.equal(pillFit(all, 7 * 48, 48).collapsed, false);
-  assert.equal(pillFit(all, 7 * 48 - 1, 48).collapsed, true);
+  assert.equal(pillFit(all, 8 * 48, 48).collapsed, false);
+  assert.equal(pillFit(all, 8 * 48 - 1, 48).collapsed, true);
   // Commander alone has two tabs, since commander tax is a counter.
   const commander = { ...all, counters: { ...all.counters, poison: false }, manaPool: false };
   assert.deepEqual(trackTabs(commander), ['damage', 'counters']);

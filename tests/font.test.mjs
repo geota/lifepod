@@ -22,10 +22,10 @@ test('node: the Mana subset has a drawn glyph for every symbol the stylesheets a
     assert.ok(font.hasGlyphForCodePoint(codePoint), `web/fonts/mana.woff2 has ${hex(codePoint)}; ${rerun}`);
     assert.ok(font.glyphForCodePoint(codePoint).path.commands.length > 0, `${hex(codePoint)} has an outline`);
   }
-  // The mana button's tap symbol is the classic tilted T, U+E61C (MANA-UNDO-SPEC §5); the curved arrow it replaced,
-  // U+E61A, is drawn nowhere now, so it's gone from the subset.
+  // The mana button's tap symbol is the classic tilted T, U+E61C (MANA-UNDO-SPEC §5). Card lookup draws {T} in rules
+  // text as printed on cards since Eighth Edition, the curved arrow U+E61A (css/cards.css), so the subset has both.
   assert.ok(used.includes(0xe61c) && font.hasGlyphForCodePoint(0xe61c), 'the subset has the classic tap symbol, U+E61C');
-  assert.ok(!used.includes(0xe61a) && !font.hasGlyphForCodePoint(0xe61a), 'the old tap arrow, U+E61A, is dropped');
+  assert.ok(used.includes(0xe61a) && font.hasGlyphForCodePoint(0xe61a), 'and card text\'s tap arrow, U+E61A');
   // U+FFFF ends every format 4 cmap, so it isn't a symbol.
   const extra = font.characterSet.filter(codePoint => codePoint !== 0xffff && !used.includes(codePoint)).map(hex);
   assert.deepEqual(extra, [], `web/fonts/mana.woff2 has only the symbols the page uses; ${rerun}`);

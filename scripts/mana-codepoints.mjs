@@ -2,7 +2,9 @@
 // to these, and tests/font.test.mjs checks the subset still has every one.
 //
 // Mana's symbols are all in the Private Use Area (U+E000 to U+F8FF). The font also maps some ASCII, for its own
-// ligatures, but LifePod only sets Mana on empty elements whose ::before draws one symbol, so ASCII isn't needed.
+// ligatures, but LifePod only sets Mana on empty elements whose ::before (or, for a hybrid mana symbol, ::after) draws
+// one symbol, so ASCII isn't needed. Card lookup's symbols (numbers, X, tap, hybrids, Phyrexian mana and the rest) are
+// in css/cards.css, so they're found here like any other.
 import { readdirSync, readFileSync } from 'node:fs';
 import { stylesheets } from './stylesheets.mjs';
 

@@ -1,6 +1,6 @@
 # Card lookup: Scryfall search syntax
 
-**Status:** spec, not built. Written 25 November 2026 for the `card-lookup` branch (read at its rebase in progress, 9908742 plus the card lookup commits). It turns the owner's decisions below into a design and a build plan.
+**Status:** built on `card-lookup` (milestones M1 to M5), with the owner's answers to §11 applied: see "As built" at the end. Written 25 November 2026 for the `card-lookup` branch (read at its rebase in progress, 9908742 plus the card lookup commits). It turns the owner's decisions below into a design and a build plan.
 
 **The owner's decisions:**
 
@@ -138,11 +138,11 @@ A query is a **syntax query** when parsing finds any of these:
 - a `!` at the start of a term;
 - a bracket;
 - a quote;
-- an uppercase `OR`.
+- `or` or `OR` between terms (as built: the owner chose Scryfall's reading, open question 4).
 
-Everything else is a **plain name query**: words, unknown `word:` runs, and a lowercase `or` or `and` between plain words. A plain query keeps today's `searchNames` ranking, the Rules text toggle and the typo pass.
+Everything else is a **plain name query**: words, unknown `word:` runs, and `and` between plain words. A plain query keeps today's `searchNames` ranking, the Rules text toggle and the typo pass.
 
-*Reason:* names contain "or" and "and" ("Death or Glory", "Fight or Flight", "Sword of War and Peace"). Scryfall reads them as operators, which buries the card among hundreds of names that contain one of the two words. Uppercase `OR`, or a lowercase `or` next to any other syntax, is the operator (open question 4).
+*As built (open question 4):* `or` is the operator in any case, exactly as on Scryfall: `death or glory` and `Death or Glory` both give Scryfall's 220 cards. Inside quotation marks it's text: `"death or glory"` is the one card, `"sol ring" or "mana crypt"` two, and `o:"draw or discard"` a literal phrase. **Our one deliberate addition:** when the whole query, folded, is a card's name, that card is listed first, so typing "Death or Glory" still finds it at the top. `and` is ignored as on Scryfall, and doesn't make a query a syntax query.
 
 ### 2.7 Malformed input
 
@@ -246,7 +246,7 @@ Every value is derived from the fields in §5.2. The J column is the Jaccard agr
 |---|---|---|---|
 | `f`, `format` | legal or restricted in the format. Formats: `standard`, `future`, `historic`, `timeless`, `gladiator`, `pioneer`, `modern`, `legacy`, `pauper`, `vintage`, `penny`, `commander` (`edh`), `oathbreaker`, `standardbrawl`, `brawl`, `competitivebrawl`, `alchemy`, `paupercommander`, `duel`, `oldschool`, `premodern`, `predh`, `tlr`. | `lg` | `f:pauper c:g t:creature` (292 = 292) |
 | `banned`, `restricted` | banned, or restricted, in the format | `lg` | `banned:legacy` (145 = 145) |
-| `r`, `rarity` | the rarity of **the one printing the Oracle file holds**. Scryfall matches a card printed at that rarity in any printing: Lightning Bolt matches `r:common`, `r:uncommon` and `r:rare` there. Every `r:` query gets the caveat note "Rarity is from one printing of each card, so cards printed at other rarities may be missing." In the fixtures, `r>=m t:dragon` found 107 of Scryfall's 118 dragons (Atarka, Kokusho and others were mythic in another printing). | `r` | `r>=r` |
+| `r`, `rarity` | as built, every rarity the card was printed at (As built, 3): some printing must meet the term, as on Scryfall, so Lightning Bolt matches `r:common`, `r:uncommon` and `r:rare`. This first read only the one printing the Oracle file holds, with a caveat note (`r>=m t:dragon` found 107 of Scryfall's 118 dragons). `in:common` and the other rarities: printed at that rarity at least once. | `rp`, `ri` | `r>=r`, `in:rare` |
 | `edhrec`, `edhrecrank` | the EDHREC rank, 1 = most popular; cards without a rank never match | `er` | `edhrec<=100` (95 = 95) |
 
 ### 3.7 Land nicknames
@@ -287,7 +287,7 @@ Scryfall's sets are small and fixed: 6 to 22 cards each, 51 for `manland`.
 |---|---|---|
 | `name` | name; the data file's order, so no sort is needed | ascending |
 | `cmc`, `mv` | mana value | ascending |
-| `power`, `toughness` | front face's stat; cards without one go last | descending |
+| `power`, `toughness` | front face's stat; cards without one go last | ascending (as built: Scryfall's saved results sort lowest first) |
 | `rarity` | §3.6 order | descending, mythic first |
 | `color` | WUBRG single colours, then multicolour, then colourless | ascending |
 | `edhrec` | rank; unranked cards go last | ascending, rank 1 first |
@@ -454,7 +454,7 @@ The prototype built everything at once in 317 to 385 ms at 4×, so a single buil
 - **Syntax query with `order:`:** that field (§3.8), ties by name.
 - **Syntax query without `order:`, with positive bare name words:** rank the hits by `searchNames`'s buckets for those words joined, then by name. `sol t:artifact` lists Sol Ring first, not Sol Talisman.
 - **Otherwise:** by name, which is the file's order, so there's no sort.
-- **The Rules text toggle in a syntax query** means that bare words also match rules text: name or text, as in a plain query (open question 5). With the toggle off, which is the default, bare words match names only, as on Scryfall.
+- **The Rules text toggle doesn't change a syntax query** (as built, open question 5): its bare words search names, exactly as on Scryfall, whatever the toggle says. The toggle affects only plain, non-syntax searches.
 
 ### 6.5 Detection and flow in `sheets/cards.js`
 
@@ -665,7 +665,7 @@ A fixture older than the data gets a warning, not a failure, so the test passes 
 |---|---|---|
 | `is:funny t:creature c:r` | 0.79 | approximate |
 | `is:frenchvanilla` | 0.81 | approximate |
-| `r>=m t:dragon` | 0.86 | the rarity caveat |
+| `r>=m t:dragon` | 0.86 (0.975 with every printing's rarity) | the rarity caveat, until rarity came from every printing (As built, 3) |
 | `is:companion` | 0.91 | one extra |
 | `is:partner` | 0.92 | |
 | `pt>=15` | 0.94 | DFC back faces |
@@ -716,3 +716,19 @@ Run M0 first: it changes what every later milestone's fixtures compare against.
 6. **Land nicknames from Scryfall at update time.** 25 search requests, about 13 s, are added to `cards:update`, cached for `--offline`. *Recommendation:* yes, rather than 25 Oracle-text regexes.
 7. **Long regexes.** Rejecting nested quantifiers also rejects a few harmless patterns. The alternative is evaluating regex terms in a module Worker with a timeout: the CSP's `worker-src` falls back to `script-src 'self'`, so a worker file is allowed. That's more code and a second copy of the columns. *Recommendation:* reject them now, and revisit only if someone hits it.
 8. **The M0 card set change.** It adds 1,062 cards back and drops 870 memorabilia and playtest cards (Hero's Path, World Championship ads, playtest cards). *Recommendation:* yes. It matches what Scryfall shows players, and the missing dual lands are a bug today.
+
+## As built
+
+The owner's answers to §11, applied on `card-lookup`:
+
+1. **EDHREC rank:** exact for every card, +93 KB gzipped (`exactRanks` in `cards-update.mjs` is `Infinity`; 1000 would round past the top thousand).
+2. **Oracle tags:** yes, as the separate lazily loaded `web/data/tags.json.gz` (M5), refreshed with the cards at release time and in the weekly pull request.
+3. **Rarity from every printing:** first no, then yes (a later decision). `npm run cards:update` also downloads Scryfall's `default_cards` file (about 80 MB, cached for `--offline`, never shipped) and writes each card's printed rarities: `rp`, the rarities `r:` reads, where they aren't just `r`; `ri`, the ones `in:` reads, where they differ from `rp`. That adds 14 KB gzipped. The rules, checked against Scryfall's results:
+   - `r:` matches each printing, digital ones too (Feral Thallid is common on MTGO's Masters Edition II), except the art, gold-bordered and token sets (tmh2's Timeless Dragon is a common). Scryfall then lists each card that has a printing that matched. So `r:common r:rare` finds nothing, and `-r:common` finds every card with a printing that isn't common. The AND's rarity terms run as one (`joinRarities()` in `cardterms.js`).
+   - `in:rare` (and the other rarities) is about the card: printed at that rarity at least once, leaving out promo sets and the special products Secret Lair, Masterpieces and From the Vault. A prerelease promo in a main set still counts. `in:` with a set code is still a cut keyword.
+   - No caveat note any more. The cards Scryfall's search leaves out entirely, such as Heroes of the Realm (M'Odo), are the only difference left in the fixtures.
+4. **`or`:** always the operator, as on Scryfall, with the exact-name boost (§2.6).
+5. **Rules text and syntax:** the toggle affects only plain searches (§6.4).
+6. **Land nicknames:** from Scryfall's search at update time, 600 ms apart, cached for `--offline`.
+7. **Catastrophic patterns:** rejected with a note.
+8. **The card set fix:** done (M0).

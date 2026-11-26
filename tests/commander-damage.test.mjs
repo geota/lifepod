@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { chromium, webkit } from 'playwright-core';
 import {
-  backHandling, button, engines, eventually, hold, openPage, reload, saved, scores, seedGame, setSwitches, startGame, test, tileProblems,
+  backHandling, button, engines, eventually, hold, openFromPill, openPage, reload, saved, scores, seedGame, setSwitches, startGame, test,
+  tileProblems,
   token, turnScreen,
 } from './helpers.mjs';
 
@@ -410,7 +411,7 @@ async function checkSeatSizes(t, engine) {
       await seedGame(page, {
         startingLife: 40, scores: Array(count).fill(40), rotations, landscapeAngle: 90, counters: { commander: true },
       });
-      await button(page, 'Commander damage').tap();
+      await openFromPill(page, 'damage');
       assert.equal(await page.locator('.map-cell[data-attacker]:visible').count(), count * (count - 1), `${view}: every seat shows`);
       assert.deepEqual(await tileProblems(page, { targets: '.map-cell[data-attacker]' }), [], view);
       const sizes = await page.evaluate(() => {
