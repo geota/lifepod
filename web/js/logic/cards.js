@@ -1,5 +1,5 @@
 // Card lookup's data and search, with no DOM: the card format in web/data/cards.json, folding names for search, the
-// ranking, and reading the mana symbols in a cost or in rules text. scripts/cards-update.mjs imports fold() from here,
+// ranking, reading the mana symbols in a cost or in rules text, and finding a card's rulings in its shard. scripts/cards-update.mjs imports fold() from here,
 // so the keys it writes and the queries the page folds always match.
 
 /**
@@ -32,6 +32,8 @@
  *   `fun` from a funny set. `lc`: the land cycles Scryfall names it in, such as `shockland` (cardterms.js `landNicknames`).
  * - `er`: the EDHREC rank, 1 the most played, exact (`exactRanks` in scripts/cards-update.mjs can round it); none for a
  *   card EDHREC doesn't rank.
+ * - `ru`: how many rulings the card has and the shard they're in, web/data/rulings/<shard>.json.gz
+ *   (scripts/cards-rulings.mjs); none for a card with no rulings.
  * These fields are there for a structured query (`c:r t:creature o:treasure mv<=3`) to be built on the matching below.
  * @typedef {CardFace & {
  *   k: string,
@@ -55,6 +57,7 @@
  *   ci?: number,
  *   fun?: number,
  *   lc?: string[],
+ *   ru?: [number, number],
  * }} Card
  */
 /**
@@ -310,4 +313,51 @@ export function splitSymbols(text) {
 export function costText(cost) {
   return cost.split(' // ').map(half => splitSymbols(half).map(run => (typeof run === 'string' ? run.trim() : run.say))
     .filter(Boolean).join(', ')).join(', or ');
+}
+
+// ---- Rulings ---------------------------------------------------------------------------------------------------------
+
+/**
+ * A ruling as the files hold it: [date, text], or [date, text, "scryfall"] for Scryfall's own notes.
+ * @typedef {[string, string] | [string, string, string]} RulingEntry
+ * @typedef {{ rulings: RulingEntry[] }} RulingTable The shared file: the rulings more than one card has.
+ * @typedef {{ rulings: RulingEntry[], cards: { n: string, i?: number, r: number[] }[] }} RulingShard A shard: its cards'
+ *   other rulings, and each card's, by place: 0 and up in the shard's table, -1 and down in the shared one's.
+ * @typedef {{ date: string, text: string, scryfall: boolean }} Ruling
+ */
+
+/** A shard's file name: 00 to 31. @param {number} shard */
+export const shardFile = shard => `${String(shard).padStart(2, '0')}.json.gz`;
+
+/**
+ * Which of the cards with its name a card is, counting from 0 in the data's order, as a shard tells them apart
+ * (Unstable's variants share a name). The data is sorted by name, so they're next to each other.
+ * @param {Card[]} cards
+ * @param {number} at
+ */
+export function nameVariant(cards, at) {
+  let variant = 0;
+  while (at - variant > 0 && cards[at - variant - 1].n === cards[at].n) variant++;
+  return variant;
+}
+
+/**
+ * A card's rulings, oldest first, from its shard and the shared file; empty if the shard doesn't have it.
+ * @param {RulingShard} shard
+ * @param {RulingTable} shared
+ * @param {string} name
+ * @param {number} [variant] nameVariant()
+ * @returns {Ruling[]}
+ */
+export function cardRulings(shard, shared, name, variant = 0) {
+  const entry = shard.cards.find(card => card.n === name && (card.i ?? 0) === variant);
+  if (!entry) return [];
+  return entry.r.map(at => (at < 0 ? shared.rulings[-1 - at] : shard.rulings[at]))
+    .filter(Boolean)
+    .map(([date, text, source]) => ({ date, text, scryfall: source === 'scryfall' }));
+}
+
+/** A ruling's date as the page prints it, like the credit's: "7 February 2025". @param {string} date YYYY-MM-DD */
+export function rulingDate(date) {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 }

@@ -1,14 +1,16 @@
 // Card lookup, behind the pill's magnifier: the data loaded the first time it opens, the search field over the
-// results and its notes, and a card's text. Importing this module wires the sheet and the button; the searching itself
-// is sheets/cardsearch.js.
+// results and its notes, and a card's text and rulings. Importing this module wires the sheet and the button; the
+// searching itself is sheets/cardsearch.js, and loading rulings sheets/cardrulings.js.
 
 import { showDialog } from '../actions/dialog.js';
-import { indexCards } from '../logic/cards.js';
-import { cardNodes, closeGroup, noteNodes, resultRow } from '../render/card.js';
+import { indexCards, nameVariant } from '../logic/cards.js';
+import { cardNodes, closeGroup, noteNodes, resultRow, rulingNodes, rulingsSection } from '../render/card.js';
 import { syncBackHandling } from '../state/state.js';
-import { lookupButton } from '../ui/dom.js';
+import { element, lookupButton } from '../ui/dom.js';
+import { dropRulings, loadRulings } from './cardrulings.js';
 import { dropCards, onFound, search, setCards } from './cardsearch.js';
 
+/** @typedef {import('../logic/cards.js').Card} Card */
 /** @typedef {import('../logic/cards.js').CardData} CardData */
 /** @typedef {import('../logic/cards.js').CardIndex} CardIndex */
 /** @typedef {import('./cardsearch.js').Found} Found */
@@ -117,8 +119,8 @@ function loadCards() {
     });
 }
 
-// Lets go of the cards, what was built from them and the rows drawn from them, so the memory comes back: a load in
-// flight is cancelled, and the index steps still to come stop. The query and the rules text toggle stay, and the next
+// Lets go of the cards, what was built from them, the rulings and the rows drawn from them, so the memory comes back: a
+// load in flight is cancelled, and the index steps still to come stop. The query and the rules text toggle stay, and the next
 // open loads the cards again with the same loading line as the first. Game state and History aren't touched.
 function evictCards() {
   clearTimeout(evictTimer);
@@ -126,6 +128,7 @@ function evictCards() {
   loadAbort = null;
   loading = null;
   dropCards();
+  dropRulings();
   index = null;
   found = null;
   shown = [];
@@ -237,6 +240,11 @@ function openCard(at) {
   if (!index) return;
   const card = index.cards[at];
   cardSheet.replaceChildren(...cardNodes(card));
+  if (card.ru) {
+    const section = rulingsSection(card.ru[0]);
+    cardSheet.append(section);
+    fillRulings(card, at, section);
+  }
   openAt = at;
   openQuery = found?.query ?? '';
   cardsSheet.dataset.view = 'card';
@@ -248,6 +256,43 @@ function openCard(at) {
 function showList() {
   cardsSheet.dataset.view = 'list';
 }
+
+// A card's rulings load as it opens, the list closed, so it's ready when opened; only its own shard is fetched, and
+// none if it's held. A card opened since, or the cards let go, leaves the answer unused. A failed load is tried again
+// when the list is next opened.
+/** @param {Card} card @param {number} at @param {HTMLElement} section */
+function fillRulings(card, at, section) {
+  if (!index) return;
+  const body = /** @type {HTMLElement} */ (section.querySelector('.card-rulings-body'));
+  section.dataset.state = 'loading';
+  body.setAttribute('aria-busy', 'true');
+  body.replaceChildren(element('p', 'card-rulings-status', 'Loading rulings…'));
+  const done = (/** @type {Node} */ node, /** @type {string} */ state) => {
+    if (!section.isConnected) return;
+    section.dataset.state = state;
+    body.removeAttribute('aria-busy');
+    body.replaceChildren(node);
+  };
+  loadRulings(card, nameVariant(index.cards, at)).then(
+    rulings => done(rulingNodes(rulings), 'loaded'),
+    () => done(element('p', 'card-rulings-status', 'The rulings couldn’t load. Close them and open them again to try again.'), 'failed'),
+  );
+}
+// "Rulings (n)" opens and closes the list. Opened near the bottom of the card, the card scrolls the heading up, so the
+// first rulings show.
+cardSheet.addEventListener('click', (event) => {
+  const toggle = /** @type {HTMLButtonElement | null} */ (/** @type {HTMLElement} */ (event.target).closest('#card-rulings-toggle'));
+  const section = /** @type {HTMLElement | null} */ (toggle?.closest('.card-rulings'));
+  if (!toggle || !section || !index) return;
+  const body = /** @type {HTMLElement} */ (section.querySelector('.card-rulings-body'));
+  const open = toggle.getAttribute('aria-expanded') !== 'true';
+  toggle.setAttribute('aria-expanded', String(open));
+  body.hidden = !open;
+  if (!open) return;
+  if (section.dataset.state === 'failed' && openAt >= 0) fillRulings(index.cards[openAt], openAt, section);
+  const view = cardSheet.getBoundingClientRect();
+  if (body.getBoundingClientRect().top > view.bottom - 96) cardSheet.scrollTop += toggle.getBoundingClientRect().top - view.top - 8;
+});
 
 queryField.addEventListener('input', runSearch);
 queryField.addEventListener('keydown', (event) => {

@@ -68,7 +68,7 @@ gh secret list --repo geota/lifepod
 
 ## Card data in a release
 
-A version tag refreshes card lookup's data on its own. CI's **Card data for a release** job runs `scripts/cards-release.mjs`: one download each of Scryfall's latest Oracle cards, Oracle tags and default cards files (`npm run cards:update`, with a 30-second limit on the list, 3 minutes on each of the first two files and 5 on the 80 MB default cards, two retries each, and 12 minutes in all), then `tests/cards-data.test.mjs`, a card count within 5% of the committed data's, a few cards every lookup needs (Sol Ring, Atraxa, Delver of Secrets, Lightning Bolt, Treasure), and the printed rarities (Lightning Bolt at common, uncommon and rare). The default cards file is only read for every printing's rarity, which `r:` and `in:` use; the Oracle tags are `data/tags.json` and `web/data/tags.json.gz`, which `otag:` reads. If any download or check fails, the committed data ships, with a warning. The web bundle, the APK and App Bundle, the iOS builds and TestFlight all build from that one copy, credit dates included, and the release notes and the job summary say which data shipped and its date.
+A version tag refreshes card lookup's data on its own. CI's **Card data for a release** job runs `scripts/cards-release.mjs`: one download each of Scryfall's latest Oracle cards, Oracle tags, rulings and default cards files (`npm run cards:update`, with a 30-second limit on the list, 3 minutes on each of the first two files and 5 on the 80 MB default cards, two retries each, and 12 minutes in all), then `tests/cards-data.test.mjs` and `tests/cards-rulings.test.mjs`, a card count and a ruling count each within 5% of the committed data's, Doubling Season's rulings, a few cards every lookup needs (Sol Ring, Atraxa, Delver of Secrets, Lightning Bolt, Treasure), and the printed rarities (Lightning Bolt at common, uncommon and rare). The default cards file is only read for every printing's rarity, which `r:` and `in:` use; the Oracle tags are `data/tags.json` and `web/data/tags.json.gz`, which `otag:` reads. If any download or check fails, the committed data ships, cards and rulings together, with a warning. The web bundle, the APK and App Bundle, the iOS builds and TestFlight all build from that one copy, credit dates included, and the release notes and the job summary say which data shipped and its date.
 
 If Scryfall is down or slow, or a check fails, the release ships the committed `data/cards.json` instead, with a warning in the job summary and the release notes. A release never fails over card data.
 
@@ -77,10 +77,10 @@ The tag's own commit is unchanged, so the refreshed data exists only in that rel
 To refresh by hand:
 
 ```sh
-npm run cards:update     # writes data/cards.json, web/data/cards.json.gz and the credit dates
-git diff --stat data/cards.json data/tags.json web/index.html README.md
+npm run cards:update     # writes data/cards.json, web/data/cards.json.gz, the tags, the rulings and the credit dates
+git diff --stat data/cards.json data/tags.json data/rulings web/index.html README.md
 npm run check
-git commit -m 'Card data: Scryfall, <date>' data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz web/index.html README.md
+git commit -m 'Card data: Scryfall, <date>' data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz data/rulings web/data/rulings web/index.html README.md
 ```
 
 ## GitHub prerelease and Obtainium

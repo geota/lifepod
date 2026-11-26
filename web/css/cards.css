@@ -143,6 +143,17 @@
 .card-facts { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--muted); font-size: var(--type-label); }
 .card-facts .ci { font-size: 1.25em; }
 .card-banned { color: var(--danger-text); font-weight: var(--weight-semibold); }
+/* The rulings, last: "Rulings (n)" as a full-width button that opens them, then each ruling with its date under it. */
+.card-rulings { display: grid; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.card-rulings-toggle { display: flex; align-items: center; gap: var(--space-2); width: 100%; padding: 0 var(--space-3); font-size: var(--type-label); font-weight: var(--weight-heavy); text-align: start; }
+.card-rulings-toggle .icon { flex: none; width: 16px; height: 16px; color: var(--muted); transition: transform var(--motion) var(--ease); }
+.card-rulings-toggle[aria-expanded="true"] .icon { transform: rotate(90deg); }
+.card-rulings-count { color: var(--muted); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.card-rulings-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.card-ruling { display: grid; gap: 2px; }
+.card-ruling-text { line-height: 1.45; }
+.card-ruling-text .pip { --pip-size: 1.05em; display: inline-grid; margin-inline: .06em; vertical-align: -.17em; }
+.card-ruling-date, .card-rulings-status { color: var(--muted); font-size: var(--type-small); }
 
 /* Wide: the results on the left, the card on the right, with no Back. */
 @container cards (min-width: 620px) {
@@ -186,6 +197,10 @@
 #cards[data-compact] .card-help { flex-direction: row; align-items: stretch; }
 #cards[data-compact] .card-help .card-back { align-self: flex-start; }
 #cards[data-compact] .help-body { flex: 1; padding: var(--space-2) var(--space-3); }
+/* So does a card, so that its text, and "Rulings (n)" with it, has room to scroll into view. */
+#cards[data-compact] .card-panel { flex-direction: row; align-items: stretch; }
+#cards[data-compact] .card-panel .card-back { align-self: flex-start; }
+#cards[data-compact] .card-sheet { flex: 1; padding: var(--space-2) var(--space-3); }
 /* iOS shrinks only the visual viewport for its keyboard, so the sheet is placed in what's left (js/sheets/cards.js). */
 #cards[data-keyboard] { height: calc(var(--view-height, 100%) - 12px); margin: calc(var(--view-top, 0px) + 6px) auto auto; }
 

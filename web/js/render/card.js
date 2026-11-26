@@ -1,7 +1,7 @@
 // Card lookup's drawing, from the card data (js/logic/cards.js): mana symbols in a cost or in rules text, a row in the
-// results, and the card itself, as text with no art. css/cards.css styles all three.
+// results, the card itself, as text with no art, and its rulings. css/cards.css styles them.
 
-import { costText, splitSymbols } from '../logic/cards.js';
+import { costText, rulingDate, splitSymbols } from '../logic/cards.js';
 import { formatAt, readLegalities } from '../logic/cardterms.js';
 import { identityNames } from '../logic/data.js';
 import { identityText } from '../logic/rules.js';
@@ -11,6 +11,7 @@ import { colourIndicator } from './tile.js';
 /** @typedef {import('../logic/cards.js').Card} Card */
 /** @typedef {import('../logic/cards.js').CardFace} CardFace */
 /** @typedef {import('../logic/cards.js').ManaSymbol} ManaSymbol */
+/** @typedef {import('../logic/cards.js').Ruling} Ruling */
 
 // One symbol: a disc (.pip, as the mana strip draws its colours), a bare glyph (.sym), or the printed text for a symbol
 // the font doesn't have. The glyph is hidden from screen readers, which hear `say` instead, unless the caller speaks
@@ -112,6 +113,42 @@ export function cardNodes(card) {
   const commander = card.t.startsWith('Token') ? 'l' : readLegalities(card.lg)[formatAt('commander')];
   if (commander !== 'l') facts.append(element('span', 'card-banned', commander === 'b' ? 'Banned in Commander' : 'Not legal in Commander'));
   return [head, ...faces, facts];
+}
+
+// A card's rulings, under the rest of it: a heading that is a button, "Rulings (n)", which opens and closes the list
+// under it, closed to begin with. The count is the card data's, so it shows before the rulings load; sheets/cards.js
+// fills the list (rulingNodes) and wires the button.
+/** @param {number} count */
+export function rulingsSection(count) {
+  const toggle = element('button', 'secondary card-rulings-toggle', icon('caret-right'), element('span', '', 'Rulings'),
+    element('span', 'card-rulings-count', `(${count})`));
+  toggle.type = 'button';
+  toggle.id = 'card-rulings-toggle';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'card-rulings');
+  const body = element('div', 'card-rulings-body', element('p', 'card-rulings-status', 'Loading rulings…'));
+  body.id = 'card-rulings';
+  body.hidden = true;
+  body.setAttribute('aria-busy', 'true');
+  return element('section', 'card-rulings', element('h4', 'card-rulings-head', toggle), body);
+}
+// The rulings as a list, oldest first, each with its date under it as Scryfall prints them, and Scryfall's own notes
+// marked as theirs. Mana symbols are drawn as in rules text; parentheses are just text here, and card names stay plain.
+/** @param {Ruling[]} rulings */
+export function rulingNodes(rulings) {
+  const list = element('ol', 'card-rulings-list');
+  for (const ruling of rulings) {
+    const text = element('p', 'card-ruling-text');
+    for (const run of splitSymbols(ruling.text)) {
+      if (typeof run === 'string') text.append(run);
+      else text.append(...symbolNodes(run, true));
+    }
+    const date = element('time', '', rulingDate(ruling.date));
+    date.dateTime = ruling.date;
+    const by = ruling.scryfall ? [' · Scryfall note'] : [];
+    list.append(element('li', 'card-ruling', text, element('p', 'card-ruling-date', date, ...by)));
+  }
+  return list;
 }
 
 // Close spellings, after a plain query's matches: a group of rows under a small heading, which a screen reader hears
