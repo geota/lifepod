@@ -163,7 +163,7 @@ for (const [name, engine] of Object.entries(engines)) {
       if (words) assert.equal(await announced(), words);
     };
     await step('ArrowDown', 'counters', 'Counters, tab 2 of 3. Press a counter to add one');
-    await step('ArrowRight', 'mana', 'Mana pool, tab 3 of 3. Press a colour to add one mana');
+    await step('ArrowRight', 'mana', 'Mana pool, tab 3 of 3. Press a colour or Treasure to add one');
     await step('ArrowRight', 'damage');
     await step('ArrowUp', 'mana');
     await step('ArrowLeft', 'counters');
@@ -268,7 +268,7 @@ for (const [name, engine] of Object.entries(engines)) {
     await visit();
     await button(page, 'Cancel').tap();
     assert.equal(await page.locator('#discard-title').textContent(), 'Discard 3 changes?');
-    assert.equal(await page.locator('#discard-message').textContent(), 'Commander damage, life, counters and mana pools go back to how they were when you opened Track.');
+    assert.equal(await page.locator('#discard-message').textContent(), 'Commander damage, life, counters, mana pools and Treasure go back to how they were when you opened Track.');
     await button(page, 'Discard').tap();
     assert.deepEqual(await state(), before, 'the whole visit goes back');
 

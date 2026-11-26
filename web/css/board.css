@@ -10,7 +10,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 /* Phosphor icons (MIT, phosphoricons.com), Bold weight, drawn inline in index.html. */
 .icon { display: block; width: 1em; height: 1em; fill: currentColor; }
 /* Game symbols from the Mana font: the d20 for dice, infect for poison, the commander symbol for commander tax, energy,
-   rad, the colour pie for identity, the classic tilted tap symbol for the mana pool and the untap symbol for turns. */
+   rad, the colour pie for identity, the classic tilted tap symbol for the mana pool, the untap symbol for turns and the
+   gold counter for Treasure. */
 .mana-icon { font: normal normal normal 1em/1 Mana; text-align: center; }
 .mana-icon::before { content: var(--glyph); speak: never; }
 .mana-icon[data-glyph="d20"] { --glyph: '\e999'; }
@@ -21,6 +22,8 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .mana-icon[data-glyph="tap"] { --glyph: '\e61c'; }
 .mana-icon[data-glyph="untap"] { --glyph: '\e61b'; }
 .mana-icon[data-glyph="commander"] { --glyph: '\e9c6'; }
+/* Treasure (MANA-SPEC-v2 §1.3): the gold counter, ms-counter-gold, drawn in the text colour wherever it shows. */
+.mana-icon[data-glyph="treasure"] { --glyph: '\e934'; }
 
 /* app.js turns the board so seats stay fixed to the device as the screen rotates. */
 .app {

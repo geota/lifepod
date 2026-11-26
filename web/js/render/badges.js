@@ -10,10 +10,10 @@ import {
   commanderLethal, commanderWarning, designationKinds, manaColours, poisonLethal, poisonWarning, reminderText,
 } from '../logic/data.js';
 import {
-  dangerLevel, hasMana, isOut, needsPassing, poolText, shownCounters, trackedDesignations,
+  dangerLevel, hasMana, isOut, needsPassing, poolsCanEmpty, poolText, shownCounters, trackedDesignations,
 } from '../logic/rules.js';
 import { toasts } from '../state/history.js';
-import { game, shownReminders, stripHolds } from '../state/state.js';
+import { game, shownReminders, stripHolds, tokenHolds } from '../state/state.js';
 import { board, element, icon, manaIcon, syncChildren, visuallyHidden } from '../ui/dom.js';
 import { bindRelease, bindStep, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark } from './tile.js';
@@ -31,6 +31,7 @@ import { counterIcon, designationIcon, identityChip, inColourOf, renderWatermark
  * @property {(index: number) => void} startTurn
  * @property {(index: number, colour: number) => void} spendMana
  * @property {(index: number) => void} clearPool
+ * @property {(index: number) => void} useTreasure
  * @property {(index: number, kind: DesignationKind) => void} dismissReminder
  * @property {(mode: BoardMode) => void} setBoardMode
  * @property {() => void} redo
@@ -193,7 +194,18 @@ function stripItems(index) {
       return button;
     },
   };
-  return [...spends, eraser, stripChipItem(index)];
+  return [...(keptShows(index) ? [keepLockItem()] : []), ...spends, eraser, stripChipItem(index)];
+}
+
+// Whether a tile's strip and folded chip show Keep's small lock at rest (MANA-SPEC-v2 §4.2): Keep is on and pools can
+// empty as the turn passes; the strip shows only while there's mana. It's not a target: Keep is changed in mana mode.
+function keptShows(index) {
+  return game.keepMana[index] && poolsCanEmpty(game);
+}
+
+/** @returns {Keyed} */
+function keepLockItem() {
+  return { key: 'keep-lock', create: () => element('span', 'keep-lock', icon('lock'), visuallyHidden('Kept')) };
 }
 
 // The strip folded into one chip, where the strip can't fit: the pool's colours and amounts with a caret, which opens
@@ -219,9 +231,10 @@ function stripChipItem(index) {
       const parts = held.length > 1
         ? [element('span', 'summary-item', ...held.map(({ colour }) => pip(colour)), String(held.reduce((sum, { amount }) => sum + amount, 0)))]
         : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
-      chip.replaceChildren(...parts, icon('caret-right'));
+      const kept = keptShows(index);
+      chip.replaceChildren(...(kept ? [element('span', 'keep-lock', icon('lock'))] : []), ...parts, icon('caret-right'));
       const total = held.reduce((sum, { amount }) => sum + amount, 0);
-      chip.setAttribute('aria-label', `${total} mana. Player ${index + 1}'s pool: ${poolText(game, index)}. Open mana`);
+      chip.setAttribute('aria-label', `${total} mana${kept ? ', kept' : ''}. Player ${index + 1}'s pool: ${poolText(game, index)}. Open mana`);
     },
   };
 }
@@ -280,7 +293,31 @@ function counterItem(kind, value) {
   };
 }
 
-// The near row: the turn chips, the identity, each counter that's set, then the holder's designations.
+// A Treasure chip (MANA-SPEC-v2 §1.3): the gold counter and the count, a button whose tap uses one. Used to 0, it stays,
+// dimmed, while the chip is being tapped (actions/mana.js), then goes.
+/** @returns {Keyed} */
+function treasureItem(index) {
+  return {
+    key: 'treasure',
+    create: () => {
+      const chip = element('button', 'chip token-chip', manaIcon('treasure'), '');
+      chip.type = 'button';
+      chip.dataset.token = 'treasure';
+      bindTap(chip, () => badgeActions.useTreasure(index));
+      return chip;
+    },
+    update: (chip) => {
+      const count = game.treasure[index];
+      /** @type {Text} */ (chip.lastChild).data = String(count);
+      chip.setAttribute('aria-label', count ? `Treasure, Player ${index + 1}, ${count}. Use one` : `Treasure, Player ${index + 1}, none left`);
+      // Not disabled, which would drop keyboard focus from it.
+      if (count) chip.removeAttribute('aria-disabled');
+      else chip.setAttribute('aria-disabled', 'true');
+    },
+  };
+}
+
+// The near row: the turn chips, the identity, each counter that's set, Treasure, then the holder's designations.
 /** @returns {Keyed[]} */
 function nearItems(index) {
   const items = turnItems(index);
@@ -293,6 +330,7 @@ function nearItems(index) {
     const value = game[kind][index];
     if (value !== 0) items.push(counterItem(kind, value));
   }
+  if (game.manaPool && (game.treasure[index] > 0 || tokenHolds.has(index))) items.push(treasureItem(index));
   for (const designation of trackedDesignations(game)) {
     if (game[designation.kind] === index) items.push(designationItem(designation, index));
   }

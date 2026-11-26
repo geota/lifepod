@@ -80,7 +80,7 @@ export const editingModes = ['damage', 'counters', 'mana'];
 export const discardMessages = {
   damage: 'Commander damage and life go back to how they were when you opened commander damage.',
   counters: 'Every counter goes back to how it was when you opened counters.',
-  mana: 'Every mana pool goes back to how it was when you opened mana.',
+  mana: 'Every mana pool and Treasure count goes back to how it was when you opened mana.',
 };
 // Track (design/polish/PILL-SPEC.md, option A): where the pill can't hold commander damage, counters and mana as three
 // buttons, they become one Track button whose mode has a tab for each, in this order. The editing modes are its tabs,
@@ -91,7 +91,7 @@ export const trackTabKinds = ['damage', 'counters', 'mana'];
 export const trackTabInfo = {
   damage: { name: 'Commander damage', words: 'commander damage', discard: ['Commander damage', 'life'] },
   counters: { name: 'Counters', words: 'counters', discard: ['counters'] },
-  mana: { name: 'Mana pool', words: 'mana', discard: ['mana pools'] },
+  mana: { name: 'Mana pool', words: 'mana', discard: ['mana pools', 'Treasure'] },
 };
 // The pill's tools, the buttons after the modes that show at rest whatever is on: Undo, card lookup's magnifier, the
 // dice and settings. The pill's fit (pillFit in logic/rules.js) follows the count.

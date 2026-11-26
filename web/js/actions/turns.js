@@ -13,14 +13,16 @@ import { maybeAskFirst, setAskFirst } from './mode.js';
 import { remind, turnStarted } from './reminders.js';
 
 // Shows a turn step on every tile and the pill, saves it at once as one undo step, with any pools it emptied
-// (MANA-UNDO-SPEC §6.2), and announces it. A turn chip passed from the keyboard is gone, and focus follows the turn to
+// (MANA-UNDO-SPEC §6.2) and none it kept, and announces it. A turn chip passed from the keyboard is gone, and focus follows the turn to
 // the chip that has it now (render/badges.js).
-/** @param {import('../logic/data.js').StepKind} kind */
-function showTurn(kind) {
+// A pass that left a kept pool says so: "Player 2's turn, round 3. Player 4's mana kept" (MANA-SPEC-v2 §4.3).
+/** @param {import('../logic/data.js').StepKind} kind @param {number[]} [kept] Players whose pools the pass kept. */
+function showTurn(kind, kept = []) {
   commit({ badges: 'all', pill: true, step: { kind } });
   haptic();
   const { active, round } = game.turn;
-  announce(-1, 'turn', () => (game.turns === 'turns' && active !== null ? `${seatName(active)}'s turn, round ${round}` : `Round ${round}`));
+  const keeps = kept.map(index => `. Player ${index + 1}'s mana kept`).join('');
+  announce(-1, 'turn', () => `${game.turns === 'turns' && active !== null ? `${seatName(active)}'s turn, round ${round}` : `Round ${round}`}${keeps}`);
 }
 
 function recordStep(before, emptied) {
@@ -43,8 +45,9 @@ export function stepTurn() {
   const next = turnForward(game);
   if (!next) return;
   game.turn = next;
-  recordStep(before, autoEmptyPools());
-  showTurn('turn');
+  const { emptied, kept } = autoEmptyPools();
+  recordStep(before, emptied);
+  showTurn('turn', kept);
   if (game.turns === 'turns') {
     // The monarch draws at the beginning of their end step, so passing the turn reminds them, and the initiative's
     // holder ventures at the beginning of their upkeep, so their turn starting reminds them.

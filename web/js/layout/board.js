@@ -246,8 +246,10 @@ function centreClearance(tile, pill, farClear) {
 // The mode grids are one size on every tile, and each face lays its grid out with as many columns as fit inside its
 // mode layer, which keeps clear of the pill on the edges the pill reaches: a narrow rotated seat gets fewer, taller
 // columns. Colours: on narrow or short boards, the first of 4 × 3, 3 × 4, 6 × 2 and 2 × 6 that fits (the layer keeps
-// 6px less than the clearance there, and 1px from other edges); elsewhere 4 × 3 always fits. Counter and mana cells:
-// three to a row, or two; seven counter cells four to a row. Identity toggles: five in a row where every tile has room (ui ≥ 264), otherwise three, or two.
+// 6px less than the clearance there, and 1px from other edges); elsewhere 4 × 3 always fits. Counter cells: three to a
+// row, or two; seven counter cells four to a row. Mana cells take the seven-cell grid too, four to a row, the colours'
+// three and a column for Treasure and Keep (MANA-SPEC-v2 §2.1), or three with those as a third row on a face too narrow
+// for four. Identity toggles: five in a row where every tile has room (ui ≥ 264), otherwise three, or two.
 // The cell and toggle sizes follow css/modes.css (.counter-cells, .identity).
 function fitModeGrids(faces, { width: ui, height: ub, size, grow, tight }) {
   const cell = Math.min(Math.max(44, Math.min((ui - 20) / 3, (ub - 10 - size) / 2)), 92 * grow);
@@ -277,6 +279,13 @@ function fitModeGrids(faces, { width: ui, height: ub, size, grow, tight }) {
     // The width the face leaves inside its clearances. The grids may reach into the layers' small default padding.
     const room = faceWidth - clear.start - clear.end + 0.5;
     player.style.setProperty('--cell-columns', 3 * cell + 20 <= room ? 3 : 2);
+    // Mana mode's grid: four to a row where they fit with the seven-cell grid's gaps, else three, as wide as the face lets
+    // the gaps be. A rule splits the colours from what stays where the gap leaves room for it.
+    const mana = 4 * wideCell + 3 * wideGap <= room ? 4 : 3;
+    const manaGap = mana === 4 ? wideGap : Math.max(0, Math.min(10, (room - 0.5 - 3 * wideCell) / 2));
+    player.dataset.manaColumns = String(mana);
+    player.style.setProperty('--mana-gap', `${manaGap}px`);
+    player.toggleAttribute('data-mana-rule', mana === 4 && manaGap >= 6);
     if (wide) {
       // A face too narrow for four takes three, closing its gaps right up if it must, since three rows still fit.
       const columns = [4, 3].find(count => count * wideCell + (count - 1) * (count === 4 ? wideGap : 0) <= room) ?? 2;

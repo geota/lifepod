@@ -2,12 +2,12 @@
 // applied, shown and saved at once as a step of the game's history, where the mode's Undo and ✕ find them
 // (MANA-UNDO-SPEC §6.5), and the choices that Colours and Identity save at once, which aren't steps.
 
-import { countKinds } from '../logic/data.js';
+import { countKinds, maxCount } from '../logic/data.js';
 import {
   applyNewEdit, countEdit, damageEdit, designationEdit, editPlayers, manaEdit,
 } from '../logic/rules.js';
 import { normalizeIdentity } from '../logic/save.js';
-import { announce, announceDesignation, announceLife, announcePool } from '../render/announce.js';
+import { announce, announceDesignation, announceLife, announcePool, announceTreasure } from '../render/announce.js';
 import { syncAllSwatches, syncCounterCells, syncIdentity, syncManaCells, syncSeatMap } from '../render/modes.js';
 import { paintColours } from '../render/tile.js';
 import { haptic } from '../state/platform.js';
@@ -97,4 +97,26 @@ export function stepCount(kind, index, delta) {
 
 export function stepMana(index, colour, delta) {
   commitEdit(manaEdit(game, index, colour, delta), `mana:${index}:${colour}`);
+}
+
+// Mana mode's Treasure cell (MANA-SPEC-v2 §2.1): tap +1, hold −1, merging per tile under the key a chip's use at rest
+// takes (opening and closing a mode closes every burst, so the two never merge).
+export function stepTreasure(index, delta) {
+  const next = game.treasure[index] + delta;
+  if (next < 0 || next > maxCount) return;
+  game.treasure[index] = next;
+  syncManaCells(index);
+  announceTreasure(index);
+  commit({ badges: [index], step: { key: `token:${index}:treasure` } });
+  haptic();
+}
+
+// Mana mode's Keep cell (MANA-SPEC-v2 §4): one player's "don't empty my pool when the turn passes", a toggle that's a
+// step of its own, like a designation cell, so it closes every open burst.
+export function toggleKeep(index) {
+  game.keepMana[index] = !game.keepMana[index];
+  syncManaCells(index);
+  announce(index, 'keep', () => `Player ${index + 1}, keep mana ${game.keepMana[index] ? 'on' : 'off'}`);
+  commit({ badges: [index] });
+  haptic();
 }
