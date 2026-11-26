@@ -11,6 +11,12 @@
 
 ---
 
+> **Owner decisions, 26 November 2026** (these override the sections below where they differ):
+> - **No Gold for now.** Build Treasure only. Its icon is the Mana font's gold counter (U+E934) in white. Gold, its switch, its cell, the five-column layout (§2.3) and the "corner" lock toggle (Q8) are all dropped; with Gold gone, mana mode never needs more than eight controls, so Keep always has its cell.
+> - **Keep is on/off only.** No "keep as colourless" state, and no extra switch.
+> - **No pips (§3.1 dropped).** Floating mana shows **each colour with its count, at every amount** ("R 1", "R 1 G 2"…), the same everywhere on the board, as today's strip does. §3.2's measurements were for pips; the build re-measures the totals with colour-and-count chips at chip height.
+> - Still open: Q1 (rename the switch), Q2 (a tap on the Treasure chip uses one), Q9 (Keep as a toggle cell).
+
 ## What's new since the first spec, and what that changes
 
 | Landed on main | What it changes here |
@@ -289,9 +295,9 @@ Carried from the first spec where they're still open, and new ones from the curr
 |---|---|---|
 | Q1 | Rename Settings → Track → "Mana pool" to **"Mana and Treasure"**, so players who only want Treasure find it? | Yes. Track's name keeps saying "mana". |
 | Q2 | At rest, should a tap on a Treasure chip **use one**, or **open mana mode**? | Use one. Undo makes a stray tap cheap, and its toast names it. |
-| Q3 | Keep: on and off only, or a third state **"Keep as colourless"** for Kruphix, Horizon Stone and Omnath, Locus of the Void? | On and off now. Add the third state only if players ask. |
-| Q6 | ~~Treasure's icon: a chest or coins?~~ | **Decided (owner):** the Mana font's gold counter (U+E934) for both, Treasure white and Gold gold. |
-| Q7 | Gold behind its own **Gold tokens** switch (off by default), or always beside Treasure? | Its own switch. Four cards make Gold, and it's what overfills the smallest boards. |
-| Q8 *(new)* | **The corner:** 640 × 360 and 568 × 320 at 5–6 players, with Gold and auto-empty on, can't fit nine 44px controls. Is Keep as a lock toggle on the floating pool at rest (`rest-568-6-corner`) acceptable there? | Yes. Keep only matters while mana floats, which is exactly when the lock shows, and the corner needs three rare settings at once. |
+| Q3 | ~~Keep: a third "keep as colourless" state?~~ | **Decided (owner):** on and off only. |
+| Q6 | ~~Treasure's icon?~~ | **Decided (owner):** the Mana font's gold counter (U+E934), in white. |
+| Q7 | ~~Gold behind its own switch?~~ | **Decided (owner):** no Gold for now. |
+| Q8 | ~~The corner's lock toggle?~~ | Moot: without Gold, every board fits Keep's cell. |
 | Q9 *(new)* | **Keep's look:** a designation-style cell, outlined when off (mocked), or a smaller checkbox-and-word control? | The cell. It's the same toggle language as the crown and castle, it's a full 44px target everywhere, and outlined it's the lightest thing in the grid. |
-| Q10 *(new)* | **The pips' limit:** pips for up to three mana, with the strip and eraser from four, or pips up to four? | Three. Three pips are 132px and fit every board's mana row with room to spare; four are 176px, nearly the whole 188px row at 568 × 320, and the owner's common case is one or two. |
+| Q10 | ~~Pips up to three or four?~~ | **Decided (owner):** no pips; colour and count at every amount. |
