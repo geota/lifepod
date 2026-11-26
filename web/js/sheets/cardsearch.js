@@ -30,6 +30,8 @@ const slowDelay = 150;
 const tagsUrl = new URL('../../data/tags.json.gz', import.meta.url);
 /** @type {Promise<void> | null} */
 let tagsLoading = null;
+/** @type {AbortController | null} */
+let tagsAbort = null;
 
 /** @type {CardIndex | null} */
 let index = null;
@@ -76,6 +78,20 @@ export function setCards(cards, again) {
   setTimeout(step, 0);
 }
 
+// Lets go of the cards and everything built from them (sheets/cards.js evicts them a while after the sheet closes): the
+// index's columns and tags hang off it in WeakMaps, so dropping it, the close-spellings index and the last results is
+// enough. The steps still to come see the cards have changed and stop; a tags download in flight is cancelled.
+export function dropCards() {
+  clearTimeout(textTimer);
+  clearTimeout(slowTimer);
+  tagsAbort?.abort();
+  tagsAbort = null;
+  tagsLoading = null;
+  index = null;
+  typos = null;
+  last = null;
+}
+
 /** @param {string} query @param {number} count */
 const wantsTypos = (query, count) => count < typoBelow && fold(query).length >= typoMinimum;
 
@@ -119,13 +135,18 @@ export function search(query, withText) {
 // The tags load once; if they can't, otag: terms are left out with a note.
 /** @param {CardIndex} cards */
 function loadTags(cards) {
-  tagsLoading ??= fetch(tagsUrl)
+  if (tagsLoading) return tagsLoading;
+  const abort = new AbortController();
+  tagsAbort = abort;
+  tagsLoading = fetch(tagsUrl, { signal: abort.signal })
     .then((response) => {
       if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
       return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).json();
     })
     .then(data => setTags(cards, data))
-    .catch(() => setTags(cards, null));
+    .catch(() => {
+      if (!abort.signal.aborted) setTags(cards, null);
+    });
   return tagsLoading;
 }
 

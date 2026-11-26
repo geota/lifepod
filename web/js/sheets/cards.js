@@ -7,7 +7,7 @@ import { indexCards } from '../logic/cards.js';
 import { cardNodes, closeGroup, noteNodes, resultRow } from '../render/card.js';
 import { syncBackHandling } from '../state/state.js';
 import { lookupButton } from '../ui/dom.js';
-import { onFound, search, setCards } from './cardsearch.js';
+import { dropCards, onFound, search, setCards } from './cardsearch.js';
 
 /** @typedef {import('../logic/cards.js').CardData} CardData */
 /** @typedef {import('../logic/cards.js').CardIndex} CardIndex */
@@ -39,12 +39,18 @@ const countDelay = 500;
 // Below this height, as with a phone's keyboard open in landscape, the sheet drops its header and credit so the field
 // and a few results fit.
 const compactHeight = 260;
+// The cards and their search data take about 60 MB, so they're let go this long after the sheet closes, and at once
+// when the app goes to the background; the next open loads them again, keeping the query and the toggle.
+export const evictDelay = 2 * 60 * 1000;
 
 /** @type {CardIndex | null} */
 let index = null;
 /** @type {Promise<void> | null} */
 let loading = null;
+/** @type {AbortController | null} */
+let loadAbort = null;
 let loadFailed = false;
+let evictTimer = 0;
 /** @type {Found | null} */
 let found = null;
 // The cards drawn, in the list's order: the matches, then any close spellings.
@@ -61,6 +67,7 @@ let countTimer = 0;
 // The magnifier opens the sheet on the results, with focus in the search field (which brings up a phone's keyboard)
 // and the last query selected to type over.
 function openLookup() {
+  clearTimeout(evictTimer);
   loadCards();
   showList();
   showDialog(cardsDialog);
@@ -79,25 +86,70 @@ function loadCards() {
   if (index || loading) return;
   loadFailed = false;
   showStatus();
-  loading = fetch(dataUrl)
+  const abort = new AbortController();
+  loadAbort = abort;
+  cardsDialog.dataset.cards = 'loading';
+  loading = fetch(dataUrl, { signal: abort.signal })
     .then((response) => {
       if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
       const unpacked = response.body.pipeThrough(new DecompressionStream('gzip'));
       return /** @type {Promise<CardData>} */ (new Response(unpacked).json());
     })
     .then((data) => {
+      if (abort.signal.aborted) return;
       index = indexCards(data.cards);
+      cardsDialog.dataset.cards = 'loaded';
       setCards(index, runSearch);
       runSearch();
     })
     .catch(() => {
+      if (abort.signal.aborted) return;
       loadFailed = true;
+      delete cardsDialog.dataset.cards;
       showStatus();
     })
     .finally(() => {
-      loading = null;
+      if (loadAbort === abort) {
+        loading = null;
+        loadAbort = null;
+      }
     });
 }
+
+// Lets go of the cards, what was built from them and the rows drawn from them, so the memory comes back: a load in
+// flight is cancelled, and the index steps still to come stop. The query and the rules text toggle stay, and the next
+// open loads the cards again with the same loading line as the first. Game state and History aren't touched.
+function evictCards() {
+  clearTimeout(evictTimer);
+  loadAbort?.abort();
+  loadAbort = null;
+  loading = null;
+  dropCards();
+  index = null;
+  found = null;
+  shown = [];
+  active = -1;
+  openAt = -1;
+  openQuery = '';
+  resultList.replaceChildren();
+  cardSheet.replaceChildren();
+  notesBlock.replaceChildren();
+  resultList.removeAttribute('aria-busy');
+  queryField.removeAttribute('aria-activedescendant');
+  queryField.setAttribute('aria-expanded', 'false');
+  delete cardsDialog.dataset.cards;
+  if (cardsDialog.open) {
+    // Back from the background with the sheet still open: load again and run the query.
+    showList();
+    showStatus();
+  }
+}
+// The background: let go at once, and load again on the way back if the sheet is still open.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (index || loading) evictCards();
+  } else if (cardsDialog.open) loadCards();
+});
 
 // ---- Results --------------------------------------------------------------------------------------------------------
 
@@ -285,5 +337,7 @@ window.addEventListener('resize', fitToView);
 cardsDialog.addEventListener('close', () => {
   clearTimeout(countTimer);
   countRegion.textContent = '';
+  clearTimeout(evictTimer);
+  evictTimer = setTimeout(evictCards, evictDelay);
   syncBackHandling();
 });
