@@ -132,6 +132,11 @@ export async function fontsReady(page) {
 // Where a test's paused clock starts.
 export const clockStart = Date.parse('2026-01-01T12:00:00Z');
 
+// The CPU slowdown the timing tests run at to stand in for a mid-range phone: 4× on a developer's machine. GitHub's shared
+// runners are already several times slower than one, and 4× on top of that measured 5× the local times, so CI runs them
+// unthrottled against the same budgets: still a regression guard, without failing on a busy runner.
+export const cpuSlowdown = process.env.CI ? 1 : 4;
+
 // ---- Opening a page -------------------------------------------------------------------------------------------------
 
 const platforms = new WeakMap();

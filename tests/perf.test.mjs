@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { openPage, savedGame, test } from './helpers.mjs';
+import { openPage, savedGame, test, cpuSlowdown } from './helpers.mjs';
 
 // The undo history's cost (UNDO-ARCHITECTURE.md §6 and §8): commit() records, saves the game with its history and
 // redraws, so with a full history of 500 steps it must stay under 4ms at 4× CPU throttle, a mid-range phone. The median
@@ -54,12 +54,12 @@ async function commitTimes(page) {
 test('chromium: commit() with 500 steps of history stays within budget at 4× CPU throttle, and an undo is one commit and one fit', async (t) => {
   const page = await openPage(t, chromium, { game: busy(fullHistory()) });
   const cdp = await page.context().newCDPSession(page);
-  await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpuSlowdown });
   const full = await commitTimes(page);
   assert.equal(full.steps, 500, 'the history stays at its cap');
   const empty = await openPage(t, chromium, { game: busy(undefined) });
   const emptyCdp = await empty.context().newCDPSession(empty);
-  await emptyCdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  await emptyCdp.send('Emulation.setCPUThrottlingRate', { rate: cpuSlowdown });
   // An empty history fills to 300 steps here, so this is the cost before the cap.
   const none = await commitTimes(empty);
   t.diagnostic(`commit at 4×, empty history: p50 ${none.p50.toFixed(2)}ms, p95 ${none.p95.toFixed(2)}ms, save ${none.bytes} bytes`);

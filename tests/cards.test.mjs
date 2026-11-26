@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { button, engines, eventually, openPage, saved, savedGame, scores, test } from './helpers.mjs';
+import { button, engines, eventually, openPage, saved, savedGame, scores, test, cpuSlowdown } from './helpers.mjs';
 
 // Card lookup behind the pill's magnifier (js/sheets/cards.js): the data loads only when it first opens, the search field and
 // its results work from the keyboard, a card reads as text with its symbols and faces, the sheet fits every size with
@@ -378,7 +378,7 @@ test('chromium: a keystroke searches 33,000 names and draws the results within a
   const page = await openPage(t, chromium);
   await openCards(page);
   const session = await page.context().newCDPSession(page);
-  await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+  await session.send('Emulation.setCPUThrottlingRate', { rate: cpuSlowdown });
   const timings = await page.evaluate(async () => {
     const { indexCards, rankResults, searchNames, searchText } = await import('/js/logic/cards.js');
     const response = await fetch('/data/cards.json.gz');
@@ -451,9 +451,8 @@ test('chromium: a keystroke searches 33,000 names and draws the results within a
   assert.ok(timings.slowMax < 50, `a slow syntax query, once typing pauses, ${timings.slowMax}ms`);
   assert.ok(timings.names < 16, `name search ${timings.names}ms`);
   assert.ok(timings.namesMax < 32, `the slowest, one letter, ${timings.namesMax}ms`);
-  // Drawing adds DOM work that varies more with the machine than the search does: alone it measures about 9–11ms, 15ms
-  // with the whole suite running beside it, and 25ms on CI's shared Linux runner, so it gets a second frame of slack. The
-  // search itself is held to one frame above.
-  assert.ok(timings.keystroke < 32, `a keystroke with drawing ${timings.keystroke}ms`);
+  // Drawing adds DOM work that varies more with the machine than the search does: alone it measures about 9–11ms, and
+  // 15ms with the whole suite running beside it, so it gets half a frame of slack.
+  assert.ok(timings.keystroke < 24, `a keystroke with drawing ${timings.keystroke}ms`);
   assert.ok(timings.text < 16, `rules text as the query grows ${timings.text}ms`);
 });
