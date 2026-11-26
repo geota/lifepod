@@ -11,7 +11,8 @@ import {
 import { kindOf } from './cardkinds.js';
 import { cutGroups, leaves, printingValues } from './cardquery.js';
 import {
-  colourCount, compareCosts, compareNumbers, compareSets, formatAt, rarityOrder, readColours, readCost, readPattern, squash,
+  colourCount, compareCosts, compareNumbers, compareSets, formatAt, joinRarities, printedRarities, rarityLetter, rarityOrder,
+  rarityWords, readColours, readCost, readPattern, readRarityParts, squash,
 } from './cardterms.js';
 
 /** @typedef {import('./cards.js').Card} Card */
@@ -148,10 +149,17 @@ function compileTerm(index, node, note) {
       return { cost: 2, test: card => want.includes(list[card][at]) };
     }
     case 'r': {
-      const want = rarityOrder[lower];
-      if (want === undefined) return fail(`${value} isn’t a rarity.`);
-      note('caveat', 'Rarity is from one printing of each card, so cards printed at other rarities may be missing.');
-      return { cost: 1, test: at => cards[at].r !== undefined && compareNumbers(rarityOrder[/** @type {string} */ (cards[at].r)], want, op) };
+      // Some printing must meet the term, or every part of a joined term (cardterms.js joinRarities()).
+      const parts = readRarityParts(value) ?? [{ negated: false, op, want: rarityOrder[lower] }];
+      if (parts.some(part => part.want === undefined)) return fail(`${value} isn’t a rarity.`);
+      const meets = (/** @type {string} */ letter) => parts.every(part => compareNumbers(rarityOrder[letter], part.want, part.op) !== part.negated);
+      return { cost: 1, test: at => [...printedRarities(cards[at])].some(meets) };
+    }
+    case 'in': {
+      // in:rare: printed at rare at least once. Only a rarity reaches here; a set or a language is a note (cardquery.js).
+      if (!rarityWords.has(lower)) return fail(`${value} isn’t a rarity.`);
+      const letter = rarityLetter(rarityOrder[lower]);
+      return { cost: 1, test: at => printedRarities(cards[at], true).includes(letter) };
     }
     case 'is': case 'has': {
       if (key === 'has') {
@@ -296,7 +304,9 @@ export function runQuery(index, parsed, query) {
   const raised = [...parsed.notes];
   /** @type {Map<QueryNode, Compiled | null>} */
   const compiled = new Map();
-  for (const node of leaves(parsed.ast)) {
+  // Rarity terms that share a printing run as one (cardterms.js joinRarities()); the rest of the query is as parsed.
+  const ast = joinRarities(parsed.ast);
+  for (const node of leaves(ast)) {
     const at = 'at' in node ? node.at : 0;
     const end = 'end' in node ? node.end : 0;
     /** @type {(kind: QueryNote['kind'], text: string, group?: string) => void} */
@@ -351,7 +361,7 @@ export function runQuery(index, parsed, query) {
     return result;
   }
 
-  const mask = parsed.ast ? evaluate(parsed.ast, null) : null;
+  const mask = ast ? evaluate(ast, null) : null;
   /** @type {number[]} */
   const matches = [];
   if (mask) for (let at = 0; at < count; at++) if (mask[at]) matches.push(at);

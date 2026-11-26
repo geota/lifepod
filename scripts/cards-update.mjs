@@ -12,7 +12,9 @@
 //
 // Scryfall asks every client for a User-Agent naming the app and an Accept header, and answers 403 without them. This
 // one sends `LifePod/<package.json version>` and nothing about who runs it.
-import { createReadStream, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { createInterface } from 'node:readline';
 import { constants, createGunzip, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +29,10 @@ const bulkFile = new URL('oracle-cards.jsonl.gz', cache);
 const metaFile = new URL('oracle-cards.json', cache);
 const nicknameFile = new URL('land-nicknames.json', cache);
 const tagsBulkFile = new URL('oracle-tags.jsonl.gz', cache);
+// Every English printing (Scryfall's default_cards, about 80 MB gzipped), read only for the rarities each card was
+// printed at; nothing else from it ships.
+const printingsFile = new URL('default-cards.jsonl.gz', cache);
+const printingsMetaFile = new URL('default-cards.json', cache);
 const tagsMetaFile = new URL('oracle-tags.json', cache);
 const tagsOutput = new URL('data/tags.json', root);
 const tagsShipped = new URL('web/data/tags.json.gz', root);
@@ -52,8 +58,44 @@ const facedLayouts = new Set(['transform', 'modal_dfc', 'split', 'adventure', 'f
 const pairing = /^(?:Partner|Friends forever|Choose a Background|Doctor's companion)/i;
 const colourOrder = 'WUBRG';
 const inColourOrder = colours => [...new Set(colours)].sort((a, b) => colourOrder.indexOf(a) - colourOrder.indexOf(b)).join('');
-// Rarity as one letter. The Oracle file holds one printing of each card, so this is that printing's rarity.
-const rarities = { common: 'c', uncommon: 'u', rare: 'r', mythic: 'm', special: 's', bonus: 'b' };
+// Rarity as one letter. The Oracle file holds one printing of each card, so `r` is that printing's rarity; `rp` and `ri`
+// are the rarities of all its printings (printedRarities()), in this order.
+const rarities = { common: 'c', uncommon: 'u', rare: 'r', special: 's', mythic: 'm', bonus: 'b' };
+const rarityLetters = Object.values(rarities).join('');
+// A card's Oracle id; a reversible card has it on each face instead.
+const oracleId = card => card.oracle_id ?? card.card_faces?.[0]?.oracle_id;
+
+// Printings in these sets aren't the card for rarity: art cards, gold-bordered copies, and the token sets that reprint a
+// card as its token (tmh2's Timeless Dragon is a common).
+const notPrintings = new Set(['memorabilia', 'token']);
+// in: also leaves out promo sets (a prerelease promo in a main set counts) and special products: Secret Lair,
+// Masterpieces, From the Vault.
+const notInSets = new Set(['promo', 'box', 'masterpiece', 'from_the_vault']);
+/**
+ * The rarities each card was printed at, by Oracle id, as letters in Scryfall's order (`cu`), from the default_cards
+ * bulk file. `r` is what r: matches on Scryfall: every printing, digital ones too, but those in notPrintings. `in` is
+ * what in: matches, which leaves out promos and special products as well. Checked against Scryfall's results in
+ * tests/fixtures/scryfall-results.json ("formats and rarity").
+ * @param {AsyncIterable<string> | Iterable<string>} lines
+ * @returns {Promise<Map<string, { r: string, in: string }>>}
+ */
+export async function printedRarities(lines) {
+  /** @type {Map<string, { r: Set<string>, in: Set<string> }>} */
+  const found = new Map();
+  for await (const line of lines) {
+    const text = line.trim().replace(/,$/, '');
+    if (!text.startsWith('{')) continue;
+    const card = JSON.parse(text);
+    const id = oracleId(card);
+    const letter = rarities[card.rarity];
+    if (!id || !letter || notPrintings.has(card.set_type)) continue;
+    if (!found.has(id)) found.set(id, { r: new Set(), in: new Set() });
+    found.get(id).r.add(letter);
+    if (!notInSets.has(card.set_type)) found.get(id).in.add(letter);
+  }
+  const inOrder = (/** @type {Set<string>} */ letters) => [...rarityLetters].filter(letter => letters.has(letter)).join('');
+  return new Map([...found].map(([id, sets]) => [id, { r: inOrder(sets.r), in: inOrder(sets.in) }]));
+}
 // The EDHREC rank, 1 the most played: exact up to this rank, then rounded to two significant figures. The owner chose
 // exact ranks for every card (+93 KB gzipped, and most lines change at each update as ranks drift); 1000 here would
 // round past the top thousand instead (+47 KB, and far fewer changed lines).
@@ -134,16 +176,18 @@ export function toCard(card) {
  * @param {string} updated The bulk file's `updated_at`.
  * @param {Record<string, string[]>} [nicknames] Each land nickname's card names, from Scryfall's search (`lc`).
  */
-export async function buildCards(lines, updated, nicknames = {}) {
-  return (await buildData(lines, updated, nicknames)).text;
+export async function buildCards(lines, updated, nicknames = {}, printed = new Map()) {
+  return (await buildData(lines, updated, nicknames, printed)).text;
 }
 /**
  * The data file's text, and each card's place in it by Oracle id, which the tags file points at.
  * @param {AsyncIterable<string> | Iterable<string>} lines
  * @param {string} updated
  * @param {Record<string, string[]>} [nicknames]
+ * @param {Map<string, { r: string, in: string }>} [printed] Each card's printed rarities (printedRarities()), for `rp`
+ *   and `ri`.
  */
-export async function buildData(lines, updated, nicknames = {}) {
+export async function buildData(lines, updated, nicknames = {}, printed = new Map()) {
   /** @type {Map<string, string[]>} */
   const cycles = new Map();
   for (const nickname of landNicknames) {
@@ -157,6 +201,10 @@ export async function buildData(lines, updated, nicknames = {}) {
     if (!keepCard(card)) continue;
     const record = toCard(card);
     if (cycles.has(card.name)) record.lc = cycles.get(card.name);
+    // Written only where they differ: `rp` from `r`, `ri` from `rp` (or `r`), `-` for none.
+    const letters = printed.get(oracleId(card));
+    if (letters && letters.r !== record.r) record.rp = letters.r;
+    if (letters && letters.in !== letters.r) record.ri = letters.in || '-';
     cards.push({ record, id: card.oracle_id });
   }
   const rows = cards.map(({ record, id }) => ({ card: record, id, json: JSON.stringify(record) }));
@@ -210,6 +258,15 @@ export function readBulk(path) {
   return createInterface({ input: gzipped ? stream.pipe(createGunzip()) : stream, crlfDelay: Infinity });
 }
 
+/** The cached default_cards file, or null. */
+export function cachedPrintings() {
+  try {
+    return { path: fileURLToPath(printingsFile), ...JSON.parse(readFileSync(printingsMetaFile, 'utf8')) };
+  } catch {
+    return null;
+  }
+}
+
 /** The cached bulk file's metadata, or null before the first download. */
 export function cachedBulk() {
   try {
@@ -240,16 +297,27 @@ async function fetchWithRetries(url, init, timeout) {
   }
 }
 
-// Downloads a bulk file into the cache unless the cached one is the latest. Each file is downloaded at most once a run.
-async function downloadBulk(entry, file, meta, cached) {
+// Downloads a bulk file into the cache unless the cached one is the latest, streamed to disk (default_cards is about
+// 80 MB) and kept gzipped, as Scryfall sends it. Each file is downloaded at most once a run.
+async function downloadBulk(entry, file, meta, cached, timeout = 180000) {
   const uri = entry?.jsonl_download_uri ?? entry?.download_uri;
   if (!uri) throw new Error(`Scryfall lists no ${entry?.type ?? 'bulk'} file`);
   if (cached?.updated_at === entry.updated_at) return;
   console.log(`Downloading ${uri}`);
-  const response = await fetchWithRetries(uri, { headers: { ...headers, Accept: '*/*' } }, 180000);
-  const bytes = Buffer.from(await response.arrayBuffer());
   mkdirSync(cache, { recursive: true });
-  writeFileSync(file, bytes);
+  const partial = new URL(`${file.pathname.split('/').pop()}.part`, cache);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetchWithRetries(uri, { headers: { ...headers, Accept: '*/*' } }, timeout);
+      await pipeline(Readable.fromWeb(/** @type {any} */ (response.body)), createWriteStream(partial));
+      break;
+    } catch (error) {
+      if (attempt >= retryDelays.length) throw error;
+      console.warn(`${error.message}; trying again in ${retryDelays[attempt] / 1000}s`);
+      await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+    }
+  }
+  renameSync(partial, file);
   writeFileSync(meta, `${JSON.stringify({ updated_at: entry.updated_at, uri }, null, 2)}\n`);
 }
 
@@ -257,6 +325,7 @@ async function download() {
   const response = await fetchWithRetries(`${api}/bulk-data`, { headers }, 30000);
   const list = (await response.json()).data;
   await downloadBulk(list.find(item => item.type === 'oracle_tags'), tagsBulkFile, tagsMetaFile, cachedTags());
+  await downloadBulk(list.find(item => item.type === 'default_cards'), printingsFile, printingsMetaFile, cachedPrintings(), 300000);
   const entry = list.find(item => item.type === 'oracle_cards');
   const uri = entry?.jsonl_download_uri ?? entry?.download_uri;
   if (!uri) throw new Error('Scryfall lists no oracle_cards file');
@@ -335,7 +404,10 @@ async function main() {
   if (!bulk) throw new Error('No cached bulk file yet: run `npm run cards:update` once with a network connection');
   const nicknames = offline ? cachedNicknames()?.lists ?? {} : await fetchNicknames(bulk.updated_at);
   if (offline && !cachedNicknames()) console.warn('No cached land nicknames: is:shockland and the rest will find nothing until an online update.');
-  const { text, places } = await buildData(readBulk(bulk.path), bulk.updated_at, nicknames);
+  const printings = cachedPrintings();
+  if (!printings) throw new Error('No cached default_cards file yet: run `npm run cards:update` once with a network connection');
+  const printed = await printedRarities(readBulk(printings.path));
+  const { text, places } = await buildData(readBulk(bulk.path), bulk.updated_at, nicknames, printed);
   mkdirSync(new URL('./', output), { recursive: true });
   mkdirSync(new URL('./', shipped), { recursive: true });
   writeFileSync(output, text);

@@ -246,7 +246,7 @@ Every value is derived from the fields in §5.2. The J column is the Jaccard agr
 |---|---|---|---|
 | `f`, `format` | legal or restricted in the format. Formats: `standard`, `future`, `historic`, `timeless`, `gladiator`, `pioneer`, `modern`, `legacy`, `pauper`, `vintage`, `penny`, `commander` (`edh`), `oathbreaker`, `standardbrawl`, `brawl`, `competitivebrawl`, `alchemy`, `paupercommander`, `duel`, `oldschool`, `premodern`, `predh`, `tlr`. | `lg` | `f:pauper c:g t:creature` (292 = 292) |
 | `banned`, `restricted` | banned, or restricted, in the format | `lg` | `banned:legacy` (145 = 145) |
-| `r`, `rarity` | the rarity of **the one printing the Oracle file holds**. Scryfall matches a card printed at that rarity in any printing: Lightning Bolt matches `r:common`, `r:uncommon` and `r:rare` there. Every `r:` query gets the caveat note "Rarity is from one printing of each card, so cards printed at other rarities may be missing." In the fixtures, `r>=m t:dragon` found 107 of Scryfall's 118 dragons (Atarka, Kokusho and others were mythic in another printing). | `r` | `r>=r` |
+| `r`, `rarity` | as built, every rarity the card was printed at (As built, 3): some printing must meet the term, as on Scryfall, so Lightning Bolt matches `r:common`, `r:uncommon` and `r:rare`. This first read only the one printing the Oracle file holds, with a caveat note (`r>=m t:dragon` found 107 of Scryfall's 118 dragons). `in:common` and the other rarities: printed at that rarity at least once. | `rp`, `ri` | `r>=r`, `in:rare` |
 | `edhrec`, `edhrecrank` | the EDHREC rank, 1 = most popular; cards without a rank never match | `er` | `edhrec<=100` (95 = 95) |
 
 ### 3.7 Land nicknames
@@ -665,7 +665,7 @@ A fixture older than the data gets a warning, not a failure, so the test passes 
 |---|---|---|
 | `is:funny t:creature c:r` | 0.79 | approximate |
 | `is:frenchvanilla` | 0.81 | approximate |
-| `r>=m t:dragon` | 0.86 | the rarity caveat |
+| `r>=m t:dragon` | 0.86 (0.975 with every printing's rarity) | the rarity caveat, until rarity came from every printing (As built, 3) |
 | `is:companion` | 0.91 | one extra |
 | `is:partner` | 0.92 | |
 | `pt>=15` | 0.94 | DFC back faces |
@@ -723,7 +723,10 @@ The owner's answers to §11, applied on `card-lookup`:
 
 1. **EDHREC rank:** exact for every card, +93 KB gzipped (`exactRanks` in `cards-update.mjs` is `Infinity`; 1000 would round past the top thousand).
 2. **Oracle tags:** yes, as the separate lazily loaded `web/data/tags.json.gz` (M5), refreshed with the cards at release time and in the weekly pull request.
-3. **Rarity from every printing:** no, for now. One printing, with the caveat note.
+3. **Rarity from every printing:** first no, then yes (a later decision). `npm run cards:update` also downloads Scryfall's `default_cards` file (about 80 MB, cached for `--offline`, never shipped) and writes each card's printed rarities: `rp`, the rarities `r:` reads, where they aren't just `r`; `ri`, the ones `in:` reads, where they differ from `rp`. That adds 14 KB gzipped. The rules, checked against Scryfall's results:
+   - `r:` matches each printing, digital ones too (Feral Thallid is common on MTGO's Masters Edition II), except the art, gold-bordered and token sets (tmh2's Timeless Dragon is a common). Scryfall then lists each card that has a printing that matched. So `r:common r:rare` finds nothing, and `-r:common` finds every card with a printing that isn't common. The AND's rarity terms run as one (`joinRarities()` in `cardterms.js`).
+   - `in:rare` (and the other rarities) is about the card: printed at that rarity at least once, leaving out promo sets and the special products Secret Lair, Masterpieces and From the Vault. A prerelease promo in a main set still counts. `in:` with a set code is still a cut keyword.
+   - No caveat note any more. The cards Scryfall's search leaves out entirely, such as Heroes of the Realm (M'Odo), are the only difference left in the fixtures.
 4. **`or`:** always the operator, as on Scryfall, with the exact-name boost (§2.6).
 5. **Rules text and syntax:** the toggle affects only plain searches (§6.4).
 6. **Land nicknames:** from Scryfall's search at update time, 600 ms apart, cached for `--offline`.

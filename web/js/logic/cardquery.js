@@ -72,6 +72,8 @@ export const cutGroups = {
 };
 /** @type {Record<string, string>} */
 const cutGroupOf = Object.fromEntries(Object.entries(cutGroups).flatMap(([group, { keys }]) => keys.map(key => [key, group])));
+// Rarities, which `in:` takes as well as set codes and languages (in:rare: printed at rare at least once).
+const inRarities = new Set(['common', 'uncommon', 'rare', 'special', 'mythic', 'bonus']);
 // Language codes, which `in:` takes as well as set codes.
 const languages = new Set(['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'ru', 'zhs', 'zht', 'he', 'la', 'grc', 'ar', 'sa', 'ph', 'qya']);
 // is: values that belong to a printing, not a card: the printing hint, not "isn't a search keyword".
@@ -175,6 +177,9 @@ export function parseQuery(input) {
       const source = text.slice(at, end);
       let group = cutGroupOf[keyword];
       if (keyword === 'in' && languages.has(value.toLowerCase())) group = 'language';
+      // in:rare is printed at rare in some set, which the offline data knows; in:<set> is a set, which it doesn't.
+      const rarityIn = keyword === 'in' && !isQuoted && inRarities.has(value.toLowerCase());
+      if (rarityIn) group = '';
       if (group) {
         note('cut', at, end, source, group);
         return null;
@@ -196,6 +201,13 @@ export function parseQuery(input) {
         return null;
       }
       if (key === 'not') return { k: 'not', item: { k: 'term', key: 'is', keyword: 'is', op: ':', value, quoted: isQuoted, regex: false, at, end } };
+      if (rarityIn) {
+        if (op !== ':' && op !== '=') {
+          note('error', at, end, `in: only takes :, so ${source} is left out.`);
+          return null;
+        }
+        return { k: 'term', key: 'in', keyword, op: ':', value, quoted: false, regex: false, at, end };
+      }
       return { k: 'term', key, keyword, op: op === '=' && wordKeys.has(key) ? ':' : op, value, quoted: isQuoted, regex: isPattern, at, end };
     }
     const value = word();

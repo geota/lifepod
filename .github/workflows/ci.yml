@@ -25,7 +25,8 @@ jobs:
     name: Card data for a release
     if: github.event_name == 'push' && github.ref_type == 'tag'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # The update downloads about 110 MB from Scryfall (scripts/cards-release.mjs gives it 12 minutes) and then tests it.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:

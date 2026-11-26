@@ -65,7 +65,24 @@ f:pauper c:g t:creature mv=3
 banned:legacy
 restricted:vintage
 banned:commander
-r>=m t:dragon # tolerance 0.85: rarity is from one printing of each card
+r>=m t:dragon
+r:common t:dragon
+r:uncommon t:angel
+r:mythic t:elf # tolerance 0.95: Scryfall's search leaves out Heroes of the Realm cards (M'Odo)
+r:c mv>=6 t:creature c:g
+r<=u t:sphinx
+r>=r t:wall
+r:special t:creature
+r:bonus
+-r:common t:dragon
+r:common r:rare t:dragon
+in:rare t:goblin
+r:rare t:goblin
+r:mythic t:goblin
+in:mythic t:goblin
+in:uncommon t:sliver
+in:common t:legendary t:creature
+in:mythic -r:mythic t:planeswalker
 
 ## combining
 t:fish or t:bird

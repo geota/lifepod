@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from './helpers.mjs';
 import { gunzipSync } from 'node:zlib';
-import { buildCards, cachedBulk, cachedNicknames, packCards, readBulk, shownDate } from '../scripts/cards-update.mjs';
+import { buildCards, cachedBulk, cachedNicknames, cachedPrintings, packCards, printedRarities, readBulk, shownDate } from '../scripts/cards-update.mjs';
 import {
   colourMask, costText, faceStats, fold, indexCards, rankResults, readSymbol, searchCards, searchNames, searchText, splitSymbols,
 } from '../web/js/logic/cards.js';
@@ -17,7 +17,7 @@ const index = indexCards(data.cards);
 const names = (query, options) => searchCards(index, query, options).results.map(at => data.cards[at].n);
 
 const faceKeys = new Set(['n', 'm', 't', 'o', 'p', 'l', 'd']);
-const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun', 'lc']);
+const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'rp', 'ri', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun', 'lc']);
 const inColourOrder = /^W?U?B?R?G?$/;
 
 test('node: the card data file has one card per line, in order, with only the fields the lookup reads', () => {
@@ -57,7 +57,7 @@ test('node: the card data file has one card per line, in order, with only the fi
   }
   // A few cards the lookup must have, as Scryfall prints them.
   const card = name => data.cards.find(entry => entry.n === name);
-  assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u', er: 1, lg: 'H+jlMSvW', pm: 'C' });
+  assert.deepEqual(card('Sol Ring'), { n: 'Sol Ring', m: '{1}', t: 'Artifact', o: '{T}: Add {C}{C}.', k: 'sol ring', v: 1, r: 'u', rp: 'ursm', ri: 'urm', er: 1, lg: 'H+jlMSvW', pm: 'C' });
   assert.equal(card('Treasure').t, 'Token Artifact — Treasure', 'the predefined tokens are kept');
   assert.equal(card('Soldier'), undefined, 'other tokens are not');
   // Paper cards whose Oracle printing is an MTGO one are kept, because paper formats list them; the cards Scryfall hides
@@ -138,7 +138,31 @@ test('node: the committed data file is what the cached bulk file builds', async 
     t.skip(`the cache is from ${cached.updated_at}, the data from ${data.about.updated}`);
     return;
   }
-  assert.equal(await buildCards(readBulk(cached.path), cached.updated_at, cachedNicknames()?.lists ?? {}), dataText);
+  const printings = cachedPrintings();
+  if (!printings || !existsSync(printings.path)) {
+    t.skip('no cached default_cards file: run npm run cards:update once');
+    return;
+  }
+  const printed = await printedRarities(readBulk(printings.path));
+  assert.equal(await buildCards(readBulk(cached.path), cached.updated_at, cachedNicknames()?.lists ?? {}, printed), dataText);
+});
+
+// r: and in: read every printing's rarity (§3.6), from Scryfall's default_cards, written only where it adds something.
+test('node: printed rarities come from every printing but art, token and gold-bordered sets, and in: leaves out promos', async () => {
+  const printing = (rarity, set_type, more = {}) => JSON.stringify({ oracle_id: 'bolt', name: 'Lightning Bolt', rarity, set_type, games: ['paper'], ...more });
+  const printed = await printedRarities([
+    printing('common', 'core'), printing('uncommon', 'masters', { games: ['mtgo'] }), printing('rare', 'promo'),
+    printing('mythic', 'box'), printing('special', 'memorabilia'), printing('bonus', 'token'),
+    JSON.stringify({ name: 'Two Faces', rarity: 'rare', set_type: 'expansion', card_faces: [{ oracle_id: 'faces' }, { oracle_id: 'faces' }] }),
+  ]);
+  assert.deepEqual(printed.get('bolt'), { r: 'curm', in: 'cu' }, 'digital printings count; promos and Secret Lair only for r:');
+  assert.deepEqual(printed.get('faces'), { r: 'r', in: 'r' }, 'a reversible card\'s Oracle id is on its faces');
+  const line = (await buildCards([JSON.stringify({ ...bulk[0], oracle_id: 'bolt' })], '2026-11-23T22:02:34.594+00:00', {}, printed)).split('\n')[2];
+  const card = JSON.parse(line.replace(/,$/, ''));
+  assert.equal(card.rp, 'curm');
+  assert.equal(card.ri, 'cu');
+  const same = await buildCards([JSON.stringify({ ...bulk[0], oracle_id: 'bolt' })], '2026-11-23T22:02:34.594+00:00', {}, new Map([['bolt', { r: bulk[0].rarity[0], in: bulk[0].rarity[0] }]]));
+  assert.ok(!same.includes('"rp"') && !same.includes('"ri"'), 'nothing written when every printing has the one rarity');
 });
 
 test('node: search ranks the whole name, then a word prefix, a prefix, word starts and contains', () => {
@@ -237,6 +261,8 @@ test('node: a release refreshes the card data only when the new data looks right
   without.about = { ...data.about, count: without.cards.length };
   assert.deepEqual(checkRelease(JSON.stringify(without), dataText), ['Sol Ring is missing']);
   assert.match(checkRelease('<html>503</html>', dataText).join(), /isn't JSON/);
+  const unprinted = { ...data, cards: data.cards.map(({ rp, ri, ...card }) => card) };
+  assert.deepEqual(checkRelease(JSON.stringify(unprinted), dataText), ['the printed rarities are missing (Lightning Bolt)']);
   for (const name of knownCards) assert.ok(data.cards.some(card => card.n === name), `${name} is in the committed data`);
 });
 

@@ -20,6 +20,9 @@
  * - `c`: the colour identity in W U B R G order; none is colourless. `co`: the card's colours, only where they differ
  *   from its identity (`-` for colourless).
  * - `v`: the mana value; none is 0. `r`: the rarity of the printing Scryfall's Oracle file holds (c, u, r, m, s or b).
+ *   `rp`: every rarity it was printed at, in that order, where that isn't just `r` (`cu` for a card printed at common
+ *   and uncommon), which r: reads; `ri`: the same without promos and special products, where it differs (`-` for
+ *   none), which in: reads. order:rarity reads `r`.
  * - `kw`: Scryfall's keywords, sorted; `pair` marks a pairing keyword (Partner, Friends forever, Choose a Background,
  *   Doctor's companion).
  * - `lead` marks a card that can be a commander.
@@ -36,6 +39,8 @@
  *   co?: string,
  *   v?: number,
  *   r?: string,
+ *   rp?: string,
+ *   ri?: string,
  *   f?: CardFace[],
  *   lead?: number,
  *   kw?: string[],

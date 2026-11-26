@@ -27,7 +27,7 @@ test('node: card lookup agrees with Scryfall on every saved query it answers', (
     // A sorted query also lists its first cards in Scryfall's order, its default direction included.
     if (order !== null && order < 0.85) low.push(`${family}: ${query} has ${Math.round(order * 100)}% of its first 20 in Scryfall's order`);
   }
-  assert.ok(scores.length >= 92, `${scores.length} queries compared`);
+  assert.ok(scores.length >= 109, `${scores.length} queries compared`);
   assert.deepEqual(low, []);
   const mean = scores.reduce((sum, score) => sum + score, 0) / scores.length;
   assert.ok(mean >= meanTolerance, `mean ${mean.toFixed(3)}`);

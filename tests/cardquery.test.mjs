@@ -66,6 +66,8 @@ test('node: malformed queries are mended or dropped, with a note, never a throw'
   assert.deepEqual(noteTexts('t>elf'), ['error: t: only takes :, so t>elf is left out.']);
   assert.deepEqual(parseQuery('e:war t:elf').notes.map(note => [note.kind, note.text, note.group]), [['cut', 'e:war', 'printing']]);
   assert.deepEqual(parseQuery('in:ja').notes.map(note => note.group), ['language']);
+  assert.deepEqual(parseQuery('in:lea').notes.map(note => note.group), ['printing']);
+  assert.deepEqual(parseQuery('in:Rare').ast, { k: 'term', key: 'in', keyword: 'in', op: ':', value: 'Rare', quoted: false, regex: false, at: 0, end: 7 });
   assert.deepEqual(parseQuery('usd>1 a:avon cube:vintage unique:prints include:extras otag:ramp').notes.map(note => note.group), // otag: is a term, not a cut
     ['prices', 'art', 'cube', 'display', 'extras']);
 });

@@ -61,8 +61,27 @@ test('node: notes say what was left out, and a query of only cut keywords lists 
   assert.deepEqual(run('mv>=x t:elf').notes.map(note => note.text), ['Mana value needs a number, even or odd.']);
   assert.match(run('is:banana t:elf').notes[0].text, /is:banana isn’t a search keyword/);
   assert.equal(run('is:foil t:elf').notes[0].kind, 'cut', 'a printing value is a cut keyword');
-  assert.match(run('r:mythic t:dragon').notes[0].text, /^Rarity is from one printing/);
+  assert.deepEqual(run('r:mythic t:dragon').notes, [], 'rarity is from every printing, with no caveat');
   assert.match(run('foo:bar t:elf').notes.at(-1)?.text ?? '', /No card names contain foo:bar, and foo: isn’t a search keyword/);
+});
+
+// Scryfall matches r: against each printing and in: against the card (§3.6): every rarity a card was printed at counts.
+test('node: r: and in: read every printing, and r: terms that share a printing stay together', () => {
+  assert.ok(has('r:common t:instant c:r mv=1', 'Lightning Bolt') && has('r:uncommon t:instant c:r mv=1', 'Lightning Bolt')
+    && has('r:rare t:instant c:r mv=1', 'Lightning Bolt'), 'Lightning Bolt was printed at common, uncommon and rare');
+  assert.ok(has('r>=r t:dragon', 'Shivan Dragon') && has('r:uncommon t:dragon', 'Shivan Dragon'), 'r>= any printing at or above');
+  assert.ok(has('-r:common t:instant c:r mv=1', 'Lightning Bolt'), '-r:common: some printing that isn\'t common');
+  assert.ok(!has('-r:common t:instant c:r mv=1', 'Burst Lightning') || has('r:uncommon t:instant c:r mv=1', 'Burst Lightning'));
+  assert.equal(names('r:common r:rare t:dragon').length, 0, 'no one printing is common and rare (Scryfall finds none)');
+  assert.ok(names('r>=u r<=r t:dragon').length > 0, 'a range on one printing');
+  assert.ok(set('r:common r:rare t:dragon').size === 0 && set('(r:common or r:rare) t:dragon').size > 0, 'OR keeps them apart');
+  assert.ok(has('in:rare t:instant c:r mv=1', 'Lightning Bolt'), 'in:rare: printed at rare at least once');
+  assert.ok(!has('in:mythic t:goblin', 'Goblin Lackey') && has('r:mythic t:goblin', 'Goblin Lackey'),
+    'in: leaves out From the Vault and Secret Lair; r: counts them');
+  assert.ok(has('in:mythic -r:mythic t:planeswalker', 'Freyalise, Llanowar\'s Fury'), 'in: and -r: together');
+  assert.deepEqual(run('in:rare t:elf').notes, [], 'in: with a rarity is a term');
+  assert.equal(run('in:lea t:elf').notes[0].kind, 'cut', 'in: with a set is still a cut keyword');
+  assert.deepEqual(run('in>rare t:elf').notes.map(note => note.text), ['in: only takes :, so in>rare is left out.']);
 });
 
 test('node: a card whose name is the whole query comes first, though "or" is the operator', () => {
@@ -73,7 +92,7 @@ test('node: a card whose name is the whole query comes first, though "or" is the
 });
 
 // A pool of terms the properties combine.
-const terms = ['c:r', 'c:g', 'id<=wu', 't:creature', 't:instant', 'mv<=2', 'mv>=4', 'pow>=3', 'f:modern', 'kw:flying', 'o:draw', 'is:split', 'r:common', 'm:{G}', 'goblin'];
+const terms = ['c:r', 'c:g', 'id<=wu', 't:creature', 't:instant', 'mv<=2', 'mv>=4', 'pow>=3', 'f:modern', 'kw:flying', 'o:draw', 'is:split', 'in:common', 'm:{G}', 'goblin'];
 const term = fc.constantFrom(...terms);
 test('node: x and -x split the cards; or is the union, and the intersection; De Morgan holds', () => {
   const all = index.cards.length;

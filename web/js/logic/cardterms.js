@@ -116,6 +116,77 @@ export function writeLegalities(legalities) {
 // Rarity, in Scryfall's order: common < uncommon < rare < special < mythic < bonus.
 /** @type {Record<string, number>} */
 export const rarityOrder = { c: 0, common: 0, u: 1, uncommon: 1, r: 2, rare: 2, s: 3, special: 3, m: 4, mythic: 4, b: 5, bonus: 5 };
+const rarityLetters = 'cursmb';
+// What in: takes as a rarity (in:rare); anything else after in: is a set or a language.
+export const rarityWords = new Set(['common', 'uncommon', 'rare', 'special', 'mythic', 'bonus']);
+/**
+ * Every rarity a card has been printed at, as letters (scripts/cards-update.mjs printedRarities()): for r:, or for in:,
+ * which leaves out promos and special products.
+ * @param {import('./cards.js').Card} card
+ * @param {boolean} [forIn]
+ */
+export function printedRarities(card, forIn = false) {
+  const all = card.rp ?? card.r ?? '';
+  return forIn && card.ri !== undefined ? card.ri.replace('-', '') : all;
+}
+
+/** @typedef {import('./cardquery.js').QueryNode} QueryNode */
+/**
+ * Scryfall matches r: against each printing, then lists each card that has a printing that matched, so
+ * `r:common r:rare` finds nothing and `-r:common` finds every card with a printing that isn't common. Each card here
+ * keeps the set of rarities it was printed at, so the rarity terms that share a printing are joined into one before
+ * the query runs: an AND's r: terms (and -r: terms) become one term that some printed rarity must meet in full, and a
+ * lone -r: term becomes "some printed rarity isn't". The joined term is an `r` term whose value lists its parts and
+ * ends in a space, such as `>=r !:m `, which readRarityParts() reads. A term that isn't a rarity stays as it was, for
+ * its own error. in: is about the card, not a printing, so it isn't joined.
+ * @param {QueryNode | null} node
+ * @returns {QueryNode | null}
+ */
+export function joinRarities(node) {
+  if (!node) return node;
+  /** @param {QueryNode} item @returns {{ part: string, at: number, end: number } | null} */
+  const partOf = (item) => {
+    const negated = item.k === 'not';
+    const term = item.k === 'not' ? item.item : item;
+    if (term.k !== 'term' || term.key !== 'r' || term.regex) return null;
+    const want = rarityOrder[term.value.toLowerCase()];
+    if (want === undefined) return null;
+    return { part: `${negated ? '!' : ''}${term.op === '=' ? ':' : term.op}${rarityLetters[want]}`, at: term.at, end: term.end };
+  };
+  /** @param {{ part: string, at: number, end: number }[]} parts @returns {QueryNode} */
+  const joined = parts => ({ k: 'term', key: 'r', keyword: 'r', op: ':', value: `${parts.map(part => part.part).join(' ')} `,
+    at: Math.min(...parts.map(part => part.at)), end: Math.max(...parts.map(part => part.end)) });
+  if (node.k === 'not') {
+    const part = partOf(node);
+    return part ? joined([part]) : { k: 'not', item: /** @type {QueryNode} */ (joinRarities(node.item)) };
+  }
+  if (node.k === 'or') return { k: 'or', items: node.items.map(item => /** @type {QueryNode} */ (joinRarities(item))) };
+  if (node.k !== 'and') return node;
+  const parts = [];
+  /** @type {QueryNode[]} */
+  const rest = [];
+  for (const item of node.items) {
+    const part = partOf(item);
+    if (part) parts.push(part);
+    else rest.push(/** @type {QueryNode} */ (joinRarities(item)));
+  }
+  return parts.length ? { k: 'and', items: [joined(parts), ...rest] } : node;
+}
+/**
+ * The parts of a joined rarity term (joinRarities()), or null for a plain r: value.
+ * @param {string} value
+ * @returns {{ negated: boolean, op: string, want: number }[] | null}
+ */
+export function readRarityParts(value) {
+  if (!value.endsWith(' ')) return null;
+  return value.trim().split(' ').map((part) => {
+    const negated = part.startsWith('!');
+    const body = negated ? part.slice(1) : part;
+    return { negated, op: body.slice(0, -1), want: rarityOrder[body.slice(-1)] };
+  });
+}
+/** @param {number} order */
+export const rarityLetter = order => rarityLetters[order];
 
 // ---- Mana costs -----------------------------------------------------------------------------------------------------------
 

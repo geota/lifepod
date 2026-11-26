@@ -1,6 +1,7 @@
 // Refreshes card lookup's data for a release build (.github/workflows/ci.yml, the card-data job on a version tag), and
-// never fails the build over it: `npm run cards:update` downloads Scryfall's latest Oracle cards file, the result is
-// checked, and if the download or a check fails, the committed data stays, with a warning in the job summary.
+// never fails the build over it: `npm run cards:update` downloads Scryfall's latest Oracle cards, Oracle tags and default
+// cards files (the last only for every printing's rarity), the result is checked, and if a download or a check fails,
+// the committed data stays, with a warning in the job summary.
 //
 //   node scripts/cards-release.mjs [--offline]
 //
@@ -42,6 +43,9 @@ export function checkRelease(text, committed) {
   if (Math.abs(count - before) > before * countTolerance) problems.push(`${count} cards, more than ${countTolerance * 100}% from the committed ${before}`);
   const names = new Set((fresh.cards ?? []).map(card => card.n));
   for (const name of knownCards) if (!names.has(name)) problems.push(`${name} is missing`);
+  // Every printing's rarity, from default_cards: Lightning Bolt was printed at common, uncommon and rare.
+  const bolt = (fresh.cards ?? []).find(card => card.n === 'Lightning Bolt');
+  if (bolt && !['c', 'u', 'r'].every(letter => (bolt.rp ?? bolt.r ?? '').includes(letter))) problems.push('the printed rarities are missing (Lightning Bolt)');
   if (Number.isNaN(Date.parse(fresh.about?.updated))) problems.push(`the date "${fresh.about?.updated}" isn't a date`);
   return problems;
 }
@@ -54,7 +58,8 @@ function main() {
   /** @type {string[]} */
   let problems = [];
   try {
-    execFileSync(node, ['scripts/cards-update.mjs', ...process.argv.slice(2)], { cwd: root, stdio: 'inherit', timeout: 10 * 60 * 1000 });
+    // Three downloads: oracle_cards (about 26 MB), oracle_tags (6 MB) and default_cards (80 MB), each tried up to three times.
+    execFileSync(node, ['scripts/cards-update.mjs', ...process.argv.slice(2)], { cwd: root, stdio: 'inherit', timeout: 12 * 60 * 1000 });
     problems = checkRelease(read('data/cards.json').toString('utf8'), committed);
     if (!problems.length) {
       execFileSync(node, ['--test', 'tests/cards-data.test.mjs'], { cwd: root, stdio: 'inherit', env: { ...process.env, LIFEPOD_TESTS: 'node' }, timeout: 5 * 60 * 1000 });
