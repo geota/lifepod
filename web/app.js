@@ -6,10 +6,10 @@
 import { renderBoard } from './js/actions/board.js';
 import { commit } from './js/actions/commit.js';
 import {
-  chooseColour, stepCount, stepDamage, stepMana, toggleDesignation, toggleIdentity,
+  chooseColour, stepCount, stepDamage, stepMana, stepTreasure, toggleDesignation, toggleIdentity, toggleKeep,
 } from './js/actions/edits.js';
 import { dismissUndoToast, redo, takeBackTo, undo } from './js/actions/history.js';
-import { clearPool, spendMana } from './js/actions/mana.js';
+import { clearPool, spendMana, useTreasure } from './js/actions/mana.js';
 import {
   cancelEditing, chooseFirst, discardEdits, leaveBoardMode, maybeAskFirst, openTrack, setBoardMode, shuffleFirst, skipFirst,
   switchTrackTab,
@@ -171,10 +171,10 @@ document.fonts?.addEventListener?.('loading', () => document.fonts.ready.then(()
 
 // Boot. The renderers' buttons call these actions, which sit above them, so they're passed in before the first draw.
 onPillFormChange(syncPill);
-setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, dismissReminder, setBoardMode, redo, dismissUndoToast });
+setBadgeActions({ stepTurn, stepBack, startTurn, spendMana, clearPool, useTreasure, dismissReminder, setBoardMode, redo, dismissUndoToast });
 // A total's running delta follows its burst of quick taps (MANA-UNDO-SPEC §6.2b).
 onBurstChange(renderLifeDelta);
-setModeActions({ stepDamage, chooseColour, toggleIdentity, stepCount, toggleDesignation, stepMana, chooseFirst });
+setModeActions({ stepDamage, chooseColour, toggleIdentity, stepCount, toggleDesignation, stepMana, stepTreasure, toggleKeep, chooseFirst });
 applyTileColours();
 applyBadgeSize();
 applyStyle();

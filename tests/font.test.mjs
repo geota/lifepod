@@ -26,6 +26,8 @@ test('node: the Mana subset has a drawn glyph for every symbol the stylesheets a
   // text as printed on cards since Eighth Edition, the curved arrow U+E61A (css/cards.css), so the subset has both.
   assert.ok(used.includes(0xe61c) && font.hasGlyphForCodePoint(0xe61c), 'the subset has the classic tap symbol, U+E61C');
   assert.ok(used.includes(0xe61a) && font.hasGlyphForCodePoint(0xe61a), 'and card text\'s tap arrow, U+E61A');
+  // Treasure's icon is the gold counter, ms-counter-gold (MANA-SPEC-v2 §1.3).
+  assert.ok(used.includes(0xe934) && font.hasGlyphForCodePoint(0xe934), 'the subset has Treasure\'s gold counter, U+E934');
   // U+FFFF ends every format 4 cmap, so it isn't a symbol.
   const extra = font.characterSet.filter(codePoint => codePoint !== 0xffff && !used.includes(codePoint)).map(hex);
   assert.deepEqual(extra, [], `web/fonts/mana.woff2 has only the symbols the page uses; ${rerun}`);

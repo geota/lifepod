@@ -238,7 +238,7 @@ function resetList() {
     `Life totals, back to ${game.startingLife}`,
     counts ? (counters.commander ? 'Counters and commander tax' : 'Counters') : counters.commander && 'Commander tax',
     counters.commander && 'Commander damage',
-    game.manaPool && 'Floating mana',
+    game.manaPool && 'Floating mana and Treasure',
     game.turns !== 'off' && 'Turns, back to round 1',
     designations.length > 0 && `The ${designations.join(' and the ')}`,
     'Colour identities',

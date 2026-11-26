@@ -26,7 +26,7 @@
 - Rotate any seat to fit your table.
 - Roll a d4, d6, d8, d10, d12 or d20 from the device's secure random number generator.
 - Look up any card offline: every paper Magic card's rules text, with mana symbols, both faces of double-faced cards, the colour identity and the official rulings. Search names as you type, or rules text too.
-- **New game**, in the Settings header, resets life, counters, commander damage, mana, turns, the monarch and the initiative, and identities. Settings and seats stay.
+- **New game**, in the Settings header, resets life, counters, commander damage, mana and Treasure, turns, the monarch and the initiative, and identities. Settings and seats stay.
 - Keeps the screen awake and saves the game between launches.
 
 <p align="center">
@@ -58,7 +58,8 @@
 
 ### Mana and identity
 
-- A floating mana pool per player, spent from a strip on the tile. On small tiles it folds into one chip that opens the pool. It can empty as each turn passes.
+- A floating mana pool per player, spent from a badge-height strip on the tile. On small tiles it folds into one chip that opens the pool. It can empty as each turn passes, unless that player keeps it.
+- Treasure tokens per player, which last until used: a chip on the tile uses one a tap.
 - Colour identity for each player, shown as the card indicator, the guild, clan or shard symbol, and its name.
 
 <p align="center">

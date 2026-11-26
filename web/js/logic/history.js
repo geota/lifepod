@@ -211,14 +211,19 @@ export function stepCells(d) {
   return cells;
 }
 
+// What mana mode and Track's mana tab change: the pools, Treasure and each player's Keep (MANA-SPEC-v2 §5.3).
+const manaFields = ['pools', 'treasure', 'keepMana'];
+
 // The Track tab a step taken in an editing mode belongs to (PILL-SPEC.md §3.2): commander damage (which changes life,
-// and can pass the monarch or the initiative), mana pools, or counters (the counts and the designations).
+// and can pass the monarch or the initiative), mana (the pools, Treasure and Keep), or counters (the counts and the
+// designations).
 /**
  * @param {Step} step
  * @returns {import('./data.js').TrackTab}
  */
 export function stepTab(step) {
-  return 'commanderDamage' in step.d ? 'damage' : 'pools' in step.d ? 'mana' : 'counters';
+  if ('commanderDamage' in step.d) return 'damage';
+  return manaFields.some(field => field in step.d) ? 'mana' : 'counters';
 }
 
 // Whether two steps touch any cell in common.
@@ -323,6 +328,8 @@ export function describeStep(step, game) {
       }
     }
   }
+  perCell('treasure', (index, b, a) => say(index, `Treasure ${b} → ${a}`));
+  perCell('keepMana', (index, _b, a) => say(index, `Keep mana ${a ? 'on' : 'off'}`));
   perCell('identities', (index, b, a) => say(index, `identity ${b || 'none'} → ${a || 'none'}`));
   for (const kind of /** @type {const} */ (['monarch', 'initiative'])) {
     const pair = d[kind];
@@ -369,6 +376,8 @@ const cellChecks = {
   identities: value => typeof value === 'string' && /^W?U?B?R?G?$/.test(value),
   commanderDamage: (value, _n, i, j) => Number.isInteger(value) && value >= 0 && value <= maxCount && (i !== j || value === 0),
   pools: value => Number.isInteger(value) && value >= 0 && value <= maxCount,
+  treasure: value => Number.isInteger(value) && value >= 0 && value <= maxCount,
+  keepMana: value => typeof value === 'boolean',
   // As fitTurn in save.js keeps it: exactly first, active and round.
   turn: (value, n) => !!value && typeof value === 'object' && !Array.isArray(value)
     && Object.keys(value).sort().join() === 'active,first,round' && seatOrNobody(value.first, n) && seatOrNobody(value.active, n)

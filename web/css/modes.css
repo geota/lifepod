@@ -239,8 +239,8 @@
   line-height: 1.35;
   pointer-events: none;
 }
-/* Mana mode: six circles, W U B R G over colourless, each the colour's mana symbol in cost style over its amount.
-   An empty colour's symbol is muted. */
+/* Mana mode: six circles, W U B over R G C, each the colour's mana symbol in cost style over its amount, then
+   Treasure and Keep (below). An empty colour's symbol is muted. */
 .mana-cell .pip { --pip-size: calc(var(--cell) * .44); }
 /* The monarch's and the initiative's cells: the crown or the castle alone, larger with no count under it, in the seat
    colour like every counter, so a cell nobody holds reads as one to tap rather than a disabled one (DESIGN-AUDIT S8).
@@ -262,6 +262,61 @@
   width: calc(var(--wide-columns, 4) * var(--cell) + (var(--wide-columns, 4) - 1) * var(--wide-gap, var(--cell-gap)));
 }
 .mana-cell[data-zero] .pip { filter: saturate(.3) brightness(.85); opacity: .5; }
+/* Mana mode's grid (MANA-SPEC-v2 §2): the colours keep their block, W U B over R G C, and a fourth column holds what
+   stays, Treasure over Keep. It's the seven-cell grid above, four to a row with gaps that close up to 2px before a cell
+   goes under 44px. A face too narrow for four takes three, with Treasure and Keep as a third row. app.js sets each face's
+   data-mana-columns and --mana-gap, and data-mana-rule where the gap leaves room for a 1px rule between the colours,
+   which empty, and what stays. */
+.counter-cells.mana-cells {
+  --cell: clamp(var(--tap-min), min((var(--ui, 400px) - 42px) / 4, (var(--ub, 400px) - 10px - var(--setup-button)) / 2), 92 * var(--grow));
+  display: grid;
+  grid-template-columns: repeat(4, var(--cell));
+  grid-auto-rows: var(--cell);
+  gap: 4px var(--mana-gap, 10px);
+  width: auto;
+}
+.player[data-mana-columns="3"] .mana-cells { grid-template-columns: repeat(3, var(--cell)); }
+.mana-cells > [data-colour="W"] { grid-area: 1 / 1; }
+.mana-cells > [data-colour="U"] { grid-area: 1 / 2; }
+.mana-cells > [data-colour="B"] { grid-area: 1 / 3; }
+.mana-cells > [data-colour="R"] { grid-area: 2 / 1; }
+.mana-cells > [data-colour="G"] { grid-area: 2 / 2; }
+.mana-cells > [data-colour="C"] { grid-area: 2 / 3; }
+.mana-cells > .treasure-cell { grid-area: 1 / 4; }
+.mana-cells > .keep-cell { grid-area: 2 / 4; }
+.player[data-mana-columns="3"] .mana-cells > .treasure-cell { grid-area: 3 / 1; }
+.player[data-mana-columns="3"] .mana-cells > .treasure-cell:not(:has(~ .keep-cell)) { grid-area: 3 / 2; }
+.player[data-mana-columns="3"] .mana-cells > .keep-cell { grid-area: 3 / 3; }
+.player[data-mana-rule] .mana-cells::before {
+  grid-area: 1 / 4 / 3 / 5;
+  justify-self: start;
+  align-self: center;
+  width: 1px;
+  height: calc(var(--cell) * 1.3);
+  margin-inline-start: calc(var(--mana-gap, 10px) / -2 - .5px);
+  background: color-mix(in oklab, var(--text) 22%, transparent);
+  content: '';
+  pointer-events: none;
+}
+/* Treasure: the gold counter in the text colour, white in both styles, over its count. */
+.treasure-cell .mana-icon { color: var(--text); }
+.treasure-cell[data-zero] .mana-icon { opacity: .6; }
+/* Keep: a toggle in the designation cells' language, but lighter when off, an outline round the lock and "Keep", the
+   lightest thing in the grid. On, the seat colour fills it and it gets the identity toggles' check. */
+.keep-cell.counter-cell {
+  position: relative;
+  gap: 2px;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--text-soft) 55%, transparent);
+  color: var(--text-soft);
+}
+.keep-cell > .icon { width: 1em; height: 1em; color: inherit; font-size: 1.1em; }
+.keep-cell .keep-word { font-size: .62em; font-weight: var(--weight-heavy); letter-spacing: .02em; }
+.keep-cell[aria-pressed="true"] { background: var(--seat); box-shadow: none; color: var(--button); }
+.keep-cell .toggle-check { --toggle: var(--cell); top: 0; right: 0; }
+.keep-cell[aria-pressed="true"] .toggle-check { display: grid; }
+.keep-cell .toggle-check .icon { color: var(--button); }
+.keep-cell.counter-cell:is(:active, [data-pressed]) { background-image: linear-gradient(var(--state-pressed), var(--state-pressed)); }
 
 /* "Who goes first?": Me first on every tile, facing its player. The shuffle lights tiles in turn; the chosen tile
    shows "Goes first" in its seat colour while the others dim. */

@@ -23,7 +23,7 @@ import { clearReminders } from './reminders.js';
 /** @typedef {import('../logic/history.js').Step} Step */
 /** @typedef {import('../logic/history.js').Changes} Changes */
 
-const perPlayer = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools'];
+const perPlayer = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools', 'treasure', 'keepMana'];
 
 // What redrawing steps takes, from the fields they changed: per-player fields redraw that seat's total and rows, the
 // turn and whole values every row, the pools and the turn the pill, tile colours the paint, rotations the seats, and a

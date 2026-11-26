@@ -3,9 +3,9 @@
 // above this module, which app.js passes in (setModeActions).
 
 import { faceAngles, identityColours, manaColours, swatches, tileSets } from '../logic/data.js';
-import { isOut, seatGrid, seatRow, shownCounters, toFace, trackedDesignations } from '../logic/rules.js';
+import { isOut, poolsCanEmpty, seatGrid, seatRow, shownCounters, toFace, trackedDesignations } from '../logic/rules.js';
 import { boardMode, editStart, editStartScores, game } from '../state/state.js';
-import { board, element, icon, visuallyHidden } from '../ui/dom.js';
+import { board, element, icon, manaIcon, visuallyHidden } from '../ui/dom.js';
 import { bindRelease, bindSeat, bindTap } from '../ui/press.js';
 import { counterIcon, designationIcon, identityChip, inColourOf } from './tile.js';
 
@@ -22,6 +22,8 @@ import { counterIcon, designationIcon, identityChip, inColourOf } from './tile.j
  * @property {(kind: CountKind, index: number, delta: number) => void} stepCount
  * @property {(kind: DesignationKind, index: number) => void} toggleDesignation
  * @property {(index: number, colour: number, delta: number) => void} stepMana
+ * @property {(index: number, delta: number) => void} stepTreasure
+ * @property {(index: number) => void} toggleKeep
  * @property {(index: number) => void} chooseFirst
  */
 /** @type {ModeActions} */
@@ -268,9 +270,12 @@ export function renderModeLayer(player, index) {
     for (const designation of trackedDesignations(game)) cells.append(buildDesignationCell(designation, index));
     layer.append(...gestureHint('Tap +1 · hold −1'), cells);
   } else if (boardMode === 'mana') {
-    // Six circles, W U B R G over colourless, three to a row.
+    // Six circles, W U B over R G C, and beside them a column for what stays (MANA-SPEC-v2 §2): Treasure over Keep, which
+    // shows only while pools can empty as the turn passes. A face too narrow for four columns puts them in a third row.
     const cells = element('div', 'counter-cells mana-cells');
     manaColours.forEach((colour, at) => cells.append(...buildManaCell(colour, at, index)));
+    cells.append(...buildTreasureCell(index));
+    if (poolsCanEmpty(game)) cells.append(buildKeepCell(index));
     layer.append(...gestureHint('Tap +1 · hold −1'), cells);
   } else if (boardMode === 'first') {
     layer.append(buildFirstPicker(index));
@@ -309,9 +314,43 @@ function buildManaCell(colour, at, index) {
   return [cell, remove];
 }
 
+// The Treasure cell: the gold counter in white over the count, a counter cell in every other way.
+function buildTreasureCell(index) {
+  const cell = element('button', 'counter-cell treasure-cell', manaIcon('treasure'), element('b'));
+  cell.type = 'button';
+  const remove = element('button', 'visually-hidden counter-remove');
+  remove.type = 'button';
+  remove.setAttribute('aria-label', `Remove one Treasure from Player ${index + 1}`);
+  remove.addEventListener('click', () => modeActions.stepTreasure(index, -1));
+  bindSeat(cell, () => modeActions.stepTreasure(index, 1), () => modeActions.stepTreasure(index, -1));
+  return [cell, remove];
+}
+
+// The Keep cell: a toggle in the designation cells' language, an outline with the lock and "Keep" when off, the seat
+// colour with a check when on, so its state doesn't rest on colour.
+function buildKeepCell(index) {
+  const check = element('span', 'toggle-check', icon('check'));
+  check.setAttribute('aria-hidden', 'true');
+  const word = element('span', 'keep-word', 'Keep');
+  word.setAttribute('aria-hidden', 'true');
+  const cell = element('button', 'counter-cell keep-cell', icon('lock'), word, check);
+  cell.type = 'button';
+  cell.setAttribute('aria-label', `Keep mana, Player ${index + 1}`);
+  bindTap(cell, () => modeActions.toggleKeep(index));
+  return cell;
+}
+
 export function syncManaCells(index) {
   const layer = board.children[index]?.querySelector('.mana-cells');
   if (!layer) return;
+  const treasure = layer.querySelector('.treasure-cell');
+  if (treasure) {
+    const count = game.treasure[index];
+    treasure.querySelector('b').textContent = String(count);
+    treasure.toggleAttribute('data-zero', count === 0);
+    treasure.setAttribute('aria-label', `Treasure, Player ${index + 1}, ${count}. Add one`);
+  }
+  layer.querySelector('.keep-cell')?.setAttribute('aria-pressed', String(game.keepMana[index]));
   for (const cell of layer.querySelectorAll('.mana-cell')) {
     const at = manaColours.findIndex(colour => colour.id === cell.dataset.colour);
     const amount = game.pools[index][at];

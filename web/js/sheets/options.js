@@ -161,6 +161,8 @@ manaSwitch.addEventListener('change', () => {
 autoEmptySwitch.addEventListener('change', () => {
   game.autoEmpty = autoEmptySwitch.checked;
   saveGame();
+  // Keep's lock shows at rest only while pools can empty.
+  renderAllBadges();
 });
 
 // Reminders: each switch saves the moment it changes. Turn reminders shows only while the monarch or the initiative is on

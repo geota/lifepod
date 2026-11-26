@@ -396,7 +396,7 @@ export const stylesCss = readStyles();
 
 // The one check that a tile's targets and parts fit (AGENTS.md: every touch target is at least 44px). For every tile,
 // each visible element matching `targets` must be
-// - a whole 44px target: 43.5px allows for rounding. A chip measures by its ::after touch area, like the turn chip's
+// - a whole 44px target: 43.5px allows for rounding. A chip or a mana strip's button measures by its ::after touch area, like the turn chip's
 //   64 × 44 and a folded mana strip's;
 // - inside its tile, to within 0.5px;
 // - clear of the pill (with `pill`, the default): not overlapping the pill as drawn, its ::before, which sits inside
@@ -420,7 +420,7 @@ export function tileProblems(page, { targets = '', parts = '', pill = true } = {
         const rect = element.getBoundingClientRect();
         if (isTarget) {
           const touch = getComputedStyle(element, '::after');
-          const size = element.matches('.chip') && touch.content !== 'none' && touch.position === 'absolute'
+          const size = element.matches('.chip, .mana-strip > button') && touch.content !== 'none' && touch.position === 'absolute'
             ? [parseFloat(touch.width), parseFloat(touch.height)] : [element.offsetWidth, element.offsetHeight];
           if (Math.min(...size) < 43.5) found.push(`${Math.round(size[0])}×${Math.round(size[1])}`);
         }

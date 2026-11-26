@@ -70,7 +70,7 @@ const layoutSizes = [[952, 427, 90], [852, 393, 90], [640, 360, 90], [620, 360, 
 
 for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: settings opens full screen, two columns from 620px wide and one below, with 44px targets and nothing sideways`, { timeout: 60000 }, async (t) => {
-    // With Mana pool on and Turns not Off, every row shows, auto-empty's included.
+    // With Mana and Treasure on and Turns not Off, every row shows, auto-empty's included.
     const page = await openPage(t, engine, {
       orientation: true, game: { startingLife: 40, scores: [40, 40, 40, 40], manaPool: true, turns: 'turns', turn: { first: 0, active: 0, round: 1 } },
     });
@@ -421,7 +421,7 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Settings').tap();
     await button(page, 'New game').tap();
     assert.deepEqual(await page.locator('#restart-resets li').allTextContents(), [
-      'Life totals, back to 30', 'Counters and commander tax', 'Commander damage', 'Floating mana', 'Turns, back to round 1',
+      'Life totals, back to 30', 'Counters and commander tax', 'Commander damage', 'Floating mana and Treasure', 'Turns, back to round 1',
       'The monarch and the initiative', 'Colour identities', 'Tile colours, shuffled',
     ]);
     assert.equal(await page.locator('#restart-keeps').textContent(), 'Settings and seats stay. You can undo a new game from the centre.');
@@ -526,18 +526,18 @@ for (const [name, engine] of Object.entries(engines)) {
     const page = await openPage(t, engine, { native: engine === chromium ? 'android' : undefined });
     const toggle = name => page.locator('#settings label', { has: page.getByRole('switch', { name, exact: true }) }).tap();
     await button(page, 'Settings').tap();
-    // The switches come in the order Commander, Poison, Energy, Experience, Rad, Mana pool, Monarch, Initiative;
-    // auto-empty follows them, shown only while Mana pool is on and Turns isn't Off.
+    // The switches come in the order Commander, Poison, Energy, Experience, Rad, Mana and Treasure, Monarch, Initiative;
+    // auto-empty follows them, shown only while Mana and Treasure is on and Turns isn't Off.
     assert.deepEqual(await page.locator('#settings-track [role="switch"]').evaluateAll(inputs => inputs.map(input => input.closest('label').textContent.trim())),
-      ['Commander', 'Poison', 'Energy', 'Experience', 'Rad', 'Mana pool', 'Monarch', 'Initiative', 'Empty mana pools when the turn passes']);
-    assert.ok(await page.locator('#auto-empty-row').isHidden(), 'auto-empty is hidden with Mana pool off');
+      ['Commander', 'Poison', 'Energy', 'Experience', 'Rad', 'Mana and Treasure', 'Monarch', 'Initiative', 'Empty mana pools when the turn passes']);
+    assert.ok(await page.locator('#auto-empty-row').isHidden(), 'auto-empty is hidden with Mana and Treasure off');
     await toggle('Poison');
     assert.equal((await saved(page)).counters.poison, true, 'Poison is saved while settings is open');
     assert.ok(!(await page.locator('#counters-button').evaluate(node => node.hidden)), 'the counters button shows at once');
     for (const name of ['Commander', 'Rad', 'Initiative']) await toggle(name);
-    await toggle('Mana pool');
+    await toggle('Mana and Treasure');
     await button(page, 'Rounds').tap();
-    assert.ok(await page.locator('#auto-empty-row').isVisible(), 'auto-empty shows with Mana pool on and Turns on');
+    assert.ok(await page.locator('#auto-empty-row').isVisible(), 'auto-empty shows with Mana and Treasure on and Turns on');
     await toggle('Name');
     await button(page, 'Off').last().tap();
     await toggle('Keep awake');
@@ -552,7 +552,7 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Settings').tap();
     const checked = await page.locator('#settings [role="switch"]').evaluateAll(inputs => Object.fromEntries(inputs.map(input => [input.closest('label').textContent.trim(), input.checked])));
     assert.deepEqual(checked, {
-      Commander: true, Poison: true, Energy: false, Experience: false, Rad: true, 'Mana pool': true, Monarch: false, Initiative: true,
+      Commander: true, Poison: true, Energy: false, Experience: false, Rad: true, 'Mana and Treasure': true, Monarch: false, Initiative: true,
       'Empty mana pools when the turn passes': true, Indicator: true, Symbol: false, Name: false, 'Keep awake': false,
       'Shuffle tile colours each game': true, 'Turn reminders': true, 'Pass-it-on hints': true, 'Gesture hints': true,
     }, 'every switch survives a reload');

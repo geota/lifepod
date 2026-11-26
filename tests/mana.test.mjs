@@ -4,7 +4,7 @@ import {
   backHandling, button, engines, eventually, faceBoxes, hold, openPage, saved, savedGame, seedGame, setSwitches, stripProblems, test, tileProblems,
 } from './helpers.mjs';
 
-// Floating mana (design/polish/SPEC.md §9): the Mana pool switch, mana mode, the strip at rest (spend, clear, undo
+// Floating mana (design/polish/SPEC.md §9): the Mana and Treasure switch, mana mode, the strip at rest (spend, clear, undo
 // clear) and emptying pools when the turn passes.
 
 // Timers in web/js/logic/data.js. A mana cell held for holdDelay takes one away, then one more every 100ms; a turn chip
@@ -32,8 +32,8 @@ const floating = page => page.locator('#mana-button').evaluate(node => node.hasA
 // Undo, ✓ and ✕ as in counters mode.
 async function checkManaMode(t, engine) {
   const page = await openPage(t, engine, { clock: true });
-  assert.ok(await page.locator('#mana-button').isHidden(), 'no mana button with Mana pool off');
-  await setSwitches(page, { 'Mana pool': true });
+  assert.ok(await page.locator('#mana-button').isHidden(), 'no mana button with Mana and Treasure off');
+  await setSwitches(page, { 'Mana and Treasure': true });
   assert.ok(await button(page, 'Mana pool').isVisible(), 'Mana pool shows the tap symbol in the pill');
   assert.equal(await page.locator('#mana-button .mana-icon').getAttribute('data-glyph'), 'tap');
   assert.equal(await floating(page), false, 'no dot while every pool is empty');
@@ -65,7 +65,7 @@ async function checkManaMode(t, engine) {
   // ✕ asks, then Discard puts every pool back.
   await button(page, 'Cancel').tap();
   assert.ok(await isOpen(page, 'discard'));
-  assert.equal(await page.locator('#discard-message').textContent(), 'Every mana pool goes back to how it was when you opened mana.');
+  assert.equal(await page.locator('#discard-message').textContent(), 'Every mana pool and Treasure count goes back to how it was when you opened mana.');
   await button(page, 'Discard').tap();
   await eventually(() => mode(page), null);
   assert.deepEqual((await saved(page)).pools, Array(4).fill([0, 0, 0, 0, 0, 0]), 'the discard is saved');
@@ -89,12 +89,12 @@ async function checkManaMode(t, engine) {
   // Every strip item is a 44px target inside its tile, clear of the pill.
   assert.deepEqual(await tileProblems(page, { targets: '.mana-strip button' }), []);
 
-  // Turning Mana pool off hides the strips and the button, and keeps the pools.
-  await setSwitches(page, { 'Mana pool': false });
+  // Turning Mana and Treasure off hides the strips and the button, and keeps the pools.
+  await setSwitches(page, { 'Mana and Treasure': false });
   assert.deepEqual(await strips(page), ['', '', '', '']);
   assert.deepEqual(await nearShown(page), [false, true, true, false]);
   assert.ok(await page.locator('#mana-button').isHidden());
-  await setSwitches(page, { 'Mana pool': true });
+  await setSwitches(page, { 'Mana and Treasure': true });
   assert.deepEqual(await strips(page), ['W2 U1 clear', '', 'R3 C1 clear', '']);
 }
 
@@ -173,7 +173,7 @@ async function checkAutoEmpty(t, engine) {
   await page.locator('#round-button').tap();
   assert.equal((await saved(page)).turn.active, 2, 'P3’s turn');
 
-  // Auto-empty shows only while Mana pool is on and Turns isn't Off. Off, pools survive a pass.
+  // Auto-empty shows only while Mana and Treasure is on and Turns isn't Off. Off, pools survive a pass.
   await button(page, 'Settings').tap();
   const autoEmpty = page.getByRole('switch', { name: 'Empty mana pools when the turn passes', exact: true });
   assert.equal(await autoEmpty.isChecked(), true, 'on by default');
@@ -183,9 +183,9 @@ async function checkAutoEmpty(t, engine) {
   assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Turns off');
   await page.locator('#turn-choices').getByRole('button', { name: 'Rounds', exact: true }).tap();
   assert.ok(await page.locator('#auto-empty-row').isVisible());
-  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
-  assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Mana pool off');
-  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana pool', exact: true }) }).tap();
+  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana and Treasure', exact: true }) }).tap();
+  assert.ok(await page.locator('#auto-empty-row').isHidden(), 'hidden with Mana and Treasure off');
+  await page.locator('#settings label', { has: page.getByRole('switch', { name: 'Mana and Treasure', exact: true }) }).tap();
   await button(page, 'Close settings').tap();
   await page.locator('#mana-button').tap();
   await cell(page, 4, 'B').tap();
@@ -264,7 +264,8 @@ function manaFaces(page) {
 const manaTargets = '.mana-strip button:not(.chip), .strip-chip';
 
 // A busy board with mana floating on every tile: Turn by turn with P1's turn chip, the identity chip with its name,
-// poison, tax and energy, the monarch on P2, and commander damage from every opponent.
+// poison, tax and energy, Treasure on P2 and P3 (MANA-SPEC-v2 §1.3), the monarch on P2, and commander damage from every
+// opponent.
 function busyManaGame(count, pool, extra = {}) {
   const zero = Array(count).fill(0);
   return savedGame(count, {
@@ -274,7 +275,7 @@ function busyManaGame(count, pool, extra = {}) {
     identity: { show: { indicator: true, symbol: false, name: true }, background: 'symbol' },
     turns: 'turns', turn: { first: 0, active: 0, round: 6 }, monarch: 1,
     commanderDamage: Array.from({ length: count }, (_, defender) => Array.from({ length: count }, (_, attacker) => (defender === attacker ? 0 : [16, 12, 8, 5, 3, 1][attacker]))),
-    manaPool: true, pools: Array(count).fill(pool), ...extra,
+    manaPool: true, pools: Array(count).fill(pool), treasure: zero.map((_, i) => [0, 3, 12, 0, 0, 0][i]), ...extra,
   });
 }
 
@@ -313,15 +314,16 @@ async function checkManaBoard(page, view, places = ['row', 'fold']) {
     }
     assert.ok(total >= natural * 2 / 3 - 0.1 && total <= natural + 0.01, `${seat}: the total is ${total}px, no less than two thirds of its ${natural}px`);
   });
-  // Pips are never shrunk: a strip's spend buttons keep the strip's full type, and a folded chip the row's full type.
+  // Pips are never shrunk: a strip takes the near row's full type (MANA-SPEC-v2 §3, chip-height), never the fit's shrunk type,
+  // with each pip 1.38em of it, and a folded chip the row's full type.
   // (The last resort's chip at the end of the near row gives way with that row, as every chip there does.)
   const pips = await page.locator('.mana-strip .pip, .mana-strip .strip-chip .pip, .mana-far .strip-chip .pip').evaluateAll(nodes => nodes.filter(pip => pip.checkVisibility())
     .map(pip => ({ width: pip.getBoundingClientRect().width, chip: Boolean(pip.closest('.strip-chip')), strip: getComputedStyle(pip.closest('.mana-strip, .mana-far, .badges')).fontSize })));
   for (const pip of pips) {
     if (pip.chip) assert.ok(pip.width >= 14.3, `${view}: a folded chip's pip is at least 14.3px (${pip.width.toFixed(1)}px)`);
     else {
-      assert.ok(pip.width >= 18.5, `${view}: a strip's pip is at least 18.5px (${pip.width.toFixed(1)}px)`);
-      assert.ok(parseFloat(pip.strip) >= 15, `${view}: a strip's type is never shrunk below 15px (${pip.strip})`);
+      assert.ok(pip.width >= 17, `${view}: a strip's pip is at least 17px (${pip.width.toFixed(1)}px)`);
+      assert.ok(parseFloat(pip.strip) >= 12.5, `${view}: a strip's type is never shrunk below the smallest badge type, 12.5px (${pip.strip})`);
     }
   }
 }
@@ -428,6 +430,40 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the mana strip never covers a life total or its glyphs`, t => checkStripClear(t, engine));
 }
 
+// The chip-height strip (MANA-SPEC-v2 §3.2, as built): with one floating mana on every tile, alternating red and blue,
+// beside a poison count, an identity chip and commander damage from every opponent, the totals keep their full size from
+// 640 × 360 up, and at 568 × 320 the strip keeps its spend button on a row of its own (where the 44px strip folded), with
+// the totals no smaller than the folded chip left them (57px at 4 to 6 players, 59px at 3). The strip is one chip tall.
+async function checkLightRow(t, engine) {
+  const page = await openPage(t, engine, { viewport: { width: 952, height: 427 } });
+  for (const [width, height] of [[952, 427], [852, 393], [640, 360], [568, 320]]) {
+    await page.setViewportSize({ width, height });
+    for (const count of [3, 4, 5, 6]) {
+      const zero = Array(count).fill(0);
+      await seedGame(page, savedGame(count, {
+        counters: { commander: true, poison: true }, poison: zero.map(() => 2), identities: ['WUB', 'UG', 'RW', 'BRG', 'WUBRG', 'BG'].slice(0, count),
+        commanderDamage: zero.map((_, d) => zero.map((__, a) => (a === d ? 0 : 3 + a))), manaPool: true,
+        pools: zero.map((_, i) => [0, i % 2, 0, (i + 1) % 2, 0, 0]),
+      }));
+      const view = `${width} × ${height}, ${count} players`;
+      const [tiles] = await manaFaces(page);
+      assert.deepEqual([...new Set(tiles.map(tile => tile.place))], ['row'], `${view}: every strip keeps its row`);
+      if (width >= 640) assert.ok(tiles.every(tile => tile.total >= tile.natural - 0.1), `${view}: the totals keep their full size (${tiles[0].total} of ${tiles[0].natural})`);
+      else assert.ok(tiles.every(tile => tile.total >= (count === 3 ? 59 : 57)), `${view}: the totals are no smaller than the folded chip left them (${tiles[0].total})`);
+      const heights = await page.locator('.player').evaluateAll(players => players.map((player) => {
+        const strip = player.querySelector('.mana-strip');
+        return [strip.offsetHeight, parseFloat(getComputedStyle(strip).fontSize) * 1.7];
+      }));
+      for (const [strip, chip] of heights) assert.ok(Math.abs(strip - chip) <= 1, `${view}: the strip is one chip tall (${strip} against ${chip.toFixed(1)}px)`);
+      assert.deepEqual(await stripProblems(page), [], `${view}: every spend button is a whole 44px target, clear of the total and rows`);
+    }
+  }
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: one floating mana costs the totals nothing from 640 × 360 up, and keeps its spend button at 568 × 320`, t => checkLightRow(t, engine));
+}
+
 test('chromium: Android back cancels mana mode the way ✕ does', async (t) => {
   const page = await openPage(t, chromium, { native: 'android', clock: true, game: savedGame(4, { manaPool: true }) });
   const back = () => page.evaluate(() => window.closeOpenDialog());
@@ -458,7 +494,7 @@ test('chromium: saved pools are checked when a game loads', async (t) => {
     return { strips: await strips(page), button: await page.locator('#mana-button').isVisible() };
   };
   const base = savedGame(4);
-  assert.deepEqual(await load(base), { strips: ['', '', '', ''], button: false }, 'an old save loads with Mana pool off');
+  assert.deepEqual(await load(base), { strips: ['', '', '', ''], button: false }, 'an old save loads with Mana and Treasure off');
   assert.deepEqual(await load({ ...base, manaPool: 'yes', pools: [[1, 0, 0, 0, 0, 0]] }), { strips: ['', '', '', ''], button: false },
     'only a true switch is on');
   assert.deepEqual(await load({ ...base, manaPool: true, pools: [[1, -1, 2.5, 100, 'x', 99], 'pool', [0, 0, 0, 0, 0, 3, 7], null] }),

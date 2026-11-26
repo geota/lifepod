@@ -1,6 +1,6 @@
 // What the page holds while it runs: the game, which is what's saved, with its undo history, and the state that isn't
 // saved (SPEC §10.1): the open board mode and where its edits began, the turn steps a hold steps back through, the turn reminders
-// showing and the strips being tapped. The history's own unsaved state is in history.js. Module-level lets are read live by importers; only this module writes them.
+// showing and the strips and Treasure chips being tapped. The history's own unsaved state is in history.js. Module-level lets are read live by importers; only this module writes them.
 
 import { designationKinds } from '../logic/data.js';
 import { loadGame } from '../logic/save.js';
@@ -47,6 +47,10 @@ export const shownReminders = new Map();
 // spent) until stripHoldTime after the last tap, and that timer. Not saved.
 /** @type {Map<number, { colours: Set<string>, timer: ReturnType<typeof setTimeout> }>} */
 export const stripHolds = new Map();
+// Treasure chips being tapped, by player, and the timer that ends it: a chip used to 0 stays, dimmed, until
+// stripHoldTime after its last tap, so a quick extra tap can't land on what would slide under the finger. Not saved.
+/** @type {Map<number, ReturnType<typeof setTimeout>>} */
+export const tokenHolds = new Map();
 
 export function saveGame() {
   writeSavedGame(JSON.stringify(game));

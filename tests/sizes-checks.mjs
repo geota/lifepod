@@ -33,7 +33,8 @@ const fitScreens = {
 };
 
 // A busy game: every counter on, colour identities set, commander damage from most opponents, Turn by turn with Player 2
-// active and Player 1 first, and mana floating in Player 1's pool, so the pill holds every button at rest. Every chip is
+// active and Player 1 first, mana floating in Player 1's pool, which Player 1 keeps, and 12 Treasure on Player 3
+// (MANA-SPEC-v2), so the pill holds every button at rest. Every chip is
 // on: Player 2, the active player, is the monarch, and the initiative is held by a player who is out and hasn't passed
 // it on (Player 5, at −3 life, or Player 4, out on poison, with four), so their row shows the "Pass it on" hint.
 function busyGame(count, style) {
@@ -53,6 +54,7 @@ function busyGame(count, style) {
       (defender === attacker ? 0 : [21, 16, 12, 8, 3][(defender + attacker) % 5]))),
     turns: 'turns', turn: { first: 0, active: 1, round: 3 },
     manaPool: true, pools: Array.from({ length: count }, (_, i) => (i === 0 ? [0, 0, 0, 3, 0, 1] : [0, 0, 0, 0, 0, 0])),
+    treasure: Array.from({ length: count }, (_, i) => (i === 2 ? 12 : 0)), keepMana: Array.from({ length: count }, (_, i) => i === 0),
   };
 }
 
@@ -118,7 +120,7 @@ async function checkSizes(t, engine, style, names) {
       for (const count of portrait ? [2, 4, 6] : [2, 3, 4, 5, 6]) {
         const view = `${count} players, ${name}, ${portrait ? 'portrait' : 'landscape'}`;
         const page = await openBoard(t, engine, size, count, portrait, style);
-        await checkTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`, view);
+        await checkTiles(page, '.controls button, .mana-strip button:not(.chip), .token-chip', `${life}, .badges .chip, .mana-strip`, view);
         // The mana strip never covers a life total or its glyphs.
         assert.deepEqual(await stripProblems(page), [], `${view}: the mana strip is clear of the total and glyphs`);
         // One size per board: every tile draws its total, glyphs and badges at the same size.
@@ -142,6 +144,13 @@ async function checkSizes(t, engine, style, names) {
         }
         if (count === 4 && !portrait) scale[name] = await readScale(page);
 
+        // Mana mode at every count (MANA-SPEC-v2 §2): the colours, Treasure and Keep, each a whole 44px target.
+        await page.locator('#mana-button, #track-button').filter({ visible: true }).first().tap();
+        if (await page.locator('#board').getAttribute('data-mode') !== 'mana') await page.locator('#track-tab-mana').tap();
+        assert.equal(await page.locator('.keep-cell').count(), count, `${view}: Keep shows in mana mode, with Turns on and auto-empty on`);
+        await checkTiles(page, '.mana-cells .counter-cell', '.mana-cells .counter-cell', `${view}, mana`);
+        await button(page, 'Cancel').tap();
+
         if (count === 4) {
           await button(page, 'Commander damage').tap();
           await checkTiles(page, '.map-cell[data-attacker]', '.map-cell', `${view}, commander damage`);
@@ -151,10 +160,6 @@ async function checkSizes(t, engine, style, names) {
           await button(page, 'Counters').tap();
           await checkTiles(page, '.counter-cell', '.counter-cell', `${view}, counters`);
           if (!portrait) scale[name].counterCell = await readModeScale(page, '.counter-cell');
-          await button(page, 'Cancel').tap();
-
-          await page.locator('#mana-button').tap();
-          await checkTiles(page, '.mana-cell', '.mana-cell', `${view}, mana`);
           await button(page, 'Cancel').tap();
 
           await button(page, 'Settings').tap();

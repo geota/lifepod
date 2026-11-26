@@ -125,6 +125,16 @@ export function fitPools(saved, count) {
   return Array.from({ length: count }, (_, index) => fitCounts(Array.isArray(saved) ? saved[index] : undefined, manaColours.length));
 }
 
+// One on or off per player, such as each player's Keep. Each is off unless it was saved as exactly true.
+/**
+ * @param {any} saved
+ * @param {number} count
+ * @returns {boolean[]}
+ */
+export function fitFlags(saved, count) {
+  return Array.from({ length: count }, (_, index) => Array.isArray(saved) && saved[index] === true);
+}
+
 // A seat index on a board of count players, or null for nobody, which is also what anything else means.
 /**
  * @param {any} value
@@ -188,9 +198,11 @@ function fitReminders(saved) {
  * @property {string[]} identities Each player's colour identity, as letters in W U B R G order; '' for none.
  * @property {IdentitySettings} identity
  * @property {number[][]} commanderDamage Damage taken, by defender then attacker; 0 where they're the same player.
- * @property {boolean} manaPool Whether the Mana pool switch is on.
+ * @property {boolean} manaPool Whether the Mana and Treasure switch is on.
  * @property {boolean} autoEmpty Whether pools empty as the turn passes.
  * @property {number[][]} pools Each player's floating mana, one count per colour in W U B R G C order.
+ * @property {number[]} treasure Each player's Treasure tokens, 0 to maxCount. Only a new game empties it.
+ * @property {boolean[]} keepMana Each player's Keep: whether the turn passing leaves their pool alone.
  * @property {TurnMode} turns
  * @property {Turn} turn
  * @property {TileSet} tileColours
@@ -234,7 +246,7 @@ export function loadGame(read, landscapeAngle) {
     landscapeAngle, colors: fitColors([], 4),
     counters: fitTrackers(), .../** @type {Record<CountKind, number[]>} */ (Object.fromEntries(countKinds.map(kind => [kind, fitCounts([], 4)]))),
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
-    manaPool: false, autoEmpty: true, pools: fitPools([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, shuffleColours: false,
+    manaPool: false, autoEmpty: true, pools: fitPools([], 4), treasure: fitCounts([], 4), keepMana: fitFlags([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, shuffleColours: false,
     badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(), trackTab: 'damage',
     history: emptyHistory(),
   };
@@ -268,6 +280,9 @@ export function loadGame(read, landscapeAngle) {
       manaPool: saved.manaPool === true,
       autoEmpty: saved.autoEmpty !== false,
       pools: fitPools(board.pools, count),
+      // A save from before Treasure and Keep has none, and nobody's pool kept.
+      treasure: fitCounts(board.treasure, count),
+      keepMana: fitFlags(board.keepMana, count),
       turns: turnModes.includes(saved.turns) ? saved.turns : 'off',
       turn: fitTurn(board.turn, count),
       // A save from before the setting, or with an unknown set, gets the default.

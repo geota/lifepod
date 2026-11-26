@@ -97,6 +97,15 @@
 .near-edge[data-drop~="name"] .turn-chip.active-chip { gap: .14em; padding-inline: .32em .38em; }
 .chip.flag-chip { width: 1.7em; padding: 0; justify-content: center; color: var(--seat); }
 .chip.flag-chip .icon { width: .95em; height: .95em; }
+/* Treasure at rest (MANA-SPEC-v2 §1.3): the gold counter in white and the count, after rad. It's a button whose tap uses
+   one, so it has the folded chip's look: the button fill, a rim ring and a 44 × 44 touch area; the plain counts beside
+   it have no ring. Used to 0, it stays dimmed while it's being tapped, then goes. */
+.chip.token-chip { position: relative; gap: .2em; padding: 0 .45em 0 .35em; border: 0; background: var(--button); color: var(--text); box-shadow: inset 0 0 0 1.5px var(--rim); font-weight: var(--weight-heavy); pointer-events: auto; }
+.token-chip .mana-icon { width: 1.05em; height: 1.05em; font-size: 1.05em; color: var(--text); }
+.token-chip::after { position: absolute; top: 50%; left: 50%; width: max(100%, var(--tap-min)); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
+.token-chip:active { background: var(--cell-pressed); }
+.token-chip:focus-visible { outline-offset: 2px; }
+.token-chip[aria-disabled="true"] { opacity: var(--disabled-opacity); }
 /* The monarch and the initiative at rest: the holder's crown or castle, round like the flag. A holder who is out and
    hasn't handed it on gets "Pass it on" instead, outlined like a Start chip; it's a button that opens counters mode. Its
    words give way with the identity names (design/polish/SPEC.md §3.2), leaving the icon and the arrow. */
@@ -186,10 +195,12 @@ div.toast-chip:active { background: var(--button); }
    transform, which outranks an animation but not a transition. */
 @keyframes reminder-in { from { opacity: 0; transform: translateY(.4em); } }
 /* Floating mana at rest (design/polish/SPEC.md §9): while a pool has mana, a strip shows each colour it holds and its
-   amount (tap to spend one), then the eraser; after the eraser, "Undo clear" for 5 seconds. Each item is a 44px-tall
-   target at least 44px wide, on a 32px capsule. It has a row of its own, between the total and the near row, so it
-   never shares a line with another badge, and commander damage keeps the far row. Its type never shrinks, so every
-   symbol stays legible on a 44px target. fit.js picks each tile's place (data-strip on the tile): row, the strip on that
+   amount (tap to spend one), then the eraser, led by Keep's lock when that player keeps their pool. It's chip-height
+   (MANA-SPEC-v2 §3), 1.7em of the near row's full type, so it costs the totals no more than a
+   badge row; each item is a target at least 44px wide whose 44 × 44 touch area reaches past the capsule, as the folded
+   chip's does. It has a row of its own, between the total and the near row, so it never shares a line with another
+   badge, and commander damage keeps the far row. Its type never shrinks below the near row's full type, so every symbol
+   stays legible. fit.js picks each tile's place (data-strip on the tile): row, the strip on that
    row where it fits across it; fold, one chip that shows the pool and opens mana mode, on that row; far, that chip under
    the far row, only where the board's totals can't make room for the row; or near, that chip at the end of the near
    row, the last resort. The total gives way first: it shrinks, and moves toward the far row, to make room. */
@@ -206,13 +217,12 @@ div.toast-chip:active { background: var(--button); }
   max-width: 100%;
   margin-bottom: 2px;
   padding: 0 2px;
-  font-size: calc(clamp(.9375rem, calc(5.4 * var(--u)), max(1.0625rem, 20 * var(--grow))) * var(--badge-scale));
+  font-size: var(--near-full-size, var(--near-row-size));
   pointer-events: auto;
 }
 /* With no near row, the strip's capsule sits where the near row would. */
-.player[data-strip="row"] .mana-strip:has(+ .badges.near[hidden]) { margin-bottom: -6px; }
-/* The capsule is 32px tall, and grows to the targets' 44px with a larger Badge size, so the symbols stay inside it. */
-.mana-strip::before { position: absolute; inset: clamp(0px, calc(22px - .8em), 6px) 0; z-index: -1; content: ''; border-radius: 16px; background: var(--chip-background); }
+.player[data-strip="row"] .mana-strip:has(+ .badges.near[hidden]) { margin-bottom: 0; }
+.mana-strip::before { position: absolute; inset: 0; z-index: -1; content: ''; border-radius: var(--radius-full); background: var(--chip-background); }
 .mana-strip[hidden], .mana-far[hidden] { display: none; }
 /* Folded: the strip shows only its chip, with a caret that says it opens mana mode, the full-size picker, on the mana
    row in the near row's full type. Where the board can't make room for that row, the strip hides and the same chip
@@ -240,8 +250,9 @@ div.toast-chip:active { background: var(--button); }
   align-items: center;
   justify-content: center;
   gap: 3px;
+  position: relative;
   min-width: var(--tap-min);
-  height: var(--tap-min);
+  height: 1.7em;
   padding: 0 4px;
   border: 0;
   border-radius: var(--radius-full);
@@ -251,10 +262,17 @@ div.toast-chip:active { background: var(--button); }
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
+.mana-strip > button:not(.chip)::after { position: absolute; top: 50%; left: 50%; width: max(100%, var(--tap-min)); height: var(--tap-min); content: ''; border-radius: var(--radius-full); transform: translate(-50%, -50%); }
 .mana-strip > button:not(.chip):active { background: var(--wash); }
 /* A colour spent to 0 keeps its place while the strip is being tapped, dimmed, until the strip reflows. */
 .mana-strip > .strip-spend[aria-disabled="true"] { opacity: var(--disabled-opacity); }
-.mana-strip .pip { --pip-size: 1.25em; }
+.mana-strip .pip { --pip-size: 1.38em; }
+/* Keep's lock (MANA-SPEC-v2 §4.2): small and soft, leading a kept pool's mana on the strip and its folded chip. It's not
+   a target; Keep is changed in mana mode. */
+.keep-lock { display: flex; flex: none; align-items: center; justify-content: center; color: var(--text-soft); }
+.keep-lock .icon { width: .8em; height: .8em; }
+.mana-strip > .keep-lock { height: 1.7em; padding-inline: .45em .1em; }
+.strip-chip .keep-lock { margin-inline-end: .05em; }
 .mana-strip > button.strip-clear { color: var(--text-soft); }
 .strip-clear .icon { width: 1.05em; height: 1.05em; }
 .mana-strip > button.strip-undo { gap: 6px; padding: 0 12px 0 8px; color: var(--text-soft); font-size: .85em; font-weight: var(--weight-semibold); }

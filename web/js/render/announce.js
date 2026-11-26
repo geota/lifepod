@@ -22,7 +22,7 @@ export function seatName(index) {
 const modeIntros = {
   damage: 'Commander damage. Press a commander on a tile to add one damage. Undo goes back one step. Save or Cancel in the centre',
   counters: 'Counters. Press a counter to add one. Undo goes back one step. Save or Cancel in the centre',
-  mana: 'Mana pool. Press a colour to add one mana. Undo goes back one step. Save or Cancel in the centre',
+  mana: 'Mana pool. Press a colour to add one mana, or Treasure, after the colours, to add one. Undo goes back one step. Save or Cancel in the centre',
   colours: 'Tile colours. Choose a colour on each tile, then Done in the centre',
   identity: 'Identities. Choose each player\'s colours, then Done in the centre',
   rotate: 'Rotate seats. Press a tile to turn it clockwise, then Done in the centre',
@@ -37,7 +37,7 @@ const modeNames = {
 // How to use each of Track's tabs, and where it is among them (design/polish/PILL-SPEC.md §3.5).
 /** @type {Record<TrackTab, string>} */
 const tabHowTo = {
-  damage: 'Press a commander on a tile to add one damage', counters: 'Press a counter to add one', mana: 'Press a colour to add one mana',
+  damage: 'Press a commander on a tile to add one damage', counters: 'Press a counter to add one', mana: 'Press a colour or Treasure to add one',
 };
 /** @param {TrackTab} tab */
 function tabPlace(tab) {
@@ -121,6 +121,17 @@ export function announceDesignation(kind) {
 
 export function announcePool(index) {
   announce(index, 'mana', () => `${seatName(index)}, mana pool ${poolText(game, index)}`);
+}
+
+// A Treasure count once a burst of taps settles: "Player 3, Coral, Treasure 3 → 2", from the step the burst made, or
+// "Treasure 2" where the latest step isn't that player's Treasure (MANA-SPEC-v2 §8).
+/** @param {number} index */
+export function announceTreasure(index) {
+  announce(index, 'treasure', () => {
+    const delta = game.history.steps[game.history.at - 1]?.d.treasure;
+    const pair = delta && !Array.isArray(delta) ? delta[index] : undefined;
+    return `${seatName(index)}, Treasure ${pair ? `${pair[0]} → ${pair[1]}` : game.treasure[index]}`;
+  });
 }
 
 // A new board drops whatever was still waiting to be read.
