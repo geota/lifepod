@@ -11,6 +11,7 @@ import { cardRulings, shardFile } from '../logic/cards.js';
 /** @typedef {import('../logic/cards.js').RulingTable} RulingTable */
 
 const folder = new URL('../../data/rulings/', import.meta.url);
+const sharedUrl = new URL('../../data/rulings/shared.json.gz', import.meta.url);
 // How many shards stay in memory: each is about 250 KB of text, well under 1 MB parsed.
 export const keptShards = 4;
 
@@ -21,9 +22,9 @@ let shared = null;
 /** @type {Map<number, Promise<RulingShard>>} */
 const shards = new Map();
 
-/** @param {string} name @param {AbortSignal} signal */
-async function fetchPacked(name, signal) {
-  const response = await fetch(new URL(name, folder), { signal });
+/** @param {URL} url @param {AbortSignal} signal */
+async function fetchPacked(url, signal) {
+  const response = await fetch(url, { signal });
   if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
   return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).json();
 }
@@ -37,7 +38,7 @@ function loadShard(shard, signal) {
     shards.set(shard, held);
     return held;
   }
-  const loading = /** @type {Promise<RulingShard>} */ (fetchPacked(shardFile(shard), signal));
+  const loading = /** @type {Promise<RulingShard>} */ (fetchPacked(new URL(shardFile(shard), folder), signal));
   shards.set(shard, loading);
   loading.catch(() => {
     if (shards.get(shard) === loading) shards.delete(shard);
@@ -48,7 +49,7 @@ function loadShard(shard, signal) {
 /** @param {AbortSignal} signal @returns {Promise<RulingTable>} */
 function loadShared(signal) {
   if (shared) return shared;
-  const loading = /** @type {Promise<RulingTable>} */ (fetchPacked('shared.json.gz', signal));
+  const loading = /** @type {Promise<RulingTable>} */ (fetchPacked(sharedUrl, signal));
   shared = loading;
   loading.catch(() => {
     if (shared === loading) shared = null;
