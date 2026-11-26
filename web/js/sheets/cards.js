@@ -39,8 +39,9 @@ const countDelay = 500;
 // Below this height, as with a phone's keyboard open in landscape, the sheet drops its header and credit so the field
 // and a few results fit.
 const compactHeight = 260;
-// The cards and their search data take about 60 MB, so they're let go this long after the sheet closes, and at once
-// when the app goes to the background; the next open loads them again, keeping the query and the toggle.
+// The cards and their search data take about 55 MB, so they're let go this long after the sheet closes, and at once
+// when the app goes to the background with the sheet closed; the next open loads them again, keeping the query and the
+// toggle.
 export const evictDelay = 2 * 60 * 1000;
 
 /** @type {CardIndex | null} */
@@ -138,17 +139,11 @@ function evictCards() {
   queryField.removeAttribute('aria-activedescendant');
   queryField.setAttribute('aria-expanded', 'false');
   delete cardsDialog.dataset.cards;
-  if (cardsDialog.open) {
-    // Back from the background with the sheet still open: load again and run the query.
-    showList();
-    showStatus();
-  }
 }
-// The background: let go at once, and load again on the way back if the sheet is still open.
+// The background lets go at once if the sheet is closed. With it open, everything stays (the results, the card shown)
+// until it closes.
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) {
-    if (index || loading) evictCards();
-  } else if (cardsDialog.open) loadCards();
+  if (document.hidden && !cardsDialog.open && (index || loading)) evictCards();
 });
 
 // ---- Results --------------------------------------------------------------------------------------------------------
@@ -338,6 +333,7 @@ cardsDialog.addEventListener('close', () => {
   clearTimeout(countTimer);
   countRegion.textContent = '';
   clearTimeout(evictTimer);
-  evictTimer = setTimeout(evictCards, evictDelay);
+  if (document.hidden) evictCards();
+  else evictTimer = setTimeout(evictCards, evictDelay);
   syncBackHandling();
 });

@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { button, engines, eventually, openPage, saved, savedGame, test } from './helpers.mjs';
 
-// Card lookup lets go of its cards (about 60 MB of heap) two minutes after the sheet closes, and at once when the app goes
-// to the background (js/sheets/cards.js `evictCards`); the next open loads them again, keeping the query. It never
-// touches the game or History.
+// Card lookup lets go of its cards (about 55 MB of heap) two minutes after the sheet closes, and at once when the app goes
+// to the background with the sheet closed (js/sheets/cards.js `evictCards`); with it open, everything stays. The next
+// open loads them again, keeping the query. It never touches the game or History.
 
 const evictDelay = 2 * 60 * 1000;
 const statusText = page => page.locator('#card-status').textContent();
@@ -79,26 +79,46 @@ async function checkEviction(t, engine) {
   await reopened(page, 't:elf c:g mv=1');
   assert.equal(fetched.length, 2, 'loaded again');
 
-  // The background lets go at once, the sheet closed or open; back with it open, it loads again and runs the query.
+  // The background with the sheet closed lets go at once.
   await closeSheet(page);
   await page.evaluate(() => window.setTestHidden(true));
   assert.equal(await cardsState(page), null, 'closed: let go at once');
   await page.evaluate(() => window.setTestHidden(false));
   await reopened(page, 't:elf c:g mv=1');
+  assert.equal(fetched.length, 3);
+
+  // With the sheet open, the background keeps everything, the card shown too, however long; closing starts the two
+  // minutes as usual, and closing while hidden lets go at once.
+  await page.locator('#card-results [role="option"]').first().click();
+  const shownCard = await page.locator('#card-name').textContent();
   await page.evaluate(() => window.setTestHidden(true));
-  assert.equal(await cardsState(page), null, 'open: let go at once');
-  assert.equal(await statusText(page), 'Loading cards…');
+  await page.clock.runFor(evictDelay * 2);
   await page.evaluate(() => window.setTestHidden(false));
-  await eventually(async () => (await rowCount(page)) > 0, true, 'back: loaded again, the query run');
+  assert.equal(await cardsState(page), 'loaded', 'open: kept through the background');
+  assert.equal(await page.locator('#card-name').textContent(), shownCard, 'the card shown stays');
+  assert.ok((await rowCount(page)) > 0, 'the results stay');
+  await closeSheet(page);
+  await page.clock.runFor(evictDelay - 1000);
+  assert.equal(await cardsState(page), 'loaded', 'closing starts the usual two minutes');
+  await page.clock.runFor(1000);
+  assert.equal(await cardsState(page), null);
+  await reopened(page, 't:elf c:g mv=1');
+  await page.evaluate(() => window.setTestHidden(true));
+  await page.evaluate(() => document.querySelector('#cards').close());
+  await eventually(() => cardsState(page), null, 'closed while hidden: let go at once, with no time passing');
+  await page.evaluate(() => window.setTestHidden(false));
   assert.equal(fetched.length, 4);
 
-  // A load cut short by the background is cancelled cleanly, and the next open finishes it.
-  await closeSheet(page);
-  await page.evaluate(() => window.setTestHidden(true));
-  await page.evaluate(() => window.setTestHidden(false));
+  // A load cut short (the sheet closed and the app sent to the background as it loads) is cancelled cleanly, and the
+  // next open loads again.
   await button(page, 'Card lookup').click();
-  await page.evaluate(() => window.setTestHidden(true));
+  await page.evaluate(() => {
+    document.querySelector('#cards').close();
+    window.setTestHidden(true);
+  });
   await page.evaluate(() => window.setTestHidden(false));
+  assert.equal(await cardsState(page), null, 'the load is cancelled');
+  await button(page, 'Card lookup').click();
   await eventually(async () => (await rowCount(page)) > 0, true, 'loaded after the cancelled load');
   assert.notEqual(await statusText(page), 'The cards couldn’t load. Close and open card lookup to try again.');
 
@@ -110,7 +130,7 @@ async function checkEviction(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: card lookup lets go of its cards after two minutes closed or in the background, and loads them again`, { timeout: 120000 }, t => checkEviction(t, engine));
+  test(`${name}: card lookup lets go of its cards after two minutes closed or in the background closed, and loads them again`, { timeout: 120000 }, t => checkEviction(t, engine));
 }
 
 // The memory comes back: nothing (a timer, a listener, a closure) keeps the cards after eviction.
