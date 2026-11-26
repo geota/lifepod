@@ -112,6 +112,6 @@ LifePod's code is under the [MIT License](LICENSE).
 
 The mana and colour indicator symbols come from the [Mana font](https://github.com/andrewgioia/mana) by Andrew Gioia, under the SIL Open Font License 1.1 ([`web/fonts/OFL.txt`](web/fonts/OFL.txt)). The mana, colour indicator, guild, clan and family symbols belong to Wizards of the Coast.
 
-Card data from [Scryfall](https://scryfall.com), updated <span data-cards-date>23 November 2026</span>. LifePod isn't produced by or endorsed by Scryfall. Card names, mana costs and rules text belong to Wizards of the Coast.
+Card data from [Scryfall](https://scryfall.com), updated <span data-cards-date>26 November 2026</span>. LifePod isn't produced by or endorsed by Scryfall. Card names, mana costs and rules text belong to Wizards of the Coast.
 
 LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
