@@ -1,6 +1,7 @@
 // `npm run cards:update`: downloads Scryfall's latest Oracle cards bulk file and writes card lookup's data: data/cards.json,
 // one card per line for readable diffs, which isn't shipped, and web/data/cards.json.gz, the same file gzipped, which
-// the page fetches and unpacks (docs/DEVELOPING.md, "Card data"). Run it before a release (RELEASING.md).
+// the page fetches and unpacks (docs/DEVELOPING.md, "Card data"). Run it before a release (RELEASING.md). It writes the
+// rulings the same way, from Scryfall's rulings file: data/rulings/, and web/data/rulings/ gzipped (scripts/cards-rulings.mjs).
 //
 //   npm run cards:update                  download the latest bulk file, keep it in the cache, write the data
 //   npm run cards:update -- --offline     rebuild from the cached bulk file, with no network
@@ -20,6 +21,7 @@ import { constants, createGunzip, gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { fold } from '../web/js/logic/cards.js';
 import { formats, landNicknames, writeLegalities } from '../web/js/logic/cardterms.js';
+import { buildRulings, readRulings, shardName, shardOf } from './cards-rulings.mjs';
 
 const root = new URL('../', import.meta.url);
 const output = new URL('data/cards.json', root);
@@ -36,6 +38,10 @@ const printingsMetaFile = new URL('default-cards.json', cache);
 const tagsMetaFile = new URL('oracle-tags.json', cache);
 const tagsOutput = new URL('data/tags.json', root);
 const tagsShipped = new URL('web/data/tags.json.gz', root);
+const rulingsBulkFile = new URL('rulings.jsonl.gz', cache);
+const rulingsMetaFile = new URL('rulings.json', cache);
+const rulingsOutput = new URL('data/rulings/', root);
+const rulingsShipped = new URL('web/data/rulings/', root);
 const { version } = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
 const headers = { 'User-Agent': `LifePod/${version}`, Accept: 'application/json' };
 
@@ -176,8 +182,8 @@ export function toCard(card) {
  * @param {string} updated The bulk file's `updated_at`.
  * @param {Record<string, string[]>} [nicknames] Each land nickname's card names, from Scryfall's search (`lc`).
  */
-export async function buildCards(lines, updated, nicknames = {}, printed = new Map()) {
-  return (await buildData(lines, updated, nicknames, printed)).text;
+export async function buildCards(lines, updated, nicknames = {}, printed = new Map(), rulings = new Map()) {
+  return (await buildData(lines, updated, nicknames, printed, rulings)).text;
 }
 /**
  * The data file's text, and each card's place in it by Oracle id, which the tags file points at.
@@ -186,8 +192,11 @@ export async function buildCards(lines, updated, nicknames = {}, printed = new M
  * @param {Record<string, string[]>} [nicknames]
  * @param {Map<string, { r: string, in: string }>} [printed] Each card's printed rarities (printedRarities()), for `rp`
  *   and `ri`.
+ * @param {Map<string, import('./cards-rulings.mjs').Ruling[]>} [rulings] Each card's rulings (readRulings()), for `ru`.
+ * @returns {Promise<{ text: string, places: Map<string, number>, kept: { id: string | undefined, name: string }[] }>}
+ *   `kept` is every card in the file's order, with the Oracle id its rulings are under.
  */
-export async function buildData(lines, updated, nicknames = {}, printed = new Map()) {
+export async function buildData(lines, updated, nicknames = {}, printed = new Map(), rulings = new Map()) {
   /** @type {Map<string, string[]>} */
   const cycles = new Map();
   for (const nickname of landNicknames) {
@@ -205,13 +214,16 @@ export async function buildData(lines, updated, nicknames = {}, printed = new Ma
     const letters = printed.get(oracleId(card));
     if (letters && letters.r !== record.r) record.rp = letters.r;
     if (letters && letters.in !== letters.r) record.ri = letters.in || '-';
-    cards.push({ record, id: card.oracle_id });
+    // How many rulings the card has, and the shard they're in (scripts/cards-rulings.mjs).
+    const ruled = rulings.get(oracleId(card));
+    if (ruled?.length) record.ru = [ruled.length, shardOf(oracleId(card))];
+    cards.push({ record, id: card.oracle_id, ruledBy: oracleId(card) });
   }
-  const rows = cards.map(({ record, id }) => ({ card: record, id, json: JSON.stringify(record) }));
+  const rows = cards.map(({ record, id, ruledBy }) => ({ card: record, id, ruledBy, json: JSON.stringify(record) }));
   rows.sort((a, b) => (a.card.k < b.card.k ? -1 : a.card.k > b.card.k ? 1 : a.json < b.json ? -1 : a.json > b.json ? 1 : 0));
   const about = { source: 'Scryfall Oracle cards bulk data, scryfall.com', updated, count: rows.length, formats };
   const text = `{"about":${JSON.stringify(about)},\n"cards":[\n${rows.map(row => row.json).join(',\n')}\n]}\n`;
-  return { text, places: new Map(rows.map((row, at) => [row.id, at])) };
+  return { text, places: new Map(rows.map((row, at) => [row.id, at])), kept: rows.map(row => ({ id: row.ruledBy, name: row.card.n })) };
 }
 
 /**
@@ -256,6 +268,15 @@ export function readBulk(path) {
   const gzipped = readFileSync(path).subarray(0, 2).equals(Buffer.from([0x1f, 0x8b]));
   const stream = createReadStream(path);
   return createInterface({ input: gzipped ? stream.pipe(createGunzip()) : stream, crlfDelay: Infinity });
+}
+
+/** The cached rulings file, or null. */
+export function cachedRulings() {
+  try {
+    return { path: fileURLToPath(rulingsBulkFile), ...JSON.parse(readFileSync(rulingsMetaFile, 'utf8')) };
+  } catch {
+    return null;
+  }
 }
 
 /** The cached default_cards file, or null. */
@@ -325,6 +346,7 @@ async function download() {
   const response = await fetchWithRetries(`${api}/bulk-data`, { headers }, 30000);
   const list = (await response.json()).data;
   await downloadBulk(list.find(item => item.type === 'oracle_tags'), tagsBulkFile, tagsMetaFile, cachedTags());
+  await downloadBulk(list.find(item => item.type === 'rulings'), rulingsBulkFile, rulingsMetaFile, cachedRulings());
   await downloadBulk(list.find(item => item.type === 'default_cards'), printingsFile, printingsMetaFile, cachedPrintings(), 300000);
   const entry = list.find(item => item.type === 'oracle_cards');
   const uri = entry?.jsonl_download_uri ?? entry?.download_uri;
@@ -407,10 +429,15 @@ async function main() {
   const printings = cachedPrintings();
   if (!printings) throw new Error('No cached default_cards file yet: run `npm run cards:update` once with a network connection');
   const printed = await printedRarities(readBulk(printings.path));
-  const { text, places } = await buildData(readBulk(bulk.path), bulk.updated_at, nicknames, printed);
+  const rulingsBulk = cachedRulings();
+  if (!rulingsBulk) throw new Error('No cached rulings file yet: run `npm run cards:update` once with a network connection');
+  const rulings = await readRulings(readBulk(rulingsBulk.path));
+  const { text, places, kept } = await buildData(readBulk(bulk.path), bulk.updated_at, nicknames, printed, rulings);
   mkdirSync(new URL('./', output), { recursive: true });
   mkdirSync(new URL('./', shipped), { recursive: true });
   writeFileSync(output, text);
+  const { shared, shards } = buildRulings(rulings, kept, rulingsBulk.updated_at);
+  const rulingSizes = writeRulings(shared, shards);
   const tagBulk = cachedTags();
   if (tagBulk) {
     const tags = await buildTags(readBulk(tagBulk.path), tagBulk.updated_at, places, places.size);
@@ -426,6 +453,24 @@ async function main() {
   const mb = bytes => `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   console.log(`data/cards.json: ${count} cards from ${bulk.updated_at}, ${mb(Buffer.byteLength(text))}`);
   console.log(`web/data/cards.json.gz: ${mb(packed.length)}`);
+  const kb = bytes => `${(bytes / 1024).toFixed(0)} KB`;
+  const total = shards.reduce((sum, shard) => sum + JSON.parse(shard).about.rulings, 0);
+  console.log(`web/data/rulings/: ${total} rulings from ${rulingsBulk.updated_at}, the shared file ${kb(rulingSizes.shared)}, `
+    + `${shards.length} shards of ${kb(Math.min(...rulingSizes.shards))} to ${kb(Math.max(...rulingSizes.shards))}, `
+    + `${mb(rulingSizes.shared + rulingSizes.shards.reduce((sum, size) => sum + size, 0))} in all`);
+}
+
+/** The rulings files: each one's text in data/rulings/, and gzipped in web/data/rulings/. Returns the gzipped sizes. */
+function writeRulings(shared, shards) {
+  mkdirSync(rulingsOutput, { recursive: true });
+  mkdirSync(rulingsShipped, { recursive: true });
+  const write = (name, text) => {
+    writeFileSync(new URL(`${name}.json`, rulingsOutput), text);
+    const packed = packCards(text);
+    writeFileSync(new URL(`${name}.json.gz`, rulingsShipped), packed);
+    return packed.length;
+  };
+  return { shared: write(shardName('shared'), shared), shards: shards.map((text, shard) => write(shardName(shard), text)) };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) await main();

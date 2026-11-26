@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from './helpers.mjs';
 import { gunzipSync } from 'node:zlib';
-import { buildCards, cachedBulk, cachedNicknames, cachedPrintings, packCards, printedRarities, readBulk, shownDate } from '../scripts/cards-update.mjs';
+import { buildCards, cachedBulk, cachedNicknames, cachedPrintings, cachedRulings, packCards, printedRarities, readBulk, shownDate } from '../scripts/cards-update.mjs';
+import { readRulings, shardCount } from '../scripts/cards-rulings.mjs';
 import {
   colourMask, costText, faceStats, fold, indexCards, rankResults, readSymbol, searchCards, searchNames, searchText, splitSymbols,
 } from '../web/js/logic/cards.js';
@@ -17,7 +18,7 @@ const index = indexCards(data.cards);
 const names = (query, options) => searchCards(index, query, options).results.map(at => data.cards[at].n);
 
 const faceKeys = new Set(['n', 'm', 't', 'o', 'p', 'l', 'd']);
-const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'rp', 'ri', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun', 'lc']);
+const cardKeys = new Set([...faceKeys, 'k', 'c', 'co', 'v', 'r', 'rp', 'ri', 'f', 'lead', 'kw', 'pair', 'er', 'lg', 'pm', 'ly', 'mr', 'gc', 'rs', 'ci', 'fun', 'lc', 'ru']);
 const inColourOrder = /^W?U?B?R?G?$/;
 
 test('node: the card data file has one card per line, in order, with only the fields the lookup reads', () => {
@@ -48,6 +49,10 @@ test('node: the card data file has one card per line, in order, with only the fi
     if (card.lg !== undefined) assert.match(card.lg, /^(\+?[a-wA-W])+$/, `${card.n}: legalities`);
     if (card.pm !== undefined) assert.match(card.pm, /^W?U?B?R?G?C?$/, `${card.n}: produced mana`);
     if (card.kw) assert.deepEqual(card.kw, [...card.kw].sort(), `${card.n}: keywords sorted`);
+    if (card.ru !== undefined) {
+      assert.ok(card.ru.length === 2 && Number.isInteger(card.ru[0]) && card.ru[0] > 0, `${card.n}: a ruling count`);
+      assert.ok(Number.isInteger(card.ru[1]) && card.ru[1] >= 0 && card.ru[1] < shardCount, `${card.n}: a ruling shard`);
+    }
     if (card.f) {
       assert.ok(card.f.length >= 2, `${card.n}: a card with faces has two or more`);
       for (const side of card.f) face(side, 'face');
@@ -143,8 +148,19 @@ test('node: the committed data file is what the cached bulk file builds', async 
     t.skip('no cached default_cards file: run npm run cards:update once');
     return;
   }
+  const rulings = cachedRulings();
+  if (!rulings || !existsSync(rulings.path)) {
+    t.skip('no cached rulings file: run npm run cards:update once');
+    return;
+  }
+  const rulingsDate = JSON.parse(read('data/rulings/shared.json')).about.updated;
+  if (rulings.updated_at !== rulingsDate) {
+    t.skip(`the cached rulings are from ${rulings.updated_at}, the data's from ${rulingsDate}`);
+    return;
+  }
   const printed = await printedRarities(readBulk(printings.path));
-  assert.equal(await buildCards(readBulk(cached.path), cached.updated_at, cachedNicknames()?.lists ?? {}, printed), dataText);
+  const ruled = await readRulings(readBulk(rulings.path));
+  assert.equal(await buildCards(readBulk(cached.path), cached.updated_at, cachedNicknames()?.lists ?? {}, printed, ruled), dataText);
 });
 
 // r: and in: read every printing's rarity (§3.6), from Scryfall's default_cards, written only where it adds something.

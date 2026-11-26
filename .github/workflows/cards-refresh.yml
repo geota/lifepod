@@ -44,8 +44,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           CARDS_DATE: ${{ steps.refresh.outputs.date }}
           CARDS_COUNT: ${{ steps.refresh.outputs.count }}
+          CARDS_RULINGS: ${{ steps.refresh.outputs.rulings }}
         run: |
-          if git diff --quiet -- data/cards.json data/tags.json; then
+          if git diff --quiet -- data/cards.json data/tags.json data/rulings/; then
             echo "Card data is up to date: Scryfall, $CARDS_DATE." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
@@ -53,11 +54,11 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git switch -c "$branch"
-          git add data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz web/index.html README.md
-          git commit -m "Card data: Scryfall, $CARDS_DATE" -m "$CARDS_COUNT cards, from npm run cards:update (scripts/cards-release.mjs)."
+          git add data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz data/rulings web/data/rulings web/index.html README.md
+          git commit -m "Card data: Scryfall, $CARDS_DATE" -m "$CARDS_COUNT cards and $CARDS_RULINGS rulings, from npm run cards:update (scripts/cards-release.mjs)."
           git push --force origin "$branch"
           title="Card data: Scryfall, $CARDS_DATE"
-          body="Scryfall's Oracle cards from $CARDS_DATE: $CARDS_COUNT cards, checked by tests/cards-data.test.mjs, the card count and the known cards. Opened by the Card data refresh workflow; run CI on this branch before merging."
+          body="Scryfall's Oracle cards from $CARDS_DATE: $CARDS_COUNT cards and $CARDS_RULINGS rulings, checked by tests/cards-data.test.mjs and tests/cards-rulings.test.mjs, the card and ruling counts, the known cards and a known card's rulings. Opened by the Card data refresh workflow; run CI on this branch before merging."
           if gh pr view "$branch" --json state --jq .state 2>/dev/null | grep -q OPEN; then
             gh pr edit "$branch" --title "$title" --body "$body"
           else

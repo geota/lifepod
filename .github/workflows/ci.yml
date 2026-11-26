@@ -16,11 +16,12 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  # Card lookup's data, refreshed from Scryfall for a release (scripts/cards-release.mjs): one bulk download, checked
-  # by tests/cards-data.test.mjs, a card count within 5% of the committed data's and a few known cards. If Scryfall is
-  # down or slow, or a check fails, the committed data ships, with a warning in the job summary; a release never fails
-  # over it. The web, Android and iOS jobs build from this one copy. Off a tag the job is skipped, and every build uses
-  # the committed data/cards.json, so CI on main and pull requests stays reproducible.
+  # Card lookup's data, refreshed from Scryfall for a release (scripts/cards-release.mjs): the cards, tags and rulings,
+  # checked by tests/cards-data.test.mjs and tests/cards-rulings.test.mjs, a card count and a ruling count within 5% of
+  # the committed data's, a few known cards and a known card's rulings. If Scryfall is down or slow, or a check fails,
+  # the committed data ships, cards and rulings together, with a warning in the job summary; a release never fails over
+  # it. The web, Android and iOS jobs build from this one copy. Off a tag the job is skipped, and every build uses the
+  # committed data, so CI on main and pull requests stays reproducible.
   card-data:
     name: Card data for a release
     if: github.event_name == 'push' && github.ref_type == 'tag'
@@ -47,6 +48,8 @@ jobs:
             web/data/cards.json.gz
             data/tags.json
             web/data/tags.json.gz
+            data/rulings/
+            web/data/rulings/
             web/index.html
             README.md
           if-no-files-found: error
@@ -54,6 +57,7 @@ jobs:
       source: ${{ steps.refresh.outputs.source }}
       date: ${{ steps.refresh.outputs.date }}
       count: ${{ steps.refresh.outputs.count }}
+      rulings: ${{ steps.refresh.outputs.rulings }}
 
   web:
     name: Web lint, seating tests, and bundle
@@ -328,11 +332,12 @@ jobs:
           CARDS_SOURCE: ${{ needs.card-data.outputs.source }}
           CARDS_DATE: ${{ needs.card-data.outputs.date }}
           CARDS_COUNT: ${{ needs.card-data.outputs.count }}
+          CARDS_RULINGS: ${{ needs.card-data.outputs.rulings }}
         run: |
           if [[ "$CARDS_SOURCE" == scryfall ]]; then
-            cards="Card data: Scryfall, $CARDS_DATE ($CARDS_COUNT cards), downloaded for this release."
+            cards="Card data: Scryfall, $CARDS_DATE ($CARDS_COUNT cards, $CARDS_RULINGS rulings), downloaded for this release."
           elif [[ -n "$CARDS_DATE" ]]; then
-            cards="Card data: the committed data from Scryfall, $CARDS_DATE ($CARDS_COUNT cards); the refresh failed."
+            cards="Card data: the committed data from Scryfall, $CARDS_DATE ($CARDS_COUNT cards, $CARDS_RULINGS rulings); the refresh failed."
           else
             cards='Card data: the committed data; the refresh job failed.'
           fi
