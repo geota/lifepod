@@ -2,6 +2,8 @@
 
 **Status:** proposal for the owner's review, 23 November 2026, against main `1a9cdb5` (v0.1.0-alpha.17). *Built since (24 November 2026): M1 (the icon), M4 (the undo core) and M5 (the modes on the history and the History sheet), with the open questions on their recommendations: Q4 placement B, Q5 keep the confirmation with its new line, Q8 a 1.5s window from the last tap, Q9 Undo always shown and dimmed, Q10 the running delta for life at rest. M2 and M3 (Treasure, Gold, Keep and the pips) aren't built, so `treasure`, `gold` and `keepMana` aren't board fields yet. See "As built" at the end.*
 
+*Superseded for M2 and M3 (26 November 2026): [MANA-SPEC-v2.md](MANA-SPEC-v2.md) redoes §2–§4 and §7–§10 against the app as it now is (Track, the mana row of alpha.17, Undo and History). Its §13 carries over Q1–Q3, Q6 and Q7.*
+
 - The mock-ups are drawn on the real app (CSS and DOM injected with Playwright, served by `scripts/serve.mjs`) and laid out with captions on the review page: `design-mana-undo/index.html` in this session's scratchpad. Each figure below names its image there.
 - Rules are quoted from the Comprehensive Rules effective 6 November 2026 and card text from Scryfall's Oracle text, both read on 23 November 2026.
 - Sizes follow SPEC.md: design at 952 × 427 first; 640 × 360 and 568 × 320 must keep working; tablets scale through `--grow`.
