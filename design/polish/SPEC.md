@@ -252,9 +252,10 @@ All of these keep 44px targets. Counts shrink their type before they ever leave.
 |---|---|
 | Mode hints ("Tap +1 · hold −1", "Your tile colour") | `ub ≥ 200` and `ui ≥ 240`, as today. Shown on the target; hidden at 640 × 360 and below with 6 players. |
 | Identity toggles | One row of five when `ui ≥ 264`; otherwise 3 + 2, or two to a row where three don't fit. |
-| Mana strip | Never dropped, and its type never shrinks. It has a row of its own above the near row, and folds into its chip where the strip doesn't fit there (§9). The life total gives way for that row first, to no less than two thirds of its size. |
+| Mana strip | Never dropped, and its type never shrinks. It has a row of its own above the near row, and folds into its chip where the strip doesn't fit there (§9). The life total gives way for that row first, to no less than two thirds of its size. *As built (MANA-SPEC-v2):* the strip is one chip tall, in the near row's full type. |
+| Treasure chip | Never dropped (MANA-SPEC-v2 §1.3), a count like the others: it shrinks with the near row's type. |
 | Settings header | Fixed at the top of the full-screen settings page; it tightens to 4px padding under 360px tall (SETTINGS-SPEC.md §3). |
-| Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. |
+| Counter and mana cells | Always icon over count. Cells are 78px on the target and 50px at 568 × 320 with 6 players; never under 44px. *As built (MANA-SPEC-v2 §2):* mana mode takes the seven-cell grid, four to a row, so its cells are 78px on the target at 3–4 players, 69px at 5–6, and 44px at 568 × 320 with 5–6. |
 
 ## 4. Setup with a fixed set of controls (Q4: S2, plus the owner's restyle)
 
@@ -296,7 +297,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 284px tall.
 
 - **Header:** ‹ · "Track" · ✕.
-- **Switch rows, three per line:** Commander, Poison, Energy, Experience, Rad, Mana pool.
+- **Switch rows, three per line:** Commander, Poison, Energy, Experience, Rad, Mana pool (*as built, MANA-SPEC-v2:* Mana and Treasure).
 - **Turns:** segmented Off · Rounds · Turn by turn.
 - **"Empty mana pools when the turn passes":** a switch row, shown only while Mana pool is on and Turns isn't Off.
 
@@ -352,7 +353,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ![Badges](renders/spec-badges.png)
 
-- **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero, then the monarch's crown and the initiative's castle on their holder's tile (§13).
+- **Near row, as today:** the identity chip, then poison, tax, energy, experience and rad, each only when it's set or above zero, then the monarch's crown and the initiative's castle on their holder's tile (§13). *As built (MANA-SPEC-v2 §1.3):* Treasure's chip, a button, comes after rad and before the crown, while Mana and Treasure is on and the count is above 0.
 - It usually stays on one line at full size on the target; the worst case drops names there (§3.2). On smaller phones the auto-drop rules (§3.2) take the name, then the symbol, then wrap or shrink; the identity chip and its indicator always stay.
 - **Decision: not the right side.** I mocked it with and without the identity chip. Reasons:
   - A column needs the + glyph to move in by 34px, which collides with the total at 6 players.
@@ -442,6 +443,22 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
   - Each round step (Rounds) or turn pass (Turn by turn) empties every pool.
   - The step stores what it emptied, and holding back that same step restores it.
 - Steps and phases aren't tracked, so mid-turn emptying is manual: one tap per pool.
+- *As built (design/polish/MANA-SPEC-v2.md, 26 November 2026):* the switch is **Mana and Treasure**, and three things joined this section.
+  - **Treasure:** a count per player (`game.treasure`, 0–99) that only a new game empties. In mana mode it's a counter cell, the Mana font's gold counter `ms-counter-gold` (`\e934`) in `--text` over the count, tap +1 and hold −1. At rest it's a chip in the near row after rad while above 0, a button with the folded chip's look (the button fill, a 1.5px `--rim` ring and a 44 × 44 touch area); a tap uses one with no colour pick, and at 0 the chip stays dimmed for `stripHoldTime`, then goes. It doesn't light the pill's mana dot.
+  - **Keep:** one on or off per player (`game.keepMana`), "don't empty this pool when the turn passes". In mana mode it's a toggle cell in the designation cells' language (`aria-pressed`): a 2px outline in `--text-soft` at 55% with the lock and "Keep" when off; the seat colour with the identity toggles' check when on. It shows only while pools can empty (Mana and Treasure on, auto-empty on and Turns not Off; `poolsCanEmpty`), and the saved values stay while it's hidden. At rest a small lock in `--text-soft` leads a kept pool's strip and folded chip; it isn't a target. A turn pass empties only the pools nobody kept (`turnPassPools`), and its step and the turn chip's hold store only those, so Undo restores exactly them; the announcement adds "Player 4's mana kept".
+  - **Mana mode's grid:** W U B over R G C, as before, and a fourth column for what stays, Treasure over Keep, on the counters mode's seven-cell grid (cell `clamp(44px, min((ui − 42px) / 4, (ub − 10px − pill) / 2), 92 × grow)`, gaps closing to 2px before a cell goes under 44px). A face too narrow for four takes three, with Treasure and Keep as a third row. A 1px rule in `--text` at 22% splits the colours from that column where the gap is 6px or more.
+  - **The strip is one chip tall:** 1.7em of the near row's full type, with 1.38em pips, each spend button at least 44px wide with a 44 × 44 touch area through `::after`, as the folded chip has. Colour and count at every amount, as before; its places and fold rules are unchanged. With one floating mana on every tile (alternating red and blue, a poison count, an identity chip and commander damage from every opponent):
+
+    | Screen | Players | No mana | Before (44px strip) | As built |
+    |---|---|---|---|---|
+    | 952 × 427 | 3 / 4 | 81px | row, 76 / 74px | row, 81px |
+    | | 5–6 | 81px | row, 81px | row, 81px |
+    | 852 × 393 | 3 / 4 | 75px | row, 63 / 60px | row, 75px |
+    | | 5–6 | 75px | row, 69px | row, 75px |
+    | 640 × 360 | 3–6 | 68px | row, 54px | row, 68px |
+    | 568 × 320 | 3 | 61px | folded (the end seat a row), 59px | row, 59px: the spend buttons stay |
+    | | 4–6 | 61px | folded, 57px | row, 57px: the spend buttons stay |
+    | 1366 × 1024 | 3–6 | 195 / 191px | row, unchanged | row, unchanged |
 
 ## 10. Data model and settings
 
@@ -455,6 +472,8 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | `energy`, `experience`, `rad` | int[players], 0–99 | zeros | `fitCounts` |
 | `pools` | int[players][6] (W U B R G C), 0–99 | zeros | new `fitPools` |
 | `manaPool` | boolean | false | |
+| `treasure` | int[players], 0–99 (MANA-SPEC-v2) | zeros | `fitCounts` |
+| `keepMana` | boolean[players] (MANA-SPEC-v2) | all false | each `=== true` (`fitFlags`) |
 | `autoEmpty` | boolean | true | `!== false` |
 | `turns` | `'off' \| 'rounds' \| 'turns'` | `'off'` | enum |
 | `turn` | `{ first: int\|null, active: int\|null, round: int 1–999 }` | `{ null, null, 1 }` | indices must be valid seats; the round is capped at `maxRound` (999), and turn steps hold there |
@@ -473,7 +492,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.2 New game
 
-- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
+- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, Treasure and every Keep (MANA-SPEC-v2), `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
 - **Opens** "Who goes first?" if Turns isn't Off.
 - **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the tab Track opens on (§14), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
 - **Shuffle tile colours each game** (Settings → Table, off by default, `game.shuffleColours`): when on, a new game gives every player a random, distinct swatch instead, from `crypto.getRandomValues` through `randomBelow` (no modulo bias), with each seat in a different colour family of the tile set while families last (`tileSets[…].families`, six per set, found by `design/polish/tiles7.mjs`; TILES.md). `loadGame` keeps it only if it was saved as exactly `true`.
@@ -493,7 +512,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 | Where | How |
 |---|---|
-| **Anything at rest:** life, spending floating mana, the eraser, turn steps (with what they emptied), "Who goes first?", New game | **Undo** in the centre: back one step per tap. Quick taps on one tile and count are one step while each comes within 1.5s of the last; the running delta shows it. **Redo** on the toast after an undo, beside Undo for keyboards, or in History. Any new game action ends Redo. |
+| **Anything at rest:** life, spending floating mana, the eraser, using a Treasure, turn steps (with what they emptied), "Who goes first?", New game | **Undo** in the centre: back one step per tap. Quick taps on one tile and count are one step while each comes within 1.5s of the last; the running delta shows it. **Redo** on the toast after an undo, beside Undo for keyboards, or in History. Any new game action ends Redo. |
 | Counters, commander damage and mana in their modes | The same history. The mode's Undo stops at what was changed in the mode; ✓ closes; ✕ asks, then undoes the mode's changes (which Redo can bring back). Transfers of the monarch and the initiative are in the step that caused them. In Track (§14), one visit across its tabs is one mode: Undo switches to the tab its step was taken on. |
 | Many steps at once | Hold Undo (or Settings → Game → History): the list, Back and Forward, or tap a row to go back to it. |
 | Turn steps, the turn chip or pill held | Steps back one turn, restoring what that pass emptied. It's a step of its own, so Undo can take it back. |
@@ -610,7 +629,7 @@ The owner chose PILL-SPEC.md's option A, Track, "only when it's needed. E.g. on 
   - In its mode: [damage | counters | mana] ‖ Undo · ✓ · ✕. Only the tabs whose features are on show. Commander alone gives two, since commander tax is a counter. With one on there's nothing to merge, and that one keeps its own button.
   - The open tab is in the chosen tint (Accent L3: `--chosen-fill`, `--chosen-ink`, `--chosen-ring`), never solid lime, and its mana pip takes an accent ring. A 2px rule in `--text-soft` at 45% sets the tabs off from Undo.
   - A tap on a tab switches the tiles' layers in place. It isn't a step, and it saves no edit.
-  - **Undo, ✓ and ✕ cover the whole visit across tabs.** Undo goes back newest first, and a step taken on another tab opens that tab first (`stepTab` in `logic/history.js`), so the change is seen; it stops at the visit's start. ✕ asks "Discard N changes?" and names what goes back: "Commander damage, life, counters and mana pools go back to how they were when you opened Track." ✓ saves and closes. Android back is ✕.
+  - **Undo, ✓ and ✕ cover the whole visit across tabs.** Undo goes back newest first, and a step taken on another tab opens that tab first (`stepTab` in `logic/history.js`), so the change is seen; it stops at the visit's start. ✕ asks "Discard N changes?" and names what goes back: "Commander damage, life, counters and mana pools go back to how they were when you opened Track." *As built (MANA-SPEC-v2 §5.3):* Treasure and Keep steps belong to the mana tab, and the mana tab's words are "mana pools and Treasure". ✓ saves and closes. Android back is ✕.
   - **Re-entry opens the last tab,** saved as `game.trackTab` (§10.1), or the first that's still on. A tile's chip opens its own tab directly (the mana strip's folded chip opens mana, "Pass it on" opens counters), and that becomes the remembered tab. Any editing mode opening, from a button, Track or a chip, becomes the remembered tab, in either form of the pill.
 - **When it collapses** (`pillFit` in `logic/rules.js`, decided by `measureBoard()`):
   - The pill's room is the seam it sits on, less 4px at each end: the board's height with 2 players (the pill stands upright), and otherwise the columns whose seats split into two rows (3 players: one column, 283px at 568 × 320).
