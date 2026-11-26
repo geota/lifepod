@@ -95,6 +95,9 @@ dialog[open], dialog[open]::backdrop { transition: opacity var(--motion) var(--e
 /* Labels outside the fitted compact groups, and those in a group already stacked, wrap rather than end in an ellipsis
    under larger text or the WCAG text-spacing overrides (ACCESSIBILITY.md L7). */
 :is(.fs-action, .reminder-grid .compact-switch, [data-stacked] .compact-switch) > .nav-label { white-space: normal; line-height: 1.2; }
+/* Track's switches too: "Mana and Treasure" is the longest, and a font a hair wider than the test's (Linux) cut it short at
+   852 × 393. Two lines fit the row's 44px. */
+.tracker-grid .compact-switch > .nav-label { white-space: normal; line-height: 1.2; }
 /* A row on its own has no divider, and a group's last row covers its own (Glass: DESIGN-AUDIT S10), however many
    columns the group has and whichever rows are hidden. */
 .wide-switch { --row-divider: transparent; }
