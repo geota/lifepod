@@ -55,7 +55,7 @@ A Treasure is sacrificed while paying (CR 605.3a–b), so its mana is spent as i
 
 *Mocks: `rest-952-4`, `rest-952-4-detail`, `use-952-4`.*
 
-- **A count chip in the near row,** shown only while the count is above 0: the icon in the seat colour, then the count. The order becomes: turn chips, identity, poison, tax, energy, experience, rad, **Treasure, Gold**, monarch, initiative.
+- **A count chip in the near row,** shown only while the count is above 0: the icon, then the count. The icon (owner, 26 November) is the Mana font's gold counter, `ms-counter-gold` (U+E934), for both tokens: **Treasure's in white** (`--text`), **Gold's in gold** (a new `--token-gold` token, about `#e2b84a`, checked at 3:1 against the chip and tile fills in both styles). Add U+E934 to the font subset. The order becomes: turn chips, identity, poison, tax, energy, experience, rad, **Treasure, Gold**, monarch, initiative.
 - **It's a button,** so it has the folded chip's look: the `--button` fill, a 1.5px `--rim` ring and a 44 × 44 target through `::after`, as the turn chip has. The plain counts beside it have no ring, so the ring is what says "tap me".
 - **A tap uses one,** with a haptic and a polite announcement: "Player 3, Treasure 3 → 2". When the count reaches 0, the chip stays in place, dimmed, for `stripHoldTime` (800ms), so a quick second tap can't land on the crown sliding under the finger. Then it goes.
 - **Never dropped** (SPEC §3.2's list of counts). It shrinks with the near row's type like any count.
@@ -71,7 +71,7 @@ A Treasure is sacrificed while paying (CR 605.3a–b), so its mana is spent as i
 - **The colours keep today's block:** W U B over R G C, in the same cells, gestures and style (tap +1, hold −1 with repeat, the hidden "Remove one" buttons).
 - **What stays takes a fourth column:** Treasure on top. Under it is Keep when Keep shows, Gold when Gold is on and Keep doesn't show, or nothing.
 - **A 1px rule** in `--text` at 22% sits in the gap between the colours and that column wherever the gap is 6px or more, so "this empties" and "this stays" read as two groups. Where the gap closes to 2px the rule hides, and the different cells (mana symbols against icons) carry the split.
-- **Treasure and Gold cells are counter cells:** the icon in the seat colour over the count, 0 muted, and a hidden "Remove one Treasure from Player 2" button.
+- **Treasure and Gold cells are counter cells:** the gold-counter icon (Treasure white, Gold gold, as at rest) over the count, 0 muted, and a hidden "Remove one Treasure from Player 2" button.
 - **The layout follows the counters mode's seven-cell grid** (`fitModeGrids` in `layout/board.js`, `.board[data-cell-grid="4"]` in `modes.css`):
   - **The cell:** `clamp(44px, min((ui − 42px) / 4, (ub − 10px − pill) / 2), 92 × grow)`.
   - **The gaps:** `clamp(2px, (ui − 12px − 4 × cell) / 3, 10px)`. They close before a cell would go under 44px.
@@ -290,7 +290,7 @@ Carried from the first spec where they're still open, and new ones from the curr
 | Q1 | Rename Settings → Track → "Mana pool" to **"Mana and Treasure"**, so players who only want Treasure find it? | Yes. Track's name keeps saying "mana". |
 | Q2 | At rest, should a tap on a Treasure chip **use one**, or **open mana mode**? | Use one. Undo makes a stray tap cheap, and its toast names it. |
 | Q3 | Keep: on and off only, or a third state **"Keep as colourless"** for Kruphix, Horizon Stone and Omnath, Locus of the Void? | On and off now. Add the third state only if players ask. |
-| Q6 | Treasure's icon: a **chest** (mocked) or Phosphor's **coins**? | The chest, if it reads at 44px on a device; coins otherwise. |
+| Q6 | ~~Treasure's icon: a chest or coins?~~ | **Decided (owner):** the Mana font's gold counter (U+E934) for both, Treasure white and Gold gold. |
 | Q7 | Gold behind its own **Gold tokens** switch (off by default), or always beside Treasure? | Its own switch. Four cards make Gold, and it's what overfills the smallest boards. |
 | Q8 *(new)* | **The corner:** 640 × 360 and 568 × 320 at 5–6 players, with Gold and auto-empty on, can't fit nine 44px controls. Is Keep as a lock toggle on the floating pool at rest (`rest-568-6-corner`) acceptable there? | Yes. Keep only matters while mana floats, which is exactly when the lock shows, and the corner needs three rare settings at once. |
 | Q9 *(new)* | **Keep's look:** a designation-style cell, outlined when off (mocked), or a smaller checkbox-and-word control? | The cell. It's the same toggle language as the crown and castle, it's a full 44px target everywhere, and outlined it's the lightest thing in the grid. |
