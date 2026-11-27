@@ -434,16 +434,21 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 }
 
-// The running delta sits directly above its total, centred on it (the owner's rule, alpha.20), facing the player on every
-// seat: clear of the far row, the folded mana chip under it, the mana strip, the near row, the − and + glyphs and the
-// pill, and above the total's box. Boards from the target down to the stress size, with commander damage on every tile,
-// with and without floating mana and Treasure, turned faces at 2 players, and a rotated seat.
+// The running delta (the owner's rules, alpha.20) sits directly above its total, centred on it, facing the player on every
+// seat; where it can't fit there even at its 14px floor, it sits beside the total, by the digits. Either way it
+// never covers the digits, the far row, the folded mana chip under it, the mana strip, the near row, the − and + glyphs
+// or the pill. Every sweep size at 2–6 players with floating mana and Treasure on every tile (which lifts the totals
+// toward the far row), the stress sizes without them too, and a rotated seat.
+const sweepSizes = [[952, 427], [852, 393], [640, 360], [568, 320], [375, 667], [320, 568], [841, 701], [1366, 1024]];
 async function checkDeltaPlace(t, engine) {
   const page = await openPage(t, engine, { clock: true, viewport: { width: 952, height: 427 } });
   const boards = [
-    [952, 427, 4, false], [952, 427, 6, true], [568, 320, 2, false], [568, 320, 6, true], [568, 320, 4, false, [1, 0, 0, 0]], [1366, 1024, 4, true],
+    ...sweepSizes.flatMap(([width, height]) => [2, 3, 4, 5, 6].map(count => [width, height, count, true])),
+    ...[2, 3, 4, 5, 6].map(count => [568, 320, count, false]), ...[2, 4, 6].map(count => [320, 568, count, false]),
+    [952, 427, 4, false, [1, 0, 0, 0]], [568, 320, 4, true, [1, 0, 0, 0]],
   ];
   const overlaps = (a, b) => a && b && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  let beside = 0;
   for (const [width, height, count, mana, rotations] of boards) {
     await page.setViewportSize({ width, height });
     const zero = Array(count).fill(0);
@@ -452,20 +457,41 @@ async function checkDeltaPlace(t, engine) {
       commanderDamage: zero.map((_, d) => zero.map((__, a) => (a === d ? 0 : 3 + a))),
       manaPool: mana, pools: zero.map((_, i) => [0, i % 2, 0, (i + 1) % 2, 0, 0]), treasure: zero.map(() => 2),
     }));
+    // Two taps on every tile, and twelve on the third, for a two-digit delta.
     for (let number = 1; number <= count; number++) {
-      for (let tap = 0; tap < 2 + number; tap++) await (number % 2 ? add : subtract)(page, number).tap();
+      for (let tap = 0; tap < (number === 3 ? 12 : 2); tap++) await (number % 2 ? add : subtract)(page, number).tap();
     }
     const view = `${width} × ${height}, ${count} players${mana ? ', mana and Treasure' : ''}${rotations ? ', a rotated seat' : ''}`;
     const faces = await faceBoxes(page, {
       delta: '.life-delta:not([hidden]) .life-delta-value', score: '.score', far: '.badges.far > *', farChip: '.mana-far > *',
       strip: '.mana-strip > *', near: '.badges.near > *', subtract: '.controls .subtract .icon', add: '.controls .add .icon',
     });
+    // Where the digits are in each total's box, from the font's own metrics (line-height 1, no descenders).
+    const insets = await page.locator('.score').evaluateAll(scores => scores.map((score) => {
+      const style = getComputedStyle(score);
+      const size = parseFloat(style.fontSize);
+      const context = document.createElement('canvas').getContext('2d');
+      context.font = `${style.fontWeight} ${size}px ${style.fontFamily}`;
+      const metrics = context.measureText(score.value);
+      const tallest = context.measureText('0123456789').actualBoundingBoxAscent;
+      const baseline = (size - metrics.fontBoundingBoxAscent - metrics.fontBoundingBoxDescent) / 2 + metrics.fontBoundingBoxAscent;
+      return { top: baseline - Math.max(metrics.actualBoundingBoxAscent, tallest), bottom: baseline };
+    }));
     faces.forEach((face, index) => {
       const seat = `${view}, P${index + 1}`;
       assert.ok(face.delta, `${seat}: the delta shows`);
-      const off = (face.delta.left + face.delta.right) / 2 - (face.score.left + face.score.right) / 2;
-      assert.ok(Math.abs(off) <= 1, `${seat}: centred on the total (${off.toFixed(1)}px off)`);
-      assert.ok(face.delta.top <= face.score.top + 0.5, `${seat}: above the total (${face.delta.top} against ${face.score.top})`);
+      const digits = { left: face.score.left, right: face.score.right, top: face.score.top + insets[index].top, bottom: face.score.top + insets[index].bottom };
+      assert.ok(!overlaps(face.delta, digits), `${seat}: clear of the digits (${JSON.stringify(face.delta)} against ${JSON.stringify(digits)})`);
+      if (face.delta.right <= digits.left + 0.5 || face.delta.left >= digits.right - 0.5) {
+        beside += 1;
+        // At the digits' vertical centre, or as near it as clears the glyph, no more than its height past their top or bottom.
+        const height = face.delta.bottom - face.delta.top;
+        assert.ok(face.delta.bottom >= digits.top - height - 0.5 && face.delta.top <= digits.bottom + height + 0.5, `${seat}: beside the total, level with the digits (${face.delta.top}–${face.delta.bottom} against ${digits.top.toFixed(1)}–${digits.bottom.toFixed(1)})`);
+      } else {
+        const off = (face.delta.left + face.delta.right) / 2 - (face.score.left + face.score.right) / 2;
+        assert.ok(Math.abs(off) <= 1, `${seat}: centred on the total (${off.toFixed(1)}px off)`);
+        assert.ok(face.delta.bottom <= digits.top + 0.5, `${seat}: above the digits`);
+      }
       for (const part of ['far', 'farChip', 'strip', 'near', 'subtract', 'add']) assert.ok(!overlaps(face.delta, face[part]), `${seat}: clear of ${part}`);
     });
     const pill = await page.locator('.life-delta-value').evaluateAll((values) => {
@@ -478,8 +504,9 @@ async function checkDeltaPlace(t, engine) {
     assert.equal(pill, 0, `${view}: clear of the pill`);
     await page.clock.runFor(mergeWindow + deltaFade);
   }
+  assert.ok(beside > 0, 'some tight tiles put the delta beside the total');
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: the running delta sits centred above its total, clear of the rows and the pill`, t => checkDeltaPlace(t, engine));
+  test(`${name}: the running delta sits centred above its total, or beside it where there's no room, never over the digits`, { timeout: 600000 }, t => checkDeltaPlace(t, engine));
 }

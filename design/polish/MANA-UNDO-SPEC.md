@@ -339,19 +339,26 @@ Up and down merge together, so a burst is its **net** change: −3 then +1 is "l
 
 *Mock: Player 3 tapping − three times while Player 2 taps + twice (`burst-952-4.png`, `burst-568-6.png`, `burst-952-4-glass.png`).*
 
-> **Moved in alpha.20 (the owner's request):** the capsule sits **directly above the total, centred on it** (within 1px), facing the player like everything on the tile. `layout/delta.js` places it: 2px above the digits' tops (measured from the total's font), and 2px below whatever is above (the far row, the folded mana chip under it, and the far edge's clearance of the pill). Where that room is shorter than the capsule, its type shrinks toward its 14px floor, then it keeps the 2px from the far row and comes down over the digits' tops only as far as it must. It never overlaps the far row, the mana strip, the near row, the − and + glyphs or the pill; its look, timing and silence (it isn't announced) are unchanged. The total's text is centred in its cell, so the delta is centred on the digits even when the "Out" tag is wider.
+> **Moved in alpha.20 (the owner's requests):** the capsule sits **directly above the total, centred on it** (within 1px), facing the player like everything on the tile; and where it can't sit there without covering the digits, **beside the total** instead. `layout/delta.js` places it, in order:
 >
-> Measured across the sweep (Chromium, both styles, 2–6 players, every tile in a burst), on three boards: commander damage from every opponent with counters and the turn chip (plain); the same with one floating mana and Treasure on every tile (mana); and six colours on every tile with Larger badges (busy). It overlapped no row, glyph or pill anywhere, and was centred within 1px everywhere. Where it comes down over the digits:
+> 1. **Above:** 2px above the digits' tops (the tallest digit, measured from the total's font) and 2px below whatever is above (the far row, the folded mana chip under it, and the far edge's clearance of the pill). Where that room is short, its type shrinks toward its 14px floor.
+> 2. **Beside:** where even 14px doesn't fit above, it sits 2px from the digits at their vertical centre, on the side away from the pill where that fits, else the other side, 2px clear of the − and + glyphs, the rows, the face's edges and the pill. Where the glyph is in the way at the centre, it moves up or down to the nearest clear spot, at most its own height past the digits' top or bottom (on a short tile, the gap above or below the glyph). It tries full type, then the floor, and on the tightest tiles goes below the floor, down to 10px, rather than cover the digits.
+> 3. **Last resort:** only if nothing fits even at 10px, above, over the digits' tops as little as it must.
+>
+> It never overlaps the far row, the mana strip, the near row, the − and + glyphs or the pill; its look, timing and silence (it isn't announced) are unchanged. The total's text is centred in its cell, so the delta is centred on the digits even when the "Out" tag is wider.
+>
+> Measured across the sweep (Chromium, both styles, 2–6 players, every tile in a burst), on three boards: commander damage from every opponent with counters and the turn chip (plain); the same with one floating mana and Treasure on every tile (mana); and six colours on every tile with **Larger** badges (busy):
 >
 > | Screen | Plain | Mana | Busy |
 > |---|---|---|---|
-> | 952 × 427 | never | never | 4–6 players, up to 9px (21% of the digits) |
-> | 852 × 393 | never | 3–6 players, 3px (6%) | 4–6 players, 9px (25%) |
-> | 640 × 360, 375 × 667 | never | never | 4–6 players, 9px (22–25%) |
-> | 568 × 320, 320 × 568 | 3–6 players, 7px (16%) | 3–6 players, 9px (22%) | 3–6 players, 11px (33%) |
-> | 841 × 701, iPad | never | never | never |
+> | 952 × 427 | above | above | beside at 4–6 players |
+> | 852 × 393 | beside at 3 players, else above | beside at 3 players, else above | beside at 4–6 players |
+> | 640 × 360 | beside at 3–6 players | beside at 3–6 players | beside at 4–6, the capsule at 11px for 5–6 |
+> | 568 × 320, 320 × 568 | beside at 3–6 players | beside at 3–6, the capsule at 10px for 5–6 | beside at 3–4; **at 5–6 the last resort** (the 44px totals leave no 10px spot off the digits) |
+> | 375 × 667 | above | above | beside at 4–6 players |
+> | 841 × 701, iPad | above | above | above |
 >
-> At 2 players it never does. The capsule is at its 14px floor in every row with a figure.
+> At 2 players it's always above. The only boards that reach the last resort combine the stress size, 5–6 players, every colour floating on every tile and the Larger Badge size; `tests/undo.test.mjs` checks every sweep size at 2–6 players at the default Badge size, where it never covers the digits.
 
 **Recommended.** While a life burst is open, the total carries a small capsule at its top end corner (−3 or +2), like a notification badge on the number.
 
