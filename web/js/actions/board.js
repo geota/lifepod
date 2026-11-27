@@ -11,7 +11,7 @@ import { renderBadges, renderPassHints } from '../render/badges.js';
 import { paintColours, renderScore } from '../render/tile.js';
 import { currentLandscapeAngle, haptic, reducedMotion } from '../state/platform.js';
 import { clearToasts, closeBurst } from '../state/history.js';
-import { game, stripHolds, turnSteps } from '../state/state.js';
+import { game, stripHolds, tokenHolds, turnSteps } from '../state/state.js';
 import { board, playerTemplate } from '../ui/dom.js';
 import { bindCounter, cancelPresses } from '../ui/press.js';
 import { commit } from './commit.js';
@@ -78,8 +78,9 @@ export function renderBoard() {
       announceLife(index);
     }
 
-    // While the strip is being tapped, a touch on the life buttons under it is a tap meant for the strip (mana.js).
-    const stripTapped = () => stripHolds.has(index);
+    // While the strip is being tapped (a colour or its Treasure), a touch on the life buttons under it is a tap meant for
+    // the strip (mana.js).
+    const stripTapped = () => stripHolds.has(index) || tokenHolds.has(index);
     bindCounter(player.querySelector('.subtract'), () => changeLife(-1), `Subtract one life from ${name}`, stripTapped);
     bindCounter(player.querySelector('.add'), () => changeLife(1), `Add one life to ${name}`, stripTapped);
     const rotateSeat = player.querySelector('.rotate-seat');

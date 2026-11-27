@@ -149,14 +149,21 @@ function turnItems(index) {
   return items;
 }
 
-// Whether a tile's strip shows: while its pool has mana, and while it's being tapped.
+// Whether a tile's strip shows: while its pool has mana or its player has Treasure (MANA-SPEC-v2's as-built note, alpha.20),
+// and while either is being tapped.
 function stripShows(index) {
-  return game.manaPool && (hasMana(game, index) || stripHolds.has(index));
+  return game.manaPool && (hasMana(game, index) || treasureShows(index) || stripHolds.has(index));
 }
 
-// A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then the eraser. While
-// the strip is being tapped, its colours keep their places, at 0 once spent or erased (actions/mana.js), so a quick
-// extra tap lands where it was aimed.
+// Whether a tile's strip holds its Treasure: while the count is above 0, and while it's being tapped, dimmed at 0.
+function treasureShows(index) {
+  return game.treasure[index] > 0 || tokenHolds.has(index);
+}
+
+// A tile's mana strip at rest: each colour its pool holds, with its amount (tap to spend one), then Treasure, set apart
+// because it stays (a tap uses one), then the eraser, which empties the colours only. With only Treasure, the strip holds
+// just that, led by Keep's lock where it shows. While the strip is being tapped, its colours keep their places, at 0 once
+// spent or erased (actions/mana.js), and Treasure at 0, dimmed, so a quick extra tap lands where it was aimed.
 /** @returns {Keyed[]} */
 function stripItems(index) {
   const held = stripHolds.get(index)?.colours;
@@ -189,12 +196,14 @@ function stripItems(index) {
     create: () => {
       const button = element('button', 'strip-clear', icon('eraser'));
       button.type = 'button';
-      button.setAttribute('aria-label', `Clear Player ${index + 1}'s mana pool`);
+      // It never touches Treasure, so its name says what it empties.
+      button.setAttribute('aria-label', `Empty floating mana, Player ${index + 1}`);
       bindTap(button, () => badgeActions.clearPool(index));
       return button;
     },
   };
-  return [...(keptShows(index) ? [keepLockItem()] : []), ...spends, eraser, stripChipItem(index)];
+  return [...(keptShows(index) ? [keepLockItem()] : []), ...spends, ...(treasureShows(index) ? [treasureItem(index)] : []),
+    ...(spends.length ? [eraser] : []), stripChipItem(index)];
 }
 
 // Whether a tile's strip and folded chip show Keep's small lock at rest (MANA-SPEC-v2 §4.2): Keep is on and pools can
@@ -221,7 +230,8 @@ function stripChipItem(index) {
       return chip;
     },
     update: (chip) => {
-      // One colour and its amount, or several colours' symbols stacked before the pool's total, so the chip stays short.
+      // One colour and its amount, or several colours' symbols stacked before the pool's total, so the chip stays short,
+      // then Treasure's gold counter and count.
       const held = manaColours.map((colour, at) => ({ colour, amount: game.pools[index][at] })).filter(({ amount }) => amount > 0);
       const pip = (colour) => {
         const symbol = element('span', 'pip');
@@ -231,10 +241,13 @@ function stripChipItem(index) {
       const parts = held.length > 1
         ? [element('span', 'summary-item', ...held.map(({ colour }) => pip(colour)), String(held.reduce((sum, { amount }) => sum + amount, 0)))]
         : held.map(({ colour, amount }) => element('span', 'summary-item', pip(colour), String(amount)));
+      const treasure = game.treasure[index];
+      if (treasure > 0) parts.push(element('span', 'summary-item summary-token', manaIcon('treasure'), String(treasure)));
       const kept = keptShows(index);
       chip.replaceChildren(...(kept ? [element('span', 'keep-lock', icon('lock'))] : []), ...parts, icon('caret-right'));
       const total = held.reduce((sum, { amount }) => sum + amount, 0);
-      chip.setAttribute('aria-label', `${total} mana${kept ? ', kept' : ''}. Player ${index + 1}'s pool: ${poolText(game, index)}. Open mana`);
+      const words = [...(total ? [`${total} mana${kept ? ', kept' : ''}`] : []), ...(treasure ? [`${treasure} Treasure`] : [])].join(' and ');
+      chip.setAttribute('aria-label', `${words || 'No mana'}. Player ${index + 1}${total ? `'s pool: ${poolText(game, index)}` : ''}. Open mana`);
     },
   };
 }
@@ -293,14 +306,14 @@ function counterItem(kind, value) {
   };
 }
 
-// A Treasure chip (MANA-SPEC-v2 §1.3): the gold counter and the count, a button whose tap uses one. Used to 0, it stays,
-// dimmed, while the chip is being tapped (actions/mana.js), then goes.
+// Treasure on the strip (MANA-SPEC-v2 §1.3, moved from the near row): the gold counter and the count, a button whose tap
+// uses one. Used to 0, it stays, dimmed, while it's being tapped (actions/mana.js), then goes.
 /** @returns {Keyed} */
 function treasureItem(index) {
   return {
     key: 'treasure',
     create: () => {
-      const chip = element('button', 'chip token-chip', manaIcon('treasure'), '');
+      const chip = element('button', 'strip-token', manaIcon('treasure'), '');
       chip.type = 'button';
       chip.dataset.token = 'treasure';
       bindTap(chip, () => badgeActions.useTreasure(index));
@@ -317,7 +330,8 @@ function treasureItem(index) {
   };
 }
 
-// The near row: the turn chips, the identity, each counter that's set, Treasure, then the holder's designations.
+// The near row: the turn chips, the identity, each counter that's set, then the holder's designations. Treasure is on
+// the mana strip.
 /** @returns {Keyed[]} */
 function nearItems(index) {
   const items = turnItems(index);
@@ -330,7 +344,6 @@ function nearItems(index) {
     const value = game[kind][index];
     if (value !== 0) items.push(counterItem(kind, value));
   }
-  if (game.manaPool && (game.treasure[index] > 0 || tokenHolds.has(index))) items.push(treasureItem(index));
   for (const designation of trackedDesignations(game)) {
     if (game[designation.kind] === index) items.push(designationItem(designation, index));
   }

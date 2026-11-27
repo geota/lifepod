@@ -293,7 +293,7 @@ for (const [name, engine] of Object.entries(engines)) {
   });
 
   // The tabs in both styles: the open tab in the chosen tint (Accent L3), never solid lime, every tab a 44px target, and
-  // a 2px rule before Undo.
+  // a 2px rule before save (Undo comes before the tabs, PILL-CENTER-SPEC.md).
   test(`${name}: Track's open tab takes the chosen tint in both styles, never solid lime`, async (t) => {
     for (const style of ['material', 'glass']) {
       const page = await openPage(t, engine, { viewport: { width: 568, height: 320 }, orientation: 90, game: busyGame(2, { style }) });
@@ -303,15 +303,58 @@ for (const [name, engine] of Object.entries(engines)) {
         return { selected: tab.getAttribute('aria-selected'), fill: disc.backgroundColor, ink: getComputedStyle(tab).color, size: [tab.offsetWidth, tab.offsetHeight] };
       }));
       const [chosen, ink, commit, rule] = [await token(page, '--chosen-fill'), await token(page, '--chosen-ink'), await token(page, '--commit-fill'),
-        await page.locator('#undo-button').evaluate(node => getComputedStyle(node, '::after').width)];
+        await page.locator('#save-button').evaluate(node => getComputedStyle(node, '::after').width)];
       const tabs = await read();
       const open = tabs.find(tab => tab.selected === 'true');
       assert.deepEqual({ fill: open.fill, ink: open.ink }, { fill: chosen, ink }, `${style}: the open tab is in the chosen tint`);
       assert.notEqual(open.fill, commit, `${style}: never solid lime`);
       assert.ok(tabs.filter(tab => tab.selected === 'false').every(tab => tab.fill !== chosen), `${style}: only the open tab`);
       assert.ok(tabs.every(tab => tab.size.every(side => side >= 44)), `${style}: every tab is a 44px target`);
-      assert.equal(rule, '2px', `${style}: a 2px rule sets the tabs off from Undo`);
+      assert.equal(rule, '2px', `${style}: a 2px rule sets the tabs off from save`);
       await page.close();
+    }
+  });
+
+  // The pill reads Undo · the modes (or Track) · the round · the tools (PILL-CENTER-SPEC.md, option A): the round within
+  // half a button of its seam's centre, Undo at one end at rest and in every mode, and the pill centred on its seam.
+  test(`${name}: the round sits near the pill's centre, with Undo leading it`, async (t) => {
+    const page = await openPage(t, engine, { viewport: { width: 952, height: 427 }, orientation: 90 });
+    const read = () => page.evaluate(() => {
+      const controls = document.querySelector('#board-controls');
+      const vertical = controls.hasAttribute('data-vertical');
+      const board = document.querySelector('#board').getBoundingClientRect();
+      const buttons = [...controls.querySelectorAll('.pill-button')].filter(node => node.checkVisibility() && node.offsetWidth);
+      const along = (box) => (vertical ? (box.top + box.bottom) / 2 : (box.left + box.right) / 2);
+      const centre = vertical ? (board.top + board.bottom) / 2 : (board.left + board.right) / 2;
+      const round = document.querySelector('#round-button');
+      const size = buttons[0].offsetWidth;
+      const pill = buttons.map(node => node.getBoundingClientRect());
+      return {
+        order: buttons.map(node => node.id.replace(/-button$|^track-tab-/g, '')),
+        round: round.checkVisibility() ? (along(round.getBoundingClientRect()) - centre) / size : null,
+        pill: ((vertical ? Math.min(...pill.map(box => box.top)) + Math.max(...pill.map(box => box.bottom)) : Math.min(...pill.map(box => box.left)) + Math.max(...pill.map(box => box.right))) / 2 - centre),
+      };
+    });
+    const cases = [
+      [952, 427, 4, {}, ['undo', 'damage', 'counters', 'mana', 'round', 'lookup', 'dice', 'setup']],
+      [952, 427, 6, {}, ['undo', 'damage', 'counters', 'mana', 'round', 'lookup', 'dice', 'setup']],
+      [952, 427, 4, { counters: { commander: true }, manaPool: false }, ['undo', 'damage', 'counters', 'round', 'lookup', 'dice', 'setup']],
+      [568, 320, 2, {}, ['undo', 'track', 'round', 'lookup', 'dice', 'setup']],
+      [1366, 1024, 4, {}, ['undo', 'damage', 'counters', 'mana', 'round', 'lookup', 'dice', 'setup']],
+    ];
+    for (const [width, height, count, extra, order] of cases) {
+      await page.setViewportSize({ width, height });
+      await seedGame(page, busyGame(count, extra));
+      const view = `${width} × ${height}, ${count} players`;
+      const rest = await read();
+      assert.deepEqual(rest.order, order, `${view}: Undo · modes · round · tools`);
+      assert.ok(Math.abs(rest.round) <= 0.5 + 0.01, `${view}: the round within half a button of the centre (${rest.round.toFixed(2)})`);
+      assert.ok(Math.abs(rest.pill) <= 1, `${view}: the pill centred on its seam (${rest.pill.toFixed(1)}px)`);
+      if (order.length % 2) assert.ok(Math.abs(rest.round) <= 0.01, `${view}: equal flanks put the round on the centre`);
+      await page.locator(count === 2 ? '#track-button' : '#counters-button').tap();
+      const mode = await read();
+      assert.deepEqual(mode.order, count === 2 ? ['undo', 'damage', 'counters', 'mana', 'save', 'cancel'] : ['undo', 'save', 'cancel'], `${view}: Undo leads the mode's pill too`);
+      await button(page, 'Cancel').tap();
     }
   });
 }

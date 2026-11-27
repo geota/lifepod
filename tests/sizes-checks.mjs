@@ -120,7 +120,7 @@ async function checkSizes(t, engine, style, names) {
       for (const count of portrait ? [2, 4, 6] : [2, 3, 4, 5, 6]) {
         const view = `${count} players, ${name}, ${portrait ? 'portrait' : 'landscape'}`;
         const page = await openBoard(t, engine, size, count, portrait, style);
-        await checkTiles(page, '.controls button, .mana-strip button:not(.chip), .token-chip', `${life}, .badges .chip, .mana-strip`, view);
+        await checkTiles(page, '.controls button, .mana-strip button:not(.chip)', `${life}, .badges .chip, .mana-strip`, view);
         // The mana strip never covers a life total or its glyphs.
         assert.deepEqual(await stripProblems(page), [], `${view}: the mana strip is clear of the total and glyphs`);
         // One size per board: every tile draws its total, glyphs and badges at the same size.

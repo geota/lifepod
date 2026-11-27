@@ -59,7 +59,7 @@
 ### Mana and identity
 
 - A floating mana pool per player, spent from a badge-height strip on the tile. On small tiles it folds into one chip that opens the pool. It can empty as each turn passes, unless that player keeps it.
-- Treasure tokens per player, which last until used: a chip on the tile uses one a tap.
+- Treasure tokens per player, which last until used: on the mana strip, where a tap uses one, and the eraser and the turn passing leave them.
 - Colour identity for each player, shown as the card indicator, the guild, clan or shard symbol, and its name.
 
 <p align="center">

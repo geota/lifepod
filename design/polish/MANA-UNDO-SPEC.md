@@ -339,6 +339,27 @@ Up and down merge together, so a burst is its **net** change: −3 then +1 is "l
 
 *Mock: Player 3 tapping − three times while Player 2 taps + twice (`burst-952-4.png`, `burst-568-6.png`, `burst-952-4-glass.png`).*
 
+> **Moved in alpha.20 (the owner's requests):** the capsule sits **directly above the total, centred on it** (within 1px), facing the player like everything on the tile; and where it can't sit there without covering the digits, **beside the total** instead. `layout/delta.js` places it, in order:
+>
+> 1. **Above:** 2px above the digits' tops (the tallest digit, measured from the total's font) and 2px below whatever is above (the far row, the folded mana chip under it, and the far edge's clearance of the pill). Where that room is short, its type shrinks toward its 14px floor.
+> 2. **Beside:** where even 14px doesn't fit above, it sits 2px from the digits at their vertical centre, on the side away from the pill where that fits, else the other side, 2px clear of the − and + glyphs, the rows, the face's edges and the pill. Where the glyph is in the way at the centre, it moves up or down to the nearest clear spot, at most its own height past the digits' top or bottom (on a short tile, the gap above or below the glyph). It tries full type, then the floor, and on the tightest tiles goes below the floor, down to 10px, rather than cover the digits.
+> 3. **Last resort:** only if nothing fits even at 10px, above, over the digits' tops as little as it must.
+>
+> It never overlaps the far row, the mana strip, the near row, the − and + glyphs or the pill; its look, timing and silence (it isn't announced) are unchanged. The total's text is centred in its cell, so the delta is centred on the digits even when the "Out" tag is wider.
+>
+> Measured across the sweep (Chromium, both styles, 2–6 players, every tile in a burst), on three boards: commander damage from every opponent with counters and the turn chip (plain); the same with one floating mana and Treasure on every tile (mana); and six colours on every tile with **Larger** badges (busy):
+>
+> | Screen | Plain | Mana | Busy |
+> |---|---|---|---|
+> | 952 × 427 | above | above | beside at 4–6 players |
+> | 852 × 393 | beside at 3 players, else above | beside at 3 players, else above | beside at 4–6 players |
+> | 640 × 360 | beside at 3–6 players | beside at 3–6 players | beside at 4–6, the capsule at 11px for 5–6 |
+> | 568 × 320, 320 × 568 | beside at 3–6 players | beside at 3–6, the capsule at 10px for 5–6 | beside at 3–4; **at 5–6 the last resort** (the 44px totals leave no 10px spot off the digits) |
+> | 375 × 667 | above | above | beside at 4–6 players |
+> | 841 × 701, iPad | above | above | above |
+>
+> At 2 players it's always above. The only boards that reach the last resort combine the stress size, 5–6 players, every colour floating on every tile and the Larger Badge size; `tests/undo.test.mjs` checks every sweep size at 2–6 players at the default Badge size, where it never covers the digits.
+
 **Recommended.** While a life burst is open, the total carries a small capsule at its top end corner (−3 or +2), like a notification badge on the number.
 
 - **Feedback:** players across the table see how much was taken, not just the new total.
@@ -389,6 +410,8 @@ Up and down merge together, so a burst is its **net** change: −3 then +1 is "l
 | Auto-empty | Stored with the turn step | Part of the turn step's patch. |
 
 ### 6.6 Placement
+
+> **Moved in alpha.20** (PILL-CENTER-SPEC.md, option A): Undo leads the pill, before the modes, at rest and in every mode (Undo · [Track's tabs] · ✓ · ✕), and the round sits between the modes and the tools.
 
 The pill already holds up to six buttons (round, damage, counters, mana, dice, settings), at 48px each. Measured on the mock, everything on, 2 players, with the pill upright along the 320px or 360px side:
 

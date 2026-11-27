@@ -460,6 +460,22 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
     | | 4–6 | 61px | folded, 57px | row, 57px: the spend buttons stay |
     | 1366 × 1024 | 3–6 | 195 / 191px | row, unchanged | row, unchanged |
 
+  - *As built, alpha.20 (the owner: "The treasure pip should be part of the mana bar. It should just have different rules for when it gets cleared"):* **Treasure is on the strip,** not in the near row. It follows the colours and comes before the eraser, the gold counter in `--text` and the count (`.strip-token`), set apart by a .3em gap and a 1px hairline in `--text` at 30% where colours precede it. A tap uses one, as before (key `token:i:treasure`, merged; the 800ms hold, during which the life halves under the strip ignore touches, as for a spend). The strip shows while the pool has mana **or** the player has Treasure; with only Treasure it holds that alone, led by Keep's lock where the lock shows, and no eraser. **The eraser empties the colours only** ("Empty floating mana, Player 2"), and the turn pass never touches Treasure; Undo covers both, and a new game resets everything. The folded chip adds the gold counter and count after the pool ("2 mana and 3 Treasure. Player 1's pool: 2 red. Open mana", or "3 Treasure. Player 1. Open mana"). The strip keeps its places, floors and fold order. Totals with Treasure only (3 on every tile, no floating mana) on the board of the table above, Chromium:
+
+    | Screen | Players | alpha.19 (the chip in the near row) | alpha.20 (Treasure on the strip) |
+    |---|---|---|---|
+    | 952 × 427 | 2–6 | 81px | row, 81px |
+    | 852 × 393 | 2–6 | 75px | row, 75px |
+    | 640 × 360 | 2–6 | 68px | row, 68px |
+    | 568 × 320 | 2 | 61px | row, 61px |
+    | | 3 | 61px | row, 59px |
+    | | 4 | 61px | row, 57px |
+    | | 5–6 | 61px | row, 57px |
+    | 841 × 701 | 2–4 / 5–6 | 133 / 115px | row, unchanged |
+    | 1366 × 1024 | 2–4 / 5–6 | 195 / 191px | row, unchanged |
+
+    A Treasure-only strip costs exactly what one floating mana does: nothing from 640 × 360 up, and at 568 × 320 the same 2–4px the one-mana row costs, with its button kept. One floating mana with Treasure beside it costs the same as one floating mana alone.
+
 ## 10. Data model and settings
 
 ### 10.1 Saved game (additions to `loadGame`/`saveGame`)
@@ -625,10 +641,11 @@ From the Comprehensive Rules effective 6 November 2026: the monarch (CR 726) and
 The owner chose PILL-SPEC.md's option A, Track, "only when it's needed. E.g. on small phones or layouts that require it." The pill stays one row.
 
 - **The pill at rest:** the round (with Turns on), commander damage, counters and mana (each while it's on), Undo, the d20 and settings, in that order, 48px each on phones and up to 64px on tablets (`--setup-button`). In a mode it's Undo, ✓ and ✕, as before.
+  - *As built, alpha.20 (PILL-CENTER-SPEC.md, option A; the owner: the turn number near the centre, Undo on a flank):* the order is **Undo · the modes (or Track) · the round · card lookup · the d20 · settings**, and in a mode **Undo · [Track's tabs] · ✓ · ✕**. The pill stays centred on its seam, so the round sits on the centre when the two flanks match (Commander alone) and half a button off when they differ by one (everything on: 24px at 952 × 427 and in the 2-player Track pill at 568 × 320, 32px on the iPad). The counts, Track's fit and the 44px fallback are unchanged; the markup is in that order, so focus follows it.
 - **Where it doesn't fit, Track:** commander damage, counters and mana become one **Track** button in their place, and their modes become tabs of one Track mode.
-  - At rest: round · Track · Undo · d20 · settings. Track's face is the icon of the tab it will open, raised over a dot for each tab that's on, that tab's dot lit; the mana dot shows on it while its face is mana and mana floats. Its name lists what it tracks: "Track: commander damage, counters, mana", then ", 3 mana floating" while mana floats.
-  - In its mode: [damage | counters | mana] ‖ Undo · ✓ · ✕. Only the tabs whose features are on show. Commander alone gives two, since commander tax is a counter. With one on there's nothing to merge, and that one keeps its own button.
-  - The open tab is in the chosen tint (Accent L3: `--chosen-fill`, `--chosen-ink`, `--chosen-ring`), never solid lime, and its mana pip takes an accent ring. A 2px rule in `--text-soft` at 45% sets the tabs off from Undo.
+  - At rest: round · Track · Undo · d20 · settings (as built in alpha.20: Undo · Track · round · magnifier · d20 · settings). Track's face is the icon of the tab it will open, raised over a dot for each tab that's on, that tab's dot lit; the mana dot shows on it while its face is mana and mana floats. Its name lists what it tracks: "Track: commander damage, counters, mana", then ", 3 mana floating" while mana floats.
+  - In its mode: [damage | counters | mana] ‖ Undo · ✓ · ✕ (as built in alpha.20: Undo · [damage | counters | mana] ‖ ✓ · ✕). Only the tabs whose features are on show. Commander alone gives two, since commander tax is a counter. With one on there's nothing to merge, and that one keeps its own button.
+  - The open tab is in the chosen tint (Accent L3: `--chosen-fill`, `--chosen-ink`, `--chosen-ring`), never solid lime, and its mana pip takes an accent ring. A 2px rule in `--text-soft` at 45% sets the tabs off from Undo (from ✓ since alpha.20).
   - A tap on a tab switches the tiles' layers in place. It isn't a step, and it saves no edit.
   - **Undo, ✓ and ✕ cover the whole visit across tabs.** Undo goes back newest first, and a step taken on another tab opens that tab first (`stepTab` in `logic/history.js`), so the change is seen; it stops at the visit's start. ✕ asks "Discard N changes?" and names what goes back: "Commander damage, life, counters and mana pools go back to how they were when you opened Track." *As built (MANA-SPEC-v2 §5.3):* Treasure and Keep steps belong to the mana tab, and the mana tab's words are "mana pools and Treasure". ✓ saves and closes. Android back is ✕.
   - **Re-entry opens the last tab,** saved as `game.trackTab` (§10.1), or the first that's still on. A tile's chip opens its own tab directly (the mana strip's folded chip opens mana, "Pass it on" opens counters), and that becomes the remembered tab. Any editing mode opening, from a button, Track or a chip, becomes the remembered tab, in either form of the pill.
