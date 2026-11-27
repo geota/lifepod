@@ -91,7 +91,7 @@ const shots = [
   { ...pixel, file: 'mana.png', seed: 'everything', mode: 'mana', crop: tile(2) },
   { ...pixel, file: 'identity.png', seed: 'commander', mode: 'identity', crop: tile(2) },
   { ...pixel, file: 'tile-colours.png', seed: 'minimal', mode: 'colours', crop: tile(2) },
-  { ...pixel, file: 'dice.png', seed: 'minimal', mode: 'dice', crop: '#dice .sheet' },
+  { ...pixel, file: 'dice.png', seed: 'minimal', mode: 'dice', crop: null },
   { size: 'ipad', engine: 'webkit', style: 'glass', count: 6, scale: 1, file: 'ipad-glass.png', seed: 'everything', mode: 'rest', crop: null },
 ];
 

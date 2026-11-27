@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { animationsDone, button, clockStart, engines, eventually, openPage, reload, saved, savedGame, test } from './helpers.mjs';
+import { animationsDone, button, clockStart, engines, eventually, openPage, reload, saved, savedGame, seedGame, test } from './helpers.mjs';
 
 const faceCounts = { 4: 4, 6: 5, 8: 4, 10: 5, 12: 6, 20: 10 };
 // The ledger's rows as they read: the die, the result and when, newest first.
 const ledger = page => page.locator('#dice-rolls .dice-row').evaluateAll(rows => rows.map(row => [...row.querySelectorAll('span')].map(span => span.textContent).join(' · ')));
 // The undo history's length, from the page's live game.
 const historySteps = page => page.evaluate(async () => (await import('/js/state/state.js')).game.history.steps.length);
+// Roll, by its label. The die on the stage is a button with the same name, so this finds Roll itself.
+const rollButton = (page, name) => page.locator('#dice-roll').filter({ hasText: new RegExp(`^${name}$`) });
 // Rolls with the reduced-motion fade and returns the announcement once the result has landed.
 async function rollOnce(page, name) {
-  await button(page, name).click();
+  await rollButton(page, name).click();
   await page.clock.runFor(reducedRoll);
   return result(page);
 }
@@ -23,7 +25,11 @@ const landsAt = Math.ceil(tumble * 0.78);
 const result = page => page.locator('#dice-result').textContent();
 const shownNumber = page => page.locator('.die-number').textContent();
 // The result's second copy on the stage's far edge, for the other side of the table.
-const echo = page => page.locator('#dice-stage .dice-echo').textContent();
+async function echo(page) {
+  const [far, near] = await page.locator('#dice-stage .dice-echo').allTextContents();
+  assert.equal(near, far, 'both long edges print the same');
+  return far;
+}
 
 async function checkDice(t, engine) {
   const page = await openPage(t, engine, { viewport: { width: 852, height: 393 }, clock: true });
@@ -52,7 +58,7 @@ async function checkDice(t, engine) {
     assert.equal(await shownNumber(page), `d${sides}`, `d${sides} names itself before a roll`);
     assert.equal(await echo(page), '', 'no second copy before a roll');
     for (let roll = 0; roll < 3; roll++) {
-      await button(page, `Roll d${sides}`).click();
+      await rollButton(page, `Roll d${sides}`).click();
       await page.clock.runFor(fadeOut - 1);
       assert.equal(await result(page), '', 'no result while the old number fades');
       await page.clock.runFor(1);
@@ -73,19 +79,30 @@ async function checkDice(t, engine) {
     return [diceSides, coinSides];
   }), await page.evaluate(() => [window.lifePodDice.sides, window.lifePodDice.coin]), 'the saved format offers what dice.js draws');
 
-  // The second copy is turned to face across the table, above the die, and screen readers hear the result once.
-  const copy = await page.locator('#dice-stage .dice-echo').evaluate((node) => {
+  // The result is printed at both long edges: turned 180° above the die for the far side, upright below it for the near
+  // side. Screen readers hear it once.
+  const copies = await page.locator('#dice-stage .dice-echo').evaluateAll(nodes => nodes.map((node) => {
     const box = node.getBoundingClientRect();
     const die = node.parentElement.querySelector('.die-body').getBoundingClientRect();
-    return { transform: getComputedStyle(node).transform, hidden: node.getAttribute('aria-hidden'), clear: box.bottom <= die.top + 1 };
-  });
-  assert.deepEqual(copy, { transform: 'matrix(-1, 0, 0, -1, 0, 0)', hidden: 'true', clear: true });
+    return { transform: getComputedStyle(node).transform, hidden: node.getAttribute('aria-hidden'), above: box.bottom <= die.top + 1, below: box.top >= die.bottom - 1 };
+  }));
+  assert.deepEqual(copies, [
+    { transform: 'matrix(-1, 0, 0, -1, 0, 0)', hidden: 'true', above: true, below: false },
+    { transform: 'none', hidden: 'true', above: false, below: true },
+  ]);
   // A new roll clears it until the result lands.
-  await button(page, 'Roll d20').click();
+  await rollButton(page, 'Roll d20').click();
   assert.equal(await echo(page), '', 'cleared while the roll is in the air');
   await page.clock.runFor(reducedRoll);
 
-  // Tapping the die rolls it too.
+  // Tapping the die rolls it too: the stage is a button named for the roll, and it takes Enter and Space.
+  assert.equal(await page.locator('#dice-stage').evaluate(stage => [stage.tagName, stage.getAttribute('aria-label')].join(' ')), 'BUTTON Roll d20');
+  await page.locator('#dice-stage').focus();
+  for (const key of ['Enter', ' ']) {
+    await page.keyboard.press(key);
+    await page.clock.runFor(reducedRoll);
+    assert.match(await result(page), /^Rolled \d+ on a d20$/, `${key === ' ' ? 'Space' : key} on the die rolls it`);
+  }
   await page.locator('#dice-stage').click();
   await page.clock.runFor(fadeOut);
   assert.match(await result(page), /^Rolled \d+ on a d20$/);
@@ -97,18 +114,6 @@ async function checkDice(t, engine) {
   assert.equal(await shownNumber(page), 'd20');
   assert.equal(await page.evaluate(() => window.closeOpenDialog()), true, 'Android back closes the dice');
 
-  // The sheet fits the smallest phones both ways.
-  for (const [width, height] of [[568, 320], [320, 568]]) {
-    await page.setViewportSize({ width, height });
-    await button(page, 'Roll dice').click();
-    for (const selector of ['#dice', '#dice-roll', '#dice-stage']) {
-      const box = await page.locator(selector).boundingBox();
-      assert.ok(box.x >= 0 && box.y >= 0 && box.x + box.width <= width && box.y + box.height <= height,
-        `${selector} fits ${width}×${height}: ${JSON.stringify(box)}`);
-    }
-    await page.keyboard.press('Escape');
-  }
-
   // Seat rotation leaves only its Done button on the board.
   await button(page, 'Settings').click();
   await button(page, 'Rotate seats on the board').click();
@@ -118,7 +123,7 @@ async function checkDice(t, engine) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  test(`${name}: the dice roll every die and fit small screens`, t => checkDice(t, engine));
+  test(`${name}: the dice roll every die, from Roll or a tap on the die`, t => checkDice(t, engine));
 }
 
 test('chromium: rolls come from the cryptographic generator without favouring any face', async (t) => {
@@ -171,11 +176,11 @@ const tumbled = page => page.evaluate(() => window.testAnimated.some(name => nam
 test('chromium: the roll animates, then settles on one result', async (t) => {
   const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 }, clock: true, motion: 'no-preference', before: recordAnimations });
   await button(page, 'Roll dice').click();
-  await button(page, 'Roll d20').click();
+  await rollButton(page, 'Roll d20').click();
   assert.ok(await tumbled(page), 'the die tumbles');
   // Taps while the die is in the air don't start another roll.
   await page.clock.runFor(100);
-  await button(page, 'Roll d20').click();
+  await rollButton(page, 'Roll d20').click();
   await page.locator('#dice-stage').click();
   await button(page, 'd6').click();
   assert.equal(await page.locator('#dice-picker [aria-pressed="true"]').textContent(), 'd20', 'the die stays while rolling');
@@ -195,7 +200,7 @@ test('chromium: the coin flips end over end, landing on its result, and only fad
   const page = await openPage(t, chromium, { viewport: { width: 852, height: 393 }, clock: true, motion: 'no-preference', before: recordAnimations });
   await button(page, 'Roll dice').click();
   await button(page, 'Coin').click();
-  await button(page, 'Flip coin').click();
+  await rollButton(page, 'Flip coin').click();
   assert.ok(await tumbled(page), 'the coin flips');
   assert.deepEqual([...new Set(await page.evaluate(() => window.testMoved))].sort(), ['opacity', 'transform'], 'moving only transforms and opacity');
   // In the air its face turns from one side to the other.
@@ -269,7 +274,7 @@ async function checkLedger(t, engine) {
   assert.equal(await page.locator('#dice-rolls').isVisible(), false);
   assert.equal(await page.locator('#dice-count').textContent(), '');
 
-  await button(page, 'Roll d20').click();
+  await rollButton(page, 'Roll d20').click();
   await page.clock.runFor(fadeOut - 1);
   assert.deepEqual(await ledger(page), [], 'nothing joins the ledger before the die lands');
   await page.clock.runFor(1);
@@ -368,4 +373,78 @@ for (const [name, engine] of Object.entries(engines)) {
   test(`${name}: the coin flips Heads or Tails, announced and printed for both sides`, t => checkCoin(t, engine));
   test(`${name}: a roll joins the saved ledger when it lands, kept to 50, emptied by a new game, never an undo step`, t => checkLedger(t, engine));
   test(`${name}: the dice page flips for the other side of the table`, t => checkFlip(t, engine));
+}
+
+// The page lies the way the board does, with the die at the centre of the phone, every control a whole 44px target on
+// the screen, and nothing to scroll but the ledger's list. Portrait windows turn it, as they turn the board.
+const pageSizes = [[952, 427], [852, 393], [640, 360], [568, 320], [1366, 1024], [393, 852], [375, 667], [320, 568], [1024, 1366]];
+async function pageProblems(page) {
+  return page.evaluate(() => {
+    const problems = [];
+    const { innerWidth: width, innerHeight: height } = window;
+    const inside = box => box.left >= -0.5 && box.top >= -0.5 && box.right <= width + 0.5 && box.bottom <= height + 0.5;
+    for (const control of document.querySelectorAll('#dice button')) {
+      const box = control.getBoundingClientRect();
+      const name = control.getAttribute('aria-label') ?? control.textContent;
+      if (box.width < 43.5 || box.height < 43.5) problems.push(`${name} is ${box.width.toFixed(1)} × ${box.height.toFixed(1)}`);
+      if (!inside(box)) problems.push(`${name} is off the screen`);
+    }
+    const die = document.querySelector('#dice-stage .die-body').getBoundingClientRect();
+    const off = Math.hypot(die.left + die.width / 2 - width / 2, die.top + die.height / 2 - height / 2);
+    if (off > 1.5) problems.push(`the die is ${off.toFixed(1)}px from the centre`);
+    for (const part of document.querySelectorAll('.dice-side, .dice-stage, .dice-ledger')) {
+      if (!inside(part.getBoundingClientRect())) problems.push(`${part.className} is off the screen`);
+    }
+    // The controls stay inside their column: Roll's foot isn't pushed out by the picker.
+    const side = document.querySelector('.dice-side');
+    for (const child of side.children) {
+      const box = child.getBoundingClientRect();
+      const column = side.getBoundingClientRect();
+      if (box.left < column.left - 0.5 || box.right > column.right + 0.5 || box.top < column.top - 0.5 || box.bottom > column.bottom + 0.5) problems.push(`${child.id || child.className} spills out of its column`);
+    }
+    for (const node of [document.querySelector('#dice'), document.querySelector('.dice-layout'), document.querySelector('.dice-ledger')]) {
+      if (node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1) problems.push(`${node.id || node.className} scrolls`);
+    }
+    return problems;
+  });
+}
+async function checkPage(t, engine) {
+  for (const style of ['material', 'glass']) {
+    const rolls = Array.from({ length: 50 }, (_, index) => ({ d: [20, 6, 2][index % 3], r: 1 + (index % 2), t: 1767268800 + index }));
+    const page = await openPage(t, engine, { clock: true, game: savedGame(4, { style, dice: { sides: 2, rolls } }) });
+    for (const players of [4, 2]) {
+      if (players === 2) await seedGame(page, savedGame(2, { style, dice: { sides: 20, rolls } }));
+      for (const [width, height] of pageSizes) {
+        await page.setViewportSize({ width, height });
+        await button(page, 'Roll dice').click();
+        const where = `${style}, ${players} players, ${width} × ${height}`;
+        assert.deepEqual(await pageProblems(page), [], where);
+        const turn = await page.evaluate(() => [document.querySelector('#dice').dataset.turn, document.querySelector('.app').dataset.boardTurn]);
+        assert.equal(turn[0], turn[1], `the page takes the board's turn: ${where}`);
+        assert.equal(await page.locator('#dice').evaluate(dialog => dialog.hasAttribute('data-ends')), players === 2, where);
+        assert.equal(await page.locator('#dice-picker button').count(), 7);
+        await page.keyboard.press('Escape');
+      }
+    }
+  }
+}
+
+// The picker is four over three: the dice d4 to d10, then d12, d20 and the coin, each row filling the column.
+async function checkPicker(t, engine) {
+  const page = await openPage(t, engine, { viewport: { width: 568, height: 320 } });
+  await button(page, 'Roll dice').click();
+  const rows = await page.locator('#dice-picker button').evaluateAll((choices) => {
+    const lines = new Map();
+    for (const choice of choices) {
+      const { top } = choice.getBoundingClientRect();
+      lines.set(Math.round(top), [...(lines.get(Math.round(top)) ?? []), choice.textContent]);
+    }
+    return [...lines.values()];
+  });
+  assert.deepEqual(rows, [['d4', 'd6', 'd8', 'd10'], ['d12', 'd20', 'Coin']]);
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the dice page centres the die, keeps every target 44px and never scrolls, in both styles, at every size`, t => checkPage(t, engine));
+  test(`${name}: the dice picker is four over three`, t => checkPicker(t, engine));
 }

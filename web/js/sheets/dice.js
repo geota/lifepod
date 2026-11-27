@@ -1,6 +1,7 @@
 // The dice page (design/polish/DICE-SPEC.md), over web/dice.js's window.lifePodDice: the picker with the six dice and
-// the coin, the stage, Roll, and the ledger of rolls, newest first. Importing this module wires the page and the pill's
-// dice button. The ledger and the last die are saved with the game (game.dice), but they aren't game state: a roll
+// the coin, Roll, the die at the centre (a tap rolls it), and the ledger of rolls, newest first. The page lies the way
+// the board does, and with two players the die and its result face the short ends. Importing this module wires the
+// page and the pill's dice button. The ledger and the last die are saved with the game (game.dice), but they aren't game state: a roll
 // saves without commit(), so it makes no undo step and never shows in History.
 
 import { diceChoices, diceLedgerCap } from '../logic/data.js';
@@ -10,7 +11,7 @@ import { game, saveGame, syncBackHandling } from '../state/state.js';
 import { diceButton, element } from '../ui/dom.js';
 
 const diceDialog = /** @type {HTMLDialogElement} */ (document.querySelector('#dice'));
-const diceStage = /** @type {HTMLDivElement} */ (document.querySelector('#dice-stage'));
+const diceStage = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-stage'));
 const dicePicker = /** @type {HTMLParent<HTMLButtonElement>} */ (document.querySelector('#dice-picker'));
 const diceRoll = /** @type {HTMLButtonElement} */ (document.querySelector('#dice-roll'));
 const diceResult = /** @type {HTMLParagraphElement} */ (document.querySelector('#dice-result'));
@@ -18,10 +19,18 @@ const diceFlip = /** @type {HTMLButtonElement} */ (document.querySelector('#dice
 const rollsList = /** @type {HTMLOListElement} */ (document.querySelector('#dice-rolls'));
 const rollsEmpty = /** @type {HTMLParagraphElement} */ (document.querySelector('#dice-empty'));
 const rollsCount = /** @type {HTMLSpanElement} */ (document.querySelector('#dice-count'));
-// The result printed a second time on the far edge of the stage, turned 180° like the pill's round button, so a player
-// across the table reads the roll the right way up too (DESIGN-AUDIT S5). Screen readers hear it once, from #dice-result.
+// The result printed again at both long edges of the stage: turned 180° at the far edge, like the pill's round button,
+// and upright at the near one, so the whole table reads it the right way up (DESIGN-AUDIT S5). With two players they
+// face the short ends instead. Screen readers hear the result once, from #dice-result.
 const diceEcho = element('span', 'dice-echo');
-diceEcho.setAttribute('aria-hidden', 'true');
+const diceEchoNear = element('span', 'dice-echo dice-echo-near');
+for (const echo of [diceEcho, diceEchoNear]) echo.setAttribute('aria-hidden', 'true');
+/** @param {string} text */
+const echo = (text) => {
+  diceEcho.textContent = text;
+  diceEchoNear.textContent = text;
+};
+const app = /** @type {HTMLElement} */ (document.querySelector('.app'));
 const { coin, label } = window.lifePodDice;
 // The times in the ledger refresh this often while the page is open, and when it opens.
 const ledgerRefresh = 30000;
@@ -91,9 +100,10 @@ function showDie(sides) {
   stopRoll = undefined;
   die = window.lifePodDice.stageDie(sides);
   die.showIdle();
-  diceEcho.textContent = '';
-  diceStage.replaceChildren(die.shadow, die.die, diceEcho);
+  echo('');
+  diceStage.replaceChildren(die.shadow, die.die, diceEcho, diceEchoNear);
   diceRoll.textContent = sides === coin ? 'Flip coin' : `Roll d${sides}`;
+  diceStage.setAttribute('aria-label', diceRoll.textContent);
   diceResult.textContent = '';
   for (const choice of dicePicker.children) choice.setAttribute('aria-pressed', String(Number(choice.value) === sides));
 }
@@ -102,7 +112,7 @@ function showDie(sides) {
 function rollDie() {
   if (stopRoll) return;
   diceResult.textContent = '';
-  diceEcho.textContent = '';
+  echo('');
   const sides = die.count;
   stopRoll = window.lifePodDice.roll(die, {
     reducedMotion: reducedMotion.matches,
@@ -110,7 +120,7 @@ function rollDie() {
       haptic();
       const words = label(sides, result);
       diceResult.textContent = sides === coin ? `Coin: ${words}` : `Rolled ${result} on a d${sides}`;
-      diceEcho.textContent = words;
+      echo(words);
       addRoll(sides, result);
     },
     done() { stopRoll = undefined; },
@@ -132,8 +142,16 @@ for (const sides of diceChoices) {
   });
   dicePicker.append(choice);
 }
-// The page faces the phone, and opens that way; the flip turns it for a player across the table, as in settings.
+// The page takes the board's turn (layout/board.js), so it lies the way the board does as the phone turns.
+function followBoard() {
+  diceDialog.dataset.turn = app.dataset.boardTurn ?? '0';
+}
+new MutationObserver(followBoard).observe(app, { attributes: true, attributeFilter: ['data-board-turn'] });
+// It opens facing the near long side; the flip turns the whole page for the far side, as in settings. With two players,
+// who sit at the short ends, the die and its result turn to face them (data-ends).
 diceButton.addEventListener('click', () => {
+  followBoard();
+  diceDialog.toggleAttribute('data-ends', game.scores.length === 2);
   diceDialog.removeAttribute('data-flipped');
   diceFlip.setAttribute('aria-pressed', 'false');
   showDie(game.dice.sides);

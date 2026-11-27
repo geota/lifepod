@@ -64,8 +64,8 @@ for (const [engine, native, name, expected] of platforms) {
 // ---- Glass on the key surfaces ------------------------------------------------------------------------------------
 
 const alpha = colour => (colour.startsWith('rgba(') ? Number(colour.slice(5, -1).split(',')[3]) : colour.startsWith('rgb(') ? 1 : Number(colour.match(/\/\s*([\d.]+)/)?.[1] ?? 1));
-// The floating chrome (pill, settings header, dice dialog), the content under it (a card, a row, a switch, a segmented
-// choice, the slider thumb) and the tiles.
+// The floating chrome (pill, settings header, card lookup's dialog), the dice page, the content under it (a card, a row,
+// a switch, a segmented choice, the slider thumb) and the tiles.
 async function readSurfaces(page) {
   const board = await page.evaluate(() => {
     const pill = getComputedStyle(document.querySelector('#board-controls'), '::before');
@@ -76,11 +76,19 @@ async function readSurfaces(page) {
       tile: { background: tile.backgroundColor, half: [half.color, half.fontSize, half.width] },
     };
   });
+  await button(page, 'Card lookup').tap();
+  const lookup = await page.evaluate(() => {
+    const dialog = getComputedStyle(document.querySelector('#cards'));
+    return { filter: dialog.webkitBackdropFilter ?? dialog.backdropFilter, background: dialog.backgroundColor, edge: dialog.borderTopWidth, edgeColour: dialog.borderTopColor };
+  });
+  await button(page, 'Close card lookup').tap();
+  // The dice page is a full page with no floating layer: its cards and controls are solid in both styles.
   await button(page, 'Roll dice').tap();
   const dice = await page.evaluate(() => {
     const dialog = getComputedStyle(document.querySelector('#dice'));
+    const solid = ['#dice', '#dice-stage', '.dice-ledger', '#dice-picker button'].every(selector => !getComputedStyle(document.querySelector(selector)).backgroundColor.startsWith('rgba'));
     const chosen = getComputedStyle(document.querySelector('#dice-picker button[aria-pressed="true"]'));
-    return { filter: dialog.webkitBackdropFilter ?? dialog.backdropFilter, background: dialog.backgroundColor, edge: dialog.borderTopWidth, edgeColour: dialog.borderTopColor, chosen: chosen.backgroundColor };
+    return { filter: dialog.webkitBackdropFilter ?? dialog.backdropFilter, solid, chosen: chosen.backgroundColor };
   });
   await button(page, 'Close dice').tap();
   await button(page, 'Settings').tap();
@@ -104,7 +112,7 @@ async function readSurfaces(page) {
     };
   });
   await button(page, 'Close settings').tap();
-  return { ...board, dice, settings };
+  return { ...board, lookup, dice, settings };
 }
 
 for (const [name, engine] of Object.entries(engines)) {
@@ -121,7 +129,8 @@ for (const [name, engine] of Object.entries(engines)) {
     // Material: solid chrome, no blur, filled rows and segments, the accent tint on the chosen segment and die.
     assert.equal(material.pill.filter, 'none');
     assert.equal(alpha(material.pill.background), 1);
-    assert.equal(material.dice.filter, 'none');
+    assert.equal(material.lookup.filter, 'none');
+    assert.deepEqual([material.dice.filter, material.dice.solid], ['none', true], 'the dice page is solid');
     assert.equal(material.settings.head.filter, 'none');
     assert.equal(material.settings.head.overBody, false, 'the Material header is its own row');
     assert.equal(material.settings.segments.chosen, materialChosen, 'the chosen segment is the accent tint');
@@ -130,17 +139,18 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal(material.dice.chosen, materialChosen, 'so is the chosen die');
     assert.deepEqual(material.settings.switch, ['36px', '20px']);
 
-    // Glass: the dice dialog and the settings header are the surface at 68% over an 18px blur, with a light edge. The
+    // Glass: card lookup's dialog and the settings header are the surface at 68% over an 18px blur, with a light edge. The
     // board's pill has the edge and highlight but no blur, over a solid tint, so the seams don't read through it
     // (DESIGN-AUDIT S10, docs/review/FINAL.md U4).
-    for (const [part, surface] of [['dice dialog', glass.dice], ['settings header', glass.settings.head]]) {
+    for (const [part, surface] of [['card lookup dialog', glass.lookup], ['settings header', glass.settings.head]]) {
       assert.equal(surface.filter, 'blur(18px) saturate(1.3)', `the ${part} is frosted`);
       assert.ok(Math.abs(alpha(surface.background) - 0.68) < 0.01, `the ${part} is tinted at 68% (${surface.background})`);
     }
     assert.equal(glass.pill.filter, 'none', 'the pill isn\'t blurred');
     assert.equal(alpha(glass.pill.background), 1, `the pill's tint is solid (${glass.pill.background})`);
     assert.equal(glass.pill.edge, '1px', 'the pill has a light edge');
-    assert.equal(glass.dice.edge, '1px', 'the dialog has a light edge');
+    assert.equal(glass.lookup.edge, '1px', 'the dialog has a light edge');
+    assert.deepEqual([glass.dice.filter, glass.dice.solid], ['none', true], 'the dice page has no glass layer: its cards and controls are solid');
     assert.equal(glass.settings.head.overBody, true, 'the settings header floats over the body, which scrolls under it');
     assert.equal(glass.settings.head.radius, '22px');
     // Content stays solid: cards are opaque; rows share their card, split by hairlines.
@@ -307,25 +317,26 @@ for (const [name, engine] of Object.entries(engines)) {
 
 // ---- Fallbacks ----------------------------------------------------------------------------------------------------
 
-// The pill, the dice dialog and the settings header: their backdrop filter, whether their fill is opaque, and their edge.
+// The pill, card lookup's dialog and the settings header: their backdrop filter, whether their fill is opaque, and their
+// edge.
 async function readChrome(page) {
   const pill = await page.evaluate(() => {
     const s = getComputedStyle(document.querySelector('#board-controls'), '::before');
     return { filter: s.webkitBackdropFilter ?? s.backdropFilter, opaque: !s.backgroundColor.startsWith('rgba'), edge: `${s.borderTopWidth} ${s.borderTopColor}` };
   });
-  await button(page, 'Roll dice').tap();
-  const dice = await page.evaluate(() => {
-    const s = getComputedStyle(document.querySelector('#dice'));
+  await button(page, 'Card lookup').tap();
+  const dialog = await page.evaluate(() => {
+    const s = getComputedStyle(document.querySelector('#cards'));
     return { filter: s.webkitBackdropFilter ?? s.backdropFilter, opaque: !s.backgroundColor.startsWith('rgba'), edge: `${s.borderTopWidth} ${s.borderTopColor}` };
   });
-  await button(page, 'Close dice').tap();
+  await button(page, 'Close card lookup').tap();
   await button(page, 'Settings').tap();
   const head = await page.evaluate(() => {
     const s = getComputedStyle(document.querySelector('.fs-head'));
     return { filter: s.webkitBackdropFilter ?? s.backdropFilter, opaque: !s.backgroundColor.startsWith('rgba'), edge: s.boxShadow.match(/0px 0px 0px (\d+px) inset/)?.[1] ?? 'none' };
   });
   await button(page, 'Close settings').tap();
-  return { pill, dice, head };
+  return { pill, dialog, head };
 }
 const glassGame = { startingLife: 40, scores: [40, 40, 40, 40], style: 'glass' };
 const solid = { filter: 'none', opaque: true };
@@ -337,7 +348,7 @@ for (const [name, engine] of Object.entries(engines)) {
     // The outline is the 3:1 control border.
     const outline = `2px ${await token(page, '--control-border')}`;
     assert.deepEqual(chrome.pill, { ...solid, edge: outline });
-    assert.deepEqual(chrome.dice, { ...solid, edge: outline });
+    assert.deepEqual(chrome.dialog, { ...solid, edge: outline });
     assert.deepEqual(chrome.head, { ...solid, edge: '2px' });
   });
 
@@ -349,14 +360,14 @@ for (const [name, engine] of Object.entries(engines)) {
     const block = stylesCss.match(/@supports not \(\(backdrop-filter: blur\(1px\)\) or \(-webkit-backdrop-filter: blur\(1px\)\)\) \{\n([\s\S]+?)\n\}/);
     assert.ok(block, 'css/tokens.css has the @supports fallback');
     assert.equal(await page.evaluate(() => CSS.supports('(backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))')), true, 'this browser draws the blur');
-    assert.equal((await readChrome(page)).dice.filter, 'blur(18px) saturate(1.3)', 'so Glass is frosted here');
+    assert.equal((await readChrome(page)).dialog.filter, 'blur(18px) saturate(1.3)', 'so Glass is frosted here');
     await page.evaluate((rules) => {
       const sheet = new CSSStyleSheet();
       sheet.replaceSync(rules);
       document.adoptedStyleSheets = [sheet];
     }, block[1]);
     const chrome = await readChrome(page);
-    for (const part of ['pill', 'dice', 'head']) assert.deepEqual({ filter: chrome[part].filter, opaque: chrome[part].opaque }, solid, `without the blur, the ${part} is solid`);
+    for (const part of ['pill', 'dialog', 'head']) assert.deepEqual({ filter: chrome[part].filter, opaque: chrome[part].opaque }, solid, `without the blur, the ${part} is solid`);
   });
 }
 
@@ -367,9 +378,9 @@ test('chromium: Glass goes solid under prefers-reduced-transparency: reduce', as
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'reduce' }] });
   assert.equal(await page.evaluate(() => matchMedia('(prefers-reduced-transparency: reduce)').matches), true);
   const chrome = await readChrome(page);
-  for (const part of ['pill', 'dice', 'head']) assert.deepEqual({ filter: chrome[part].filter, opaque: chrome[part].opaque }, solid, `the ${part} is solid`);
+  for (const part of ['pill', 'dialog', 'head']) assert.deepEqual({ filter: chrome[part].filter, opaque: chrome[part].opaque }, solid, `the ${part} is solid`);
   await cdp.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-transparency', value: 'no-preference' }] });
-  assert.equal((await readChrome(page)).dice.filter, 'blur(18px) saturate(1.3)', 'and frosted again without it');
+  assert.equal((await readChrome(page)).dialog.filter, 'blur(18px) saturate(1.3)', 'and frosted again without it');
 });
 
 // Under 360px tall, Glass's settings header is its own solid row, as Material's is, rather than floating over a fifth of

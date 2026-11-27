@@ -97,26 +97,35 @@
     </section>
   </template>
 
-  <dialog id="dice" aria-labelledby="dice-title">
-    <div class="sheet dice-sheet">
-      <div class="sheet-header">
-        <h2 id="dice-title">Dice</h2>
-        <button class="close" type="button" id="dice-flip" aria-label="Turn dice to face the other side" aria-pressed="false"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,224.49l-24,24a12,12,0,0,1-17-17L171,228H80a28,28,0,0,1-28-28V108a12,12,0,0,1,24,0v92a4,4,0,0,0,4,4h91l-3.52-3.51a12,12,0,0,1,17-17l24,24A12,12,0,0,1,208.49,224.49ZM80,76a12,12,0,0,0,8.49-20.49L85,52h91a4,4,0,0,1,4,4v92a12,12,0,0,0,24,0V56a28,28,0,0,0-28-28H85l3.52-3.52a12,12,0,0,0-17-17l-24,24a12,12,0,0,0,0,17l24,24A12,12,0,0,0,80,76Z"/></svg></button>
-        <button class="close" type="button" data-close aria-label="Close dice"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+  <!-- Dice (design/polish/DICE-SPEC.md): a full page that lies the way the board does, for the whole table. The six dice,
+       the coin and Roll on the left, the die at the centre of the phone with its result for both sides, and the ledger
+       on the right. The flip turns the whole page for the other side. -->
+  <dialog id="dice" class="fs" aria-labelledby="dice-title">
+    <div class="dice-frame">
+      <div class="dice-layout">
+        <h2 class="visually-hidden" id="dice-title">Dice</h2>
+        <div class="dice-side">
+          <button class="close" type="button" data-close aria-label="Close dice"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button>
+          <div class="dice-picker" id="dice-picker" role="group" aria-label="Sides"></div>
+          <button class="primary dice-roll" type="button" id="dice-roll" autofocus></button>
+        </div>
+        <!-- A tap on the die rolls it: the stage is a button with the same name as Roll. -->
+        <button class="dice-stage" type="button" id="dice-stage"></button>
+        <!-- The ledger: the last 50 rolls, newest first, saved with the game. The rows aren't controls, and the list isn't a
+             live region: #dice-result announces each roll once, when it lands. -->
+        <div class="dice-ledger-cell">
+          <section class="fs-sec dice-ledger" aria-labelledby="dice-ledger-title">
+            <div class="dice-ledger-head">
+              <h3 id="dice-ledger-title"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M76,64A12,12,0,0,1,88,52H216a12,12,0,0,1,0,24H88A12,12,0,0,1,76,64Zm140,52H88a12,12,0,0,0,0,24H216a12,12,0,0,0,0-24Zm0,64H88a12,12,0,0,0,0,24H216a12,12,0,0,0,0-24ZM44,112a16,16,0,1,0,16,16A16,16,0,0,0,44,112Zm0-64A16,16,0,1,0,60,64,16,16,0,0,0,44,48Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,44,176Z"/></svg>Rolls<span class="dice-count" id="dice-count"></span></h3>
+              <button class="close" type="button" id="dice-flip" aria-label="Turn dice to face the other side" aria-pressed="false"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M208.49,224.49l-24,24a12,12,0,0,1-17-17L171,228H80a28,28,0,0,1-28-28V108a12,12,0,0,1,24,0v92a4,4,0,0,0,4,4h91l-3.52-3.51a12,12,0,0,1,17-17l24,24A12,12,0,0,1,208.49,224.49ZM80,76a12,12,0,0,0,8.49-20.49L85,52h91a4,4,0,0,1,4,4v92a12,12,0,0,0,24,0V56a28,28,0,0,0-28-28H85l3.52-3.52a12,12,0,0,0-17-17l-24,24a12,12,0,0,0,0,17l24,24A12,12,0,0,0,80,76Z"/></svg></button>
+            </div>
+            <p class="dice-empty" id="dice-empty">No rolls yet this game. Each roll shows here, newest first.</p>
+            <ol class="dice-rolls" id="dice-rolls" aria-label="Rolls, newest first"></ol>
+          </section>
+        </div>
+        <p class="visually-hidden" id="dice-result" aria-live="polite"></p>
+        <p class="visually-hidden" data-announcer aria-live="polite"></p>
       </div>
-      <!-- Tapping the die rolls it too. The Roll button is the control for keyboards and screen readers. -->
-      <div class="dice-stage" id="dice-stage"></div>
-      <div class="dice-picker" id="dice-picker" role="group" aria-label="Sides"></div>
-      <button class="primary dice-roll" type="button" id="dice-roll" autofocus></button>
-      <!-- The ledger: the last 50 rolls, newest first, saved with the game. The rows aren't controls, and the list isn't a
-           live region: #dice-result announces each roll once, when it lands. -->
-      <section class="dice-ledger" aria-labelledby="dice-ledger-title">
-        <h3 id="dice-ledger-title"><svg class="icon" viewBox="0 0 256 256" aria-hidden="true" focusable="false"><path d="M76,64A12,12,0,0,1,88,52H216a12,12,0,0,1,0,24H88A12,12,0,0,1,76,64Zm140,52H88a12,12,0,0,0,0,24H216a12,12,0,0,0,0-24Zm0,64H88a12,12,0,0,0,0,24H216a12,12,0,0,0,0-24ZM44,112a16,16,0,1,0,16,16A16,16,0,0,0,44,112Zm0-64A16,16,0,1,0,60,64,16,16,0,0,0,44,48Zm0,128a16,16,0,1,0,16,16A16,16,0,0,0,44,176Z"/></svg>Rolls<span class="dice-count" id="dice-count"></span></h3>
-        <p class="dice-empty" id="dice-empty">No rolls yet. Each roll shows here, newest first.</p>
-        <ol class="dice-rolls" id="dice-rolls" aria-label="Rolls, newest first"></ol>
-      </section>
-      <p class="visually-hidden" id="dice-result" aria-live="polite"></p>
-      <p class="visually-hidden" data-announcer aria-live="polite"></p>
     </div>
   </dialog>
 
@@ -495,7 +504,7 @@
             <div class="privacy-text">
               <h4>Privacy</h4>
               <p>LifePod collects no data. There are no accounts, ads, analytics, or tracking, and the apps make no network requests.</p>
-              <p>The current game (players, life totals, seat rotations, tile colours, counters, the monarch and the initiative, floating mana, turns, and settings) is saved only on this device. Removing the app or clearing its data deletes it.</p>
+              <p>The current game (players, life totals, seat rotations, tile colours, counters, the monarch and the initiative, floating mana, turns, dice rolls, and settings) is saved only on this device. Removing the app or clearing its data deletes it.</p>
               <p>Full policy: github.com/geota/lifepod/blob/main/PRIVACY.md</p>
               <h4>Credits</h4>
               <p>LifePod is unofficial Fan Content permitted under the Fan Content Policy. Not approved/endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.</p>
