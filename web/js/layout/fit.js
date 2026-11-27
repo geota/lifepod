@@ -7,6 +7,7 @@ import { trackedDesignations } from '../logic/rules.js';
 import { toasts } from '../state/history.js';
 import { game, shownReminders } from '../state/state.js';
 import { board, boardControls } from '../ui/dom.js';
+import { placeLifeDeltas } from './delta.js';
 
 // Auto-drop (design/polish/SPEC.md §3.2): what gives way, first to go first, when a badge row is wider than its
 // tile. Each row first drops words and marks: on the near row the identity's name, the turn chip's word "Turn" and the
@@ -111,6 +112,8 @@ function fitBadgeRows() {
   fitStrips();
   // A turn reminder's place depends on how tall the near edge came out.
   for (const index of new Set([...shownReminders.keys(), ...toasts.keys()])) placeReminders(board.children[index]);
+  // A running delta sits above its total, wherever the fit left it.
+  placeLifeDeltas();
   syncBoardDrops();
   fitted = fitInputs();
 }

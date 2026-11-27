@@ -339,6 +339,20 @@ Up and down merge together, so a burst is its **net** change: −3 then +1 is "l
 
 *Mock: Player 3 tapping − three times while Player 2 taps + twice (`burst-952-4.png`, `burst-568-6.png`, `burst-952-4-glass.png`).*
 
+> **Moved in alpha.20 (the owner's request):** the capsule sits **directly above the total, centred on it** (within 1px), facing the player like everything on the tile. `layout/delta.js` places it: 2px above the digits' tops (measured from the total's font), and 2px below whatever is above (the far row, the folded mana chip under it, and the far edge's clearance of the pill). Where that room is shorter than the capsule, its type shrinks toward its 14px floor, then it keeps the 2px from the far row and comes down over the digits' tops only as far as it must. It never overlaps the far row, the mana strip, the near row, the − and + glyphs or the pill; its look, timing and silence (it isn't announced) are unchanged. The total's text is centred in its cell, so the delta is centred on the digits even when the "Out" tag is wider.
+>
+> Measured across the sweep (Chromium, both styles, 2–6 players, every tile in a burst), on three boards: commander damage from every opponent with counters and the turn chip (plain); the same with one floating mana and Treasure on every tile (mana); and six colours on every tile with Larger badges (busy). It overlapped no row, glyph or pill anywhere, and was centred within 1px everywhere. Where it comes down over the digits:
+>
+> | Screen | Plain | Mana | Busy |
+> |---|---|---|---|
+> | 952 × 427 | never | never | 4–6 players, up to 9px (21% of the digits) |
+> | 852 × 393 | never | 3–6 players, 3px (6%) | 4–6 players, 9px (25%) |
+> | 640 × 360, 375 × 667 | never | never | 4–6 players, 9px (22–25%) |
+> | 568 × 320, 320 × 568 | 3–6 players, 7px (16%) | 3–6 players, 9px (22%) | 3–6 players, 11px (33%) |
+> | 841 × 701, iPad | never | never | never |
+>
+> At 2 players it never does. The capsule is at its 14px floor in every row with a figure.
+
 **Recommended.** While a life burst is open, the total carries a small capsule at its top end corner (−3 or +2), like a notification badge on the number.
 
 - **Feedback:** players across the table see how much was taken, not just the new total.

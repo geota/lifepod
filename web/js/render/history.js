@@ -1,7 +1,8 @@
 // What the undo history draws on the board: the running delta on a total while its life burst is open
-// (MANA-UNDO-SPEC §6.2b), such as −3 at the total's top end corner, which is exactly what one Undo would take back.
+// (MANA-UNDO-SPEC §6.2b), such as −3 centred above the total, which is exactly what one Undo would take back.
 // The toasts an undo leaves are badge-row chips (render/badges.js).
 
+import { placeLifeDelta } from '../layout/delta.js';
 import { deltaFade } from '../logic/data.js';
 import { openBurst } from '../state/history.js';
 import { reducedMotion } from '../state/platform.js';
@@ -33,6 +34,7 @@ export function renderLifeDelta(tile) {
     delta.dataset.sign = change > 0 ? 'gain' : 'loss';
     delete delta.dataset.fading;
     delta.hidden = false;
+    placeLifeDelta(/** @type {Element} */ (board.children[tile]));
     return;
   }
   if (!delta || delta.hidden || fades.has(tile)) return;

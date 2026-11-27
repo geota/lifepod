@@ -260,6 +260,8 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: -.055em;
   padding-inline-end: .055em;
+  /* Centred in its cell, which the "Out" tag can make wider, so the running delta above it is centred on the digits. */
+  text-align: center;
   color: var(--text);
 }
 .score[data-out] { color: var(--life-out); }
@@ -333,11 +335,12 @@
   border: 0;
   background: transparent;
 }
-/* The running delta of a life burst (MANA-UNDO-SPEC §6.2b): a capsule at the total's top end corner, 0.3 of its size and
-   never under 14px, overlapping the corner by about a fifth of its width, facing the player. Its number is the seat
-   colour for a gain and the total's red for a loss, ringed in the same. It's drawn from a zero-sized anchor in the
-   total's cell, so it takes no room and nothing refits, isn't a target, and fades once the burst ends. */
-.life-delta { grid-area: 1 / 2; align-self: start; justify-self: end; position: relative; width: 0; height: 0; pointer-events: none; }
+/* The running delta of a life burst (MANA-UNDO-SPEC §6.2b, moved in alpha.20): a capsule directly above the total,
+   centred on it, 0.3 of its size and never under 14px, facing the player. Its number is the seat colour for a gain and
+   the total's red for a loss, ringed in the same. It's drawn from a zero-sized anchor at the top centre of the total's
+   cell, so it takes no room and nothing refits, isn't a target, and fades once the burst ends. layout/delta.js sets its
+   top: just above the digits, clear of the far row and the pill. */
+.life-delta { grid-area: 1 / 2; align-self: start; justify-self: center; position: relative; width: 0; height: 0; pointer-events: none; }
 .life-delta[hidden] { display: none; }
 .life-delta-value {
   position: absolute;
@@ -354,7 +357,7 @@
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
   white-space: nowrap;
-  transform: translate(-20%, -35%);
+  transform: translateX(-50%);
   transition: opacity .3s var(--ease);
 }
 .life-delta[data-sign="loss"] .life-delta-value { color: var(--life-out); }

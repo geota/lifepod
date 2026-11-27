@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {
-  button, engines, eventually, hold, openPage, reload, saved, savedGame, scores, seedGame, test, tileProblems,
+  button, engines, eventually, faceBoxes, hold, openPage, reload, saved, savedGame, scores, seedGame, test, tileProblems,
 } from './helpers.mjs';
 
 // Game-wide Undo and Redo (MANA-UNDO-SPEC §6, UNDO-ARCHITECTURE.md): one step per action, quick taps on one tile and
@@ -432,4 +432,54 @@ for (const [name, engine] of Object.entries(engines)) {
     const back = await saved(page);
     assert.deepEqual([back.commanderDamage[2][0], back.scores[2], back.monarch], [0, 40, 2], 'one Undo takes back the damage, the life and the crown');
   });
+}
+
+// The running delta sits directly above its total, centred on it (the owner's rule, alpha.20), facing the player on every
+// seat: clear of the far row, the folded mana chip under it, the mana strip, the near row, the − and + glyphs and the
+// pill, and above the total's box. Boards from the target down to the stress size, with commander damage on every tile,
+// with and without floating mana and Treasure, turned faces at 2 players, and a rotated seat.
+async function checkDeltaPlace(t, engine) {
+  const page = await openPage(t, engine, { clock: true, viewport: { width: 952, height: 427 } });
+  const boards = [
+    [952, 427, 4, false], [952, 427, 6, true], [568, 320, 2, false], [568, 320, 6, true], [568, 320, 4, false, [1, 0, 0, 0]], [1366, 1024, 4, true],
+  ];
+  const overlaps = (a, b) => a && b && a.left < b.right - 0.5 && b.left < a.right - 0.5 && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+  for (const [width, height, count, mana, rotations] of boards) {
+    await page.setViewportSize({ width, height });
+    const zero = Array(count).fill(0);
+    await seedGame(page, savedGame(count, {
+      ...(rotations ? { rotations } : {}), counters: { commander: true, poison: true }, poison: zero.map(() => 2),
+      commanderDamage: zero.map((_, d) => zero.map((__, a) => (a === d ? 0 : 3 + a))),
+      manaPool: mana, pools: zero.map((_, i) => [0, i % 2, 0, (i + 1) % 2, 0, 0]), treasure: zero.map(() => 2),
+    }));
+    for (let number = 1; number <= count; number++) {
+      for (let tap = 0; tap < 2 + number; tap++) await (number % 2 ? add : subtract)(page, number).tap();
+    }
+    const view = `${width} × ${height}, ${count} players${mana ? ', mana and Treasure' : ''}${rotations ? ', a rotated seat' : ''}`;
+    const faces = await faceBoxes(page, {
+      delta: '.life-delta:not([hidden]) .life-delta-value', score: '.score', far: '.badges.far > *', farChip: '.mana-far > *',
+      strip: '.mana-strip > *', near: '.badges.near > *', subtract: '.controls .subtract .icon', add: '.controls .add .icon',
+    });
+    faces.forEach((face, index) => {
+      const seat = `${view}, P${index + 1}`;
+      assert.ok(face.delta, `${seat}: the delta shows`);
+      const off = (face.delta.left + face.delta.right) / 2 - (face.score.left + face.score.right) / 2;
+      assert.ok(Math.abs(off) <= 1, `${seat}: centred on the total (${off.toFixed(1)}px off)`);
+      assert.ok(face.delta.top <= face.score.top + 0.5, `${seat}: above the total (${face.delta.top} against ${face.score.top})`);
+      for (const part of ['far', 'farChip', 'strip', 'near', 'subtract', 'add']) assert.ok(!overlaps(face.delta, face[part]), `${seat}: clear of ${part}`);
+    });
+    const pill = await page.locator('.life-delta-value').evaluateAll((values) => {
+      const box = document.querySelector('#board-controls').getBoundingClientRect();
+      return values.filter((value) => {
+        const own = value.getBoundingClientRect();
+        return own.left < box.right - 0.5 && box.left < own.right - 0.5 && own.top < box.bottom - 0.5 && box.top < own.bottom - 0.5;
+      }).length;
+    });
+    assert.equal(pill, 0, `${view}: clear of the pill`);
+    await page.clock.runFor(mergeWindow + deltaFade);
+  }
+}
+
+for (const [name, engine] of Object.entries(engines)) {
+  test(`${name}: the running delta sits centred above its total, clear of the rows and the pill`, t => checkDeltaPlace(t, engine));
 }
