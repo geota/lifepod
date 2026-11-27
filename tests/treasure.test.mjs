@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import {
-  button, engines, eventually, hold, openPage, saved, savedGame, seedGame, setSwitches, test, tileProblems,
+  button, engines, eventually, hold, openPage, saved, savedGame, seedGame, setSwitches, stripProblems, test, tileProblems,
 } from './helpers.mjs';
 
-// Treasure and Keep (design/polish/MANA-SPEC-v2.md, as built): Treasure's cell in mana mode and its chip at rest, Keep's
-// cell and what it does to the turn pass, their undo steps and words, Track's mana tab, New game and old saves.
+// Treasure and Keep (design/polish/MANA-SPEC-v2.md, as built): Treasure's cell in mana mode and its place on the mana
+// strip at rest, Keep's cell and what it does to the turn pass, their undo steps and words, Track's mana tab, New game and
+// old saves.
 
 // Timers in web/js/logic/data.js. Tests pause the page's clock, so each happens only when the test runs it.
 const holdDelay = 500;
@@ -13,7 +14,7 @@ const mergeWindow = 1500;
 
 const tile = (page, number) => page.locator(`.player:nth-child(${number})`);
 const mode = page => page.locator('#board').getAttribute('data-mode');
-const chip = (page, number) => tile(page, number).locator('.badges.near .token-chip');
+const chip = (page, number) => tile(page, number).locator('.mana-strip > .strip-token');
 const treasureCell = (page, number) => tile(page, number).locator('.treasure-cell');
 const keepCell = (page, number) => tile(page, number).locator('.keep-cell');
 const history = async page => (await saved(page)).history;
@@ -23,13 +24,14 @@ const announced = async (page) => {
   await page.clock.runFor(700);
   return page.locator('#announcer').textContent();
 };
-// Each tile's near row as it reads: each chip's kind, Treasure's with its count.
+// Each tile's near row as it reads: each chip's kind.
 const nearRow = (page, number) => tile(page, number).locator('.badges.near > *').evaluateAll(chips => chips.filter(node => node.checkVisibility())
-  .map(node => (node.matches('.token-chip') ? `treasure ${node.textContent}` : node.dataset.kind ?? node.dataset.designation ?? node.className.split(' ').at(-1))));
-// Each tile's strip as it reads, with Keep's lock as 'lock'.
+  .map(node => node.dataset.kind ?? node.dataset.designation ?? node.className.split(' ').at(-1)));
+// Each tile's strip as it reads, with Keep's lock as 'lock' and Treasure as 'treasure' and its count.
 const strips = page => page.locator('.mana-strip').evaluateAll(rows => rows.map(row => (row.hidden ? '' : [...row.children]
   .filter(item => !item.matches('.chip') && item.checkVisibility())
-  .map(item => (item.matches('.keep-lock') ? 'lock' : item.matches('.strip-clear') ? 'clear' : `${item.dataset.colour}${item.textContent}`)).join(' '))));
+  .map(item => (item.matches('.keep-lock') ? 'lock' : item.matches('.strip-clear') ? 'clear' : item.matches('.strip-token') ? `treasure${item.textContent}`
+    : `${item.dataset.colour}${item.textContent}`)).join(' '))));
 
 // A 4-player game with Mana and Treasure on, poison and rad, the monarch on Player 1, and Turn by turn on Player 1.
 function treasureGame(extra = {}) {
@@ -40,11 +42,12 @@ function treasureGame(extra = {}) {
 }
 
 for (const [name, engine] of Object.entries(engines)) {
-  // Mana mode's fourth column: Treasure's cell, tap +1 and hold −1, beside the colours and above Keep; at rest, its chip
-  // after rad and before the crown, a button whose tap uses one, dimmed at 0 while it's being tapped, then gone.
-  test(`${name}: Treasure counts up in mana mode, and its chip at rest uses one a tap`, async (t) => {
+  // Mana mode's fourth column: Treasure's cell, tap +1 and hold −1, beside the colours and above Keep; at rest, an item on
+  // the mana strip, not the near row, whose tap uses one, dimmed at 0 while it's being tapped, then gone.
+  test(`${name}: Treasure counts up in mana mode, and on the strip at rest uses one a tap`, async (t) => {
     const page = await openPage(t, engine, { clock: true, game: treasureGame() });
-    assert.equal(await chip(page, 1).count(), 0, 'no chip with no Treasure');
+    assert.equal(await chip(page, 1).count(), 0, 'no Treasure with none');
+    assert.deepEqual(await strips(page), ['', '', '', ''], 'and no strip');
     await page.locator('#mana-button').tap();
     const cells = await tile(page, 1).locator('.mana-cells').evaluate(grid => [...grid.querySelectorAll('.counter-cell')].map((cell) => {
       const style = getComputedStyle(cell);
@@ -64,12 +67,11 @@ for (const [name, engine] of Object.entries(engines)) {
     await treasureCell(page, 1).tap();
     await button(page, 'Save').tap();
 
-    assert.deepEqual(await nearRow(page, 1), ['active-chip', 'flag-chip', 'poison', 'rad', 'treasure 3', 'monarch'], 'after rad, before the crown');
+    assert.deepEqual(await nearRow(page, 1), ['active-chip', 'flag-chip', 'poison', 'rad', 'monarch'], 'not in the near row');
+    assert.deepEqual(await strips(page), ['treasure3', '', '', ''], 'a strip with only Treasure: no eraser');
     assert.equal(await chip(page, 1).getAttribute('aria-label'), 'Treasure, Player 1, 3. Use one');
-    assert.deepEqual(await tileProblems(page, { targets: '.token-chip' }), [], 'the chip is a whole 44px target inside its tile');
-    // Its look: the button fill and a rim ring, like the folded chip, which the plain counts don't have.
-    const looks = await tile(page, 1).locator('.badges.near').evaluate(row => ['.token-chip', '.chip[data-kind="rad"]'].map(selector => getComputedStyle(row.querySelector(selector)).boxShadow !== 'none'));
-    assert.deepEqual(looks, [true, false], 'Treasure has a ring and rad has none');
+    assert.equal(await chip(page, 1).locator('.mana-icon').getAttribute('data-glyph'), 'treasure', 'the gold counter');
+    assert.deepEqual(await stripProblems(page), [], 'a whole 44px target inside its tile, clear of the total and rows');
 
     await chip(page, 1).tap();
     await chip(page, 1).tap();
@@ -82,6 +84,7 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal((await saved(page)).treasure[0], 0, 'a tap at 0 does nothing');
     await page.clock.runFor(stripHoldTime);
     assert.equal(await chip(page, 1).count(), 0, 'then it goes');
+    assert.deepEqual(await strips(page), ['', '', '', ''], 'and with no mana, the strip with it');
     assert.deepEqual((await history(page)).steps.at(-1).d, { treasure: { 0: [3, 0] } }, 'quick uses merge into one step');
     assert.equal(await page.locator('#mana-button').evaluate(node => node.hasAttribute('data-floating')), false, 'Treasure doesn\'t light the mana dot');
 
@@ -93,6 +96,55 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.equal(await chip(page, 1).count(), 0);
     await setSwitches(page, { 'Mana and Treasure': true });
     assert.equal(await chip(page, 1).textContent(), '3');
+  });
+
+  // The eraser and the turn pass empty the colours and leave Treasure (the owner's rule, alpha.20): the strip keeps the
+  // Treasure item, apart from the colours, and Keep's lock leads it while Keep is on.
+  test(`${name}: the eraser and the turn pass leave Treasure on the strip`, async (t) => {
+    const pools = [[0, 0, 0, 2, 0, 0], [0, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
+    const page = await openPage(t, engine, { clock: true, game: treasureGame({ pools, treasure: [3, 2, 0, 1], keepMana: [false, false, false, true], monarch: null }) });
+    assert.deepEqual(await strips(page), ['R2 treasure3 clear', 'U1 treasure2 clear', '', 'lock treasure1'], 'after the colours, before the eraser; alone with Keep\'s lock');
+    // A hairline and a gap set Treasure apart from the colours, and there's none where it's alone.
+    const rules = await page.locator('.mana-strip > .strip-token').evaluateAll(items => items.map(item => getComputedStyle(item, '::before').content !== 'none'));
+    assert.deepEqual(rules, [true, true, false]);
+    const eraser = tile(page, 1).locator('.strip-clear');
+    assert.equal(await eraser.getAttribute('aria-label'), 'Empty floating mana, Player 1', 'the eraser says it empties the colours');
+    await eraser.tap();
+    assert.deepEqual((await saved(page)).pools[0], [0, 0, 0, 0, 0, 0]);
+    assert.equal((await saved(page)).treasure[0], 3, 'the eraser leaves Treasure');
+    assert.deepEqual((await history(page)).steps.at(-1).d, { pools: { 0: { 3: [2, 0] } } }, 'its step holds only the colours');
+    await page.clock.runFor(stripHoldTime);
+    assert.deepEqual((await strips(page))[0], 'treasure3', 'the strip keeps Treasure, and the eraser goes with the colours');
+    await page.locator('#undo-button').tap();
+    assert.deepEqual((await strips(page))[0], 'R2 treasure3 clear', 'Undo puts the colours back');
+    // The turn pass empties the colours, never Treasure (once Undo's toast has left the near edge).
+    await page.clock.runFor(4000);
+    await tile(page, 1).locator('.turn-chip').tap();
+    await page.clock.runFor(stripHoldTime);
+    assert.deepEqual(await strips(page), ['treasure3', 'treasure2', '', 'lock treasure1']);
+    assert.deepEqual((await saved(page)).treasure, [3, 2, 0, 1]);
+    // While Treasure is being tapped, the life halves under the strip ignore a touch, as for a spend.
+    await chip(page, 4).tap();
+    await tile(page, 4).locator('.controls .add').tap({ force: true });
+    assert.equal((await saved(page)).scores[3], 40, 'a tap meant for Treasure doesn\'t add life');
+    assert.deepEqual((await strips(page))[3], 'lock treasure0');
+  });
+
+  // Where the strip folds, its chip sums the pool and Treasure, and opens mana mode as before.
+  test(`${name}: a folded strip's chip shows Treasure with the pool, and opens mana`, async (t) => {
+    const six = [2, 1, 3, 4, 5, 6];
+    const page = await openPage(t, engine, {
+      clock: true, viewport: { width: 568, height: 320 },
+      game: savedGame(6, { manaPool: true, pools: Array(6).fill(six), treasure: [3, 0, 0, 0, 0, 0], counters: { commander: true, poison: true }, poison: Array(6).fill(9) }),
+    });
+    const folded = tile(page, 1).locator('.strip-chip').filter({ visible: true });
+    assert.equal(await folded.count(), 1, 'the strip folds');
+    assert.deepEqual(await folded.locator('.summary-item').allTextContents(), ['21', '3'], 'the pool\'s total, then Treasure\'s count');
+    assert.equal(await folded.locator('.summary-token .mana-icon').getAttribute('data-glyph'), 'treasure');
+    assert.match(await folded.getAttribute('aria-label'), /^21 mana and 3 Treasure\. Player 1's pool: .+\. Open mana$/);
+    assert.deepEqual(await tileProblems(page, { targets: '.strip-chip' }), [], 'a whole target inside its tile');
+    await folded.tap();
+    assert.equal(await mode(page), 'mana');
   });
 
   // Undo and Redo of Treasure (MANA-SPEC-v2 §5): the toast names it, History has its row, and a mode's taps and a chip's
@@ -147,10 +199,10 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual(await look(), { seat: true, clear: false, check: 'grid' }, 'on: the seat colour fills it, with a check');
     assert.equal(await announced(page), 'Player 2, Sky, Treasure 3 → 4. Player 2, keep mana on');
     await button(page, 'Save').tap();
-    assert.deepEqual(await strips(page), ['R2 clear', 'lock U1 clear', '', 'G1 clear'], 'a kept pool\'s mana is led by a lock');
+    assert.deepEqual(await strips(page), ['R2 clear', 'lock U1 treasure4 clear', '', 'G1 clear'], 'a kept pool\'s mana is led by a lock');
 
     await tile(page, 1).locator('.turn-chip').tap();
-    assert.deepEqual(await strips(page), ['', 'lock U1 clear', '', ''], 'the pass empties every pool but the kept one');
+    assert.deepEqual(await strips(page), ['', 'lock U1 treasure4 clear', '', ''], 'the pass empties every pool but the kept one');
     const pass = (await history(page)).steps.at(-1);
     assert.deepEqual(Object.keys(pass.d.pools).map(Number), [0, 3], 'the step holds only the pools it emptied');
     assert.equal((await saved(page)).treasure[1], 4, 'Treasure is never emptied');
@@ -168,7 +220,7 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Settings').tap();
     await page.locator('#auto-empty-row').tap();
     await button(page, 'Close settings').tap();
-    assert.deepEqual(await strips(page), ['R2 clear', 'U1 clear', '', 'G1 clear'], 'no lock while nothing empties');
+    assert.deepEqual(await strips(page), ['R2 clear', 'U1 treasure4 clear', '', 'G1 clear'], 'no lock while nothing empties');
     await page.locator('#mana-button').tap();
     assert.equal(await page.locator('.keep-cell').count(), 0, 'no Keep cell with auto-empty off');
     assert.equal(await treasureCell(page, 2).isVisible(), true, 'Treasure stays');
@@ -231,11 +283,11 @@ for (const [name, engine] of Object.entries(engines)) {
     const old = savedGame(4, { manaPool: true, pools: [[1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]], turns: 'rounds',
       history: { v: 1, at: 1, base: 1, steps: [{ t: 0, d: { pools: { 0: { 0: [0, 1] } } } }] } });
     await seedGame(page, old);
-    assert.equal(await page.locator('.token-chip').count(), 0);
+    assert.equal(await page.locator('.strip-token').count(), 0);
     const loaded = await live(page);
     assert.deepEqual([loaded.treasure, loaded.keepMana, loaded.history.steps.length], [[0, 0, 0, 0], [false, false, false, false], 1]);
     await seedGame(page, { ...old, treasure: [3, -1, 100, 'x'], keepMana: [1, true, 'true', null] });
-    assert.deepEqual(await page.locator('.token-chip').allTextContents(), ['3']);
+    assert.deepEqual(await page.locator('.strip-token').allTextContents(), ['3']);
     assert.deepEqual((await live(page)).keepMana, [false, true, false, false], 'only true keeps a pool');
   });
 }

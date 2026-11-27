@@ -460,6 +460,22 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
     | | 4–6 | 61px | folded, 57px | row, 57px: the spend buttons stay |
     | 1366 × 1024 | 3–6 | 195 / 191px | row, unchanged | row, unchanged |
 
+  - *As built, alpha.20 (the owner: "The treasure pip should be part of the mana bar. It should just have different rules for when it gets cleared"):* **Treasure is on the strip,** not in the near row. It follows the colours and comes before the eraser, the gold counter in `--text` and the count (`.strip-token`), set apart by a .3em gap and a 1px hairline in `--text` at 30% where colours precede it. A tap uses one, as before (key `token:i:treasure`, merged; the 800ms hold, during which the life halves under the strip ignore touches, as for a spend). The strip shows while the pool has mana **or** the player has Treasure; with only Treasure it holds that alone, led by Keep's lock where the lock shows, and no eraser. **The eraser empties the colours only** ("Empty floating mana, Player 2"), and the turn pass never touches Treasure; Undo covers both, and a new game resets everything. The folded chip adds the gold counter and count after the pool ("2 mana and 3 Treasure. Player 1's pool: 2 red. Open mana", or "3 Treasure. Player 1. Open mana"). The strip keeps its places, floors and fold order. Totals with Treasure only (3 on every tile, no floating mana) on the board of the table above, Chromium:
+
+    | Screen | Players | alpha.19 (the chip in the near row) | alpha.20 (Treasure on the strip) |
+    |---|---|---|---|
+    | 952 × 427 | 2–6 | 81px | row, 81px |
+    | 852 × 393 | 2–6 | 75px | row, 75px |
+    | 640 × 360 | 2–6 | 68px | row, 68px |
+    | 568 × 320 | 2 | 61px | row, 61px |
+    | | 3 | 61px | row, 59px |
+    | | 4 | 61px | row, 57px |
+    | | 5–6 | 61px | row, 57px |
+    | 841 × 701 | 2–4 / 5–6 | 133 / 115px | row, unchanged |
+    | 1366 × 1024 | 2–4 / 5–6 | 195 / 191px | row, unchanged |
+
+    A Treasure-only strip costs exactly what one floating mana does: nothing from 640 × 360 up, and at 568 × 320 the same 2–4px the one-mana row costs, with its button kept. One floating mana with Treasure beside it costs the same as one floating mana alone.
+
 ## 10. Data model and settings
 
 ### 10.1 Saved game (additions to `loadGame`/`saveGame`)

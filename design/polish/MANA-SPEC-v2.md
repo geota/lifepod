@@ -28,6 +28,8 @@
 > - **Words and Track:** History rows and toasts read "Treasure 3 → 2" and "Keep mana on/off"; Track's ✕ says "… mana pools and Treasure go back …", and mana mode's "Every mana pool and Treasure count goes back to how it was when you opened mana." Mana mode's announcement says "Press a colour to add one mana, or Treasure, after the colours, to add one".
 > - **Deviations:** the strip takes the near row's full type with no floor of its own, so at 12.5px type its pips are 17px (they were at least 18.5px); a strip button's touch area, like the folded chip's, can overlap the near row's top by a few pixels, where the strip wins. Treasure on the busiest near rows (every counter, the turn chip and the crown at 640 × 360) can make the row wrap, as any count would.
 
+> **Changed in alpha.20 (the owner's request):** Treasure moved from the near row into the mana strip, after the colours and before the eraser, set apart by a gap and a hairline; the strip shows while there's floating mana or Treasure; the eraser ("Empty floating mana") and the turn pass leave Treasure; the folded chip includes it. §1.3's "Why the near row" no longer holds: a Treasure-only strip measured the same as one floating mana, which costs the totals nothing from 640 × 360 up. SPEC.md §9 has the measurements.
+
 ## What's new since the first spec, and what that changes
 
 | Landed on main | What it changes here |
