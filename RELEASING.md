@@ -77,9 +77,9 @@ The tag's own commit is unchanged, so the refreshed data exists only in that rel
 To refresh by hand:
 
 ```sh
-npm run cards:update     # writes data/cards.json, web/data/cards.json.gz, the tags, the rulings and the credit dates
+npm run cards:update     # downloads into the per-user cache (docs/DEVELOPING.md, "Card data"), writes data/cards.json, web/data/cards.json.gz, the tags, the rulings and the credit dates
 git diff --stat data/cards.json data/tags.json data/rulings web/index.html README.md
-npm run check
+npm run check            # with the cache and the data from the same files, the two data tests run rather than skip
 git commit -m 'Card data: Scryfall, <date>' data/cards.json web/data/cards.json.gz data/tags.json web/data/tags.json.gz data/rulings web/data/rulings web/index.html README.md
 ```
 
