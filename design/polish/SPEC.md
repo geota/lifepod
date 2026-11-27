@@ -483,6 +483,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 | `badgeSize` | `'default' \| 'large' \| 'larger'` (SETTINGS-SPEC.md §10) | `'default'` | enum (`badgeSizeOrder`) |
 | `style` | `'material' \| 'glass'` or null (SETTINGS-SPEC.md §9) | null: the platform's default | enum, anything else is null |
 | `trackTab` | `'damage' \| 'counters' \| 'mana'` (§14) | `'damage'` | enum (`trackTabKinds`); Track opens on the first tab that's on when it's off |
+| `dice` | `{ sides, rolls: [{ d, r, t }] }` (§16, DICE-SPEC.md) | `{ sides: 20, rolls: [] }` | `fitDice`: `sides` is 4, 6, 8, 10, 12, 20 or 2 (the coin), else 20; a roll whose `d` isn't one of those, whose `r` isn't a whole number from 1 to `d` or whose `t` isn't a whole number of seconds is dropped, and only the newest 50 (`diceLedgerCap`) are kept. A settings field: no undo step |
 
 - Unchanged: `scores`, `startingLife`, `rotations`, `keepAwake`, `landscapeAngle`, `poison`, `casts`, `identities`, `commanderDamage`.
 - *As built:* each field falls back on its own. `startingLife` must be a whole number from 1 to 999 (`maxStartingLife`, the slider's range), or it's 40. A score that isn't a safe whole number starts at the starting life. Only when `scores` doesn't give a known player count (2–6) does the save get the default 4-player board; the fields that don't depend on the count, such as the settings, are still kept.
@@ -492,7 +493,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.2 New game
 
-- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, Treasure and every Keep (MANA-SPEC-v2), `turn` (round 1, no first or active player), the monarch and the initiative (nobody), and the colour identities (none; updated 22 November 2026: they used to be kept). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
+- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, Treasure and every Keep (MANA-SPEC-v2), `turn` (round 1, no first or active player), the monarch and the initiative (nobody), the colour identities (none; updated 22 November 2026: they used to be kept) and the dice ledger (§16; the die last picked stays). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
 - **Opens** "Who goes first?" if Turns isn't Off.
 - **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the tab Track opens on (§14), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
 - **Shuffle tile colours each game** (Settings → Table, off by default, `game.shuffleColours`): when on, a new game gives every player a random, distinct swatch instead, from `crypto.getRandomValues` through `randomBelow` (no modulo bias), with each seat in a different colour family of the tile set while families last (`tileSets[…].families`, six per set, found by `design/polish/tiles7.mjs`; TILES.md). `loadGame` keeps it only if it was saved as exactly `true`.
@@ -660,3 +661,12 @@ Every paper card's rules text, offline, from Scryfall (docs/DEVELOPING.md, "Card
 - **Not game state:** opening, searching and reading cards record no undo step and don't show in History.
 - **Accessibility:** the field is a combobox over a listbox; arrows move through the results and Enter opens one, with focus moving to the card's name. The count is announced half a second after typing stops. Symbols are read as words ("tap: Add colourless colourless"). Focus returns to the magnifier on close; Escape and Android's back close the sheet.
 - **Loading:** the gzipped data is fetched the first time card lookup opens, never at startup, and unpacked in the page.
+
+## 16. Dice (added 26 November 2026)
+
+The pill's d20 opens Dice, a full page for the whole table; design/polish/DICE-SPEC.md has the design and its as-built notes, and design/dice/SPEC.md the dice's shapes, colours and roll.
+
+- **Layout:** the page lies the way the board does (it takes `data-board-turn`) in three columns: the six dice and the coin, four over three, above Roll on the left, with ✕ in the corner; the die at the centre of the phone, where a tap rolls it, with its result printed again at both long edges; and the Rolls card on the right. With two players the die and its result face the short ends. The flip turns the whole page for the far side. The page never scrolls, and every target is at least 44px.
+- **The coin:** a seventh choice, flipped from the same secure generator as the dice, Heads (1) or Tails (2), announced "Coin: Heads".
+- **The ledger:** the last 50 rolls, newest first, as "d20 · 17 · 2 min ago" or "Coin · Heads · just now". A roll joins it when it lands. Saved with the game in `dice` (§10.1), it's a setting rather than game state: rolls make no undo step and don't show in History. New game clears it (§10.2), and undoing the new game doesn't bring the rolls back.
+- **The last die picked** is remembered in `dice.sides`, the coin included.

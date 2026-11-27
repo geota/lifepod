@@ -23,6 +23,8 @@ Your working idea holds. Keep it **horizontal in board coordinates for every lay
 
 ## 2. The dice sheet
 
+*Replaced (26 November 2026):* Dice is now a full page for the whole table, with a ledger of rolls and a coin; design/polish/DICE-SPEC.md has its layout and behaviour. The sheet below is how it was built first. The die shapes, colours and roll (§3, §4) still apply, and the stage's die is now sized by the page.
+
 A `<dialog id="dice" aria-labelledby="dice-title">` that reuses `.sheet-header`, `.close` and `.primary`. Its parts:
 
 - **Header**: "Dice" and a close button.

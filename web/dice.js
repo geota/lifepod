@@ -1,6 +1,6 @@
 'use strict';
 
-// Dice for the dice sheet: geometry, drawing, true-random rolls and the roll animation.
+// Dice and the coin for the dice page: geometry, drawing, true-random rolls and the roll and flip animations.
 // The design and its reasoning are in design/dice/SPEC.md; the geometry comes from design/dice/shapes.js.
 window.lifePodDice = (() => {
   const svgNS = 'http://www.w3.org/2000/svg';
@@ -82,6 +82,22 @@ window.lifePodDice = (() => {
   };
   const sides = Object.keys(shapes).map(Number);
 
+  // The coin, a two-sided die (DICE-SPEC.md): a round front face inside a bevelled rim, lit from the upper left like the
+  // dice, with a fine ring inside the rim. The rim's lit half is tone 1 and its far half tone 3, as on the d6. Its result
+  // is a word, so the face holds "Heads" or "Tails" at a size that fits the wider of the two.
+  const coinSides = 2;
+  const coinFaces = ['Heads', 'Tails'];
+  const coin = {
+    radius: 46,
+    rim: [
+      [1, 'M82.53,17.47 A46,46 0 0 0 17.47,82.53 L23.84,76.16 A37,37 0 0 1 76.16,23.84 Z'],
+      [3, 'M17.47,82.53 A46,46 0 0 0 82.53,17.47 L76.16,23.84 A37,37 0 0 1 23.84,76.16 Z'],
+    ],
+    face: 37,
+    ring: 32.5,
+    number: { x: 50, y: 50, size: 17.5, baseline: 56.3 },
+  };
+
   function element(name, attributes = {}) {
     const node = document.createElementNS(svgNS, name);
     for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, value);
@@ -97,6 +113,12 @@ window.lifePodDice = (() => {
 
   function body(count) {
     const group = element('g');
+    if (count === coinSides) {
+      for (const [tone, d] of coin.rim) group.append(element('path', { d, class: `die-face tone-${tone}` }));
+      group.append(element('circle', { cx: 50, cy: 50, r: coin.face, class: 'die-face tone-0' }));
+      group.append(element('circle', { cx: 50, cy: 50, r: coin.radius, class: 'die-outline' }));
+      return group;
+    }
     for (const [tone, points] of shapes[count].faces) {
       group.append(element('polygon', { points, class: `die-face tone-${tone}` }));
     }
@@ -112,27 +134,36 @@ window.lifePodDice = (() => {
   }
 
   // The die on the stage: a shadow, then the body with its number.
+  // The word or number a result reads as: 17 on a d20, Heads or Tails on the coin.
+  function label(count, value) {
+    return count === coinSides ? coinFaces[value - 1] : String(value);
+  }
+
   function stageDie(count) {
-    const shape = shapes[count];
+    const shape = count === coinSides ? coin : shapes[count];
     const shadow = svg('die-shadow', count);
-    shadow.append(element('polygon', { points: shape.outline }));
+    shadow.append(count === coinSides
+      ? element('circle', { cx: 50, cy: 50, r: coin.radius })
+      : element('polygon', { points: shape.outline }));
     const die = svg('die-body', count);
     die.append(body(count));
+    // The coin's fine ring sits on its face, inside the rim; the icon leaves it out, as it's too small to read there.
+    if (count === coinSides) die.append(element('circle', { cx: 50, cy: 50, r: coin.ring, class: 'coin-ring' }));
     const number = element('text', { class: 'die-number', x: shape.number.x, 'text-anchor': 'middle' });
     die.append(number);
     return {
       count, shadow, die, number,
       show(value) {
         number.removeAttribute('data-idle');
-        number.textContent = String(value);
+        number.textContent = label(count, value);
         number.setAttribute('font-size', shape.number.size);
         number.setAttribute('y', shape.number.baseline);
       },
       // Before a roll the face names the die ("d20") in a quieter ink, so it isn't read as a result.
       showIdle() {
-        const size = Math.round(shape.number.size * (count >= 10 ? 0.62 : 0.72));
+        const size = Math.round(shape.number.size * (count >= 10 ? 0.62 : count === coinSides ? 0.84 : 0.72));
         number.setAttribute('data-idle', '');
-        number.textContent = `d${count}`;
+        number.textContent = count === coinSides ? 'Coin' : `d${count}`;
         number.setAttribute('font-size', size);
         number.setAttribute('y', Math.round((shape.number.y + 0.36 * size) * 10) / 10);
       },
@@ -177,6 +208,36 @@ window.lifePodDice = (() => {
     ];
   }
 
+  // The coin's flip: it rises and falls back over the tumble's landing time while it turns end over end, drawn as its
+  // height squashing to an edge and back. Seven half turns, slowing as it comes down. Only transforms move.
+  const halfTurns = 7;
+  const flipSteps = 28;
+  const turned = p => halfTurns * Math.PI * (1 - (1 - p) ** 2);
+  function flipFrames() {
+    const frames = [];
+    for (let step = 0; step <= flipSteps; step++) {
+      const p = step / flipSteps;
+      const lift = 4 * p * (1 - p);
+      const size = 1 + 0.14 * lift;
+      const edge = Math.max(0.04, Math.abs(Math.cos(turned(p))));
+      frames.push({ offset: p * landsAt, transform: `translate(0, ${(-16 * lift).toFixed(2)}%) scale(${size.toFixed(3)}, ${(size * edge).toFixed(3)})` });
+    }
+    frames.push({ offset: 0.88, transform: 'translate(0, 0) scale(1.03, .96)', easing: 'cubic-bezier(.3, 0, .3, 1)' });
+    frames.push({ offset: 1, transform: 'translate(0, 0) scale(1, 1)' });
+    return frames;
+  }
+  // The shadow stays on the table, shrinking and fading while the coin is up.
+  function flipShadowFrames() {
+    return [
+      { offset: 0, transform: 'translate(2%, 4%) scale(1)', opacity: 0.6, easing: 'cubic-bezier(.3, .6, .5, 1)' },
+      { offset: landsAt / 2, transform: 'translate(6%, 12%) scale(.8)', opacity: 0.25, easing: 'cubic-bezier(.5, 0, .7, .4)' },
+      { offset: landsAt, transform: 'translate(2%, 4%) scale(1)', opacity: 0.65 },
+      { offset: 1, transform: 'translate(2%, 4%) scale(1)', opacity: 0.6 },
+    ];
+  }
+  // When the coin is edge-on (ms), where its face changes: Heads and Tails in turn, ending on the result as it lands.
+  const flipTicks = Array.from({ length: halfTurns }, (_, turn) => Math.round((1 - Math.sqrt(1 - (turn + 0.5) / halfTurns)) * landsAt * duration));
+
   // Rolls the stage die. onLand(result) runs once the result shows, and done() once the die has settled.
   // Returns a function that stops the roll early.
   function roll(stage, { reducedMotion, onLand, done }) {
@@ -196,6 +257,14 @@ window.lifePodDice = (() => {
         animations.push(stage.number.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: 'ease-out' }));
       });
       after(250, done);
+    } else if (stage.count === coinSides) {
+      animations.push(stage.die.animate(flipFrames(), duration));
+      animations.push(stage.shadow.animate(flipShadowFrames(), duration));
+      flipTicks.forEach((at, turn) => {
+        after(at, () => stage.show((halfTurns - 1 - turn) % 2 === 0 ? result : 3 - result));
+      });
+      after(duration * landsAt, land);
+      after(duration, done);
     } else {
       const spin = randomFace(2) === 1 ? 1 : -1;
       animations.push(stage.die.animate(tumbleFrames(spin), duration));
@@ -223,5 +292,5 @@ window.lifePodDice = (() => {
     };
   }
 
-  return { sides, icon, stageDie, randomFace, roll };
+  return { sides, coin: coinSides, icon, stageDie, label, randomFace, roll };
 })();

@@ -108,7 +108,7 @@ export function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
   // A new game keeps every setting, the seats' rotations (for the same player count) and the tile colours, or deals
   // each player a random one from the tile set when Shuffle tile colours each game is on (SPEC §10.2). It resets life,
-  // every count, commander damage, floating mana, Treasure and Keep, and the colour identities.
+  // every count, commander damage, floating mana, Treasure and Keep, the colour identities and the dice rolls.
   game.colors = game.shuffleColours ? shuffledColours(playerCount, tileSets[game.tileColours].families) : fitColors(game.colors, playerCount);
   for (const kind of countKinds) game[kind] = fitCounts([], playerCount);
   game.identities = fitIdentities([], playerCount);
@@ -122,6 +122,9 @@ export function startGame(playerCount, startingLife) {
   // Nobody is the monarch or has the initiative until an effect says so.
   game.monarch = null;
   game.initiative = null;
+  // The dice ledger empties; the die the page opens on stays. Rolls aren't in the history, so undoing the new game
+  // doesn't bring them back (DICE-SPEC.md §2).
+  game.dice.rolls = [];
   clearReminders();
   turnSteps.length = 0;
   endStripHolds();

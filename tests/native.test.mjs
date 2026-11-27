@@ -260,7 +260,7 @@ const reduceScript = enabled => swift.match(/evaluateJavaScript\("(window\.setRe
 // The dialogs' fill and the blur behind them (the board's pill has no blur and a solid tint; DESIGN-AUDIT S10, FINAL.md
 // U4).
 const glassChrome = page => page.evaluate(() => {
-  const dialog = getComputedStyle(document.querySelector('#dice'));
+  const dialog = getComputedStyle(document.querySelector('#cards'));
   return {
     style: document.documentElement.dataset.style,
     reduce: document.documentElement.hasAttribute('data-reduce-transparency'),

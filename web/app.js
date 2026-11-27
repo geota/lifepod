@@ -1,6 +1,6 @@
 // LifePod's entry point, the page's one module script (index.html). It loads the modules under js/ (AGENTS.md, "Modules"),
 // whose dependencies run one way: logic → state → layout → render → actions → sheets → here. Importing the sheets wires
-// the settings page, the dice sheet and card lookup; this file wires the pill's other buttons, back and Escape, the window and the
+// the settings page, the dice page and card lookup; this file wires the pill's other buttons, back and Escape, the window and the
 // fonts, passes the renderers the actions their buttons call, and draws the board.
 
 import { renderBoard } from './js/actions/board.js';

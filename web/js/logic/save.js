@@ -3,7 +3,7 @@
 // fields of a new game. Pure: no DOM and no state, so it can be tested without a browser.
 
 import {
-  badgeSizeOrder, clockwiseEdges, countKinds, defaultTileSet, identityBackgrounds, identityColours, identityParts,
+  badgeSizeOrder, clockwiseEdges, countKinds, defaultTileSet, diceChoices, diceLedgerCap, identityBackgrounds, identityColours, identityParts,
   identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playerCounts, quarterTurns, reminderKinds,
   styleOrder, swatches, tileSetOrder, trackers, trackTabKinds, turnModes,
 } from './data.js';
@@ -177,6 +177,30 @@ function fitReminders(saved) {
   return /** @type {Reminders} */ (Object.fromEntries(reminderKinds.map(kind => [kind, saved?.[kind] !== false])));
 }
 
+// The dice page's saved state (DICE-SPEC.md §4): the last die picked, a d20 unless it's one the picker offers, and the
+// ledger, oldest first. A roll that doesn't fit its die is dropped, and only the newest diceLedgerCap are kept.
+/**
+ * @param {any} [saved]
+ * @returns {Dice}
+ */
+export function fitDice(saved) {
+  /** @type {unknown[]} */
+  const rolls = Array.isArray(saved?.rolls) ? saved.rolls : [];
+  return {
+    sides: diceChoices.includes(saved?.sides) ? saved.sides : 20,
+    rolls: rolls.filter(fitsRoll).slice(-diceLedgerCap).map(({ d, r, t }) => ({ d, r, t })),
+  };
+}
+
+/**
+ * @param {any} roll
+ * @returns {roll is Roll}
+ */
+function fitsRoll(roll) {
+  return diceChoices.includes(roll?.d) && Number.isInteger(roll.r) && roll.r >= 1 && roll.r <= roll.d
+    && Number.isSafeInteger(roll.t) && roll.t >= 0;
+}
+
 /**
  * The saved game: what loadGame returns, saveGame writes as JSON and every render reads. loadGame checks each field of
  * a save and falls back to its default, so a field added here needs a fit* check there too (AGENTS.md).
@@ -214,6 +238,18 @@ function fitReminders(saved) {
  * @property {Reminders} reminders
  * @property {TrackTab} trackTab The tab Track last showed, where the pill has one Track button (PILL-SPEC.md §3.2).
  * @property {History} history The undo history (logic/history.js): its steps, oldest first, and how many are applied.
+ * @property {Dice} dice The dice page's last die and its ledger of rolls. A setting, not a game step: undo never touches it.
+ */
+/**
+ * @typedef {object} Dice
+ * @property {number} sides The die the page opens on, one of diceChoices: 4, 6, 8, 10, 12 or 20, or 2 for the coin.
+ * @property {Roll[]} rolls The ledger, oldest first, at most diceLedgerCap. A new game empties it.
+ */
+/**
+ * @typedef {object} Roll
+ * @property {number} d The die's sides, one of diceChoices; 2 is the coin.
+ * @property {number} r The result, from 1 to d; on the coin, 1 is Heads and 2 is Tails.
+ * @property {number} t When it landed, in whole Unix seconds.
  */
 /**
  * @typedef {object} IdentitySettings
@@ -248,7 +284,7 @@ export function loadGame(read, landscapeAngle) {
     identities: fitIdentities([], 4), identity: fitIdentitySettings(), commanderDamage: fitDamage([], 4),
     manaPool: false, autoEmpty: true, pools: fitPools([], 4), treasure: fitCounts([], 4), keepMana: fitFlags([], 4), turns: 'off', turn: fitTurn(null, 4), tileColours: defaultTileSet, shuffleColours: false,
     badgeSize: 'default', style: null, monarch: null, initiative: null, reminders: fitReminders(), trackTab: 'damage',
-    history: emptyHistory(),
+    history: emptyHistory(), dice: fitDice(),
   };
   try {
     const snapshot = read();
@@ -303,6 +339,8 @@ export function loadGame(read, landscapeAngle) {
       // A save from before Undo, or a history that's corrupt, gets an empty one; the game itself is never touched
       // (fitHistory in history.js).
       history: fitHistory(saved.history, count),
+      // A save from before the dice page has no dice: a d20 and no rolls.
+      dice: fitDice(saved.dice),
     };
   } catch {
     return defaults;

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import fc from 'fast-check';
 import {
-  badgeSizeOrder, countKinds, designationKinds, historyBytes, historyCap, historyFields, historyVersion, identityBackgrounds,
+  badgeSizeOrder, countKinds, designationKinds, diceChoices, diceLedgerCap, historyBytes, historyCap, historyFields, historyVersion, identityBackgrounds,
   identityParts, identitySettingsVersion, manaColours, maxCount, maxRound, maxStartingLife, playOrders, playerCounts,
   pillTools, reminderKinds, settingsFields, stepKinds, styleOrder, swatches, tileSetOrder, trackers, trackTabKinds, turnModes,
 } from '../web/js/logic/data.js';
@@ -54,6 +54,9 @@ function gameProblems(g) {
   if (!reminderKinds.every(k => typeof g.reminders[k] === 'boolean')) p.push('reminders');
   if (!trackTabKinds.includes(g.trackTab)) p.push('trackTab');
   if (historyProblems(g.history, n).length) p.push('history');
+  if (!(g.dice && diceChoices.includes(g.dice.sides) && Array.isArray(g.dice.rolls) && g.dice.rolls.length <= diceLedgerCap
+    && g.dice.rolls.every(roll => Object.keys(roll).join() === 'd,r,t' && diceChoices.includes(roll.d) && Number.isInteger(roll.r)
+      && roll.r >= 1 && roll.r <= roll.d && Number.isSafeInteger(roll.t) && roll.t >= 0))) p.push('dice');
   return p;
 }
 
@@ -87,6 +90,9 @@ const identity = fc.subarray(['W', 'U', 'B', 'R', 'G']).map(a => a.join(''));
 // Rounds near both ends, where the limits are, as well as anywhere between.
 const round = fc.oneof(fc.integer({ min: 1, max: maxRound }), fc.constantFrom(1, 2, maxRound - 1, maxRound));
 
+// One roll in the dice ledger: a die or the coin (2), a result on it, and when, in Unix seconds.
+const rollArb = fc.constantFrom(...diceChoices).chain(d => fc.record({ d: fc.constant(d), r: fc.integer({ min: 1, max: d }), t: fc.integer({ min: 0, max: 2 ** 32 }) }));
+
 // A valid Game, field by field, for a given player count.
 const gameOf = n => fc.record({
   startingLife: fc.integer({ min: 1, max: maxStartingLife }),
@@ -116,6 +122,7 @@ const gameOf = n => fc.record({
   reminders: boolRecord(reminderKinds),
   trackTab: fc.constantFrom(...trackTabKinds),
   history: fc.constant(0).map(() => emptyHistory()),
+  dice: fc.record({ sides: fc.constantFrom(...diceChoices), rolls: fc.array(rollArb, { maxLength: diceLedgerCap }) }),
 });
 
 // ---- Actions on the board, for the history's properties ----------------------------------------------------------
@@ -295,6 +302,25 @@ test('node: scores for no known board start the default board and keep the setti
     assert.equal(g.monarch, null);
     for (const [key, value] of Object.entries(settings)) assert.equal(g[key], value, key);
   }
+});
+
+test('node: the dice ledger loads only rolls that fit, the newest 50, and a save from before it gets a d20 and no rolls', () => {
+  assert.deepEqual(load(JSON.stringify({ scores: [40, 40] })).dice, { sides: 20, rolls: [] }, 'a save from before the dice page');
+  for (const dice of [null, 7, 'd6', [], { sides: '6', rolls: {} }, { sides: 3 }, { sides: 100, rolls: 'x' }]) {
+    assert.deepEqual(load(JSON.stringify({ dice })).dice, { sides: 20, rolls: [] }, `dice ${json(dice)}`);
+  }
+  assert.equal(load(JSON.stringify({ dice: { sides: 2 } })).dice.sides, 2, 'the coin is remembered');
+  const good = [{ d: 2, r: 1, t: 10 }, { d: 20, r: 20, t: 11 }, { d: 4, r: 1, t: 0 }];
+  const bad = [
+    null, 5, [], { d: 20, r: 21, t: 1 }, { d: 20, r: 0, t: 1 }, { d: 2, r: 3, t: 1 }, { d: 3, r: 1, t: 1 }, { d: 6, r: 2.5, t: 1 },
+    { d: 6, r: '2', t: 1 }, { d: 6, r: 2, t: -1 }, { d: 6, r: 2, t: 1.5 }, { d: 6, r: 2 }, { n: 1, t: 4 },
+  ];
+  const loaded = load(JSON.stringify({ dice: { sides: 6, rolls: [bad[0], good[0], ...bad.slice(1, 6), good[1], ...bad.slice(6), { ...good[2], x: 1 }] } })).dice;
+  assert.deepEqual(loaded, { sides: 6, rolls: good }, 'every roll that fits, in order, without extra keys');
+  const many = Array.from({ length: diceLedgerCap + 7 }, (_, t) => ({ d: 6, r: (t % 6) + 1, t }));
+  const capped = load(JSON.stringify({ dice: { sides: 6, rolls: many } })).dice.rolls;
+  assert.equal(capped.length, diceLedgerCap);
+  assert.deepEqual(capped, many.slice(-diceLedgerCap), 'the newest are kept');
 });
 
 // ---- Play order and turns ----------------------------------------------------------------------------------------

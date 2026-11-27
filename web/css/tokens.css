@@ -31,9 +31,8 @@
   /* The colour indicator's rim: the text colour at 65%. */
   --ci-rim: #f2f2efa6;
 
-  /* Dice: each die's own colours are under "Die colours" below. See design/dice/SPEC.md. */
+  /* Dice: each die's own colours are under "Die colours" in dice.css. See design/dice/SPEC.md. */
   --die-shadow: #070808;
-  --dice-stage-pressed: #191a1c;
   --press-overlay: #f2f2ef1a;
 
   /* The safe-area insets, as variables so a test can stand in for a notch. */

@@ -1,52 +1,56 @@
 /* Dice, then the page-wide rules that must come last: the hover states, reduced motion and the compact sheet spacing.
    They override earlier rules by coming later, so keep them at the end of the last file. */
-/* Dice sheet: the die on a stage, the sides picker and Roll. Landscape puts the stage on the left.
-   #dice keeps these gaps over the compact sheet spacing for small screens below. */
-#dice { width: min(420px, calc(100% - 32px)); }
-#dice .dice-sheet {
-  grid-template-areas: "header" "stage" "picker" "roll";
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4) var(--space-4);
+/* The dice page (design/polish/DICE-SPEC.md): a full-screen dialog (settings' dialog.fs, whose flip turns the whole
+   page 180°) holding a frame that takes the board's turn, as .app does in board.css, so the page lies the way the board
+   does. It's laid out in three columns, side | stage | side, with equal sides so the die sits at the centre of the
+   phone. The frame can be turned, so the layout reads its own size through container queries. Each pair of opposite
+   edges keeps the larger of its safe-area insets, which keeps the die centred too. */
+/* The page never scrolls, so its type grows with the system text size only to 130%: past that the choices' labels and
+   the ledger's rows would no longer fit their 44px targets and columns. */
+#dice.fs { --rem: calc(1rem * min(var(--text-scale), 1.3)); --type-label: calc(.875 * var(--rem)); --type-small: calc(.8125 * var(--rem)); padding: 0; font-size: var(--rem); }
+.dice-frame {
+  --pad-x: max(var(--space-2), var(--safe-left), var(--safe-right));
+  --pad-y: max(var(--space-2), var(--safe-top), var(--safe-bottom));
+  --pad-block: var(--pad-y);
+  --pad-inline: var(--pad-x);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100dvw;
+  height: 100dvh;
+  transform: translate(-50%, -50%);
+  container: dice-page / size;
 }
-.dice-sheet .sheet-header { grid-area: header; }
-.dice-stage {
-  grid-area: stage;
+#dice:is([data-turn="90"], [data-turn="270"]) .dice-frame { --pad-block: var(--pad-x); --pad-inline: var(--pad-y); width: 100dvh; height: 100dvw; }
+#dice[data-turn="90"] .dice-frame { transform: translate(-50%, -50%) rotate(90deg); }
+#dice[data-turn="180"] .dice-frame { transform: translate(-50%, -50%) rotate(180deg); }
+#dice[data-turn="270"] .dice-frame { transform: translate(-50%, -50%) rotate(270deg); }
+.dice-layout {
+  --side: clamp(188px, 28%, 300px);
   display: grid;
-  place-items: center;
-  block-size: clamp(176px, calc(100dvh - 340px), 340px);
-  border-radius: var(--card-radius);
-  background: var(--background);
-  container-type: size;
-  overflow: hidden;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-user-select: none;
-  user-select: none;
+  grid-template-columns: var(--side) minmax(0, 1fr) var(--side);
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--space-2);
+  height: 100%;
+  padding: var(--pad-block) var(--pad-inline);
 }
-.dice-stage:active { background: var(--dice-stage-pressed); }
-.dice-stage > svg { grid-area: 1 / 1; width: 70cqmin; height: 70cqmin; overflow: visible; }
-/* The result again on the stage's far edge, upside down, for the other side of the table. */
-.dice-echo {
-  grid-area: 1 / 1;
-  align-self: start;
-  margin-top: 2.5cqmin;
-  transform: rotate(180deg);
-  color: var(--text);
-  font-size: 9cqmin;
-  font-weight: var(--weight-heavy);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.03em;
-  line-height: 1;
-}
-/* Three to a row at the default text size; larger text (--rem) fits fewer to a row rather than crowding them. */
-.dice-picker { grid-area: picker; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, calc(4.25 * var(--rem))), 1fr)); gap: var(--space-1); }
+
+/* The left column: ✕ in its corner, then the picker together above Roll at the foot. The picker is four over three
+   (the six dice, then d12, d20 and the coin), each choice its icon over its label, at least 44px wide: the side column
+   is never narrower than four of them. */
+.dice-side { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: var(--space-2); min-width: 0; min-height: 0; }
+.dice-side > .close { justify-self: start; }
+.dice-picker { grid-row: 3; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: var(--choice-height, 60px); gap: var(--space-1); }
+.dice-picker > button { grid-column: span 3; }
+.dice-picker > button:nth-child(n + 5) { grid-column: span 4; }
 .dice-picker button {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  min-height: 48px;
-  padding: 0 var(--space-1);
+  gap: 3px;
+  min-width: 0;
+  padding: 0 2px;
   border: var(--control-edge) solid var(--control-border);
   border-radius: var(--button-radius);
   background: var(--control-fill);
@@ -54,23 +58,134 @@
   font-size: var(--type-label);
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 .dice-picker button[aria-pressed="true"] { border-color: var(--pick-fill); background: var(--pick-fill); color: var(--pick-ink); box-shadow: var(--pick-shadow); }
-.dice-picker svg { flex: none; width: 22px; height: 22px; overflow: visible; }
-.dice-roll { grid-area: roll; min-height: 48px; font-size: calc(1.0625 * var(--rem)); }
-@media (orientation: landscape) {
-  #dice { width: fit-content; max-width: calc(100% - 32px); }
-  #dice .dice-sheet {
-    grid-template-columns: auto minmax(212px, max(260px, calc(16.25 * var(--rem))));
-    grid-template-rows: auto 1fr auto;
-    grid-template-areas: "stage header" "stage picker" "stage roll";
-    /* stylelint-disable-next-line plugin/no-unsupported-browser-features -- the grid gap, not multi-column layout, which the partial note is about. */
-    column-gap: var(--space-4);
-    padding: var(--space-3);
+.dice-picker svg { flex: none; width: var(--choice-icon, 22px); height: var(--choice-icon, 22px); overflow: visible; }
+.dice-roll { grid-row: 4; min-height: var(--roll-height, 56px); margin: 0; font-size: calc(1.0625 * var(--rem)); }
+
+/* The stage, a button: a tap on the die rolls it. The die sits at the centre of the phone, and its result shows on its
+   own face, toward the near side, and again at each long edge: upright at the near one and turned 180° at the far one. */
+.dice-stage {
+  grid-column: 2;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--card-radius);
+  background: var(--card-fill);
+  color: var(--text);
+  container-type: size;
+  overflow: hidden;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.dice-stage:active { background: var(--raised); }
+.dice-stage > svg { grid-area: 1 / 1; width: min(80cqw, 60cqh); height: min(80cqw, 60cqh); overflow: visible; }
+.dice-echo {
+  grid-area: 1 / 1;
+  align-self: start;
+  margin-top: 3cqmin;
+  transform: rotate(180deg);
+  color: var(--text);
+  font-size: 13cqmin;
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.03em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.dice-echo-near { align-self: end; margin: 0 0 3cqmin; transform: none; }
+/* Two players sit at the short ends: the die and its copies turn a quarter, one copy toward each end, the die's face
+   with the left one. The rotate property leaves the roll's transform animation alone. */
+#dice[data-ends] .dice-stage > svg { width: min(60cqw, 80cqh); height: min(60cqw, 80cqh); rotate: 90deg; }
+#dice[data-ends] .dice-echo { align-self: center; justify-self: end; margin: 0 3cqmin 0 0; transform: rotate(-90deg); font-size: min(13cqmin, 11cqw); }
+#dice[data-ends] .dice-echo-near { justify-self: start; margin: 0 0 0 3cqmin; transform: rotate(90deg); }
+
+/* The right column: the Rolls card, facing the near side. With two players it turns a quarter to face the right-hand
+   end where it keeps room for its rows (240px across); the page's flip then turns it to the left-hand end. */
+.dice-ledger-cell { grid-column: 3; position: relative; min-width: 0; min-height: 0; container: dice-ledger / size; }
+.dice-ledger { position: absolute; inset: 0; grid-template-rows: auto auto minmax(0, 1fr); align-content: start; container: dice-rolls / inline-size; }
+@container dice-ledger (min-width: 240px) {
+  #dice[data-ends] .dice-ledger { inset: auto; top: 50%; left: 50%; width: 100cqh; height: 100cqw; translate: -50% -50%; rotate: -90deg; }
+}
+.dice-ledger-head { display: flex; align-items: center; gap: var(--space-2); margin: -4px -4px 0 0; }
+.dice-ledger-head > h3 { display: flex; flex: 1; align-items: center; gap: var(--space-2); min-width: 0; margin: 0; color: var(--muted); font-size: var(--type-small); font-weight: var(--weight-heavy); letter-spacing: .06em; text-transform: uppercase; }
+.dice-ledger-head > h3 > .icon { flex: none; width: 16px; height: 16px; color: var(--text-soft); }
+.dice-ledger-head .close { flex: none; }
+.dice-ledger-head .close .icon { width: 18px; height: 18px; }
+
+/* Small phones (640 × 360 and 568 × 320): shorter choices and Roll, and tighter cards. */
+@container dice-page (max-height: 380px) {
+  .dice-layout { --choice-height: 52px; --roll-height: 52px; }
+  .dice-ledger { gap: 6px; padding: 10px; }
+}
+/* Tablets: wider sides, bigger choices and Roll. */
+@container dice-page (min-height: 700px) {
+  .dice-layout { --side: clamp(260px, 28%, 380px); --choice-height: 76px; --choice-icon: 30px; --roll-height: 64px; gap: var(--space-4); padding: max(var(--space-4), var(--pad-block)) max(var(--space-4), var(--pad-inline)); }
+  .dice-roll { font-size: calc(1.25 * var(--rem)); }
+}
+
+/* The ledger: a heading with the count, then the rolls, newest first, in a list that scrolls on its own. Each row is the
+   die's icon, its name in soft text, the result in heavy figures and the time on the right, in fixed columns so they
+   line up; the result's column widens for Heads and Tails while the list holds a coin flip. Rows aren't controls, so
+   40px is spacing. */
+.dice-ledger h3 .dice-count { margin-inline-start: auto; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; font-weight: var(--weight-semibold); }
+.dice-empty { margin: 0; color: var(--text-soft); font-size: var(--type-label); }
+.dice-empty[hidden], .dice-rolls[hidden] { display: none; }
+.dice-rolls:has(> [data-sides="2"]) { --result-column: calc(3.75 * var(--rem)); }
+.dice-rolls {
+  --result-column: calc(1.75 * var(--rem));
+  display: grid;
+  align-content: start;
+  gap: calc(var(--row-gap) / 3);
+  min-height: 0;
+  margin: 0 calc(-1 * var(--space-1));
+  padding: 0 var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+}
+.dice-row {
+  display: grid;
+  grid-template-columns: 18px calc(2.25 * var(--rem)) var(--result-column) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-3) 0 var(--row-inset);
+  border-radius: var(--row-radius);
+  background: var(--row-fill);
+  box-shadow: inset 0 -1px 0 var(--row-divider);
+}
+.dice-row:last-child { box-shadow: none; }
+.dice-row .die-icon { width: 18px; height: 18px; overflow: visible; color: var(--die-front); }
+.dice-row-die { color: var(--text-soft); font-size: var(--type-label); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; }
+.dice-row-result { color: var(--text); font-size: calc(1.25 * var(--rem)); font-weight: var(--weight-heavy); font-variant-numeric: tabular-nums; letter-spacing: -.02em; text-align: end; }
+.dice-row-when { justify-self: end; color: var(--muted); font-size: var(--type-small); white-space: nowrap; }
+/* The newest roll, the one on the stage, a tone above the rest. It doesn't use lime, which is for chosen and commit. */
+.dice-row[data-latest] { background: color-mix(in oklab, var(--text) 6%, var(--raised)); box-shadow: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .dice-row[data-fresh] { animation: dice-row-in .2s cubic-bezier(.2, 0, 0, 1); }
+}
+@keyframes dice-row-in { from { opacity: 0; transform: translateY(-8px); } }
+/* A narrow card (small phones): the die's name over the time, the result on the right. */
+@container dice-rolls (max-width: 219.98px) {
+  .dice-row {
+    grid-template-columns: 16px minmax(0, 1fr) auto;
+    grid-template-areas: "icon die result" "icon when result";
+    gap: 0 var(--space-2);
+    min-height: 44px;
+    padding-block: 3px;
   }
-  /* The stage is a size container, so it needs both sizes set. */
-  .dice-stage { block-size: min(calc(100dvh - 38px), 400px); inline-size: min(calc(100dvh - 38px), 400px); }
-  .dice-picker { align-content: start; }
+  .dice-row .die-icon { grid-area: icon; width: 16px; height: 16px; }
+  .dice-row-die { grid-area: die; line-height: 1.15; }
+  .dice-row-when { grid-area: when; justify-self: stretch; overflow: hidden; line-height: 1.15; text-overflow: ellipsis; }
+  .dice-row-result { grid-area: result; min-width: 1.4em; }
+  .dice-row[data-sides="2"] .dice-row-result { font-size: calc(1.0625 * var(--rem)); }
 }
 
 /* Die colours. Each die keeps one hue, with the sage die's lightness steps: a pale front face, side faces
@@ -100,6 +215,10 @@
   --die-front: #e9dafd; --die-side-1: #c9b2e5; --die-side-2: #aa90c8; --die-side-3: #8a71a7;
   --die-edge: #66537d; --die-outline: #352b41; --die-ink: #241a2f; --die-ink-idle: #66547b;
 }
+[data-sides="2"] { /* the coin: silver, a hue none of the dice use */
+  --die-front: #e6e8eb; --die-side-1: #c3c8ce; --die-side-2: #a2a8b0; --die-side-3: #828992;
+  --die-edge: #5e646c; --die-outline: #30343a; --die-ink: #1b1e22; --die-ink-idle: #5c6269;
+}
 /* The die, shared by the stage and the picker icons. */
 .die-face, .die-outline { stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .die-body .die-face { stroke: var(--die-edge); stroke-width: 1.5px; }
@@ -108,7 +227,9 @@
 .die-body .tone-1 { fill: var(--die-side-1); }
 .die-body .tone-2 { fill: var(--die-side-2); }
 .die-body .tone-3 { fill: var(--die-side-3); }
-.die-shadow polygon { fill: var(--die-shadow); }
+.die-shadow > * { fill: var(--die-shadow); }
+/* The coin's fine ring, inside its rim. */
+.coin-ring { fill: none; stroke: var(--die-edge); stroke-width: 1.25px; vector-effect: non-scaling-stroke; opacity: .7; }
 /* Both layers are positioned so the translucent shadow can't paint over the die. */
 .die-shadow { position: relative; z-index: 0; opacity: .6; transform: translate(2%, 4%); }
 .die-body { position: relative; z-index: 1; }
@@ -142,7 +263,7 @@
   .board-controls:is([data-mode="rotate"], [data-mode="colours"], [data-mode="identity"]) #setup-button:hover::before { content: none; }
   .save-button:hover::before { background: var(--accent-pressed); }
   :is(.primary, .k-commit):hover { background: var(--accent-pressed); }
-  .dice-stage:hover { background: var(--dice-stage-pressed); }
+  .dice-stage:hover { background: var(--raised); }
 }
 /* Motion is 200ms emphasised easing (Material) or a 250ms spring (Glass), and none at all under reduced motion, where
    pressed controls keep their size too. */

@@ -203,7 +203,7 @@ export const historyFields = [
 ];
 export const settingsFields = [
   'keepAwake', 'landscapeAngle', 'counters', 'identity', 'manaPool', 'autoEmpty', 'turns', 'tileColours',
-  'shuffleColours', 'badgeSize', 'style', 'reminders', 'trackTab', 'history',
+  'shuffleColours', 'badgeSize', 'style', 'reminders', 'trackTab', 'history', 'dice',
 ];
 // The saved history's format, and its cap: the newest 500 steps, and at most 64 KB of them as JSON.
 export const historyVersion = 1;
@@ -214,6 +214,14 @@ export const mergeWindow = 1500;
 // The running delta on a total fades for this long once its burst ends (§6.2b), and an undo's toast stays this long.
 export const deltaFade = 300;
 export const toastTime = 4000;
+// The dice page (design/polish/DICE-SPEC.md): what the picker offers, in its order, by number of sides, where 2 is the
+// coin (a roll of 1 is Heads and 2 is Tails, the words web/dice.js's lifePodDice.label gives), and how many rolls the
+// ledger keeps. The dice match lifePodDice.sides and the coin lifePodDice.coin (tests/dice.test.mjs). Rolls are saved
+// with the game but aren't game state: no undo step records them.
+export const diceSides = [4, 6, 8, 10, 12, 20];
+export const coinSides = 2;
+export const diceChoices = [...diceSides, coinSides];
+export const diceLedgerCap = 50;
 // The labels a step can carry, where its cells alone don't say what it was.
 /** @typedef {'newGame' | 'turn' | 'turnBack' | 'first' | 'start' | 'eraser'} StepKind */
 /** @type {string[]} */
