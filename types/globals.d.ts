@@ -38,7 +38,7 @@ interface LifePodIosHandlers {
   haptic: LifePodMessageHandler<null>;
 }
 
-/** The die on the dice sheet's stage, from `lifePodDice.stageDie`. */
+/** The die or coin on the dice page's stage, from `lifePodDice.stageDie`. */
 interface LifePodDie {
   count: number;
   shadow: SVGSVGElement;
@@ -50,10 +50,14 @@ interface LifePodDie {
 
 /** web/dice.js, a classic script that loads before app.js, the module entry, and sets window.lifePodDice. */
 interface LifePodDice {
-  /** The dice the sheet offers, by their number of sides. */
+  /** The dice the page offers, by their number of sides. */
   sides: number[];
+  /** The coin's number of sides, 2: icon, stageDie, label and roll take it like a die's. */
+  coin: number;
   icon(count: number): SVGSVGElement;
   stageDie(count: number): LifePodDie;
+  /** What a result reads as: the number on a die, Heads (1) or Tails (2) on the coin. */
+  label(count: number, value: number): string;
   /** A uniform whole number from 1 to count. */
   randomFace(count: number): number;
   /** Rolls the stage die and returns a function that stops the roll early. */

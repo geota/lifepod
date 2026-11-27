@@ -242,6 +242,7 @@ function resetList() {
     game.turns !== 'off' && 'Turns, back to round 1',
     designations.length > 0 && `The ${designations.join(' and the ')}`,
     'Colour identities',
+    game.dice.rolls.length > 0 && 'Dice rolls',
     game.shuffleColours && 'Tile colours, shuffled',
   ].filter(item => typeof item === 'string');
 }
