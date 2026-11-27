@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from './helpers.mjs';
 import { gunzipSync } from 'node:zlib';
-import { buildCards, cachedBulk, cachedNicknames, cachedPrintings, cachedRulings, packCards, printedRarities, readBulk, shownDate } from '../scripts/cards-update.mjs';
+import { buildCards, cacheFolder, cacheMismatch, cacheMissing, cachedBulk, cachedNicknames, cachedPrintings, cachedRulings, packCards, printedRarities, readBulk, shownDate } from '../scripts/cards-update.mjs';
 import { readRulings, shardCount } from '../scripts/cards-rulings.mjs';
 import {
   colourMask, costText, faceStats, fold, indexCards, rankResults, readSymbol, searchCards, searchNames, searchText, splitSymbols,
@@ -135,32 +137,40 @@ test('node: cards-update.mjs builds the same file from the same bulk file, every
 
 test('node: the committed data file is what the cached bulk file builds', async (t) => {
   const cached = cachedBulk();
-  if (!cached || !existsSync(cached.path)) {
-    t.skip('no cached bulk file: run npm run cards:update once');
-    return;
-  }
-  if (cached.updated_at !== data.about.updated) {
-    t.skip(`the cache is from ${cached.updated_at}, the data from ${data.about.updated}`);
-    return;
-  }
   const printings = cachedPrintings();
-  if (!printings || !existsSync(printings.path)) {
-    t.skip('no cached default_cards file: run npm run cards:update once');
-    return;
-  }
   const rulings = cachedRulings();
-  if (!rulings || !existsSync(rulings.path)) {
-    t.skip('no cached rulings file: run npm run cards:update once');
+  const missing = [['Oracle cards file', cached], ['default_cards file', printings], ['rulings file', rulings]].find(([, file]) => !file || !existsSync(file.path));
+  if (missing) {
+    t.skip(cacheMissing(missing[0]));
     return;
   }
-  const rulingsDate = JSON.parse(read('data/rulings/shared.json')).about.updated;
-  if (rulings.updated_at !== rulingsDate) {
-    t.skip(`the cached rulings are from ${rulings.updated_at}, the data's from ${rulingsDate}`);
+  const mismatch = cacheMismatch([
+    { name: 'Oracle cards', cached: cached.updated_at, data: data.about.updated },
+    { name: 'rulings', cached: rulings.updated_at, data: JSON.parse(read('data/rulings/shared.json')).about.updated },
+  ]);
+  if (mismatch) {
+    t.skip(mismatch);
     return;
   }
   const printed = await printedRarities(readBulk(printings.path));
   const ruled = await readRulings(readBulk(rulings.path));
   assert.equal(await buildCards(readBulk(cached.path), cached.updated_at, cachedNicknames()?.lists ?? {}, printed, ruled), dataText);
+});
+
+// The cache is shared by every checkout on the machine, outside node_modules, which npm ci deletes.
+test('node: the Scryfall cache is one folder per user, and a stale one says what to run', () => {
+  const home = homedir();
+  assert.equal(cacheFolder({}), join(home, '.cache', 'lifepod', 'scryfall'));
+  assert.equal(cacheFolder({ XDG_CACHE_HOME: '/xdg' }), '/xdg/lifepod/scryfall');
+  assert.equal(cacheFolder({ XDG_CACHE_HOME: '/xdg', LIFEPOD_SCRYFALL_CACHE: '/mine' }), '/mine');
+  assert.equal(cacheFolder({ LIFEPOD_SCRYFALL_CACHE: 'here' }), resolve('here'), 'a relative path from the current folder');
+  assert.equal(cacheMismatch([{ name: 'rulings', cached: '2026-11-26T10:00:00+00:00', data: '2026-11-26T10:00:00+00:00' }]), null);
+  assert.equal(cacheMismatch([{ name: 'Oracle cards', cached: '2026-11-27T10:00:00+00:00', data: '2026-11-26T10:00:00+00:00' }]),
+    'the cached Oracle cards are from 2026-11-27, the data\'s from 2026-11-26: run `npm run cards:update` to rebuild the data, or `npm run cards:fetch` after the data is next refreshed');
+  assert.match(cacheMismatch([{ name: 'Oracle cards', cached: '2026-11-25T10:00:00+00:00', data: '2026-11-26T10:00:00+00:00' }]),
+    /from 2026-11-25, the data's from 2026-11-26: run `npm run cards:fetch`/, 'an older cache: fetch first');
+  assert.match(cacheMismatch([{ name: 'rulings', cached: '2026-11-26T22:00:00+00:00', data: '2026-11-26T10:00:00+00:00' }]),
+    /from 2026-11-26T22:00:00\+00:00, the data's from 2026-11-26T10:00:00\+00:00/, 'the times when the days are the same');
 });
 
 // r: and in: read every printing's rarity (§3.6), from Scryfall's default_cards, written only where it adds something.

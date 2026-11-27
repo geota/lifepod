@@ -3,22 +3,28 @@
 // the page fetches and unpacks (docs/DEVELOPING.md, "Card data"). Run it before a release (RELEASING.md). It writes the
 // rulings the same way, from Scryfall's rulings file: data/rulings/, and web/data/rulings/ gzipped (scripts/cards-rulings.mjs).
 //
-//   npm run cards:update                  download the latest bulk file, keep it in the cache, write the data
-//   npm run cards:update -- --offline     rebuild from the cached bulk file, with no network
+//   npm run cards:update                  download the latest bulk files into the cache, write the data
+//   npm run cards:update -- --offline     rebuild from the cached bulk files, with no network
+//   npm run cards:fetch                   download the latest bulk files into the cache, and write nothing else
 //
 // It also writes the bulk file's date into the credits in web/index.html and the README.
 //
-// The cache is node_modules/.cache/lifepod-cards/: the bulk file as downloaded and its Scryfall metadata. The same
-// bulk file always gives the same output, byte for byte (tests/cards-data.test.mjs checks it).
+// The cache holds the bulk files as downloaded, their Scryfall metadata and the land nicknames. It's one folder per user,
+// outside the checkout, so every checkout and worktree on the machine shares one download and `npm ci` leaves it alone:
+// $LIFEPOD_SCRYFALL_CACHE if set, else $XDG_CACHE_HOME/lifepod/scryfall, else ~/.cache/lifepod/scryfall (cacheFolder()).
+// The same bulk files always give the same output, byte for byte; tests/cards-data.test.mjs and
+// tests/cards-rulings.test.mjs check that the committed data is what the cache builds, when their dates match.
 //
 // Scryfall asks every client for a User-Agent naming the app and an Accept header, and answers 403 without them. This
 // one sends `LifePod/<package.json version>` and nothing about who runs it.
-import { createReadStream, createWriteStream, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { cpSync, createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createInterface } from 'node:readline';
 import { constants, createGunzip, gzipSync } from 'node:zlib';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { fold } from '../web/js/logic/cards.js';
 import { formats, landNicknames, writeLegalities } from '../web/js/logic/cardterms.js';
 import { buildRulings, readRulings, shardName, shardOf } from './cards-rulings.mjs';
@@ -26,7 +32,27 @@ import { buildRulings, readRulings, shardName, shardOf } from './cards-rulings.m
 const root = new URL('../', import.meta.url);
 const output = new URL('data/cards.json', root);
 const shipped = new URL('web/data/cards.json.gz', root);
-const cache = new URL('node_modules/.cache/lifepod-cards/', root);
+/**
+ * The cache folder: $LIFEPOD_SCRYFALL_CACHE if set, else $XDG_CACHE_HOME/lifepod/scryfall, else
+ * ~/.cache/lifepod/scryfall. A relative path is taken from the current folder.
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {string}
+ */
+export function cacheFolder(env = process.env) {
+  return resolve(env.LIFEPOD_SCRYFALL_CACHE || join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'lifepod', 'scryfall'));
+}
+const cache = pathToFileURL(`${cacheFolder()}/`);
+// Where the cache was before it moved out of the checkout. npm ci deleted it, but a checkout that still has it hands it
+// over once: if the new folder has no Oracle cards file and the old one does, the old folder is copied in.
+const oldCache = new URL('node_modules/.cache/lifepod-cards/', root);
+if (!existsSync(new URL('oracle-cards.json', cache)) && existsSync(new URL('oracle-cards.json', oldCache))) {
+  try {
+    cpSync(oldCache, cache, { recursive: true, force: false, filter: source => !source.endsWith('.part') });
+    console.warn(`Copied the card cache from ${fileURLToPath(oldCache)} to ${fileURLToPath(cache)}`);
+  } catch (error) {
+    console.warn(`Couldn't copy the old card cache: ${error.message}`);
+  }
+}
 const bulkFile = new URL('oracle-cards.jsonl.gz', cache);
 const metaFile = new URL('oracle-cards.json', cache);
 const nicknameFile = new URL('land-nicknames.json', cache);
@@ -318,6 +344,16 @@ async function fetchWithRetries(url, init, timeout) {
   }
 }
 
+// A file in the cache is written beside it under a name of this run's own, then renamed over it, so another checkout
+// reading the shared cache, or downloading at the same time, never sees half a file.
+const partialOf = file => new URL(`${file.pathname.split('/').pop()}.${process.pid}.part`, cache);
+function writeCached(file, data) {
+  mkdirSync(cache, { recursive: true });
+  const partial = partialOf(file);
+  writeFileSync(partial, data);
+  renameSync(partial, file);
+}
+
 // Downloads a bulk file into the cache unless the cached one is the latest, streamed to disk (default_cards is about
 // 80 MB) and kept gzipped, as Scryfall sends it. Each file is downloaded at most once a run.
 async function downloadBulk(entry, file, meta, cached, timeout = 180000) {
@@ -326,7 +362,7 @@ async function downloadBulk(entry, file, meta, cached, timeout = 180000) {
   if (cached?.updated_at === entry.updated_at) return;
   console.log(`Downloading ${uri}`);
   mkdirSync(cache, { recursive: true });
-  const partial = new URL(`${file.pathname.split('/').pop()}.part`, cache);
+  const partial = partialOf(file);
   for (let attempt = 0; ; attempt++) {
     try {
       const response = await fetchWithRetries(uri, { headers: { ...headers, Accept: '*/*' } }, timeout);
@@ -339,7 +375,7 @@ async function downloadBulk(entry, file, meta, cached, timeout = 180000) {
     }
   }
   renameSync(partial, file);
-  writeFileSync(meta, `${JSON.stringify({ updated_at: entry.updated_at, uri }, null, 2)}\n`);
+  writeCached(meta, `${JSON.stringify({ updated_at: entry.updated_at, uri }, null, 2)}\n`);
 }
 
 async function download() {
@@ -358,10 +394,8 @@ async function download() {
   }
   console.log(`Downloading ${uri}`);
   const file = await fetchWithRetries(uri, { headers: { ...headers, Accept: '*/*' } }, 180000);
-  const bytes = Buffer.from(await file.arrayBuffer());
-  mkdirSync(cache, { recursive: true });
-  writeFileSync(bulkFile, bytes);
-  writeFileSync(metaFile, `${JSON.stringify({ updated_at: entry.updated_at, uri }, null, 2)}\n`);
+  writeCached(bulkFile, Buffer.from(await file.arrayBuffer()));
+  writeCached(metaFile, `${JSON.stringify({ updated_at: entry.updated_at, uri }, null, 2)}\n`);
   return cachedBulk();
 }
 
@@ -415,22 +449,55 @@ export async function fetchNicknames(updated) {
       url = body.has_more ? body.next_page : null;
     }
   }
-  mkdirSync(cache, { recursive: true });
-  writeFileSync(nicknameFile, `${JSON.stringify({ updated_at: updated, lists }, null, 1)}\n`);
+  writeCached(nicknameFile, `${JSON.stringify({ updated_at: updated, lists }, null, 1)}\n`);
   return lists;
 }
 
+/**
+ * Why the committed data can't be checked against the cache, or null when it can: each file's cached date against the
+ * date the data was written from. A cache newer than the data is normal, since Scryfall updates its files every day.
+ * @param {{ name: string, cached: string, data: string }[]} files
+ * @returns {string | null}
+ */
+export function cacheMismatch(files) {
+  const stale = files.filter(file => file.cached !== file.data);
+  if (!stale.length) return null;
+  // The day alone, unless both are from the same day.
+  const shown = ({ cached, data }) => (cached.slice(0, 10) === data.slice(0, 10) ? [cached, data] : [cached.slice(0, 10), data.slice(0, 10)]);
+  const dates = stale.map(file => {
+    const [cached, data] = shown(file);
+    return `the cached ${file.name} are from ${cached}, the data's from ${data}`;
+  }).join('; ');
+  return stale.every(file => Date.parse(file.cached) > Date.parse(file.data))
+    ? `${dates}: run \`npm run cards:update\` to rebuild the data, or \`npm run cards:fetch\` after the data is next refreshed`
+    : `${dates}: run \`npm run cards:fetch\` to download Scryfall's latest files, or \`npm run cards:update\` to rebuild the data from them`;
+}
+/** What to do when a cached file is missing. */
+export const cacheMissing = (name) => `no cached ${name} in ${fileURLToPath(cache)}: run \`npm run cards:fetch\` to download Scryfall's files`;
+
+/** `npm run cards:fetch`: the latest bulk files and land nicknames into the cache, and nothing else written. */
+async function fetchOnly() {
+  const bulk = await download();
+  await fetchNicknames(bulk.updated_at);
+  console.log(`The cache, ${fileURLToPath(cache)}, holds Scryfall's files from ${bulk.updated_at}:`);
+  for (const [name, file] of [['oracle cards', bulk], ['default cards', cachedPrintings()], ['rulings', cachedRulings()], ['oracle tags', cachedTags()]]) {
+    console.log(`  ${name}: ${file?.updated_at ?? 'missing'}`);
+  }
+  console.log('Run `npm run cards:update -- --offline` to rebuild the data from them.');
+}
+
 async function main() {
+  if (process.argv.includes('--fetch')) return fetchOnly();
   const offline = process.argv.includes('--offline');
   const bulk = offline ? cachedBulk() : await download();
-  if (!bulk) throw new Error('No cached bulk file yet: run `npm run cards:update` once with a network connection');
+  if (!bulk) throw new Error(`No cached bulk file yet in ${fileURLToPath(cache)}: run \`npm run cards:update\` once with a network connection`);
   const nicknames = offline ? cachedNicknames()?.lists ?? {} : await fetchNicknames(bulk.updated_at);
   if (offline && !cachedNicknames()) console.warn('No cached land nicknames: is:shockland and the rest will find nothing until an online update.');
   const printings = cachedPrintings();
-  if (!printings) throw new Error('No cached default_cards file yet: run `npm run cards:update` once with a network connection');
+  if (!printings) throw new Error(`No cached default_cards file yet in ${fileURLToPath(cache)}: run \`npm run cards:update\` once with a network connection`);
   const printed = await printedRarities(readBulk(printings.path));
   const rulingsBulk = cachedRulings();
-  if (!rulingsBulk) throw new Error('No cached rulings file yet: run `npm run cards:update` once with a network connection');
+  if (!rulingsBulk) throw new Error(`No cached rulings file yet in ${fileURLToPath(cache)}: run \`npm run cards:update\` once with a network connection`);
   const rulings = await readRulings(readBulk(rulingsBulk.path));
   const { text, places, kept } = await buildData(readBulk(bulk.path), bulk.updated_at, nicknames, printed, rulings);
   mkdirSync(new URL('./', output), { recursive: true });
