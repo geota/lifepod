@@ -15,6 +15,7 @@ LifePod saves the current game on your device so it is still there the next time
 - the mana floating in each player's pool
 - the turn: who went first, whose turn it is, and the round
 - who is the monarch and who has the initiative
+- the last 50 dice rolls and coin flips, with when each landed, and the die last picked
 - whether **Keep awake**, the **Commander**, **Poison**, **Energy**, **Experience** and **Rad** counters, **Monarch**, **Initiative**, **Mana pool** and emptying mana pools when the turn passes are on, the **Turns** setting, and the **Reminders** switches
 
 This stays on your device: in the app's private storage on Android and iOS, or in your browser's local storage on the web. Deleting the app or clearing its data removes it.

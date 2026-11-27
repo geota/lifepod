@@ -24,13 +24,13 @@
 - Tap either half of your tile for −1 or +1, or hold for bigger steps. Several players can tap at once.
 - Every seat faces its player, and the board stays put when the phone turns.
 - Rotate any seat to fit your table.
-- Roll a d4, d6, d8, d10, d12 or d20 from the device's secure random number generator.
+- Roll a d4, d6, d8, d10, d12 or d20, or flip a coin, from the device's secure random number generator, with a ledger of the last 50 rolls.
 - Look up any card offline: every paper Magic card's rules text, with mana symbols, both faces of double-faced cards, the colour identity and the official rulings. Search names as you type, or rules text too.
-- **New game**, in the Settings header, resets life, counters, commander damage, mana and Treasure, turns, the monarch and the initiative, and identities. Settings and seats stay.
+- **New game**, in the Settings header, resets life, counters, commander damage, mana and Treasure, turns, the monarch and the initiative, identities and dice rolls. Settings and seats stay.
 - Keeps the screen awake and saves the game between launches.
 
 <p align="center">
-  <img src="screenshots/readme/dice.png" width="400" alt="The dice sheet with a d20 and the six dice to pick from" />
+  <img src="screenshots/readme/dice.png" width="400" alt="The dice page: the d20 at the centre, the six dice and the coin to pick from, and the ledger of rolls" />
 </p>
 
 ### Commander and counters

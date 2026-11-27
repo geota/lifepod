@@ -14,7 +14,9 @@ Choose **Rotate seats** in Settings → **Table**, then tap a tile to turn it 90
 
 ## Dice
 
-Tap the die in the center to roll a d4, d6, d8, d10, d12 or d20. Each die is drawn in its own shape, and every roll comes from the device's cryptographic random number generator, so no face is favoured.
+Tap the die in the center to open **Dice**. Pick a d4, d6, d8, d10, d12 or d20, or **Coin**, then tap the die in the middle or **Roll** (**Flip coin** for the coin). Each die is drawn in its own shape, and every roll comes from the device's cryptographic random number generator, so no face is favoured. The result shows on the die and again along both long edges, the right way up for each side of the table; with two players, it faces each end. The page lies the way the board does, and the flip button turns it to face the other side.
+
+**Rolls**, on the right, lists the last 50 rolls and flips, newest first, with how long ago each was, such as "d20 · 17 · 2 min ago" or "Coin · Heads · just now". It's saved with the game, so it's still there after the app closes, and **New game** clears it. Rolls aren't part of the game's history, so Undo doesn't take them back. Dice opens on the die you picked last.
 
 ## Card lookup
 
