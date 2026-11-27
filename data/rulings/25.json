@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":25,"shards":32,"cards":589,"rulings":2305},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":25,"shards":32,"cards":589,"rulings":2305},
 "rulings":[
 ["2004-10-04","A card with X in the cost is treated as X=0."],
 ["2004-10-04","Creature cards which are revealed but are not the lowest cost, or any non-creature cards revealed remain in their owners’ hands and stop being revealed."],

@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":22,"shards":32,"cards":614,"rulings":2409},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":22,"shards":32,"cards":614,"rulings":2409},
 "rulings":[
 ["2004-10-04","A permanent which is of multiple colors counts as each of its colors."],
 ["2004-10-04","A targeted spell which is delayed will still succeed even if its target has phased out and back in again."],

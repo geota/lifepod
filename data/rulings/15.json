@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":15,"shards":32,"cards":600,"rulings":2210},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":15,"shards":32,"cards":600,"rulings":2210},
 "rulings":[
 ["2004-10-04","A spell or ability that tells a player to “put a land onto the battlefield” does not count as playing a land."],
 ["2004-10-04","Can target a card with no color words on it."],

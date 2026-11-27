@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":23,"shards":32,"cards":582,"rulings":2321},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":23,"shards":32,"cards":582,"rulings":2321},
 "rulings":[
 ["2004-10-04","A multicolored card has more than one color in its mana cost."],
 ["2004-10-04","Can’t reduce the cost below zero."],

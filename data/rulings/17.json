@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":17,"shards":32,"cards":589,"rulings":2548},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":17,"shards":32,"cards":589,"rulings":2548},
 "rulings":[
 ["2004-10-04","Alpha Status counts each creature once if that creature shares at least one creature type with the enchanted creature."],
 ["2004-10-04","Can be used more than once in a turn. Each time, the opponent can pay to prevent giving first strike to a creature, but this payment only stops the current activation and not future activations of Tidal Flats."],

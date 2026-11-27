@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":28,"shards":32,"cards":669,"rulings":2561},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":28,"shards":32,"cards":669,"rulings":2561},
 "rulings":[
 ["2004-10-04","A single permanent may cause both the second and third abilities to trigger. For example, Underground Sea is both an Island and a Swamp, and Skeleton Ship is both blue and black."],
 ["2004-10-04","Animated lands are affected by this spell. If on the battlefield with an effect that limits the number of land you untap, untapping an animated land will count as the one creature and the one land you can untap... thereby limiting you to one thing to be untapped."],

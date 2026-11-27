@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":18,"shards":32,"cards":609,"rulings":2359},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":18,"shards":32,"cards":609,"rulings":2359},
 "rulings":[
 ["2004-10-04","A counter is placed on every player's upkeep, not just the controller's upkeep."],
 ["2004-10-04","All \"enters\" abilities trigger as normal."],

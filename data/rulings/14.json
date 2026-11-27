@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":14,"shards":32,"cards":669,"rulings":2564},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":14,"shards":32,"cards":669,"rulings":2564},
 "rulings":[
 ["2004-10-04","Everything about the original spell is copied, including any decisions made on announcement, such as whether it was kicked or its Buyback cost was paid. Effects on the spell, such as Sleight of Mind or Flashback, are not copied."],
 ["2004-10-04","If Planeswalker’s Mischief leaves the battlefield, any cards it exiled are still under the effect of the ability and can be cast (and if they are not cast, they are returned to the owner’s hand)."],

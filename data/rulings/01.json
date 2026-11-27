@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":1,"shards":32,"cards":620,"rulings":2566},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":1,"shards":32,"cards":620,"rulings":2566},
 "rulings":[
 ["2004-10-04","Any abilities which have already resolved before the coin flip are not undone. Any abilities that trigger when it attacks which have not already resolved will still resolve."],
 ["2004-10-04","Anything which counts the number of Swamps on the battlefield will not double count an actual Swamp card while Blanket of Night is on the battlefield."],

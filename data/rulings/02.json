@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":2,"shards":32,"cards":617,"rulings":2562},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":2,"shards":32,"cards":617,"rulings":2562},
 "rulings":[
 ["2004-10-04","An empty library will have no card to reveal, so a player with an empty library has no card to compare. The effect looks for the highest cost card of the cards that actually are revealed."],
 ["2004-10-04","Being “without flying” is a targeting restriction. The ability won’t resolve if the target gains flying before the ability resolves."],

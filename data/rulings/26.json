@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":26,"shards":32,"cards":634,"rulings":2734},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":26,"shards":32,"cards":634,"rulings":2734},
 "rulings":[
 ["2004-10-04","A creature is only considered an “unblocked creature” if it is an attacker during combat after blockers are declared."],
 ["2004-10-04","Additional mana spent to cover the differences in mana costs is not part of the mana cost of this spell. It is spent during spell resolution."],

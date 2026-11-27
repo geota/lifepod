@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":30,"shards":32,"cards":646,"rulings":2627},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":30,"shards":32,"cards":646,"rulings":2627},
 "rulings":[
 ["2004-10-04","Can be used on a creature that is already tapped."],
 ["2004-10-04","Cost modifiers which add a cost are not restricted to only white mana."],

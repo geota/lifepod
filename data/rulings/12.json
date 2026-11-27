@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":12,"shards":32,"cards":627,"rulings":2386},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":12,"shards":32,"cards":627,"rulings":2386},
 "rulings":[
 ["2004-10-04","A creature with no color does not gain any Protection ability."],
 ["2004-10-04","Any +1/+1 counter which is on this card can be turned into a Tetravite token. It does not care where the +1/+1 counter came from."],
