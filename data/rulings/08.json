@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":8,"shards":32,"cards":681,"rulings":2562},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":8,"shards":32,"cards":681,"rulings":2562},
 "rulings":[
 ["2004-10-04","Being untapped is a targeting restriction. If the target is tapped before this spell resolves, then this spell doesn’t resolve."],
 ["2004-10-04","Both the +1/+1 and trample last only until end of turn."],

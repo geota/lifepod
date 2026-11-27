@@ -17,6 +17,7 @@
     "store:images": "node store/render.mjs",
     "screenshots:readme": "node scripts/readme-screenshots.mjs",
     "font:subset": "node scripts/subset-mana.mjs",
+    "cards:fetch": "node scripts/cards-update.mjs --fetch",
     "cards:update": "node scripts/cards-update.mjs"
   },
   "devDependencies": {

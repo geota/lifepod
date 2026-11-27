@@ -3,7 +3,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { test } from './helpers.mjs';
 import { buildRulings, readRulings, shardCount, shardName, shardOf } from '../scripts/cards-rulings.mjs';
-import { buildData, cachedBulk, cachedNicknames, cachedPrintings, cachedRulings, printedRarities, readBulk } from '../scripts/cards-update.mjs';
+import { buildData, cacheMismatch, cacheMissing, cachedBulk, cachedNicknames, cachedPrintings, cachedRulings, printedRarities, readBulk } from '../scripts/cards-update.mjs';
 
 // Card rulings (scripts/cards-rulings.mjs), with no browser: the shards each card's rulings are in, the builder writing
 // the same files every time, and the shape of data/rulings/ and the gzipped copies in web/data/rulings/.
@@ -196,12 +196,17 @@ test('node: the committed rulings are what the cached bulk files build', async (
   const bulk = cachedBulk();
   const printings = cachedPrintings();
   const rulingsBulk = cachedRulings();
-  if (![bulk, printings, rulingsBulk].every(file => file && existsSync(file.path))) {
-    t.skip('no cached bulk files: run npm run cards:update once');
+  const missing = [['Oracle cards file', bulk], ['default_cards file', printings], ['rulings file', rulingsBulk]].find(([, file]) => !file || !existsSync(file.path));
+  if (missing) {
+    t.skip(cacheMissing(missing[0]));
     return;
   }
-  if (rulingsBulk.updated_at !== shared.about.updated || bulk.updated_at !== JSON.parse(cardsText).about.updated) {
-    t.skip(`the cache is from ${rulingsBulk.updated_at} and ${bulk.updated_at}, the data from ${shared.about.updated}`);
+  const mismatch = cacheMismatch([
+    { name: 'Oracle cards', cached: bulk.updated_at, data: JSON.parse(cardsText).about.updated },
+    { name: 'rulings', cached: rulingsBulk.updated_at, data: shared.about.updated },
+  ]);
+  if (mismatch) {
+    t.skip(mismatch);
     return;
   }
   // One file read at a time: a bulk file's lines start as soon as it's opened.

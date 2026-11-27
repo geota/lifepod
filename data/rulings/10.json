@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":10,"shards":32,"cards":619,"rulings":2443},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":10,"shards":32,"cards":619,"rulings":2443},
 "rulings":[
 ["2004-10-04","At the start of the sub-game both players draw their initial hand (usually 7 cards). If one player has fewer cards than required, that player loses. If both have fewer than required, both players lose."],
 ["2004-10-04","Both abilities are triggered abilities. The first one triggers on the activating of a creature ability, and the second triggers on declaration of attacking or blocking."],

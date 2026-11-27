@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":6,"shards":32,"cards":660,"rulings":2535},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":6,"shards":32,"cards":660,"rulings":2535},
 "rulings":[
 ["2004-10-04","A creature with Protection from Creatures can't be targeted by this card's ability."],
 ["2004-10-04","Affects lands tapped for rest of turn, not just swamps on the battlefield at the time it resolves. This is because it affects players and not the lands themselves."],

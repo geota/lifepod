@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":11,"shards":32,"cards":630,"rulings":2575},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":11,"shards":32,"cards":630,"rulings":2575},
 "rulings":[
 ["2004-10-04","Any creature which is lowered below a toughness of 1 will die at the beginning of the upkeep step, since that is the first time State-Based Actions are checked."],
 ["2004-10-04","Because it does not have tapping as part of its activation cost, you can activate the ability many times in one turn, but it is destroyed at the end of any turn in which you use it."],

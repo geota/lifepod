@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":31,"shards":32,"cards":612,"rulings":2299},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":31,"shards":32,"cards":612,"rulings":2299},
 "rulings":[
 ["2004-10-04","Any 'X' in the creature's cost is treated as zero."],
 ["2004-10-04","Can be used if a player has less than 2 cards in their library. It will remove 0 or 1 cards if that is all that is available."],

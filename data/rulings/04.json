@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":4,"shards":32,"cards":608,"rulings":2417},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":4,"shards":32,"cards":608,"rulings":2417},
 "rulings":[
 ["2004-10-04","If X is zero, it deals no damage (not -1 damage) to non-flying creatures it taps."],
 ["2004-10-04","If a creature is removed from being a blocker of a given attacker, any triggered abilities that would have happened because it was declared as a blocker still happen."],

@@ -1,4 +1,4 @@
-{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T10:00:32.195+00:00","shard":29,"shards":32,"cards":590,"rulings":2295},
+{"about":{"source":"Scryfall rulings bulk data, scryfall.com","updated":"2026-11-26T22:00:32.942+00:00","shard":29,"shards":32,"cards":590,"rulings":2295},
 "rulings":[
 ["2004-10-04","A Leprechaun with Protection from Green can be blocked by a creature (since it is not green at that time) but will not take damage from the creature (since it is green during the combat damage step)."],
 ["2004-10-04","All the creature cards enter simultaneously."],
