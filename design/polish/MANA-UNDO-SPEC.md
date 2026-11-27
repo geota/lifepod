@@ -404,6 +404,8 @@ Up and down merge together, so a burst is its **net** change: −3 then +1 is "l
 
 ### 6.6 Placement
 
+> **Moved in alpha.20** (PILL-CENTER-SPEC.md, option A): Undo leads the pill, before the modes, at rest and in every mode (Undo · [Track's tabs] · ✓ · ✕), and the round sits between the modes and the tools.
+
 The pill already holds up to six buttons (round, damage, counters, mana, dice, settings), at 48px each. Measured on the mock, everything on, 2 players, with the pill upright along the 320px or 360px side:
 
 | Pill | Length | 568 × 320 (2 players) | 640 × 360 (2 players) |

@@ -62,7 +62,7 @@ Tap Track and the center shows a tab for each of them, then Undo, the check mark
 
 ## Undo
 
-**Undo** sits in the center controls, between the game's buttons and the die. Each tap steps back one action through the whole game: a life change, spending or erasing floating mana, using a Treasure, a turn step (with the pools it emptied), "Who goes first?", or a new game. Quick taps on one tile and one count are one action: while you keep tapping, within a second and a half of the last tap, a small badge centred above the total shows the change so far (−3), which is exactly what one Undo takes back. Two players tapping at once each keep their own.
+**Undo** sits at one end of the center controls, before the game's buttons, at rest and in every mode. Each tap steps back one action through the whole game: a life change, spending or erasing floating mana, using a Treasure, a turn step (with the pools it emptied), "Who goes first?", or a new game. Quick taps on one tile and one count are one action: while you keep tapping, within a second and a half of the last tap, a small badge centred above the total shows the change so far (−3), which is exactly what one Undo takes back. Two players tapping at once each keep their own.
 
 After an undo, a note on the tile it changed, facing its player, says what was undone ("Undid life 38 → 37"), with **Redo** to bring it back, for four seconds. You can keep stepping back and forward until someone takes a new action, which ends Redo. Undoing a new game brings the whole board back, players, colours and seats included, and every tile says "Game restored". Undo is dimmed when there's nothing to undo; screen readers hear what it would undo, and a Redo button follows it for keyboards. Hold Undo to open History.
 
@@ -78,7 +78,7 @@ Set **Turns** in Settings → **Track** to follow the game's turns: **Off** (the
 
 With **Rounds**, the first player's flag shows the round: tap it as each round starts, or hold it to go back one. With **Turn by turn**, the active player's tile lifts toward their colour inside a ring, and their row leads with the untap symbol and "Turn 3": tap it when your turn ends and play passes to the next player who isn't out, with the round going up when play comes back round to the first player, who keeps a small flag. Hold it to step back one turn. If nobody's turn has started, every tile of a player who is still in has a Start chip until someone starts theirs.
 
-Either way, the round leads the center controls, printed twice so both sides of the table can read it, and works like the chip, so anyone can step the game on. Turn steps save at once, and **Undo** in the center takes one back, with any mana it emptied. Off hides everything about turns and keeps it for when you switch back on.
+Either way, the round sits near the middle of the center controls, between the game's buttons and the tools, printed twice so both sides of the table can read it, and works like the chip, so anyone can step the game on. Turn steps save at once, and **Undo** in the center takes one back, with any mana it emptied. Off hides everything about turns and keeps it for when you switch back on.
 
 ## The monarch and the initiative
 

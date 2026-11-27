@@ -225,6 +225,8 @@ This reads the owner's "one tabbed page" literally.
 | P5 | **Undo crossing tabs:** when the step it undoes is in another tab, switch to that tab (proposed), or undo it out of sight? | Switch, so the change is visible. |
 | P6 | **The 3-player board at 568 × 320** also overflows with eight buttons (seat 3 loses 100px of its face). Is that confirmation enough that the fix should cover every count, not only 2 players? | Yes. A covers it. |
 
+> **Reordered in alpha.20** (PILL-CENTER-SPEC.md, option A): Undo leads the pill, then the modes or Track (or its tabs in Track's mode), the round, then the tools, so the round sits near the pill's centre and Undo at one end in every state. The counts and the fit below are unchanged.
+
 ## 12. As built (24 November 2026)
 
 The owner approved A with a twist: "Yes, but can we do this only when its needed. E.g. on small phones or layouts that require it." SPEC.md §14 describes the build; this is what differs from §3 and §10 above.

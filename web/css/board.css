@@ -231,16 +231,27 @@ button:focus-visible, input:focus-visible, [role="slider"]:focus-visible { outli
 .track-dots > i { width: 4px; height: 4px; border-radius: 50%; background: var(--text-soft); opacity: .4; }
 .track-dots > i[hidden] { display: none; }
 .track-dots > i[data-on] { background: var(--text); opacity: 1; }
-/* Track's tabs lead its mode's pill: one row with the buttons beside them, the open tab in the chosen tint (Accent L3),
-   never solid lime, which is for ✓. Its mana pip takes an accent ring. The last tab's disc reaches its divider like any
-   button's, and a 2px rule, stronger than the dividers, sets the tabs off from Undo, save and ✕. */
+/* Track's tabs follow Undo in its mode's pill (design/polish/PILL-CENTER-SPEC.md): one row with the buttons beside them,
+   the open tab in the chosen tint (Accent L3), never solid lime, which is for ✓. Its mana pip takes an accent ring. The
+   first tab takes the divider after Undo and is never the pill's end; the last tab's disc reaches its divider like any
+   button's, and a 2px rule, stronger than the dividers, sets the tabs off from save and ✕. */
 .pill-tabs { display: flex; }
 .pill-tabs[hidden] { display: none; }
 .pill-tabs > .pill-button:nth-last-child(1 of :not([hidden]))::before { inset-inline-end: 2px; }
+.pill-button:not([hidden]) ~ .pill-tabs > .pill-button:nth-child(1 of :not([hidden]))::before { inset-inline-start: 2px; }
+.pill-button:not([hidden]) ~ .pill-tabs > .pill-button:nth-child(1 of :not([hidden]))::after {
+  position: absolute;
+  top: calc(2 * var(--pill-inset));
+  bottom: calc(2 * var(--pill-inset));
+  left: 0;
+  width: 1px;
+  content: '';
+  background: var(--border);
+}
 .track-tab[aria-selected="true"] { color: var(--chosen-ink); }
 .track-tab[aria-selected="true"]::before { background: var(--chosen-fill); box-shadow: var(--chosen-ring); }
 .track-tab[aria-selected="true"] .tap-pip { box-shadow: var(--tap-pip-edge), 0 0 0 2px var(--accent); }
-#board-controls .pill-tabs:not([hidden]) + #undo-button::after {
+#board-controls .pill-tabs:not([hidden]) ~ .save-button::after {
   position: absolute;
   top: var(--pill-inset);
   bottom: var(--pill-inset);
