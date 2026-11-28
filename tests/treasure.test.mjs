@@ -275,9 +275,6 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, 'Skip').tap();
     const fresh = await saved(page);
     assert.deepEqual([fresh.treasure, fresh.keepMana], [[0, 0, 0, 0], [false, false, false, false]]);
-    await page.locator('#undo-button').tap();
-    assert.deepEqual((await saved(page)).treasure, [2, 0, 5, 0], 'undoing the new game brings them back');
-    assert.deepEqual((await saved(page)).keepMana, [true, false, false, true]);
 
     // A save from before Treasure: no chips, nobody's pool kept, and its history still works.
     const old = savedGame(4, { manaPool: true, pools: [[1, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]], turns: 'rounds',

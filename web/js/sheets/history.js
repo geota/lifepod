@@ -34,8 +34,7 @@ function ago(step) {
   return `${Math.floor(seconds / 3600)} h ago`;
 }
 
-// One step's row: the seat's dot, "Player 2 · Sky", what changed and how long ago; a new game is a divider. A tap goes to
-// just after it.
+// One step's row: the seat's dot, "Player 2 · Sky", what changed and how long ago. A tap goes to just after it.
 /** @param {Step} step @param {number} index @param {boolean} ahead */
 function row(step, index, ahead) {
   const button = element('button', 'history-row');
@@ -43,22 +42,15 @@ function row(step, index, ahead) {
   button.dataset.at = String(index + 1);
   if (ahead) button.dataset.ahead = '';
   const when = element('span', 'history-when', ago(step));
-  if (step.k === 'newGame') {
-    const scores = Array.isArray(step.d.scores) ? step.d.scores[1] : game.scores;
-    const life = Array.isArray(step.d.startingLife) ? step.d.startingLife[1] : scores[0];
-    button.classList.add('history-divider');
-    button.append(element('span', 'history-what', `New game · ${scores.length} players at ${life}`), when);
-  } else {
-    const { tiles, table, label } = describeStep(step, game);
-    const seat = tiles[0]?.index ?? (step.d.turn ? step.d.turn[1].active ?? step.d.turn[1].first : null);
-    const dot = element('span', 'history-dot');
-    dot.setAttribute('aria-hidden', 'true');
-    if (seat !== null && seat < game.scores.length) inColourOf(dot, seat);
-    else dot.dataset.table = '';
-    const who = seat !== null && seat < game.scores.length ? seatWords(game, seat).replace(', ', ' · ') : 'Table';
-    const what = [...tiles.flatMap(({ index: tile, words }) => (tile === seat ? words : [`Player ${tile + 1}: ${words.join(', ')}`])), ...table];
-    button.append(dot, element('span', 'history-who', who), element('span', 'history-what', (step.d.turn && label ? [label, ...what] : what).join(', ')), when);
-  }
+  const { tiles, table, label } = describeStep(step, game);
+  const seat = tiles[0]?.index ?? (step.d.turn ? step.d.turn[1].active ?? step.d.turn[1].first : null);
+  const dot = element('span', 'history-dot');
+  dot.setAttribute('aria-hidden', 'true');
+  if (seat !== null && seat < game.scores.length) inColourOf(dot, seat);
+  else dot.dataset.table = '';
+  const who = seat !== null && seat < game.scores.length ? seatWords(game, seat).replace(', ', ' · ') : 'Table';
+  const what = [...tiles.flatMap(({ index: tile, words }) => (tile === seat ? words : [`Player ${tile + 1}: ${words.join(', ')}`])), ...table];
+  button.append(dot, element('span', 'history-who', who), element('span', 'history-what', (step.d.turn && label ? [label, ...what] : what).join(', ')), when);
   button.setAttribute('aria-label', `${button.textContent}${ahead ? ', undone' : ''}. Go to here`);
   button.addEventListener('click', () => {
     jumpTo(index + 1);

@@ -61,8 +61,8 @@ function gameProblems(g) {
 }
 
 // A valid History (logic/history.js): version 1, `at` within its steps, at most historyCap steps and historyBytes of
-// them, each step's t, k and n well formed and its delta naming only board fields, and a fixed point of fitHistory, which
-// checks every cell against the player count at its place.
+// them, each step's t, k and n well formed (never a new game, which empties the history instead) and its delta naming
+// only board fields, and a fixed point of fitHistory, which checks every cell against the player count.
 function historyProblems(h, n) {
   const p = [];
   if (!h || h.v !== historyVersion || !Array.isArray(h.steps)) return ['shape'];
@@ -173,14 +173,21 @@ function act(g, { kind, a, b, c }) {
   }
   return kind === 6 ? 'newGame' : kind === 5 ? 'turn' : undefined;
 }
+/** Whether an action is a new game. */
+act.newGame = ({ kind }) => kind === 6;
 
 // Records each action as the app's commit() does, one step per action with nothing merged, and leaves `back` of them
-// undone, so the game is where the history's `at` says.
-function played(g, actions, back = 0) {
-  const history = emptyHistory();
+// undone, so the game is where the history's `at` says. A new game empties the history, as startGame does (SPEC §10.2);
+// with oldSave, it's a step instead, as saves from before that recorded it, with k 'newGame'.
+function played(g, actions, back = 0, { oldSave = false } = {}) {
+  let history = emptyHistory();
   actions.forEach((action, t) => {
     const before = boardOf(g);
     const k = act(g, action);
+    if (k === 'newGame' && !oldSave) {
+      history = emptyHistory();
+      return;
+    }
     const d = diffBoard(before, boardOf(g));
     if (Object.keys(d).length) history.steps.push({ t, ...(k ? { k } : {}), d });
   });
@@ -587,10 +594,11 @@ test('node: undo ∘ do = id and redo ∘ undo = id, for any action on any game'
 
 test('node: after any actions, undoing every step gives the start, and undoing j then redoing j gives the same game', () => {
   fc.assert(fc.property(anyGame, steps, fc.nat(30), (g, actions, j) => {
-    // From a game at the end of its own history, so every step since is one of these actions.
-    g.history = emptyHistory();
+    // From the last new game, which empties the history, so every step since is one of these actions.
+    const last = actions.findLastIndex(action => act.newGame(action));
+    played(g, actions.slice(0, last + 1));
     const start = boardJson(g);
-    played(g, actions);
+    played(g, actions.slice(last + 1));
     const end = structuredClone(g);
     const { history } = g;
     const back = j % (history.steps.length + 1);
@@ -709,7 +717,7 @@ test('node: the history stays within 500 steps and 64 KB, dropping the oldest', 
 });
 
 // fitHistory (§10): anything at all never throws and gives a valid history, a valid one round-trips, and a bad step
-// drops itself and everything further from `at`, including across a change of player count.
+// drops itself and everything further from `at`; an old save's New game step counts as bad.
 test('node: fitHistory accepts anything without throwing, and gives a valid history', () => {
   const cell = fc.oneof(fc.anything(), fc.tuple(nearMiss, nearMiss), fc.dictionary(fc.constantFrom('0', '1', '2', '7', '-1', 'x'), fc.tuple(nearMiss, nearMiss)));
   const weird = fc.oneof(fc.anything(), fc.jsonValue(), fc.record({ v: fc.constant(1), at: fc.anything(), base: fc.anything(), steps: fc.array(fc.anything()) }),
@@ -750,19 +758,47 @@ test('node: a corrupt step drops itself and every step further from at; at is cl
     { keepMana: { 0: [false, 1] } }, { keepMana: { 0: [true, true] } }, { keepMana: { 0: ['false', true] } }, { keepMana: [[false], [true]] }]) {
     assert.deepEqual(fit([{ t: 0, d }], 1).steps, [], `a bad step is dropped: ${json(d)}`);
   }
-  assert.equal(fit([{ t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [40, 40]], treasure: [[3, 0, 0, 1], [0, 0]], keepMana: [[true, false, false, false], [false, false]] } }], 1, 2).steps.length, 1,
-    'a new game\'s whole Treasure and Keep, across a change of player count'); 
-  // Across a new game from 4 players to 6: the steps before it are checked against 4 players, the ones after against 6.
+  // A step never changes the player count: a whole value must fit the board on both sides.
+  assert.deepEqual(fit([{ t: 0, d: { scores: [[40, 40, 40, 40], [40, 40]] } }], 1, 2).steps, [], 'a whole value of another count');
+  // Saves from before a new game emptied the history (SPEC §10.2) kept it as a step, k 'newGame', sometimes across a
+  // change of player count. The history now begins after the last one taken, and ends before the first one ahead.
   const newGame = { t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [30, 30, 30, 30, 30, 30]] } };
-  assert.equal(fit([life(3, 40, 39), newGame, life(5, 30, 29)], 3, 6).steps.length, 3, 'each side of a count change has its own count');
-  assert.equal(fit([life(5, 40, 39), newGame, life(5, 30, 29)], 3, 6).steps.length, 2, 'a step before it is checked against 4 players');
-  assert.equal(fit([newGame, life(5, 30, 29)], 1, 6).at, 1, 'with a step ahead');
-  assert.deepEqual(fit([newGame, life(5, 30, 29)], 0, 6).steps, [], 'at 0 the game has 6 players, so a new game from 4 ahead of it is wrong');
+  const sameCount = { t: 0, k: 'newGame', d: { scores: { 0: [36, 40], 1: [38, 40] }, treasure: [[3, 0, 0, 1], [0, 0, 0, 0]] } };
+  assert.deepEqual(fit([life(3, 40, 39), newGame, life(5, 30, 29)], 3, 6), { v: 1, at: 1, base: 5, steps: [life(5, 30, 29)] },
+    'only the steps after an old new game are kept');
+  assert.deepEqual(fit([life(0, 40, 39), sameCount, life(2, 40, 37), sameCount, life(3, 40, 36)], 5), { v: 1, at: 1, base: 5, steps: [life(3, 40, 36)] },
+    'and after the last of several, with the same count');
+  assert.deepEqual(fit([newGame, life(5, 30, 29)], 1, 6), { v: 1, at: 0, base: 5, steps: [life(5, 30, 29)] }, 'just after one, the step ahead is kept');
+  assert.deepEqual(fit([life(3, 40, 39), newGame, life(5, 30, 29)], 1), { v: 1, at: 1, base: 5, steps: [life(3, 40, 39)] },
+    'an undone new game ahead goes, with everything after it');
+  assert.deepEqual(fit([sameCount], 1).steps, [], 'a history of only a new game is empty');
   // A history that's corrupt never touches the rest of the save.
   const save = { startingLife: 40, scores: [39, 40, 40, 40], history: { v: 1, at: 'x', base: null, steps: [null, life(0, 40, 39)] } };
   const loaded = load(JSON.stringify(save));
   assert.deepEqual(loaded.scores, [39, 40, 40, 40]);
   assert.deepEqual(loaded.history, { v: 1, at: 1, base: 0, steps: [life(0, 40, 39)] });
+});
+
+// Saves from before a new game emptied the history recorded it as a step (k 'newGame'). Loading one keeps the game as
+// it was and only the history of its current game: the steps taken since the last new game before `at`, and the steps
+// ahead up to the first new game ahead, so Undo never crosses a new game.
+test('node: an old save with new games in its history loads its game, and the history of that game only', () => {
+  fc.assert(fc.property(fc.constantFrom(...playerCounts).chain(gameOf), steps, fc.nat(30), (g, actions, back) => {
+    g.history = emptyHistory();
+    played(g, actions, back, { oldSave: true });
+    const old = structuredClone(g.history);
+    const loaded = load(JSON.stringify(g));
+    for (const key of Object.keys(g)) if (key !== 'history') assert.equal(json(loaded[key]), json(g[key]), `field ${key}`);
+    assert.deepEqual(gameProblems(loaded), []);
+    const taken = old.steps.slice(0, old.at);
+    const from = taken.findLastIndex(step => step.k === 'newGame') + 1;
+    const ahead = old.steps.slice(old.at);
+    const until = ahead.findIndex(step => step.k === 'newGame');
+    const expected = [...taken.slice(from), ...(until < 0 ? ahead : ahead.slice(0, until))];
+    assert.equal(json(loaded.history.steps), json(expected));
+    assert.equal(loaded.history.at, old.at - from);
+    assert.ok(loaded.history.steps.every(step => step.k !== 'newGame'), 'no new game is left in the history');
+  }), opts);
 });
 
 // What each step says (§6.7), for Undo's name, the toast and the announcement.
@@ -787,7 +823,6 @@ test('node: describeStep and stepText say what each kind of step changed', () =>
   ];
   for (const [d, words] of cases) assert.equal(text(d), words);
   assert.equal(stepText({ t: 0, k: 'eraser', d: { pools: { 0: { 0: [2, 0], 3: [1, 0] } } } }, g), 'Player 1, Sage, mana pool emptied');
-  assert.equal(stepText({ t: 0, k: 'newGame', d: { scores: [[40, 40, 40, 40], [40, 40]] } }, g), 'new game');
   const rounds = { ...g, turns: 'rounds' };
   assert.equal(stepText({ t: 0, k: 'turn', d: { turn: [{ first: 0, active: null, round: 2 }, { first: 0, active: null, round: 3 }], pools: { 0: { 0: [1, 0] } } } }, rounds), 'round 2 → 3. mana pools emptied');
   assert.deepEqual(describeStep({ t: 0, k: 'turn', d: { turn: [{ first: 0, active: 0, round: 1 }, { first: 0, active: 1, round: 1 }] } }, g).label, 'turn pass');

@@ -10,7 +10,7 @@ import { announce, announceDesignation, announceLife, clearAnnouncements } from 
 import { renderBadges, renderPassHints } from '../render/badges.js';
 import { paintColours, renderScore } from '../render/tile.js';
 import { currentLandscapeAngle, haptic, reducedMotion } from '../state/platform.js';
-import { clearToasts, closeBurst } from '../state/history.js';
+import { clearHistory, clearToasts, closeBurst } from '../state/history.js';
 import { game, stripHolds, tokenHolds, turnSteps } from '../state/state.js';
 import { board, playerTemplate } from '../ui/dom.js';
 import { bindCounter, cancelPresses } from '../ui/press.js';
@@ -109,7 +109,8 @@ export function startGame(playerCount, startingLife) {
   if (playerCount !== game.scores.length) game.rotations = Array(playerCount).fill(0);
   // A new game keeps every setting, the seats' rotations (for the same player count) and the tile colours, or deals
   // each player a random one from the tile set when Shuffle tile colours each game is on (SPEC §10.2). It resets life,
-  // every count, commander damage, floating mana, Treasure and Keep, the colour identities and the dice rolls.
+  // every count, commander damage, floating mana, Treasure and Keep, the colour identities, the dice rolls and the undo
+  // history.
   game.colors = game.shuffleColours ? shuffledColours(playerCount, tileSets[game.tileColours].families) : fitColors(game.colors, playerCount);
   for (const kind of countKinds) game[kind] = fitCounts([], playerCount);
   game.identities = fitIdentities([], playerCount);
@@ -123,8 +124,7 @@ export function startGame(playerCount, startingLife) {
   // Nobody is the monarch or has the initiative until an effect says so.
   game.monarch = null;
   game.initiative = null;
-  // The dice ledger empties; the die the page opens on stays. Rolls aren't in the history, so undoing the new game
-  // doesn't bring them back (DICE-SPEC.md §2).
+  // The dice ledger empties; the die the page opens on stays (DICE-SPEC.md §2).
   game.dice.rolls = [];
   clearReminders();
   turnSteps.length = 0;
@@ -136,9 +136,10 @@ export function startGame(playerCount, startingLife) {
   // A new game starts with every badge at full size.
   resetDrops();
   syncBoardTurn();
+  // The history starts again with the game: a new game isn't a step, and Undo can't reach the game before it.
+  clearHistory();
   renderBoard();
-  // A new game is one step, which Undo can take back (MANA-UNDO-SPEC §6.9); the history carries on through it.
-  commit({ pill: true, step: { kind: 'newGame' } });
+  commit({ pill: true, step: false });
   announce(-1, 'game', () => `New game, ${playerCount} players at ${startingLife} life`);
   setAskFirst(game.turns !== 'off');
   maybeAskFirst();

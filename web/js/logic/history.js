@@ -3,15 +3,16 @@
 // the cap, the words that describe a step, and fitHistory, which checks a saved history. No DOM and no state.
 //
 // A step is { t, k?, n?, d }: t is seconds since the history began (base), k a label for steps that aren't just their
-// cells (a new game, a turn pass), n how many taps a burst merged, and d its delta, by board field:
+// cells (a turn pass, the eraser), n how many taps a burst merged, and d its delta, by board field:
 // - a per-player field's delta is { index: [before, after] }, such as { scores: { 2: [38, 37] } };
 // - a grid's (commanderDamage, pools) is { i: { j: [before, after] } };
-// - a scalar's (startingLife, turn, monarch, initiative), and an array whose length changed (a new game with another
-//   player count), is the whole [before, after].
+// - a scalar's (startingLife, turn, monarch, initiative) is the whole [before, after], and so is an array's whose shape
+//   changed.
+// A new game isn't a step: it empties the history (SPEC §10.2), so every step is on a board of one player count.
 
 import {
   countKinds, historyBytes, historyCap, historyFields, historyVersion, manaColours, maxCount, maxRound, maxStartingLife,
-  playerCounts, stepKinds, swatches, tileSets,
+  stepKinds, swatches, tileSets,
 } from './data.js';
 
 /** @typedef {import('./save.js').Game} Game */
@@ -275,11 +276,11 @@ const seatOf = index => (index === null ? 'nobody' : `Player ${index + 1}`);
 const number = value => String(value).replace('-', '−');
 const countWords = /** @type {Record<string, string>} */ ({ poison: 'poison', energy: 'energy', experience: 'experience', rad: 'rad' });
 /** @type {Record<string, string>} */
-const kindLabels = { newGame: 'new game', turn: 'turn pass', turnBack: 'step back', first: 'who goes first', start: 'turn start', eraser: 'mana pool emptied' };
+const kindLabels = { turn: 'turn pass', turnBack: 'step back', first: 'who goes first', start: 'turn start', eraser: 'mana pool emptied' };
 
 /**
  * What a step changed, in words (MANA-UNDO-SPEC §6.7): what each player's tile changed (life 38 → 37), and what changed
- * for the table (a turn pass, a new game). game is the board after the step was applied or taken back, for the seats'
+ * for the table (a turn pass, a round). game is the board after the step was applied or taken back, for the seats'
  * names. A designation's handoff is on both players' tiles.
  *
  * @param {Step} step
@@ -295,9 +296,6 @@ export function describeStep(step, game) {
   const table = [];
   const { d, k } = step;
   const label = k ? kindLabels[k] ?? null : null;
-  if (k === 'newGame') {
-    return { tiles: [], table: [`${(Array.isArray(d.scores) ? d.scores[1] : game.scores).length} players`], label };
-  }
   /** @param {string} field @param {(index: number, b: any, a: any) => void} each */
   const perCell = (field, each) => {
     const delta = d[field];
@@ -354,7 +352,6 @@ export function describeStep(step, game) {
 /** @param {Step} step @param {Game} game */
 export function stepText(step, game) {
   const { tiles, table, label } = describeStep(step, game);
-  if (step.k === 'newGame') return 'new game';
   return [...tiles.map(({ index, words }) => `${seatWords(game, index)}, ${words.join(', ')}`), ...table].join('. ') || label || 'a change';
 }
 
@@ -405,77 +402,73 @@ const isPair = pair => Array.isArray(pair) && pair.length === 2;
 /** @param {string} key @param {number} below */
 const indexIn = (key, below) => /^(0|[1-9]\d*)$/.test(key) && Number(key) < below;
 
-// A saved step's delta, checked cell by cell, with the player counts before and after it; or null if any cell is wrong.
-// A field it doesn't know, such as one a later version removed, is left out (UNDO-ARCHITECTURE §8).
-/** @param {any} saved @param {number} after The player count after the step. @returns {{ d: Changes, before: number } | null} */
-function fitChanges(saved, after) {
+// A saved step's delta, checked cell by cell for a board of n players; or null if any cell is wrong. A field it doesn't
+// know, such as one a later version removed, is left out (UNDO-ARCHITECTURE §8).
+/** @param {any} saved @param {number} n @returns {Changes | null} */
+function fitChanges(saved, n) {
   if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;
-  // A whole-value scores change is a new game with its own count on each side.
-  const scores = saved.scores;
-  const before = Array.isArray(scores) && Array.isArray(scores[0]) ? scores[0].length : after;
-  if (Array.isArray(scores) && (!isPair(scores) || !Array.isArray(scores[1]) || scores[1].length !== after || !playerCounts.includes(before))) return null;
   /** @type {Changes} */
   const d = {};
   for (const [field, delta] of Object.entries(saved)) {
     if (!historyFields.includes(field)) continue;
     const check = cellChecks[field];
     if (Array.isArray(delta)) {
-      if (!isPair(delta) || !wholeValid(field, delta[0], before) || !wholeValid(field, delta[1], after) || same(delta[0], delta[1])) return null;
+      if (!isPair(delta) || !wholeValid(field, delta[0], n) || !wholeValid(field, delta[1], n) || same(delta[0], delta[1])) return null;
       d[field] = [copy(delta[0]), copy(delta[1])];
       continue;
     }
-    // Cells by index only make sense on a board whose count the step doesn't change.
-    if (isScalar(field) || !delta || typeof delta !== 'object' || before !== after) return null;
+    if (isScalar(field) || !delta || typeof delta !== 'object') return null;
     /** @type {Record<string, any>} */
     const cells = {};
     for (const [i, value] of Object.entries(delta)) {
-      if (!indexIn(i, after)) return null;
+      if (!indexIn(i, n)) return null;
       if (isGrid(field)) {
         if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
         /** @type {Record<string, Pair>} */
         const row = {};
         for (const [j, pair] of Object.entries(value)) {
-          if (!indexIn(j, rowLength(field, after)) || !isPair(pair) || pair[0] === pair[1]) return null;
-          if (!check(pair[0], after, Number(i), Number(j)) || !check(pair[1], after, Number(i), Number(j))) return null;
+          if (!indexIn(j, rowLength(field, n)) || !isPair(pair) || pair[0] === pair[1]) return null;
+          if (!check(pair[0], n, Number(i), Number(j)) || !check(pair[1], n, Number(i), Number(j))) return null;
           row[j] = [pair[0], pair[1]];
         }
         if (!Object.keys(row).length) return null;
         cells[i] = row;
       } else {
-        if (!isPair(value) || value[0] === value[1] || !check(value[0], after, Number(i), 0) || !check(value[1], after, Number(i), 0)) return null;
+        if (!isPair(value) || value[0] === value[1] || !check(value[0], n, Number(i), 0) || !check(value[1], n, Number(i), 0)) return null;
         cells[i] = [value[0], value[1]];
       }
     }
     if (!Object.keys(cells).length) return null;
     d[field] = cells;
   }
-  return Object.keys(d).length ? { d, before } : null;
+  return Object.keys(d).length ? d : null;
 }
 
-// A saved step, checked: its delta for the player count after it, with t a whole number of seconds or more and k and n
-// only where they're valid. null if its delta is wrong.
-/** @param {any} saved @param {number} after */
-function fitStep(saved, after) {
-  if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return null;
-  const fitted = fitChanges(saved.d, after);
-  if (!fitted) return null;
+// A saved step, checked: its delta for a board of n players, with t a whole number of seconds or more and k and n only
+// where they're valid. null if its delta is wrong, or if it's a new game: saves from before a new game emptied the
+// history kept one as a step (k 'newGame'), and the history now begins after it.
+/** @param {any} saved @param {number} n @returns {Step | null} */
+function fitStep(saved, n) {
+  if (!saved || typeof saved !== 'object' || Array.isArray(saved) || saved.k === 'newGame') return null;
+  const d = fitChanges(saved.d, n);
+  if (!d) return null;
   /** @type {Step} */
   const step = /** @type {Step} */ ({ t: Number.isFinite(saved.t) && saved.t >= 0 ? saved.t : 0 });
   if (stepKinds.includes(saved.k)) step.k = saved.k;
   if (Number.isInteger(saved.n) && saved.n > 1) step.n = saved.n;
-  step.d = fitted.d;
-  return { step, before: fitted.before };
+  step.d = d;
+  return step;
 }
 
 // A saved history, checked (MANA-UNDO-SPEC §10): never throws, and the worst case is an empty history, never a broken
-// game. count is the loaded game's player count, which is the count at `at`.
+// game. count is the loaded game's player count, which no step changes, since a new game empties the history.
 // 1. Anything but an object with a known version is empty.
 // 2. It keeps the newest historyCap steps.
 // 3. `at` must be a whole number from 0 to the number of steps; otherwise it's the end (no Forward).
-// 4. From `at`, it walks back through the steps taken, tracking the player count across a new game's whole-value
-//    scores, and forward through the steps ahead. A step is kept only if every cell names a board field, has indexes in
-//    range for the count at that point, and both values pass that field's check. The first invalid step drops itself and
-//    everything further from `at`.
+// 4. From `at`, it walks back through the steps taken and forward through the steps ahead. A step is kept only if every
+//    cell names a board field, has indexes in range for the count, and both values pass that field's check. The first
+//    invalid step drops itself and everything further from `at`. An old save's New game step counts as invalid, so
+//    only the game it started is kept, as if that new game had emptied the history.
 // 5. Then it keeps at most historyBytes of the newest steps.
 /** @param {any} saved @param {number} count @returns {History} */
 export function fitHistory(saved, count) {
@@ -489,23 +482,17 @@ export function fitHistory(saved, count) {
     at -= extra;
     /** @type {Step[]} */
     const back = [];
-    let players = count;
     for (let index = at - 1; index >= 0; index--) {
-      const fitted = fitStep(steps[index], players);
-      if (!fitted) break;
-      back.unshift(fitted.step);
-      players = fitted.before;
+      const step = fitStep(steps[index], count);
+      if (!step) break;
+      back.unshift(step);
     }
     /** @type {Step[]} */
     const ahead = [];
-    players = count;
     for (let index = at; index < steps.length; index++) {
-      // A step ahead is checked for its count after; it must start from the count before it.
-      const after = Array.isArray(steps[index]?.d?.scores) && Array.isArray(steps[index].d.scores[1]) ? steps[index].d.scores[1].length : players;
-      const fitted = fitStep(steps[index], after);
-      if (!fitted || fitted.before !== players) break;
-      ahead.push(fitted.step);
-      players = after;
+      const step = fitStep(steps[index], count);
+      if (!step) break;
+      ahead.push(step);
     }
     const base = Number.isFinite(saved.base) && saved.base >= 0 ? saved.base : 0;
     /** @type {History} */

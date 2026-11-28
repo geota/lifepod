@@ -224,40 +224,93 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.deepEqual((await saved(page)).pools[0], [1, 0, 0, 2, 0, 0], 'and the eraser\'s pool');
     assert.equal(await announced(page), 'Undid: Player 1, Jade, mana pool emptied');
 
-    // "Who goes first?" after a new game: a skip that changes nothing records nothing; a pick is a step.
+    // "Who goes first?" after a new game: a pick is the new game's first step.
     await newGame(page);
     await eventually(() => page.locator('#board').getAttribute('data-mode'), 'first');
     await button(page, 'Me first, Player 3').tap();
     await page.clock.runFor(1000);
     const picked = await history(page);
-    assert.deepEqual(picked.steps.slice(-2).map(step => step.k), ['newGame', 'first']);
+    assert.deepEqual(picked.steps.map(step => step.k), ['first'], 'the new game emptied the history; the pick is its first step');
     await undoButton(page).tap();
     assert.deepEqual((await saved(page)).turn, { first: null, active: null, round: 1 }, 'Undo takes the pick back');
+    assert.equal(await undoButton(page).getAttribute('aria-disabled'), 'true', 'and no further, into the game before');
   });
 
-  // New game is a step (§6.9): undoing one with a different player count restores the count, the scores, every
-  // per-player field, colours and rotations, and draws the board again; "Game restored" shows on every tile.
-  test(`${name}: Undo takes back a new game, even one that changed the player count`, async (t) => {
-    const before = savedGame(4, {
-      scores: [31, 22, 40, 7], rotations: [1, 0, 2, 0], colors: [3, 1, 2, 0], counters: { poison: true, monarch: true }, poison: [0, 3, 0, 9], monarch: 2,
-      identities: ['WU', '', 'R', 'BG'], manaPool: true, pools: [[0, 0, 0, 2, 0, 0], ...Array(3).fill([0, 0, 0, 0, 0, 0])],
-    });
-    const page = await openPage(t, engine, { clock: true, game: before });
+  // A new game empties the history (SPEC §10.2): the steps taken, the steps ahead and any open burst go, Undo and
+  // Redo dim, and a relaunch keeps it so (History's own test is in history.test.mjs). Undo still works within the new game.
+  test(`${name}: a new game empties the history, and Undo works within the new game`, async (t) => {
+    const page = await openPage(t, engine, { clock: true, game: savedGame(4) });
+    await subtract(page, 1).tap();
+    await page.clock.runFor(mergeWindow + 100);
+    await subtract(page, 2).tap();
+    await undoButton(page).tap();
+    // A step ahead, a step back and a burst still open on tile 3.
+    await subtract(page, 3).tap();
+    await subtract(page, 3).tap();
+    assert.equal(await delta(page, 3), '−2');
+    await newGame(page);
+    assert.deepEqual(await history(page), { v: 1, at: 0, base: 0, steps: [] }, 'nothing back, nothing ahead');
+    assert.equal(await undoButton(page).getAttribute('aria-disabled'), 'true', 'Undo dims');
+    assert.equal(await undoButton(page).getAttribute('aria-label'), 'Undo, nothing to undo');
+    assert.equal(await page.locator('#redo-button').getAttribute('aria-label'), 'Redo, nothing to redo');
+    await undoButton(page).tap({ force: true });
+    assert.deepEqual(await scores(page), [40, 40, 40, 40], 'and Undo does nothing');
+    assert.equal(await delta(page, 3), null, 'the open burst ended with the old game');
+
+    // A relaunch keeps it empty.
+    await reload(page);
+    assert.deepEqual((await history(page)).steps, []);
+    assert.equal(await undoButton(page).getAttribute('aria-disabled'), 'true', 'Undo is still dimmed after a relaunch');
+
+    // The first tap of the new game is a step of its own, not merged with the old game's burst, and Undo takes it back.
+    await subtract(page, 3).tap();
+    assert.deepEqual((await history(page)).steps.map(step => step.d), [{ scores: { 2: [40, 39] } }]);
+    await undoButton(page).tap();
+    assert.deepEqual(await scores(page), [40, 40, 40, 40], 'Undo works within the new game');
+    assert.equal(await undoButton(page).getAttribute('aria-disabled'), 'true', 'and stops at its start');
+  });
+
+  // The same from Settings, where a change of players or starting life is a pending new game that Start new game
+  // starts: the history empties, even across a change of player count, and stays empty after a relaunch.
+  test(`${name}: a new game from a pending change in Settings empties the history too`, async (t) => {
+    const page = await openPage(t, engine, { clock: true, game: savedGame(4, { scores: [31, 22, 40, 7] }) });
+    await subtract(page, 1).tap();
+    await page.clock.runFor(mergeWindow + 100);
+    await subtract(page, 2).tap();
     await button(page, 'Settings').tap();
     await button(page, '6 players').tap();
+    assert.equal(await page.locator('#save-setup').textContent(), 'Start new game');
     await page.locator('#save-setup').tap();
     await eventually(() => page.locator('.player').count(), 6);
-    assert.equal((await history(page)).steps.at(-1).k, 'newGame');
-    assert.equal(await undoButton(page).getAttribute('aria-label'), 'Undo: new game');
+    assert.deepEqual(await history(page), { v: 1, at: 0, base: 0, steps: [] }, 'the history is empty');
+    assert.equal(await undoButton(page).getAttribute('aria-label'), 'Undo, nothing to undo');
+    await undoButton(page).tap({ force: true });
+    assert.equal(await page.locator('.player').count(), 6, 'Undo doesn\'t bring the old game back');
+    await reload(page);
+    assert.equal(await page.locator('.player').count(), 6);
+    assert.deepEqual((await history(page)).steps, [], 'and a relaunch keeps it empty');
+    assert.equal(await undoButton(page).getAttribute('aria-disabled'), 'true');
+  });
+
+  // A save from before a new game emptied the history kept the new game as a step (k 'newGame'), sometimes across a
+  // change of player count. It loads with its game as saved and only the steps since that new game, which still undo.
+  test(`${name}: an old save with a new game in its history loads safely`, async (t) => {
+    const oldHistory = {
+      v: 1, at: 3, base: 0, steps: [
+        { t: 0, d: { scores: { 0: [40, 39] } } },
+        { t: 5, k: 'newGame', d: { scores: [[39, 40], [40, 40, 40, 40]], rotations: [[0, 0], [0, 0, 0, 0]], colors: [[0, 1], [0, 1, 2, 3]] } },
+        { t: 9, d: { scores: { 2: [40, 30] } } },
+      ],
+    };
+    const page = await openPage(t, engine, { clock: true, game: savedGame(4, { scores: [40, 40, 30, 40], history: oldHistory }) });
+    assert.deepEqual(await scores(page), [40, 40, 30, 40], 'the game loads as saved');
+    assert.equal(await page.locator('.player').count(), 4);
+    assert.deepEqual((await live(page)).history.steps, [oldHistory.steps[2]], 'only the step since the new game is kept');
+    assert.equal(await undoButton(page).getAttribute('aria-label'), 'Undo: Player 3, Coral, life 40 → 30');
     await undoButton(page).tap();
-    await eventually(() => page.locator('.player').count(), 4, 'the board is drawn for 4 again');
-    const back = await saved(page);
-    for (const field of ['scores', 'rotations', 'colors', 'poison', 'monarch', 'identities', 'pools']) assert.deepEqual(back[field], before[field], `${field} restored`);
-    assert.deepEqual(await toasts(page), Array(4).fill('Undid game restoredRedo'), '"Game restored" on every tile');
-    assert.equal(await announced(page), 'Undid: new game. 4 players restored');
-    await tile(page, 1).locator('.toast-redo').tap();
-    await eventually(() => page.locator('.player').count(), 6, 'Redo deals the new game again');
-    assert.equal(await announced(page), 'Redid: new game. 6 players at 40 life');
+    assert.deepEqual(await scores(page), [40, 40, 40, 40], 'it undoes');
+    assert.equal(await undoButton(page).getAttribute('aria-disabled'), 'true', 'and Undo stops there, not crossing the old new game');
+    assert.equal(await page.locator('.player').count(), 4);
   });
 
   // What isn't a step (§6.3): settings, seat rotation, tile colours and identities. They don't drop Forward, and an
