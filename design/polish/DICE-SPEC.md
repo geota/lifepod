@@ -50,7 +50,7 @@ Make Dice a full-screen page that lies the way the board does, in three columns.
   - **New game clears it.** The die last picked stays.
   - It keeps the **last 50** rolls, and the 51st drops the oldest.
   - Rolls never make an undo step and don't show in History.
-  - New game's confirmation lists "Dice rolls" among what it resets while there are any. Undoing a New game doesn't bring the rolls back, because they aren't game state.
+  - New game's confirmation lists "Dice rolls" among what it resets while there are any. A New game can't be undone (it empties the undo history, SPEC.md §10.2), so the rolls never come back.
   - There's no Clear button: New game clears it.
 - **Accessibility:** an `<ol aria-label="Rolls, newest first">` under the card's `<h3>`. Each row reads "17 on a d20, 2 minutes ago", or "Coin: Heads, just now". The list isn't a live region, because `#dice-result` already announces "Rolled 17 on a d20" or "Coin: Heads" once. The rows aren't buttons. The flip is `aria-pressed`, named "Turn dice to face the other side".
 - **Not included:** who rolled or whose turn it was (the page can't know, and the active player is often the wrong guess), and copy or share.
@@ -101,7 +101,7 @@ The code:
 - **Side columns of at least 188px**, not 156px: four choices at 44px across need it. At 568 × 320 that leaves a 160px stage and a 128px die.
 - **The die** is `min(80cqw, 60cqh)` of the stage (247px on the target, against the proposal's 230px), so a tall, narrow stage on a small phone still gets a large die.
 - **Text size** grows on this page only to 130% (§1).
-- **New game clears the ledger**; there's no "New game" divider in the list. An undone New game doesn't bring the rolls back.
+- **New game clears the ledger**; there's no "New game" divider in the list.
 
 ## Questions for the owner (answered)
 
