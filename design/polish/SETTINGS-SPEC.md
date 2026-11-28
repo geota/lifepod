@@ -98,7 +98,7 @@ While a change is pending:
 
 - **Done** reads **Start new game**.
 - **New game** hides.
-- A line in the Game section says what will happen: "Starts a new game with 6 players at 40 life when you press Start new game."
+- A line in the Game section says what will happen: "Starts a new game with 6 players at 40 life when you press Start new game. You can't undo a new game."
 - **Board actions start the new game first, then their mode.** For example, Colours right after choosing 6 players starts a 6-player game and opens Colours on it.
 - Undoing the change (choosing the old values again) clears the pending state.
 

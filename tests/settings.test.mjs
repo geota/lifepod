@@ -336,13 +336,13 @@ for (const [name, engine] of Object.entries(engines)) {
 
     await button(page, '6 players').tap();
     assert.equal(await doneLabel(page), 'Start new game');
-    assert.equal(await pendingText(page), 'Starts a new game with 6 players at 40 life when you press Start new game.');
+    assert.equal(await pendingText(page), "Starts a new game with 6 players at 40 life when you press Start new game. You can't undo a new game.");
     // Screen readers hear it from #settings-status once the slider settles, with what Close does.
     await eventually(() => page.locator('#settings-status').textContent(),
-      'Starts a new game with 6 players at 40 life when you press Start new game. Close keeps the current game.');
+      "Starts a new game with 6 players at 40 life when you press Start new game. You can't undo a new game. Close keeps the current game.");
     assert.ok(!(await button(page, 'New game').isVisible()), 'New game hides while a game is pending');
     await button(page, '30').tap();
-    assert.equal(await pendingText(page), 'Starts a new game with 6 players at 30 life when you press Start new game.');
+    assert.equal(await pendingText(page), "Starts a new game with 6 players at 30 life when you press Start new game. You can't undo a new game.");
     // Choosing the old values again clears it.
     await button(page, '4 players').tap();
     await button(page, '40').tap();

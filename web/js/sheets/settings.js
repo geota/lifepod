@@ -89,7 +89,7 @@ function renderSettings() {
   settingsDone.textContent = pending ? 'Start new game' : 'Done';
   restartButton.hidden = pending;
   // The pending line says what Done will do. ✕, Escape and back keep the current game.
-  const words = pending ? `Starts a new game with ${selectedPlayerCount} players at ${selectedLife} life when you press Start new game.` : '';
+  const words = pending ? `Starts a new game with ${selectedPlayerCount} players at ${selectedLife} life when you press Start new game. You can't undo a new game.` : '';
   if (settingsPending.textContent !== words) settingsPending.replaceChildren(...(pending ? [icon('play'), element('span', '', words)] : []));
   settingsPending.toggleAttribute('data-empty', !pending);
   // Screen readers hear it once the slider settles, rather than with every step's value.
