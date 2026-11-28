@@ -331,16 +331,15 @@ async function checkLedger(t, engine) {
   assert.equal(await historySteps(page), steps, 'still no undo step');
   await page.keyboard.press('Escape');
 
-  // A new game empties the ledger, and its confirmation says so. Undoing it doesn't bring them back.
+  // A new game empties the ledger, and its confirmation says so. It also empties the undo history, so Undo can't
+  // bring them back either.
   await button(page, 'Settings').click();
   await button(page, 'New game').click();
   assert.ok((await page.locator('#restart-resets li').allTextContents()).includes('Dice rolls'));
   await page.locator('#restart').getByRole('button', { name: 'Start new game' }).click();
   await eventually(() => page.evaluate(() => document.querySelectorAll('dialog[open]').length), 0, 'the new game starts');
   assert.deepEqual((await saved(page)).dice, { sides: 2, rolls: [] }, 'the rolls go and the coin stays');
-  await page.locator('#undo-button').click();
-  assert.equal(await historySteps(page), steps + 1, 'the new game was a step, now undone');
-  assert.deepEqual((await saved(page)).dice.rolls, [], 'undoing the new game leaves the ledger empty');
+  assert.equal(await historySteps(page), 0, 'the new game emptied the history');
   await button(page, 'Roll dice').click();
   assert.deepEqual(await ledger(page), []);
   assert.equal(await page.locator('#dice-empty').isVisible(), true);

@@ -2,9 +2,7 @@
 // nothing, redrawing only what the step touched, then a toast on each tile it changed and one announcement. The history
 // itself is in state/history.js, and its rules in logic/history.js.
 
-import { syncBoardTurn } from '../layout/board.js';
-import { resetDrops } from '../layout/fit.js';
-import { countKinds, editingModes, toastTime } from '../logic/data.js';
+import { editingModes, toastTime } from '../logic/data.js';
 import { describeStep, stepText } from '../logic/history.js';
 import { announce, clearAnnouncements, seatName } from '../render/announce.js';
 import { renderBadges, renderPassHints } from '../render/badges.js';
@@ -14,39 +12,31 @@ import { bringForward, clearToasts, dismissToast, setToasts, takeBack } from '..
 import { haptic } from '../state/platform.js';
 import { boardMode, editStart, game, turnSteps } from '../state/state.js';
 import { cancelPresses } from '../ui/press.js';
-import { renderBoard } from './board.js';
 import { commit } from './commit.js';
-import { endStripHolds } from './mana.js';
 import { showUndoneTab } from './mode.js';
-import { clearReminders } from './reminders.js';
 
 /** @typedef {import('../logic/history.js').Step} Step */
 /** @typedef {import('../logic/history.js').Changes} Changes */
 
-const perPlayer = ['scores', 'rotations', 'colors', ...countKinds, 'identities', 'commanderDamage', 'pools', 'treasure', 'keepMana'];
-
 // What redrawing steps takes, from the fields they changed: per-player fields redraw that seat's total and rows, the
-// turn and whole values every row, the pools and the turn the pill, tile colours the paint, rotations the seats, and a
-// change of player count (a new game's) the whole board.
+// turn and whole values every row, the pools and the turn the pill, tile colours the paint and rotations the seats. No
+// step changes the player count, since a new game empties the history.
 /** @param {Changes[]} changes */
 function dirtyFrom(changes) {
   /** @type {Set<number>} */
   const tiles = new Set();
   let all = false;
-  let board = false;
   /** @type {Set<number | null>} */
   const holders = new Set();
   const fields = new Set(changes.flatMap(Object.keys));
   for (const [field, delta] of changes.flatMap(Object.entries)) {
-    const whole = Array.isArray(delta);
-    if (whole && perPlayer.includes(field) && delta[0].length !== delta[1].length) board = true;
     if (field === 'monarch' || field === 'initiative') for (const holder of delta) holders.add(holder);
-    else if (field === 'turn' || whole) all = true;
+    else if (field === 'turn' || Array.isArray(delta)) all = true;
     else for (const index of Object.keys(delta)) tiles.add(Number(index));
   }
   for (const holder of holders) if (holder !== null) tiles.add(holder);
   return {
-    board, tiles: all ? /** @type {'all'} */ ('all') : [...tiles], paint: fields.has('colors'), layout: fields.has('rotations'),
+    tiles: all ? /** @type {'all'} */ ('all') : [...tiles], paint: fields.has('colors'), layout: fields.has('rotations'),
     pill: fields.has('pools') || fields.has('turn'), turn: fields.has('turn'),
   };
 }
@@ -57,17 +47,6 @@ function redraw(changes) {
   const dirty = dirtyFrom(changes);
   // The hold-back buffer is about turns as they were; after an undo of one, a hold steps back by the play order.
   if (dirty.turn) turnSteps.length = 0;
-  if (dirty.board) {
-    // A different player count: the board is drawn again, as at a new game, and what isn't saved goes with it.
-    clearReminders();
-    endStripHolds();
-    turnSteps.length = 0;
-    resetDrops();
-    syncBoardTurn();
-    renderBoard();
-    commit({ pill: true, step: false });
-    return;
-  }
   if (dirty.paint) paintColours();
   commit({ scores: dirty.tiles, badges: dirty.tiles, pill: dirty.pill, layout: dirty.layout, step: false });
   // Who is out, and so who must pass the monarch or the initiative on, may have changed.
@@ -88,19 +67,13 @@ function turnNow() {
   return game.turns === 'turns' && active !== null ? `${seatName(active)}'s turn, round ${round}` : `Round ${round}`;
 }
 
-// What an undo or redo says, and the toasts it leaves at rest: one on each tile the step changed, facing its player; for
-// a turn step, on the tile whose turn it is now; for a new game, "Game restored" on every tile.
+// What an undo or redo says, and the toasts it leaves at rest: one on each tile the step changed, facing its player, and
+// for a turn step, on the tile whose turn it is now.
 /** @param {Step[]} steps The steps taken back or brought forward, in the order they were. @param {'Undid' | 'Redid'} verb */
 function feedback(steps, verb) {
   haptic();
   const latest = /** @type {Step} */ (steps.at(-1));
-  const { k, d } = latest;
-  let text;
-  if (k === 'newGame') {
-    text = verb === 'Undid' ? `new game. ${game.scores.length} players restored` : `new game. ${game.scores.length} players at ${game.startingLife} life`;
-  } else if (d.turn) {
-    text = `${describeStep(latest, game).label ?? 'turn'}. ${turnNow()}`;
-  } else text = stepText(latest, game);
+  const text = latest.d.turn ? `${describeStep(latest, game).label ?? 'turn'}. ${turnNow()}` : stepText(latest, game);
   const lead = steps.length > 1 ? `${verb === 'Undid' ? 'Back' : 'Forward'} ${steps.length} steps, to ${text}` : `${verb}: ${text}`;
   // What the taps since said is no longer the news: the undo says where things stand.
   clearAnnouncements();
@@ -110,10 +83,6 @@ function feedback(steps, verb) {
   const words = new Map();
   // The step nearest where the history is now speaks for each tile it touched.
   for (const step of [...steps].reverse()) {
-    if (step.k === 'newGame') {
-      for (const [index] of game.scores.entries()) if (!words.has(index)) words.set(index, verb === 'Undid' ? 'game restored' : 'new game');
-      continue;
-    }
     const described = describeStep(step, game);
     if (step.d.turn) {
       const tile = game.turn.active ?? game.turn.first;

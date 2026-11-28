@@ -5,7 +5,7 @@
 
 import { mergeWindow } from '../logic/data.js';
 import {
-  applyStep, boardOf, diffBoard, mergeStep, overlaps, stepCells, trimHistory,
+  applyStep, boardOf, diffBoard, emptyHistory, mergeStep, overlaps, stepCells, trimHistory,
 } from '../logic/history.js';
 import { game } from './state.js';
 
@@ -80,6 +80,14 @@ export function closeBursts() {
 // The board as it is now becomes the baseline, without recording anything: after a setting that changed a board field
 // (Turns clears whose turn it is), and after an undo.
 export function rebase() {
+  baseline = boardOf(game);
+}
+
+// A new game starts the history afresh (SPEC §10.2): nothing to undo or redo, no burst open, and the new board as the
+// baseline. A new game isn't a step, so Undo never reaches back into the game before it.
+export function clearHistory() {
+  closeBursts();
+  game.history = emptyHistory();
   baseline = boardOf(game);
 }
 

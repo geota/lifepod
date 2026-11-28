@@ -101,6 +101,7 @@ Mix: 448 taps, 30 commander-damage steps with transfers, 20 turn passes that emp
 - **The board fields** are what undo restores: `startingLife`, `scores`, `rotations`, `colors`, `poison`, `casts`, `energy`, `experience`, `rad`, `identities`, `commanderDamage`, `pools`, `treasure`, `gold`, `keepMana`, `turn`, `monarch` and `initiative`.
 - **Never stored:** settings, `landscapeAngle` and the history itself.
 - **Why this list:** New game can change any of these, and undoing a New game must bring them all back. Settings are never steps (MANA-UNDO-SPEC §6.3).
+- *Updated 27 November 2026:* New game is no longer a step: it empties the history (SPEC.md §10.2, MANA-UNDO-SPEC's as-built note), so no step carries a whole board or changes the player count. The sizes and options below, measured with New game steps, are kept as the record.
 
 ---
 

@@ -202,7 +202,7 @@ They empty as the turn passes, while "Empty mana pools when the turn passes" is 
 | A pip spend | −1 | `spend:i:colour`, as today |
 | The Keep cell, or the corner's lock | On or off | None. It's a moment, like a designation cell, and it breaks every open burst. |
 | A turn pass with a kept pool | The turn and the pools it emptied | As today. A kept pool isn't in the step, since it didn't change. |
-| New game | Also resets `treasure`, `gold` and `keepMana` | As today. Undoing New game brings them back. |
+| New game | Also resets `treasure`, `gold` and `keepMana` | As today. *Updated 27 November 2026:* New game empties the undo history and can't be undone (SPEC.md §10.2). |
 
 ### 5.2 Words
 

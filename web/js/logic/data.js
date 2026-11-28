@@ -223,6 +223,6 @@ export const coinSides = 2;
 export const diceChoices = [...diceSides, coinSides];
 export const diceLedgerCap = 50;
 // The labels a step can carry, where its cells alone don't say what it was.
-/** @typedef {'newGame' | 'turn' | 'turnBack' | 'first' | 'start' | 'eraser'} StepKind */
+/** @typedef {'turn' | 'turnBack' | 'first' | 'start' | 'eraser'} StepKind */
 /** @type {string[]} */
-export const stepKinds = ['newGame', 'turn', 'turnBack', 'first', 'start', 'eraser'];
+export const stepKinds = ['turn', 'turnBack', 'first', 'start', 'eraser'];

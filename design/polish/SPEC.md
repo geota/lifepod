@@ -509,7 +509,7 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 ### 10.2 New game
 
-- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, Treasure and every Keep (MANA-SPEC-v2), `turn` (round 1, no first or active player), the monarch and the initiative (nobody), the colour identities (none; updated 22 November 2026: they used to be kept) and the dice ledger (§16; the die last picked stays). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. A new game is one undo step and keeps the history (MANA-UNDO-SPEC §6.9), so Undo in the centre brings the old game back.
+- **Resets:** scores (to the starting life), poison, casts (commander tax), energy, experience, rad, commander damage, pools, Treasure and every Keep (MANA-SPEC-v2), `turn` (round 1, no first or active player), the monarch and the initiative (nobody), the colour identities (none; updated 22 November 2026: they used to be kept) and the dice ledger (§16; the die last picked stays). It also clears what isn't saved: turn reminders, the turn steps a hold steps back through, and strip holds. *Updated 27 November 2026 (the owner: "a new game should reset the undo stack"):* it **empties the undo history**, the steps back, the steps ahead and any open burst, so Undo is dimmed and History is empty until the new game's first action. A new game isn't an undo step, and Undo can't reach the game before it; the confirmation is the only guard, and says "You can't undo a new game." The same goes for a pending players or life change started with **Start new game**. (It used to be one undo step that kept the history, MANA-UNDO-SPEC §6.9.)
 - **Opens** "Who goes first?" if Turns isn't Off.
 - **Keeps:** every setting (the Track switches, Turns, Reminders, Style, Tile colours, Badge size and what tiles show of identities), the tab Track opens on (§14), the player count and starting life unless Settings changed them, the rotations (only when the player count is unchanged) and the tile colours.
 - **Shuffle tile colours each game** (Settings → Table, off by default, `game.shuffleColours`): when on, a new game gives every player a random, distinct swatch instead, from `crypto.getRandomValues` through `randomBelow` (no modulo bias), with each seat in a different colour family of the tile set while families last (`tileSets[…].families`, six per set, found by `design/polish/tiles7.mjs`; TILES.md). `loadGame` keeps it only if it was saved as exactly `true`.
@@ -529,11 +529,12 @@ The sheet is `min(600px, 100% − 32px)` wide and 348px tall, so it fits the tar
 
 | Where | How |
 |---|---|
-| **Anything at rest:** life, spending floating mana, the eraser, using a Treasure, turn steps (with what they emptied), "Who goes first?", New game | **Undo** in the centre: back one step per tap. Quick taps on one tile and count are one step while each comes within 1.5s of the last; the running delta shows it. **Redo** on the toast after an undo, beside Undo for keyboards, or in History. Any new game action ends Redo. |
+| **Anything at rest:** life, spending floating mana, the eraser, using a Treasure, turn steps (with what they emptied), "Who goes first?" | **Undo** in the centre: back one step per tap. Quick taps on one tile and count are one step while each comes within 1.5s of the last; the running delta shows it. **Redo** on the toast after an undo, beside Undo for keyboards, or in History. Any new game action ends Redo. |
+| New game | Not undoable (updated 27 November 2026): it empties the history, back and forward, so Undo starts again with the new game (§10.2). |
 | Counters, commander damage and mana in their modes | The same history. The mode's Undo stops at what was changed in the mode; ✓ closes; ✕ asks, then undoes the mode's changes (which Redo can bring back). Transfers of the monarch and the initiative are in the step that caused them. In Track (§14), one visit across its tabs is one mode: Undo switches to the tab its step was taken on. |
 | Many steps at once | Hold Undo (or Settings → Game → History): the list, Back and Forward, or tap a row to go back to it. |
 | Turn steps, the turn chip or pill held | Steps back one turn, restoring what that pass emptied. It's a step of its own, so Undo can take it back. |
-| Settings, Rotate seats, tile colours, identities | Instant, and not in the history. Toggle back. A New game's resets of them are undone with the New game. |
+| Settings, Rotate seats, tile colours, identities | Instant, and not in the history. Toggle back. |
 
 ## 11. Build plan
 
@@ -685,5 +686,5 @@ The pill's d20 opens Dice, a full page for the whole table; design/polish/DICE-S
 
 - **Layout:** the page lies the way the board does (it takes `data-board-turn`) in three columns: the six dice and the coin, four over three, above Roll on the left, with ✕ in the corner; the die at the centre of the phone, where a tap rolls it, with its result printed again at both long edges; and the Rolls card on the right. With two players the die and its result face the short ends. The flip turns the whole page for the far side. The page never scrolls, and every target is at least 44px.
 - **The coin:** a seventh choice, flipped from the same secure generator as the dice, Heads (1) or Tails (2), announced "Coin: Heads".
-- **The ledger:** the last 50 rolls, newest first, as "d20 · 17 · 2 min ago" or "Coin · Heads · just now". A roll joins it when it lands. Saved with the game in `dice` (§10.1), it's a setting rather than game state: rolls make no undo step and don't show in History. New game clears it (§10.2), and undoing the new game doesn't bring the rolls back.
+- **The ledger:** the last 50 rolls, newest first, as "d20 · 17 · 2 min ago" or "Coin · Heads · just now". A roll joins it when it lands. Saved with the game in `dice` (§10.1), it's a setting rather than game state: rolls make no undo step and don't show in History. New game clears it (§10.2).
 - **The last die picked** is remembered in `dice.sides`, the coin included.

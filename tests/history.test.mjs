@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import {
-  backHandling, button, engines, eventually, hold, openPage, saved, savedGame, scores, test,
+  backHandling, button, engines, eventually, hold, openPage, savedGame, scores, test,
 } from './helpers.mjs';
 
 // The History sheet (MANA-UNDO-SPEC §6.8): a hold on Undo or Settings → Game → History opens it; rows newest first,
-// with Now between the steps ahead and the steps taken, new games as dividers; a row jumps there; Back and Forward;
+// with Now between the steps ahead and the steps taken; a new game empties it; a row jumps there; Back and Forward;
 // a short screen puts them in the header; back and Escape close it, and focus returns to what opened it.
 
 const mergeWindow = 1500;
@@ -19,7 +19,7 @@ const rows = page => page.locator('#history-list > li').evaluateAll(items => ite
   const row = item.querySelector('button');
   const what = row.querySelector('.history-what').textContent;
   const who = row.querySelector('.history-who')?.textContent;
-  return `${row.matches('.history-divider') ? 'divider ' : ''}${row.hasAttribute('data-ahead') ? 'ahead ' : ''}${who ? `${who}: ` : ''}${what}`;
+  return `${row.hasAttribute('data-ahead') ? 'ahead ' : ''}${who ? `${who}: ` : ''}${what}`;
 }));
 
 // Three life steps on three tiles, a second apart and more, so none merge.
@@ -67,8 +67,8 @@ for (const [name, engine] of Object.entries(engines)) {
     assert.ok(await page.locator('#history-forward').isDisabled());
   });
 
-  // A new game is a divider; the steps before it stay, and a row before it goes back across it.
-  test(`${name}: a new game is a divider in History, and a row before it brings the old game back`, async (t) => {
+  // A new game empties History (SPEC §10.2): the old game's rows go, and the new game's steps are the only rows.
+  test(`${name}: a new game empties History, which then lists only the new game's steps`, async (t) => {
     const page = await openPage(t, engine, { clock: true, game: savedGame(4) });
     await subtract(page, 1).tap();
     await page.clock.runFor(mergeWindow + 1);
@@ -76,14 +76,23 @@ for (const [name, engine] of Object.entries(engines)) {
     await button(page, '2 players').tap();
     await page.locator('#save-setup').tap();
     await eventually(() => page.locator('.player').count(), 2);
+    await hold(page, page.locator('#undo-button'), holdDelay);
+    assert.equal(await isOpen(page), true);
+    assert.deepEqual(await rows(page), [], 'no rows from the old game');
+    assert.ok(await page.locator('#history-empty').isVisible(), 'and it says there\'s nothing yet');
+    assert.ok(await page.locator('#history-back').isDisabled());
+    assert.ok(await page.locator('#history-forward').isDisabled());
+    await page.keyboard.press('Escape');
+    await eventually(() => isOpen(page), false);
     await subtract(page, 2).tap();
     await button(page, 'Settings').tap();
     await button(page, 'History').tap();
     assert.equal(await isOpen(page), true, 'Settings → Game → History opens it');
-    assert.deepEqual(await rows(page), ['Now', 'Player 2 · Sky: life 40 → 39', 'divider New game · 2 players at 40', 'Player 1 · Jade: life 40 → 39']);
-    await page.locator('.history-row').last().tap();
-    await eventually(() => page.locator('.player').count(), 4, 'the 4-player game comes back');
-    assert.deepEqual((await saved(page)).scores, [39, 40, 40, 40]);
+    assert.deepEqual(await rows(page), ['Now', 'Player 2 · Sky: life 40 → 39'], 'only the new game\'s step');
+    await page.locator('#history-back').tap();
+    assert.deepEqual(await scores(page), [40, 40]);
+    assert.ok(await page.locator('#history-back').isDisabled(), 'Back stops at the new game\'s start');
+    assert.equal(await page.locator('.player').count(), 2);
     await page.keyboard.press('Escape');
     await eventually(() => isOpen(page), false);
     assert.equal(await page.evaluate(() => document.activeElement?.id), 'settings-history', 'focus returns to the History row in Settings');
